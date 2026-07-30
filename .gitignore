@@ -1,0 +1,5 @@
+# Local deployment output and credentials.
+/build/
+/dist/
+*.env
+!.env.example
