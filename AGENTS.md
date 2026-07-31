@@ -3,11 +3,11 @@
 - Read `docs/orinoco-lite-plan.md` before working and follow its current
   milestone and scope.
 - Do not begin work listed as deferred or excluded from the current milestone.
-- In `submodules/www-from-model`, keep `main` available to mirror
-  `upstream/main`; make downstream changes on the branch named by the plan.
-- Treat `submodules/dump-research-info` and
-  `submodules/centerforopenneuroscience.org` as migration inputs, not production
-  runtime dependencies.
+- Implement the CON site in `submodules/centerforopenneuroscience.org` on the
+  `orinoco-lite` branch. Preserve its legacy branch and tag.
+- Keep `submodules/www-from-model` `main` available to mirror `upstream/main`.
+- Treat `submodules/dump-research-info` as a migration input, not a production
+  runtime dependency.
 - Do not require a continuously running metadata service for builds or deployed
   sites.
 - Update parent submodule pins deliberately and keep credentials outside every
