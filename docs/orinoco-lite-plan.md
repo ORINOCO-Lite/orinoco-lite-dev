@@ -1,368 +1,272 @@
-# Orinoco Lite implementation plan
+# Orinoco Lite execution plan
 
-Status: revised proposal for review
+Status: active
 
-## Goal
+## Outcome
 
-Let a lab create one GitHub repository, add structured research metadata and
-editorial content, and deploy a lab website to GitHub Pages. The repository
-should remain understandable without knowledge of the underlying Orinoco
-toolchain.
+Enable a lab to create one GitHub repository, add structured research metadata
+and editorial content, and deploy a static lab website through GitHub Pages.
+The lab should not need to understand or operate the underlying Orinoco
+services.
 
-Canonical metadata is human-editable YAML in Git. The same records may later
-support websites, graphs, grants, CVs, annual reports, and other projections.
+Canonical metadata is human-editable YAML in Git. GitHub pull requests provide
+the authentication, review, and publication boundary. The same records may
+later support websites, graphs, grants, CVs, annual reports, and other
+projections.
 
-## Proposed architecture
+## Current repository map
 
-- A lab starts from a small GitHub template, not a fork of the coordination
+| Repository | Current role |
+| --- | --- |
+| [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Development workspace, architecture, component pins, and integration coordination |
+| [`con/www-from-model`](https://github.com/con/www-from-model) | First downstream implementation and CON website prototype |
+| [`www/www-from-model`](https://hub.psychoinformatics.de/www/www-from-model) | Upstream metadata-driven Hugo website |
+| `centerforopenneuroscience.org` | Source of existing CON editorial content, assets, URLs, and presentation requirements |
+| `dump-research-info` | Source of reviewed CON metadata and migration/provenance logic |
+| Orinoco repositories | Upstream schemas, Dump Things, `qri`, graph, UI, and enrichment components |
+| `con/orinoco-lite-action` | Future released build and deployment implementation; not yet extracted |
+| `con/orinoco-lite-template` | Future minimal lab starter; not yet created |
+
+The coordination repository currently pins 24 independently usable component
+repositories under `submodules/`. Their present location does not imply that
+all are runtime dependencies. Directory reorganization is not required before
+the first website slice.
+
+## Repository and branch policy
+
+The local `submodules/www-from-model` repository has:
+
+- `origin`: `https://github.com/con/www-from-model.git`;
+- `upstream`: `https://hub.psychoinformatics.de/www/www-from-model.git`; and
+- `main`: the branch reserved for mirroring `upstream/main`.
+
+Create `con-site` from `main` for CON-specific integration. Rebase `con-site`
+onto `upstream/main` while it remains a small, privately coordinated prototype.
+Once others depend on the branch, avoid rewriting shared history and integrate
+upstream changes by an agreed merge or refresh process.
+
+Keep changes separated where practical:
+
+- CON metadata, content, assets, and theme overrides belong on `con-site`.
+- Generally useful fixes belong on focused topic branches and should be offered
+  upstream narrowly.
+- Released Orinoco Lite behavior will eventually be extracted into a separate,
+  versioned action rather than maintained as permanent CON-specific patches.
+
+The parent repository pins explicit component commits. Updating an upstream
+reference must not silently change a released lab build.
+
+## Architectural decisions
+
+- A lab starts from a small GitHub template, not a fork of this coordination
   repository.
-- Each lab initially keeps canonical metadata, website content, configuration,
-  and deployment in one repository.
-- Each lab repository calls a tagged reusable workflow from
-  `con/orinoco-lite-action`. That workflow is the runtime implementation of
-  metadata validation, projection, Hugo generation, and Pages deployment.
-- The current coordination repository is a development workspace used to track
-  upstream components, document the architecture, and assemble candidate
-  releases. Lab builds and deployments never depend on it.
-- Git branches, pull requests, protections, and reviews provide curation.
-- The deployed website requires no continuously running metadata service.
-- Dump Things may run ephemerally inside CI to reuse upstream validation and
-  projection behavior.
+- The default topology is one self-contained repository containing metadata,
+  website content, configuration, and deployment.
+- A separate metadata repository is an optional later topology for cases with
+  distinct permissions, release schedules, or independently managed consumers.
+- The public site is a deterministic static projection and requires no
+  continuously running metadata backend.
+- Dump Things may run locally and ephemerally in CI to preserve upstream
+  validation and projection behavior.
 - JSONL is an internal adapter when required by `qri`, not a second canonical
   format.
-- RDF is generated only for an identified consumer, such as SHACL-vue or a
-  linked-data application.
-- The first release uses GitHub-native editing and authentication mechanisms.
-  A GitHub App and OAuth broker remain optional later capabilities.
+- RDF is generated only when an identified consumer requires it.
+- Direct Git editing and pull requests are the complete initial editing path.
+- GitHub Issue Forms, SHACL-vue, a GitHub App, and an OAuth broker are possible
+  later improvements, not first-milestone dependencies.
+- GitHub Pages is the initial preview and deployment target.
 
-## Repository roles
+## First milestone: CON vertical slice
 
-| Repository | Responsibility |
-| --- | --- |
-| `con/orinoco-lite-dev` | Proposed name for this coordination and integration workspace |
-| `con/orinoco-lite-action` | Versioned reusable workflows and build implementation |
-| `con/orinoco-lite-template` | Minimal GitHub template and optional Copier configuration |
-| `<lab>/<lab-website>` | Canonical lab metadata, content, theme, configuration, and deployment |
-| `centerforopenneuroscience.org` | First complete lab instance and migration target |
-| `dump-research-info` | CON migration source and historical ingestion implementation |
-| `www-from-model` | Primary Hugo-generation reference and source of reusable patterns |
-| Orinoco components | Upstream schemas, validation, query, graph, UI, and enrichment tools |
+### Goal
 
-The current `orinoco-action` directory should not be renamed until this plan
-and repository ownership are approved. Released action versions must pin a
-tested set of Orinoco dependencies independently of the coordination
-repository's current upstream pins.
+Produce a GitHub Pages preview from one small, connected set of real CON
+records using as much of the upstream `www-from-model` pipeline as practical.
+This milestone establishes the actual metadata, generator, theme, and workflow
+boundaries before they are generalized.
 
-## Coordination layout
+### Minimum data slice
 
-The coordination repository should distinguish upstream projects from
-implementations and migration inputs. A later reorganization may use:
+Include:
 
-```text
-upstream/orinoco/
-references/www-from-model/
-migration/dump-research-info/
-instances/centerforopenneuroscience.org/
-components/orinoco-lite-action/
-components/orinoco-lite-template/
-docs/
-```
+- the Center for Open Neuroscience organization;
+- one person;
+- one project;
+- one publication or dataset;
+- the relationships connecting those records;
+- one or more representative depictions or assets; and
+- enough editorial content to evaluate the homepage and primary navigation.
 
-These may remain Git submodules so cross-repository development states are
-reproducible. The `upstream/orinoco/` area is specifically for tracking the
-rapidly changing Orinoco projects; lab instances are not upstream components.
+Use records that already have reviewed evidence in `dump-research-info` and
+content or assets already present in `centerforopenneuroscience.org`.
 
-## Lab repository contract
+### Execution sequence
 
-The default topology is one self-contained repository per lab:
+1. Create `con-site` in `submodules/www-from-model` from the mirrored `main`.
+2. Identify the exact metadata collection, schema release, and build entry
+   points currently used by upstream `www-from-model`.
+3. Select the minimum connected CON records and their source evidence.
+4. Transform those records into individual upstream-compatible YAML files on
+   `con-site`.
+5. Copy only the corresponding editorial content and assets from
+   `centerforopenneuroscience.org`.
+6. Add the smallest CON theme and configuration overrides needed to evaluate
+   the site.
+7. Adapt the upstream build so required Dump Things behavior runs ephemerally
+   during CI rather than depending on a dedicated service.
+8. Use `qri` and Hugo to produce the static website.
+9. Add a repository-local GitHub Actions workflow that publishes a GitHub Pages
+   preview from the prototype branch.
+10. Record any necessary divergence from upstream and keep reusable fixes
+    isolated for possible contribution.
 
-```text
-metadata/
-content/
-static/
-config/
-lab.yaml
-.github/workflows/pages.yaml
-```
+The production build must consume the combined candidate tree. It must not
+continually join independently changing data from `dump-research-info` and
+content from `centerforopenneuroscience.org`.
 
-The exact Hugo and metadata subdirectories will be fixed by the CON vertical
-slice rather than invented in advance. Stable conventions should remove the
-need for most action inputs.
+### Exit criteria
 
-Keeping the website and metadata together provides one pull request, preview,
-review policy, and deployment boundary. Other applications can still consume
-the stable `metadata/` tree or explicitly published projections.
-
-A separate metadata repository is an advanced topology. It should be added
-only when different access controls, release schedules, or independently
-managed consumers justify cross-repository coordination.
-
-## Target system
-
-```mermaid
-flowchart TD
-    D["Orinoco Lite development workspace"] --> A["Versioned reusable workflow"]
-    D --> T["GitHub lab template"]
-    T --> L["Lab website repository"]
-    E["Git edits, issue forms, or exported graphical edits"] --> PR["Pull request"]
-    PR --> L
-    L --> CI["GitHub Actions"]
-    A --> CI
-    CI --> DT["Ephemeral Dump Things validation"]
-    DT --> Q["qri projections and Hugo generation"]
-    Q --> P["GitHub Pages"]
-    Q --> X["Optional RDF or application-specific projections"]
-```
+- One canonical metadata change deterministically changes the preview site.
+- The selected records validate through the upstream Orinoco path.
+- Invalid records stop publication.
+- The website builds without contacting a persistent metadata service.
+- The preview contains the selected organization, person, project, output,
+  relationships, and representative assets.
+- The build uses only files in the candidate lab repository plus pinned build
+  dependencies.
+- CON-specific and potentially reusable changes remain distinguishable.
+- No production DNS, domain, or existing-site deployment is changed.
 
 ## Metadata and build contract
 
-- Store approved records as individual YAML files following the upstream Dump
-  Things filesystem and Things-derived schema conventions.
-- Use `.dumpthings.yaml` configuration where required by the selected upstream
-  collection layout.
-- Preserve source observations, retrieval details, candidate records,
+- Store approved entities as individual YAML records following the filesystem
+  and schema conventions selected from upstream Orinoco.
+- Use `.dumpthings.yaml` collection configuration where required by that
+  upstream layout.
+- Preserve source observations, retrieval details, candidates,
   reconciliation decisions, and reviewed additions separately from approved
   public records.
-- Pin a released schema and compatible Orinoco toolchain for each action
-  release.
-- Start Dump Things locally and ephemerally in CI when that is the most faithful
-  way to validate or project records; never depend on a dedicated remote
-  service.
+- Maintain stable identifiers and explicit relationships during migration.
+- Pin a compatible schema and toolchain for every reproducible build.
 - Run Dump Things ephemerally in CI using the upstream Orinoco validation path.
   Direct LinkML validation may provide an earlier, faster check, but it is not
   the sole publication gate unless its scope is shown to match the required
   Dump Things checks.
-- Convert validated records to JSONL transiently when `qri` requires its
-  record-stream interface.
-- Generate RDF only when SHACL-vue or another named consumer requires it.
-- Treat generated pages, caches, JSONL, and RDF as build artifacts rather than
-  canonical records.
+- Convert validated records to JSONL transiently when `qri` requires its stream
+  interface.
+- Generate RDF only for a named editor, graph, or interoperability consumer.
+- Treat generated Hugo content, caches, JSONL, RDF, and pages as build
+  artifacts rather than canonical records.
 - Keep editorial Markdown, theme overrides, media, redirects, and site
-  configuration in the lab repository.
+  configuration with the lab website.
 
-## Template strategy
+## Explicit first-milestone non-goals
 
-The GitHub template is the primary zero-install onboarding path. It should
-contain only:
+- Full migration of all CON records.
+- Production cutover or DNS changes.
+- Pixel-level parity with the existing CON website.
+- Extraction of `orinoco-lite-action`.
+- Creation of `orinoco-lite-template` or Copier prompts.
+- A separate canonical metadata repository.
+- GitHub App, OAuth broker, or direct graphical writes.
+- Published JSONL or RDF without an identified consumer.
+- Grant, CV, annual-report, or other secondary projections.
+- Reorganization or wholesale updating of every tracked submodule.
+- Broad upstream refactoring.
 
-- the canonical directory skeleton;
-- a small lab configuration file;
-- example metadata and content;
-- a short caller workflow pinned to a released Orinoco Lite workflow; and
-- concise setup and editing instructions.
+## Later phases
 
-The same repository may optionally support Copier for prompted setup, including
-lab identity, repository settings, initial people, and theme choices. Copier
-must not own ongoing build behavior. Improvements should normally reach labs
-through action-version updates rather than large template rewrites.
+### 2. Complete CON migration
 
-## Action interface
-
-The primary public interface should be a reusable workflow rather than a set of
-low-level build inputs. Version one should:
-
-- assume metadata and site content are in the same repository;
-- use conventional paths instead of requiring `metadata-root`, `site-root`, or
-  `output-dir`;
-- obtain the Pages URL and base path from GitHub Pages configuration rather
-  than asking the lab to supply `base-url`;
-- start any required Orinoco services ephemerally;
-- validate metadata and fail before publication on invalid records;
-- run `qri` and Hugo;
-- upload previews or review artifacts for pull requests;
-- deploy approved default-branch builds through GitHub Pages; and
-- pin every runtime Orinoco dependency.
-
-Composite actions may implement internal stages, but labs should call one short
-workflow. Optional `metadata-repository` and `metadata-ref` inputs may be added
-later for the split-repository topology.
-
-## Editing and authentication
-
-Version one must work without operating an interactive external service:
-
-- Direct GitHub file editing and normal pull requests are the complete,
-  authoritative path.
-- GitHub Issue Forms may provide structured proposals for common additions and
-  an Action may convert accepted proposals into metadata pull requests.
-- SHACL-vue may initially load the schema and current graph, validate edits,
-  and export proposed YAML or a patch for submission through GitHub.
-
-Using GitHub as the identity provider does not remove the need for a secure
-OAuth code exchange. GitHub Pages and Actions cannot provide that interactive
-endpoint. A full SHACL-vue write path therefore requires either user-managed
-credentials or a small broker.
-
-If graphical editing proves to justify that service, a later release may add a
-GitHub App and stateless OAuth broker. Cloudflare Workers is one possible
-implementation, not a version-one dependency. The broker must store neither
-metadata nor long-lived user tokens, and all changes must still enter through a
-pull request.
-
-## Architecture documents
-
-After this plan is approved:
-
-- create `orinoco-system.md` as a dated description of the original Orinoco
-  architecture and current upstream behavior;
-- create `orinoco-lite-system.md` as the maintained description of the adopted
-  Lite architecture; and
-- create `required-clarifications.md` containing only unresolved decisions
-  that block implementation.
-
-The documents should explain system behavior and advantages without framing
-Orinoco Lite as a philosophical critique of upstream Orinoco.
-
-## Implementation phases
-
-### 1. Coordination foundation
-
-- Approve repository names, ownership, and the one-repository-per-lab default.
-- Classify tracked repositories as upstream, reference, migration, instance,
-  or Lite component.
-- Reorganize component paths without changing nested repository history.
-- Create the three architecture documents described above.
-- Update the README and agent instructions.
-- Rename and publish this repository only after review.
-
-Exit: contributors can identify every repository, source of truth, generated
-artifact, and unresolved decision.
-
-### 2. CON metadata migration
-
-- Define the upstream-compatible YAML collection layout in
-  `centerforopenneuroscience.org`.
-- Transform accepted records from `dump-research-info` into individual YAML
-  files.
-- Preserve source snapshots, evidence, review additions, merge policy, and
+- Migrate all accepted records from `dump-research-info` into canonical YAML.
+- Preserve source snapshots, evidence, review decisions, merge policy, and
   identifiers.
 - Compare record counts, persistent identifiers, relationships, and approved
-  assets before retiring any old path.
-- Keep `dump-research-info` available until migration parity is accepted.
+  assets before retiring any migration path.
+- Keep `dump-research-info` available as migration history until parity is
+  accepted.
 
-Exit: all accepted CON records validate from canonical files in the website
-repository without loss of meaningful provenance or review information.
+Exit: the candidate lab repository is the single canonical source for accepted
+CON metadata and website content.
 
-### 3. Website vertical slice
+### 3. Website completion and cutover
 
-- Create an integration branch in `centerforopenneuroscience.org`.
-- Replace the Pelican build on that branch with a Hugo structure based on
-  `www-from-model`.
-- Reuse its taxonomy, templates, `qri`, graph, assets, and Congo-theme patterns
-  where they fit.
-- Run required Dump Things behavior ephemerally during CI.
-- Implement one connected slice containing an organization, person, project,
-  publication or dataset, relationships, depictions, and editorial content.
-- Preserve existing public URLs or define explicit redirects.
+- Complete content and presentation work based on the proven vertical slice.
+- Account for existing public URLs, redirects, assets, attribution, and
+  accessibility.
+- Establish branch protection, reviewers, Pages ownership, and deployment
+  permissions.
+- Review the static preview before changing the production domain.
 
-Exit: one canonical metadata correction deterministically changes the preview
-site, without a persistent metadata backend.
+Exit: the candidate can replace the existing CON deployment without losing
+required content, URLs, or provenance.
 
-### 4. Reusable action and template
+### 4. Reusable action and lab template
 
-- Create `con/orinoco-lite-action`.
-- Extract validation, cache generation, projection, Hugo build, and Pages
-  deployment from the working CON slice.
-- Create `con/orinoco-lite-template` with a minimal caller workflow and example
-  lab.
-- Add optional Copier questions only after the plain GitHub template works.
-- Test a new independent lab repository created from the template.
-- Keep the production CON domain unchanged until parity review.
+- Extract validation, projection, Hugo build, and Pages deployment from the
+  working CON implementation into `con/orinoco-lite-action`.
+- Expose one tagged reusable workflow with conventional paths and pinned
+  dependencies.
+- Obtain Pages URL and base-path information from GitHub Pages configuration
+  rather than requiring users to calculate it.
+- Create `con/orinoco-lite-template` with the canonical directory skeleton,
+  example records, lab configuration, and a short caller workflow.
+- Add Copier only if prompted initialization materially improves setup after
+  the plain GitHub template works.
+- Test the release in a new independent lab repository.
 
-Exit: a lab can create one repository, replace the example metadata, and deploy
-through a pinned Orinoco Lite release.
+Exit: a lab can replace example metadata and deploy without understanding the
+Orinoco toolchain.
 
-### 5. GitHub-native editing
+### 5. Editing and additional projections
 
-- Document direct file and pull-request editing.
-- Prototype Issue Forms for common, bounded metadata additions.
-- Convert suitable submissions into branches and pull requests through Actions.
-- Configure SHACL-vue for schema-driven validation and export without a write
-  service.
-- Require branch protection and designated metadata reviewers.
+- Document direct file and pull-request editing first.
+- Evaluate Issue Forms for bounded metadata additions.
+- Configure SHACL-vue for validation and export before introducing direct
+  writes.
+- Consider a GitHub App and stateless OAuth broker only if the editing benefit
+  justifies operating an external endpoint.
+- Add RDF, grants, CVs, annual reports, and other projections only for concrete
+  consumers.
 
-Exit: a lab member can propose a metadata change without bypassing Git review
-or operating external authentication infrastructure.
-
-### 6. Generalization and optional services
-
-- Publish stable action tags and an upgrade policy.
-- Add RDF only for a demonstrated graph or editor integration.
-- Add grant, CV, annual-summary, and other projections incrementally.
-- Evaluate a GitHub App and OAuth broker only after testing GitHub-native
-  editing.
-- Evaluate split metadata repositories against an actual multi-application use
-  case.
-- Contribute generally useful, narrowly scoped changes upstream.
-- Keep lab-specific content and presentation downstream.
-
-Exit: another lab can adopt a documented release without understanding the
-underlying Orinoco toolchain, while advanced consumers have a clear extension
-path.
+Exit: additional interfaces preserve the same canonical records and Git review
+boundary.
 
 ## Upstream synchronization and contribution policy
 
-- Check upstream component heads on a scheduled basis.
-- Open grouped coordination pull requests when pins change.
+- Check upstream component heads on a deliberate schedule.
 - Never auto-merge upstream updates.
-- Summarize changed components and run integration tests before promoting pins
-  into an action release.
-- Ensure a released action cannot change merely because an upstream branch
-  advances.
-- Develop reusable fixes on focused branches in the relevant component.
+- Summarize relevant component changes and test candidate pins before release.
+- Ensure action tags pin reproducible dependency versions.
+- Develop reusable fixes on focused branches in the relevant repository.
 - Submit only narrow, generally useful changes upstream.
 - Keep CON-specific policy, metadata, content, and presentation downstream.
 
-## Acceptance scenarios
+## Deferred decisions
 
-- A lab creates one independent repository from the GitHub template.
-- Replacing example metadata and enabling Pages is sufficient for a first
-  deployment.
-- One pull request can update canonical metadata, preview the result, and merge
-  the website change atomically.
-- Invalid records cannot be published.
-- CI may start Dump Things, but the build and deployed website require no
-  continuously running metadata backend.
-- Repeated builds from identical inputs are identical.
-- JSONL remains transient unless a documented consumer requires publication.
-- RDF is published only when a documented consumer requires it.
-- Another application can consume the canonical `metadata/` contract without
-  owning the website build.
-- Existing CON content, assets, URLs, and attribution are accounted for before
-  production cutover.
-- Upstream updates cannot silently alter a released action.
+These do not block the first vertical slice:
 
-## Required clarifications
+- final ownership and naming of the action and template repositories;
+- the public product documentation entry point;
+- the exact template configuration and optional Copier questions;
+- whether guided editing begins with Issue Forms or SHACL-vue export;
+- whether an external OAuth broker is ever acceptable;
+- criteria for splitting metadata into a separate repository;
+- published RDF or JSONL contracts;
+- metadata licensing, CODEOWNERS, and long-term review policy;
+- production Pages, DNS, and domain ownership; and
+- the final pull-request preview experience.
 
-- Who creates and administers `con/orinoco-lite-dev`,
-  `con/orinoco-lite-action`, and `con/orinoco-lite-template`?
-- Should the public product name belong to the template repository or to a
-  separate documentation entry point?
-- What exact upstream collection layout and schema release become the
-  version-one metadata contract?
-- Which initial setup questions belong in `lab.yaml`, GitHub repository
-  settings, and optional Copier prompts?
-- Are Issue Forms sufficient for the first guided editing workflow?
-- Is an external OAuth broker ever acceptable, or must graphical editing remain
-  export-only until GitHub provides a suitable native mechanism?
-- What event would justify splitting canonical metadata into its own
-  repository?
-- Which team or CODEOWNERS entry must approve metadata and editorial changes?
-- Who controls GitHub Pages, DNS, and the production CON domain cutover?
-- Which explicit license applies to canonical metadata?
-- What preview experience is required for pull requests?
+Resolve each decision immediately before the phase that depends on it. Do not
+block the vertical slice waiting for speculative answers.
 
-## Working assumptions
+## Handoff for the next thread
 
-- One self-contained repository per lab is the default topology.
-- GitHub templates are the primary onboarding path; Copier is optional.
-- GitHub Pages is the initial deployment target.
-- Canonical metadata is YAML following the selected Orinoco filesystem
-  convention.
-- Dump Things may run ephemerally in CI but is not deployed as a persistent
-  service.
-- Version one requires no OAuth broker.
-- JSONL is an internal `qri` adapter.
-- RDF and other projections are demand-driven.
-- Media uses ordinary Git unless repository size requires another decision.
-- English-only content is sufficient for the first release.
+Begin in `/Users/johnlee/code/CON/orinoco-lite-dev` and implement only the first
+milestone above. The primary implementation repository is
+`submodules/www-from-model`; create `con-site` there before making CON-specific
+changes. Use `submodules/dump-research-info` and
+`submodules/centerforopenneuroscience.org` only as migration inputs.
+
+Do not begin by generalizing the action, creating more architecture documents,
+or reorganizing all submodules. First prove one real record-to-website path.

@@ -1,12 +1,24 @@
 # Agent instructions
 
-This repository coordinates a static deployment of the Center for Open Neuroscience website.
+- Read `docs/orinoco-lite-plan.md` before working and follow its current
+  milestone and scope.
+- Do not begin work listed as deferred or excluded from the current milestone.
+- In `submodules/www-from-model`, keep `main` available to mirror
+  `upstream/main`; make downstream changes on the branch named by the plan.
+- Treat `submodules/dump-research-info` and
+  `submodules/centerforopenneuroscience.org` as migration inputs, not production
+  runtime dependencies.
+- Do not require a continuously running metadata service for builds or deployed
+  sites.
+- Update parent submodule pins deliberately and keep credentials outside every
+  repository.
 
-- Keep website content in the website submodule's existing content directories.
-- Prefer GitHub pull requests as the review and edit boundary for metadata.
-- Do not introduce a dump-things backend server for the public deployment.
-- Reuse Orinoco components where they fit, especially schemas, query/rendering tools, assets, and workflow actions.
-- Keep each component independently branchable inside its own submodule.
-- A submodule is tracked by this parent only when the deployment uses it. Until then, its directory may remain untracked.
-- Keep credentials in GitHub Actions secrets or other external configuration, never in this repository.
-- Keep planning notes concise and record meaningful architectural decisions in `docs/plan.md`.
+## Commit co-authorship
+
+Every commit authored by Codex must include:
+
+```text
+Co-Authored-By: <tool name> <tool version> / <model name> <model version> <codex@openai.com>
+```
+
+Discover both versions from the active tool and session. Do not guess.
