@@ -67,24 +67,6 @@ Keep changes separated where practical:
 The parent repository pins explicit component commits. Updating an upstream
 reference must not silently change a released lab build.
 
-## History strategy
-
-Do not use `.git/info/grafts`, `git replace`, an unrelated-history merge, or a
-whole-project snapshot to connect the website histories. The two repositories
-have different identities and deployment responsibilities.
-
-Instead:
-
-- retain the complete legacy site on its branch and tag;
-- start `orinoco-lite` from CON `master`;
-- keep `con/www-from-model/main` as the clean comparison source;
-- record each reviewed upstream base in `UPSTREAM.md` and
-  `provenance/imports.yaml`;
-- import scaffold code, content changes, metadata, and deployment in separate
-  commits; and
-- send generally useful adaptations upstream from focused
-  `con/www-from-model` branches.
-
 ## Architectural decisions
 
 - A lab starts from a small GitHub template, not a fork of this coordination
@@ -121,7 +103,7 @@ Include:
 - the Center for Open Neuroscience organization;
 - one person;
 - one project;
-- one publication or dataset;
+- publications
 - the relationships connecting those records;
 - one or more representative depictions or assets; and
 - enough editorial content to evaluate the homepage and primary navigation.
@@ -318,13 +300,11 @@ block the vertical slice waiting for speculative answers.
 
 ## Handoff for the next thread
 
-Begin in `/Users/johnlee/code/CON/orinoco-lite-dev` and implement only the first
-milestone above. The primary implementation repository is
+Implement only the first milestone above. The primary implementation repository is
 `submodules/centerforopenneuroscience.org` on `orinoco-lite`. Preserve
 `legacy-site` for content and visual comparison, push implementation commits to
-the `leej3` fork, and open draft pull requests against CON `master`. Use
-`submodules/www-from-model` as the clean upstream mirror and
-`submodules/dump-research-info` only as a migration input.
+the `leej3` fork. Use `submodules/www-from-model` as the clean upstream mirror and
+`submodules/dump-research-info` only as a migration input. Keep track of your progress in docs/milestone-1-progress.md.
 
 Do not begin by generalizing the action, creating more architecture documents,
 or reorganizing all submodules. First prove one real record-to-website path.
