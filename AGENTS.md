@@ -4,8 +4,11 @@
   milestone and scope.
 - Do not begin work listed as deferred or excluded from the current milestone.
 - Implement the CON site in `submodules/centerforopenneuroscience.org` on the
-  `orinoco-lite` branch. Preserve its legacy branch and tag.
+  `orinoco-lite` branch, which descends from the existing CON `master` branch.
+  Preserve the legacy branch and tag.
 - Keep `submodules/www-from-model` `main` available to mirror `upstream/main`.
+- Adopt upstream code selectively; do not merge or graft the complete
+  `www-from-model` history into the CON branch.
 - Treat `submodules/dump-research-info` as a migration input, not a production
   runtime dependency.
 - Do not require a continuously running metadata service for builds or deployed

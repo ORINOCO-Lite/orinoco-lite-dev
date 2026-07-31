@@ -7,8 +7,8 @@ coordinates development of a GitHub-native lab website workflow.
 Lab websites do not build or deploy from this repository. The first
 implementation will live on the `orinoco-lite` branch of the existing
 [`centerforopenneuroscience.org`](https://github.com/con/centerforopenneuroscience.org)
-repository. That preserves the established website repository while starting
-the new implementation from the real history of upstream
+repository. That branch continues the established CON history while selectively
+adopting useful scaffolding from upstream
 [`www-from-model`](https://hub.psychoinformatics.de/www/www-from-model).
 
 [`con/www-from-model`](https://github.com/con/www-from-model) remains a clean
@@ -28,7 +28,7 @@ assets, and visual identity preserved from the legacy website.
 flowchart LR
     U["Upstream Orinoco repositories"] --> D["orinoco-lite-dev"]
     W["Upstream www-from-model"] --> M["con/www-from-model mirror"]
-    M --> I["centerforopenneuroscience.org orinoco-lite branch"]
+    M -. "selected code and fixes" .-> I["centerforopenneuroscience.org orinoco-lite branch"]
     C["Legacy CON branch, tag, content, and assets"] --> I
     R["Reviewed CON research metadata"] --> I
     I --> A["GitHub Actions build"]

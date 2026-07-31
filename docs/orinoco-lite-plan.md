@@ -40,10 +40,9 @@ website repository. Preserve its current source history as:
 - `legacy-site`, a branch at the pre-Orinoco Lite site tip; and
 - `legacy-site-2026-07-31`, an immutable baseline tag.
 
-Create `orinoco-lite` in that same repository from
-`con/www-from-model/main`. This gives the new implementation genuine upstream
-ancestry without replacing the existing CON repository. The legacy and new
-branches may have unrelated histories; they do not need to be merged.
+Create `orinoco-lite` from the existing CON `master` branch. This preserves
+normal CON ancestry and permits ordinary fork-based pull requests. Import only
+the useful `www-from-model` scaffolding in focused, attributed commits.
 
 The local `submodules/www-from-model` repository keeps:
 
@@ -51,15 +50,15 @@ The local `submodules/www-from-model` repository keeps:
 - `upstream`: `https://hub.psychoinformatics.de/www/www-from-model.git`; and
 - `main`: a clean mirror of `upstream/main`.
 
-Rebase `centerforopenneuroscience.org/orinoco-lite` onto the mirrored
-`www-from-model` history only while the downstream branch remains small and
-privately coordinated. Once others depend on the branch, avoid rewriting its
-history. Pin the last incorporated upstream commit and integrate later changes
-selectively or through an agreed merge process.
+Track the last reviewed `www-from-model` commit explicitly. Review subsequent
+upstream changes against that commit, then copy, adapt, or cherry-pick only the
+parts that remain useful. The CON branch is never rebased onto the complete
+upstream website history.
 
 Keep changes separated where practical:
 
-- CON metadata, content, assets, and theme overrides belong on `orinoco-lite`.
+- CON metadata, existing content, assets, theme changes, and adopted scaffold
+  code belong on `orinoco-lite`.
 - Generally useful fixes belong on focused branches in `con/www-from-model`
   and should be offered upstream narrowly.
 - Released Orinoco Lite behavior will eventually be extracted into a separate,
@@ -70,23 +69,21 @@ reference must not silently change a released lab build.
 
 ## History strategy
 
-Do not use `.git/info/grafts`, `git replace`, or a synthetic snapshot merge to
-connect the website histories. Replacement ancestry is not a durable project
-history, while a one-commit source snapshot would discard the common ancestor
-needed for useful upstream comparisons.
+Do not use `.git/info/grafts`, `git replace`, an unrelated-history merge, or a
+whole-project snapshot to connect the website histories. The two repositories
+have different identities and deployment responsibilities.
 
 Instead:
 
 - retain the complete legacy site on its branch and tag;
-- start `orinoco-lite` directly from the selected upstream commit;
-- import CON content, design, metadata, and deployment in separate commits;
-- record the selected upstream source and commit in `UPSTREAM.md`; and
-- stop rebasing cleanly if downstream divergence makes continued rebasing more
-  expensive than selective adoption.
-
-If legacy history must later be reachable from the new default branch, add one
-explicit, documented two-parent cutover commit. This is optional and provides
-no upstream synchronization benefit.
+- start `orinoco-lite` from CON `master`;
+- keep `con/www-from-model/main` as the clean comparison source;
+- record each reviewed upstream base in `UPSTREAM.md` and
+  `provenance/imports.yaml`;
+- import scaffold code, content changes, metadata, and deployment in separate
+  commits; and
+- send generally useful adaptations upstream from focused
+  `con/www-from-model` branches.
 
 ## Architectural decisions
 
@@ -136,24 +133,26 @@ content or assets already present in `centerforopenneuroscience.org`.
 
 1. Fully hydrate the legacy `centerforopenneuroscience.org` history and preserve
    its current tip as `legacy-site` and `legacy-site-2026-07-31`.
-2. Create `orinoco-lite` in that repository from `con/www-from-model/main` and
-   push it without changing the default branch or production deployment.
+2. Create `orinoco-lite` from the existing CON `master`, push it to a writable
+   fork, and open a draft pull request without changing production deployment.
 3. Capture the current deployed site output, representative screenshots,
    public URL inventory, and essential visual design values for comparison.
-4. Identify the exact metadata collection, schema release, and build entry
-   points currently used by upstream `www-from-model`.
-5. Select the minimum connected CON records and their source evidence.
-6. Transform those records into individual upstream-compatible YAML files on
+4. Identify the exact metadata collection, schema release, templates, scripts,
+   and build entry points worth adopting from `www-from-model`.
+5. Import the minimum useful Hugo, Congo, projection, and build scaffolding in
+   separate commits with explicit upstream provenance.
+6. Select the minimum connected CON records and their source evidence.
+7. Transform those records into individual upstream-compatible YAML files on
    `orinoco-lite`.
-7. Import only the corresponding editorial content, assets, and design values
-   from `legacy-site`.
-8. Adapt the upstream build so required Dump Things behavior runs ephemerally
-   during CI rather than depending on a dedicated service.
-9. Use `qri` and Hugo to produce the static website.
-10. Add a repository-local GitHub Actions workflow that publishes a GitHub
+8. Preserve the corresponding editorial content, assets, URLs, and design
+   values from the existing CON tree.
+9. Adapt the build so required Dump Things behavior runs ephemerally during CI
+   rather than depending on a dedicated service.
+10. Use `qri` and Hugo to produce the static website.
+11. Add a repository-local GitHub Actions workflow that publishes a GitHub
     Pages preview from the prototype branch.
-11. Record the upstream base and necessary divergence, keeping reusable fixes
-    isolated for possible contribution.
+12. Record necessary divergence and keep reusable fixes isolated for possible
+    contribution.
 
 The production build must consume the combined candidate tree. It must not
 continually join independently changing data from `dump-research-info` and
@@ -322,7 +321,8 @@ block the vertical slice waiting for speculative answers.
 Begin in `/Users/johnlee/code/CON/orinoco-lite-dev` and implement only the first
 milestone above. The primary implementation repository is
 `submodules/centerforopenneuroscience.org` on `orinoco-lite`. Preserve
-`legacy-site` for content and visual comparison. Use
+`legacy-site` for content and visual comparison, push implementation commits to
+the `leej3` fork, and open draft pull requests against CON `master`. Use
 `submodules/www-from-model` as the clean upstream mirror and
 `submodules/dump-research-info` only as a migration input.
 
