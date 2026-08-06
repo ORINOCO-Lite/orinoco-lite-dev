@@ -1,0 +1,101 @@
+name: Upstream Psychoinformatics Pages trial
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-psychoinformatics-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Check out the coordination branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out the pinned upstream site only
+        run: |
+          git submodule sync -- submodules/www-from-model
+          git submodule update --init --depth 1 -- submodules/www-from-model
+          git -C submodules/www-from-model config core.worktree \
+            "${GITHUB_WORKSPACE}/submodules/www-from-model"
+          git -C submodules/www-from-model submodule update --init --depth 1 -- themes/congo
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.1
+          enable-cache: false
+
+      - name: Install git-annex
+        run: uv tool install git-annex==10.20260717
+
+      - name: Hydrate upstream annexed assets
+        run: |
+          git -C submodules/www-from-model fetch --depth 1 \
+            origin \
+            +010ca44f751d2ab60b9d4ad58c5931d1804e3c9e:refs/remotes/origin/git-annex
+          git -C submodules/www-from-model remote add upstream \
+            https://hub.psychoinformatics.de/www/www-from-model.git
+          git -C submodules/www-from-model fetch --depth 1 \
+            upstream \
+            +010ca44f751d2ab60b9d4ad58c5931d1804e3c9e:refs/remotes/upstream/git-annex
+          git -C submodules/www-from-model config --add annex.private true
+          git -C submodules/www-from-model annex init
+          git -C submodules/www-from-model annex get .
+          test -z "$(git -C submodules/www-from-model annex find --not --in=here)"
+
+      - name: Install Hugo Extended
+        uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3.2.1
+        with:
+          hugo-version: 0.154.5
+          extended: true
+
+      - name: Read the Pages deployment URL
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build the unmodified upstream source
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          hugo \
+            --minify \
+            --source submodules/www-from-model \
+            --destination "${RUNNER_TEMP}/upstream-site" \
+            --baseURL "${BASE_URL%/}/"
+
+      - name: Adapt and audit the generated Pages artifact
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          python3 tools/adapt_upstream_pages.py \
+            "${RUNNER_TEMP}/upstream-site" \
+            --base-path "${BASE_PATH:-/}"
+          python3 tools/adapt_upstream_pages.py \
+            "${RUNNER_TEMP}/upstream-site" \
+            --base-path "${BASE_PATH:-/}" \
+            --check-only
+          test -f "${RUNNER_TEMP}/upstream-site/index.html"
+          test -f "${RUNNER_TEMP}/upstream-site/graph.json"
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/upstream-site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

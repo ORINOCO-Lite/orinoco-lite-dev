@@ -92,5 +92,5 @@
 	branch = main
 [submodule "submodules/www-from-model"]
 	path = submodules/www-from-model
-	url = https://hub.psychoinformatics.de/www/www-from-model.git
+	url = https://github.com/con/www-from-model.git
 	branch = main

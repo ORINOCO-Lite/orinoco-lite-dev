@@ -19,6 +19,12 @@ GitHub mirror and integration reference for that upstream history.
 The canonical implementation and handoff document is
 [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md).
 
+The separate current-upstream reproduction branch is documented in
+[`docs/upstream-psychoinformatics-trial.md`](docs/upstream-psychoinformatics-trial.md).
+It rebuilds the complete pinned Psychoinformatics snapshot locally and carries
+a generated-artifact adapter for GitHub Pages project paths without changing
+the upstream website source.
+
 The next milestone is a small, connected CON website preview built on the
 `orinoco-lite` branch of `centerforopenneuroscience.org`. It will combine
 reviewed metadata migrated from `dump-research-info` with selected content,
