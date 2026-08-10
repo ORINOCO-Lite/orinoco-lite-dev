@@ -222,11 +222,15 @@ the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true`
 query parameter. The production Pages workflow leaves the upstream URL as its
 default, so this local bridge does not alter a deployed public site.
 
-`pixi run serve-shacl-vue` initializes the pinned `shacl-vue` checkout, applies
-one local compatibility patch for its `show_all_fields` compile error, installs
-the locked npm dependencies, and serves the app at port 3000. Browser testing
-confirmed that a generated edit link opens the local app and selects the
-`dlthings:Thing` view with the requested PID query.
+`pixi run serve-shacl-vue` synchronizes and initializes the pinned `shacl-vue`
+checkout from the CON GitHub mirror, installs the locked npm dependencies, and
+serves the app at port 3000. The parent gitlink points to
+`d5790a4431f7773a2e29fbb0d26e542ed0311ec5`, a submodule commit that fixes the
+upstream `show_all_fields` ref initialization. This keeps the compatibility
+change reviewable in the submodule history rather than hiding it in a root
+preparation script. Browser testing confirmed that a generated edit link opens
+the local app and selects the `dlthings:Thing` view with the requested PID
+query.
 
 This is currently a local editor UI bridge, not a complete local curation
 backend. The pinned app configuration uses its bundled demonstration RDF data

@@ -137,7 +137,7 @@ github_pages_project_path_trial:
     console_warnings: 0
 
 local_editor_bridge:
-  shacl_vue_pin: dbb9bfa3997881abb0dfc8ba1bbc572ddc39b8d0
+  shacl_vue_pin: d5790a4431f7773a2e29fbb0d26e542ed0311ec5
   shacl_vue_url: http://127.0.0.1:3000/
   edit_urls_rewritten: 953
   browser_route_status: 200

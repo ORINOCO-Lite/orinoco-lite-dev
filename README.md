@@ -42,8 +42,11 @@ prepares and serves the pinned `submodules/shacl-vue` checkout at
 this record” links to that local instance while preserving the record query
 parameters. The static site still has no write backend, so this provides the
 local editor UI and form state, not persistence to the generated snapshot. The
-preparation task applies one local compatibility patch for an upstream
-`show_all_fields` compile error before installing its locked npm dependencies.
+SHACL Vue checkout is pinned to the CON mirror's
+`codex/local-editor-compatibility` branch at the parent gitlink; its
+`show_all_fields` fix is therefore visible as a normal submodule commit. The
+Pixi task only synchronizes that tracked checkout and installs its locked npm
+dependencies.
 
 The next milestone is a small, connected CON website preview built on the
 `orinoco-lite` branch of `centerforopenneuroscience.org`. It will combine

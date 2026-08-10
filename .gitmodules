@@ -68,8 +68,8 @@
 	branch = main
 [submodule "submodules/shacl-vue"]
 	path = submodules/shacl-vue
-	url = https://hub.psychoinformatics.de/orinoco/shacl-vue.git
-	branch = main
+	url = https://github.com/con/shacl-vue.git
+	branch = codex/local-editor-compatibility
 [submodule "submodules/some-things"]
 	path = submodules/some-things
 	url = https://hub.psychoinformatics.de/orinoco/some-things.git
