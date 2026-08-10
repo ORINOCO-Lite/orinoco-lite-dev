@@ -51,6 +51,31 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             (site_dir / "graph.js").write_text('fetch("/graph.json")', encoding="utf-8")
             self.assertEqual(audit_site(site_dir, "/"), [])
 
+    def test_edit_url_rewrite_is_configurable_and_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            (site_dir / "index.html").write_text(
+                '<a href="https://pool.psychoinformatics.de/ui/?pid=example&edit=true">Edit</a>',
+                encoding="utf-8",
+            )
+
+            local_edit_url = "http://127.0.0.1:3000/"
+            before = audit_site(site_dir, "/", local_edit_url)
+            self.assertEqual(
+                before, ["index.html: edit URL https://pool.psychoinformatics.de/ui/"]
+            )
+
+            stats = adapt_site(site_dir, "/", local_edit_url)
+            self.assertEqual(stats.edit_urls_rewritten, 1)
+            self.assertIn(
+                'href="http://127.0.0.1:3000/?pid=example&edit=true"',
+                (site_dir / "index.html").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(audit_site(site_dir, "/", local_edit_url), [])
+            self.assertEqual(
+                adapt_site(site_dir, "/", local_edit_url).edit_urls_rewritten, 0
+            )
+
     def test_adapt_site_rewrites_all_upstream_escape_types(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             site_dir = Path(temp_dir)

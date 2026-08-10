@@ -15,7 +15,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 
 HTML_URL_RE = re.compile(
@@ -28,6 +28,12 @@ HTML_URL_RE = re.compile(
     re.IGNORECASE,
 )
 GRAPH_FETCH_RE = re.compile(r"fetch\((?P<quote>[\"'])/graph\.json(?P=quote)\)")
+EDIT_HREF_RE = re.compile(
+    r"(?P<prefix>\bhref\s*=\s*)(?P<quote>[\"'])"
+    r"(?P<url>https?://[^\"']+/ui/)",
+    re.IGNORECASE,
+)
+DEFAULT_EDIT_URL = "https://pool.psychoinformatics.de/ui/"
 
 
 @dataclass
@@ -37,6 +43,7 @@ class AdaptationStats:
     graph_script_urls_rewritten: int = 0
     graph_node_urls_rewritten: int = 0
     webmanifest_urls_rewritten: int = 0
+    edit_urls_rewritten: int = 0
 
 
 def normalize_base_path(value: str) -> str:
@@ -52,6 +59,18 @@ def normalize_base_path(value: str) -> str:
     if any(part in {".", ".."} for part in parts):
         raise ValueError("base path cannot contain '.' or '..' segments")
     return "/" if not parts else f"/{'/'.join(parts)}/"
+
+
+def normalize_edit_url(value: str) -> str:
+    """Return a URL suitable as the base of a SHACL Vue edit link."""
+
+    value = value.strip()
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("edit URL must be an absolute HTTP(S) URL")
+    if parsed.query or parsed.fragment:
+        raise ValueError("edit URL cannot contain a query or fragment")
+    return f"{value.rstrip('/')}/"
 
 
 def prefix_root_url(url: str, base_path: str) -> str:
@@ -94,6 +113,21 @@ def rewrite_graph_script(text: str, base_path: str) -> tuple[str, int]:
     return GRAPH_FETCH_RE.sub(replace, text), rewrites
 
 
+def rewrite_edit_urls(text: str, edit_url: str) -> tuple[str, int]:
+    rewrites = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal rewrites
+        current_url = match.group("url")
+        if current_url == edit_url:
+            return match.group(0)
+        rewrites += 1
+        quote = match.group("quote")
+        return f"{match.group('prefix')}{quote}{edit_url}"
+
+    return EDIT_HREF_RE.sub(replace, text), rewrites
+
+
 def rewrite_graph_data(data: object, base_path: str) -> int:
     if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
         raise ValueError("graph.json does not contain a nodes list")
@@ -126,12 +160,13 @@ def rewrite_webmanifest_data(data: object, base_path: str) -> int:
     return rewrites
 
 
-def audit_site(site_dir: Path, base_path: str) -> list[str]:
+def audit_site(
+    site_dir: Path, base_path: str, edit_url: str = DEFAULT_EDIT_URL
+) -> list[str]:
     """Return root-path leaks that would escape a Pages project path."""
 
     base_path = normalize_base_path(base_path)
-    if base_path == "/":
-        return []
+    edit_url = normalize_edit_url(edit_url)
     violations: list[str] = []
     for html_path in sorted(site_dir.rglob("*.html")):
         text = html_path.read_text(encoding="utf-8")
@@ -139,9 +174,14 @@ def audit_site(site_dir: Path, base_path: str) -> list[str]:
             url = match.group("quoted") or match.group("bare")
             if prefix_root_url(url, base_path) != url:
                 violations.append(f"{html_path.relative_to(site_dir)}: {url}")
+        for match in EDIT_HREF_RE.finditer(text):
+            if match.group("url") != edit_url:
+                violations.append(
+                    f"{html_path.relative_to(site_dir)}: edit URL {match.group('url')}"
+                )
 
     graph_script = site_dir / "graph.js"
-    if graph_script.is_file():
+    if graph_script.is_file() and base_path != "/":
         for match in GRAPH_FETCH_RE.finditer(graph_script.read_text(encoding="utf-8")):
             violations.append(f"graph.js: /graph.json ({match.start()})")
 
@@ -177,27 +217,30 @@ def audit_site(site_dir: Path, base_path: str) -> list[str]:
     return violations
 
 
-def adapt_site(site_dir: Path, base_path: str) -> AdaptationStats:
+def adapt_site(
+    site_dir: Path, base_path: str, edit_url: str = DEFAULT_EDIT_URL
+) -> AdaptationStats:
     """Rewrite the generated site in place and fail if any path leaks remain."""
 
     base_path = normalize_base_path(base_path)
+    edit_url = normalize_edit_url(edit_url)
     if not site_dir.is_dir():
         raise FileNotFoundError(f"site directory does not exist: {site_dir}")
 
     stats = AdaptationStats()
-    if base_path == "/":
-        return stats
 
     for html_path in sorted(site_dir.rglob("*.html")):
         original = html_path.read_text(encoding="utf-8")
         rewritten, count = rewrite_html(original, base_path)
-        if count:
+        rewritten, edit_count = rewrite_edit_urls(rewritten, edit_url)
+        if count or edit_count:
             html_path.write_text(rewritten, encoding="utf-8")
             stats.html_files_changed += 1
             stats.html_urls_rewritten += count
+            stats.edit_urls_rewritten += edit_count
 
     graph_script = site_dir / "graph.js"
-    if graph_script.is_file():
+    if graph_script.is_file() and base_path != "/":
         original = graph_script.read_text(encoding="utf-8")
         rewritten, count = rewrite_graph_script(original, base_path)
         if count:
@@ -227,7 +270,7 @@ def adapt_site(site_dir: Path, base_path: str) -> AdaptationStats:
             )
             stats.webmanifest_urls_rewritten += count
 
-    violations = audit_site(site_dir, base_path)
+    violations = audit_site(site_dir, base_path, edit_url)
     if violations:
         sample = "\n".join(f"  - {item}" for item in violations[:20])
         raise RuntimeError(
@@ -249,6 +292,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="report root-path leaks without changing the artifact",
     )
+    parser.add_argument(
+        "--edit-url",
+        default=DEFAULT_EDIT_URL,
+        help="SHACL Vue base URL for generated edit links",
+    )
     return parser.parse_args(argv)
 
 
@@ -256,16 +304,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
         base_path = normalize_base_path(args.base_path)
+        edit_url = normalize_edit_url(args.edit_url)
         if not args.site_dir.is_dir():
             raise FileNotFoundError(f"site directory does not exist: {args.site_dir}")
         if args.check_only:
-            violations = audit_site(args.site_dir, base_path)
+            violations = audit_site(args.site_dir, base_path, edit_url)
             print(
                 json.dumps({"base_path": base_path, "violations": violations}, indent=2)
             )
             return 1 if violations else 0
 
-        stats = adapt_site(args.site_dir, base_path)
+        stats = adapt_site(args.site_dir, base_path, edit_url)
         print(json.dumps({"base_path": base_path, **asdict(stats)}, indent=2))
         return 0
     except (FileNotFoundError, ValueError, RuntimeError, json.JSONDecodeError) as exc:

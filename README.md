@@ -36,6 +36,15 @@ On macOS ARM, conda-forge does not currently publish Git Annex, so Pixi uses
 the host `git-annex` executable (for example, installed with Homebrew). The
 Linux Pixi environment includes Git Annex `10.20260601` directly in its lock.
 
+For local editing, run `pixi run serve-shacl-vue` in a second terminal. It
+prepares and serves the pinned `submodules/shacl-vue` checkout at
+`http://127.0.0.1:3000/`; the Pixi-controlled site builds rewrite the “Edit
+this record” links to that local instance while preserving the record query
+parameters. The static site still has no write backend, so this provides the
+local editor UI and form state, not persistence to the generated snapshot. The
+preparation task applies one local compatibility patch for an upstream
+`show_all_fields` compile error before installing its locked npm dependencies.
+
 The next milestone is a small, connected CON website preview built on the
 `orinoco-lite` branch of `centerforopenneuroscience.org`. It will combine
 reviewed metadata migrated from `dump-research-info` with selected content,

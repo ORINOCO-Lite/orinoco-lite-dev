@@ -5,6 +5,7 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 site_root="$repository_root/submodules/www-from-model"
 base_url=${BASE_URL:-http://127.0.0.1:1313/}
 destination=${DESTINATION:-$repository_root/build/upstream-psychoinformatics}
+edit_url=${SHACL_VUE_URL:-https://pool.psychoinformatics.de/ui/}
 annex_commit=010ca44f751d2ab60b9d4ad58c5931d1804e3c9e
 upstream_url=https://hub.psychoinformatics.de/www/www-from-model.git
 
@@ -60,10 +61,12 @@ hugo \
 
 python3 "$repository_root/tools/adapt_upstream_pages.py" \
   "$destination" \
-  --base-path "$base_path"
+  --base-path "$base_path" \
+  --edit-url "$edit_url"
 python3 "$repository_root/tools/adapt_upstream_pages.py" \
   "$destination" \
   --base-path "$base_path" \
+  --edit-url "$edit_url" \
   --check-only
 
 printf 'Built the upstream site at %s\n' "$destination"

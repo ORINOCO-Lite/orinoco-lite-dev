@@ -213,6 +213,31 @@ GitHub Actions, but this trial deliberately did not enable Pages or publish an
 external preview. This avoids claiming a shared Pages environment or changing
 any production domain before review.
 
+## Local SHACL Vue editor bridge
+
+The upstream edit footer originally hard-codes
+`https://pool.psychoinformatics.de/ui/`. Pixi-controlled local builds set
+`SHACL_VUE_URL=http://127.0.0.1:3000/`; the generated-artifact adapter rewrites
+the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true`
+query parameter. The production Pages workflow leaves the upstream URL as its
+default, so this local bridge does not alter a deployed public site.
+
+`pixi run serve-shacl-vue` initializes the pinned `shacl-vue` checkout, applies
+one local compatibility patch for its `show_all_fields` compile error, installs
+the locked npm dependencies, and serves the app at port 3000. Browser testing
+confirmed that a generated edit link opens the local app and selects the
+`dlthings:Thing` view with the requested PID query.
+
+This is currently a local editor UI bridge, not a complete local curation
+backend. The pinned app configuration uses its bundled demonstration RDF data
+and has `use_service=false`; the upstream website's current record snapshot is
+not loaded into that RDF graph. Consequently, an upstream PID can open the
+local app but cannot be fetched or persisted there without either a local
+Dump Things-compatible service or a future migration of the canonical records
+into the SHACL Vue input graph. The browser check exposed this boundary as
+expected `get-record`/missing-record errors rather than silently presenting a
+working editor for nonexistent local data.
+
 ## Annex boundary and GitHub-only reproducibility
 
 The upstream source has 39 annexed worktree paths representing 38 unique keys
