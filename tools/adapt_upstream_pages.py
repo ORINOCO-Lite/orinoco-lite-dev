@@ -130,6 +130,8 @@ def audit_site(site_dir: Path, base_path: str) -> list[str]:
     """Return root-path leaks that would escape a Pages project path."""
 
     base_path = normalize_base_path(base_path)
+    if base_path == "/":
+        return []
     violations: list[str] = []
     for html_path in sorted(site_dir.rglob("*.html")):
         text = html_path.read_text(encoding="utf-8")

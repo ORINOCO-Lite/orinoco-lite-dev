@@ -45,6 +45,12 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
                 audit_site(site_dir, "/orinoco-lite-dev"), ["index.html: /graph.js"]
             )
 
+    def test_root_base_path_allows_root_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            (site_dir / "graph.js").write_text('fetch("/graph.json")', encoding="utf-8")
+            self.assertEqual(audit_site(site_dir, "/"), [])
+
     def test_adapt_site_rewrites_all_upstream_escape_types(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             site_dir = Path(temp_dir)

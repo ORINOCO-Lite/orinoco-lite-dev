@@ -1,0 +1,19 @@
+[workspace]
+name = "orinoco-upstream-trial"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[dependencies]
+python = ">=3.12,<3.13"
+hugo = "==0.154.5"
+
+[target.linux-64.dependencies]
+git-annex = "==10.20260601"
+
+[tasks]
+build = { cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8767/", DESTINATION = "build/upstream-local" } }
+serve = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/upstream-local" }
+build-pages = { cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8766/orinoco-lite-dev/", DESTINATION = "build/pages-preview/orinoco-lite-dev" } }
+serve-pages = { depends-on = ["build-pages"], cmd = "python3 -m http.server 8766 --directory build/pages-preview" }
+audit-pages = { cmd = "python3 tools/adapt_upstream_pages.py build/pages-preview/orinoco-lite-dev --base-path /orinoco-lite-dev/ --check-only" }
+test = "python3 -m unittest discover -s tests -p 'test_*.py'"
