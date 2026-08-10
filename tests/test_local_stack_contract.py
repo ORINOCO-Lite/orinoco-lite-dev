@@ -9,6 +9,16 @@ POOL_UI = ROOT / "submodules" / "pool.psychoinformatics.de-ui"
 class LocalStackContractTests(unittest.TestCase):
     def test_pixi_exposes_all_local_services(self) -> None:
         pixi = (ROOT / "pixi.toml").read_text(encoding="utf-8")
+        self.assertIn(
+            'serve = { depends-on = ["build", "prepare-local-stack", '
+            '"build-pool-ui"], cmd = "tools/serve_local_stack.sh" }',
+            pixi,
+        )
+        self.assertIn(
+            'serve-static = { depends-on = ["build"], cmd = '
+            '"python3 -m http.server 8767 --directory build/upstream-local" }',
+            pixi,
+        )
         for task in (
             "prepare-local-stack",
             "refresh-local-pool",

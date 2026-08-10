@@ -45,22 +45,23 @@ the host `git-annex` executable (for example, installed with Homebrew). The
 Linux Pixi environment includes Git Annex `10.20260601` directly in its lock.
 
 The local editor is a complete service-backed deployment, not a demo-data
-preview. Prepare it once, then use separate terminals for the services and
-the site:
+preview. Start the whole deployment with one command:
 
 ```console
-pixi run prepare-local-stack       # fetch/cache the current upstream public pool
-pixi run serve-dump-things         # Dump Things: http://127.0.0.1:8111/
-pixi run seed-local-pool           # copy the snapshot into public/protected
-pixi run serve-git-annex           # git-annex p2p HTTP: http://127.0.0.1:8122/
-pixi run serve-shacl-vue           # upstream pool UI: http://127.0.0.1:3000/
-pixi run serve                    # generated site: http://127.0.0.1:8767/
+pixi run serve                     # prepare, build, seed, and serve everything
 ```
 
-The first task downloads the upstream public `Thing` collection into ignored
-`build/local-stack` runtime state (use `pixi run refresh-local-pool` to fetch a
-new snapshot). `seed-local-pool` loads those records into both local Dump
-Things collections. The editor UI is the tracked
+Pixi runs the setup and build dependencies before the supervisor starts Dump
+Things, seeds both local collections, starts the git-annex and SHACL Vue
+services, checks their contracts, and serves the generated site. The initial
+run downloads the upstream public `Thing` collection into ignored
+`build/local-stack` runtime state; use `pixi run refresh-local-pool` to fetch a
+new snapshot. Press Ctrl-C to stop every child service. Individual
+`serve-dump-things`, `serve-git-annex`, `serve-shacl-vue`, and
+`seed-local-pool` tasks remain available for debugging, and
+`pixi run serve-static` starts only the generated-site HTTP server.
+
+The editor UI is the tracked
 `submodules/pool.psychoinformatics.de-ui` deployment branch, with its nested
 SHACL Vue checkout and generated schema assets tracked in submodule history.
 Its service URLs, token mode, and git-annex p2p URL all point at the local

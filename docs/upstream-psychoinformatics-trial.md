@@ -239,7 +239,23 @@ the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true`
 query parameter. The production Pages workflow leaves the upstream URL as its
 default, so this local stack does not alter the static deployment.
 
-The editor is now deployed with the upstream service architecture locally:
+The editor is now deployed with the upstream service architecture locally. The
+one-command entry point is:
+
+```bash
+pixi run serve
+```
+
+Its Pixi dependencies perform the recursive checkout, upstream snapshot
+preparation, Hugo build, and pool UI build. The `serve_local_stack.sh`
+supervisor then starts Dump Things, seeds both local collections, starts the
+git-annex and SHACL Vue services, checks their contracts, and serves the
+generated site. All child logs are written below
+`build/local-stack/logs/`; Ctrl-C stops the complete stack. The individual
+service tasks below remain useful when debugging a single component, while
+`pixi run serve-static` serves only the generated Hugo output.
+
+The underlying tasks are:
 
 1. `pixi run prepare-local-stack` downloads the public `Thing` collection from
    the upstream pool API into ignored `build/local-stack` state. The measured
