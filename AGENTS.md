@@ -20,8 +20,10 @@
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
   for every commit subject and body.
-- Keep commit messages, logs, and documentation prose wrapped to approximately
-  80 columns; avoid long unwrapped lines.
+- Keep commit subjects and body lines wrapped to approximately 80 columns;
+  avoid long unwrapped commit-message lines.
+- Use the Snapper pre-commit hook to auto-format documentation and minimize
+  diffs when editing prose.
 
 ## Commit co-authorship
 
