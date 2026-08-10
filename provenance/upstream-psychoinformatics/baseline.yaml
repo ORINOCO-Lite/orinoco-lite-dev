@@ -10,8 +10,8 @@ parent_trial:
 website:
   upstream_repository: https://hub.psychoinformatics.de/www/www-from-model.git
   upstream_commit: 5b401e0c478a4409442b3a8a285bd3efd5d30e05
-  github_mirror: https://github.com/con/www-from-model.git
-  github_mirror_main: 5b401e0c478a4409442b3a8a285bd3efd5d30e05
+  github_mirror: https://github.com/leej3/www-from-model.git
+  github_mirror_main: 6c8b9a5b7260dc20dfe1453dd863b353e8f90f06
   annex_metadata_commit: 010ca44f751d2ab60b9d4ad58c5931d1804e3c9e
   congo_commit: 3623fa505ee42fee899844d94a4ff7f5a1ae9096
   previous_parent_pin: 6945272e5f3fcf353627b8e1c3e68bcaf76cc2ce
@@ -137,7 +137,7 @@ github_pages_project_path_trial:
     console_warnings: 0
 
 local_editor_bridge:
-  pool_ui_pin: 808600558358f77d4b7b68fd44ed5d2d4fa47f67
+  pool_ui_pin: 1572ef909321626f5efb2ea04b2f256e03ba50a4
   pool_ui_branch: codex/local-deployment
   shacl_vue_pin: d5790a4431f7773a2e29fbb0d26e542ed0311ec5
   shacl_vue_url: http://127.0.0.1:3000/

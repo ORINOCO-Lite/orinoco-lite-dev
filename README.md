@@ -6,12 +6,12 @@ coordinates development of a GitHub-native lab website workflow.
 
 Lab websites do not build or deploy from this repository. The first
 implementation will live on the `orinoco-lite` branch of the existing
-[`centerforopenneuroscience.org`](https://github.com/con/centerforopenneuroscience.org)
+[`centerforopenneuroscience.org`](https://github.com/leej3/centerforopenneuroscience.org)
 repository. That branch continues the established CON history while selectively
 adopting useful scaffolding from upstream
 [`www-from-model`](https://hub.psychoinformatics.de/www/www-from-model).
 
-[`con/www-from-model`](https://github.com/con/www-from-model) remains a clean
+[`leej3/www-from-model`](https://github.com/leej3/www-from-model) remains a clean
 GitHub mirror and integration reference for that upstream history.
 
 ## Start here
@@ -24,6 +24,12 @@ The separate current-upstream reproduction branch is documented in
 It rebuilds the complete pinned Psychoinformatics snapshot locally and carries
 a generated-artifact adapter for GitHub Pages project paths without changing
 the upstream website source.
+
+All recursive submodule URLs in this branch resolve to public mirrors under
+[`leej3`](https://github.com/leej3), except `dump-research-info`, which remains
+the CON-owned migration input at `github.com/con/dump-research-info`. The
+account mirrors preserve the upstream refs needed by the pinned checkout;
+nested pool UI, theme, and schema dependencies are mirrored there as well.
 
 The trial is Pixi-controlled. `pixi run checkout-submodules` synchronizes and
 fully checks out every pinned submodule, including nested submodules. From this
@@ -79,7 +85,7 @@ assets, and visual identity preserved from the legacy website.
 ```mermaid
 flowchart LR
     U["Upstream Orinoco repositories"] --> D["orinoco-lite-dev"]
-    W["Upstream www-from-model"] --> M["con/www-from-model mirror"]
+    W["Upstream www-from-model"] --> M["leej3/www-from-model mirror"]
     M -. "selected code and fixes" .-> I["centerforopenneuroscience.org orinoco-lite branch"]
     C["Legacy CON branch, tag, content, and assets"] --> I
     R["Reviewed CON research metadata"] --> I

@@ -85,15 +85,16 @@ increase by 731, graph size increases from 307 nodes/882 edges to 1,038
 nodes/2,148 edges, and Hugo output increases from 491 pages/576 files to 1,973
 pages/2,058 files.
 
-`https://github.com/con/www-from-model.git` had been left at the old parent pin
-and had no `git-annex` branch. It was fast-forwarded without rewriting history:
+The account-owned `https://github.com/leej3/www-from-model.git` mirror carries
+the upstream site refs and the deployment branch's nested account URL. It was
+populated without rewriting the upstream history:
 
 | Ref | Current value |
 | --- | --- |
-| `refs/heads/main` | `5b401e0c478a4409442b3a8a285bd3efd5d30e05` |
+| `refs/heads/main` | `6c8b9a5b7260dc20dfe1453dd863b353e8f90f06` |
 | `refs/heads/git-annex` | `010ca44f751d2ab60b9d4ad58c5931d1804e3c9e` |
 
-The parent `.gitmodules` entry now uses the `con` mirror. Local site checkouts
+The parent `.gitmodules` entry now uses the `leej3` mirror. Local site checkouts
 use `origin` for that mirror and `upstream` for the Psychoinformatics source.
 The Hugo theme remains the exact nested gitlink
 `3623fa505ee42fee899844d94a4ff7f5a1ae9096` from the upstream site.
@@ -104,10 +105,26 @@ the deliberately unpublished CON site pin, the deleted/divergent
 `dump-research-info` branch, and a six-commit-stale
 `things-enrichment-tools` pin that is not used by the website workflows. The
 complete table is in
-`provenance/upstream-psychoinformatics/submodule-inventory.tsv`. Of the
-Psychoinformatics repositories, `con/www-from-model` is the only matching
-repository currently present in the `con` organization; the two other `con`
-entries are native CON inputs rather than upstream mirrors.
+`provenance/upstream-psychoinformatics/submodule-inventory.tsv`. The only
+intentional `con` URL remaining in the parent is the migration-input
+`dump-research-info` repository.
+
+## Account-owned recursive mirrors
+
+The deployment branch now uses public `leej3` GitHub mirrors for every
+top-level submodule except `submodules/dump-research-info`. That repository is
+intentionally left at `github.com/con/dump-research-info` because it is a
+CON-owned migration input. The account mirrors preserve the pinned commits and
+the fetched upstream branches; existing `leej3` repositories were retained
+without deleting their unrelated branches. Nested dependencies are covered as
+well: the pool UI points to `leej3/shacl-vue`, the website and CON site themes
+point to `leej3/congo`, and `tools` points to `leej3/datalad-concepts`.
+
+The account mirror set is deliberately separate from the parent repository:
+`orinoco-lite-dev` remains the only repository in this workflow that is not
+under `leej3`. A fresh recursive checkout therefore needs only public GitHub
+URLs, while `dump-research-info` remains visibly attributable to CON in the
+parent `.gitmodules` file and inventory.
 
 ## What is actually required
 
@@ -271,7 +288,7 @@ configuration and Git history.
 The upstream source has 39 annexed worktree paths representing 38 unique keys
 and 55,916,505 hydrated bytes. There is no Git LFS configuration.
 
-A fresh clone from `con/www-from-model` showed two availability classes:
+A fresh clone from `leej3/www-from-model` showed two availability classes:
 
 - 25 paths can currently be fetched through URLs registered in annex; and
 - 14 paths (1,276,022 bytes) are available only from the upstream annex

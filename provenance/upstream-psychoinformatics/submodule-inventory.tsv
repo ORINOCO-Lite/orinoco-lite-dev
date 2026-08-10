@@ -1,7 +1,7 @@
 path	parent_main_pin	configured_branch	default_branch	current_default_head	status	workflow_role	con_repository
 submodules/artwork	890a92fe62d6de0e142724fe1e79a4e82b920c4c	main	main	890a92fe62d6de0e142724fe1e79a4e82b920c4c	exact	irrelevant	none
 submodules/bids-things	d0d4dfd9fc40f0e05daac28b8c3b151c25efb76b	main	main	d0d4dfd9fc40f0e05daac28b8c3b151c25efb76b	exact	irrelevant	none
-submodules/centerforopenneuroscience.org	2621231d27b70fb425107a132159f7a9e0d99cda	master	master	e6e9200a0987a65097afff896105ff838be1659e	pin 10 commits ahead and on no advertised branch	irrelevant	native con repository
+submodules/centerforopenneuroscience.org	578723864c7ee55c4ec541fd41e5cf82055b434f	orinoco-lite	orinoco-lite	578723864c7ee55c4ec541fd41e5cf82055b434f	exact account mirror; nested congo URL points to leej3/congo	irrelevant	leej3/centerforopenneuroscience.org
 submodules/curatee-kit	de3d023683f62419aa4a1d70b4dfad32b971beb5	main	main	de3d023683f62419aa4a1d70b4dfad32b971beb5	exact	irrelevant	none
 submodules/dump-research-info	1c7e99ec6f296d5e6cb6a61e3b786227190802da	agent/git-native-con-metadata (missing)	main	60e8fb79c11eae62eaf17637d4d79f3bbc7edb98	divergent: pin-only 20, default-only 4	irrelevant	native con repository
 submodules/dump-things-pyclient	1e79391195ad4412286344189dc5f81a06accb90	master	master	1e79391195ad4412286344189dc5f81a06accb90	exact	metadata refresh	none
@@ -16,10 +16,10 @@ submodules/psyinf-pool-files-public	d5689b11c67d5232f84782c73ed003e847734557	mai
 submodules/query-things	ef1141430a471455d4a5f4e07d7989ec717f56f4	main	main	ef1141430a471455d4a5f4e07d7989ec717f56f4	exact	metadata refresh	none
 submodules/research-information-ui-assets	f1b744e5d009c61b77bd3ddd6fde29c2ad46ea69	main	main	f1b744e5d009c61b77bd3ddd6fde29c2ad46ea69	exact	irrelevant	none
 submodules/shacl-tulip	fee25fdfc00c4898e4a928814f576c027c75d678	main	main	fee25fdfc00c4898e4a928814f576c027c75d678	exact	irrelevant	none
-submodules/pool.psychoinformatics.de-ui	808600558358f77d4b7b68fd44ed5d2d4fa47f67	codex/local-deployment	main	45a698f58204c5413c757fe44ed47cd04e504674	deployment branch tracks local Dump Things, schema assets, and git-annex configuration; nested shacl-vue pin d5790a4431f7773a2e29fbb0d26e542ed0311ec5	local editor and local service stack	con/pool.psychoinformatics.de-ui mirror
+submodules/pool.psychoinformatics.de-ui	1572ef909321626f5efb2ea04b2f256e03ba50a4	codex/local-deployment	main	45a698f58204c5413c757fe44ed47cd04e504674	deployment branch tracks local Dump Things, schema assets, git-annex configuration, and nested account URL	local editor and local service stack	leej3/pool.psychoinformatics.de-ui
 submodules/some-things	ee1dcdac44076d94a70dcd3c2f07f404b4e69c14	main	main	ee1dcdac44076d94a70dcd3c2f07f404b4e69c14	exact	irrelevant	none
 submodules/things-enrichment-tools	d15d0866e3208eb21365dac978d747aedb63b456	main	main	dcfcceda15987ce51ebf51ce1583824d474639fc	behind by 6 commits	irrelevant	none
 submodules/things-graph-renderer	04f6241e37532fdb03b6f95d2dbe304e7171d504	main	main	04f6241e37532fdb03b6f95d2dbe304e7171d504	exact	maintenance only	none
 submodules/things-schemas	d26ea4135e28c25b134c64de1cdc15d15cd2f9f0	main	main	d26ea4135e28c25b134c64de1cdc15d15cd2f9f0	exact	irrelevant to current workflow	none
-submodules/tools	729f4186c08728e3354412f650d961e9702743df	main	main	729f4186c08728e3354412f650d961e9702743df	exact	irrelevant	none
-submodules/www-from-model	6945272e5f3fcf353627b8e1c3e68bcaf76cc2ce	main	main	5b401e0c478a4409442b3a8a285bd3efd5d30e05	behind by 3 commits	static build and metadata refresh	con/www-from-model synchronized
+submodules/tools	c76e9a9c547acddab3efd510c73e341793ca5cfa	main	main	c76e9a9c547acddab3efd510c73e341793ca5cfa	exact account mirror; nested datalad-concepts URL points to leej3/datalad-concepts	irrelevant	leej3/tools
+submodules/www-from-model	6c8b9a5b7260dc20dfe1453dd863b353e8f90f06	main	main	6c8b9a5b7260dc20dfe1453dd863b353e8f90f06	exact account mirror; nested congo URL points to leej3/congo	static build and metadata refresh	leej3/www-from-model

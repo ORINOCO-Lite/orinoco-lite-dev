@@ -1,18 +1,18 @@
 [submodule "submodules/artwork"]
 	path = submodules/artwork
-	url = https://hub.psychoinformatics.de/orinoco/artwork.git
+	url = https://github.com/leej3/artwork.git
 	branch = main
 [submodule "submodules/bids-things"]
 	path = submodules/bids-things
-	url = https://hub.psychoinformatics.de/orinoco/bids-things.git
+	url = https://github.com/leej3/bids-things.git
 	branch = main
 [submodule "submodules/centerforopenneuroscience.org"]
 	path = submodules/centerforopenneuroscience.org
-	url = https://github.com/con/centerforopenneuroscience.org.git
-	branch = master
+	url = https://github.com/leej3/centerforopenneuroscience.org.git
+	branch = orinoco-lite
 [submodule "submodules/curatee-kit"]
 	path = submodules/curatee-kit
-	url = https://hub.psychoinformatics.de/orinoco/curatee-kit.git
+	url = https://github.com/leej3/curatee-kit.git
 	branch = main
 [submodule "submodules/dump-research-info"]
 	path = submodules/dump-research-info
@@ -20,77 +20,77 @@
 	branch = agent/git-native-con-metadata
 [submodule "submodules/dump-things-pyclient"]
 	path = submodules/dump-things-pyclient
-	url = https://hub.psychoinformatics.de/orinoco/dump-things-pyclient.git
+	url = https://github.com/leej3/dump-things-pyclient.git
 	branch = master
 [submodule "submodules/dump-things-service"]
 	path = submodules/dump-things-service
-	url = https://hub.psychoinformatics.de/orinoco/dump-things-service.git
+	url = https://github.com/leej3/dump-things-service.git
 	branch = master
 [submodule "submodules/dump-things-service-mirror"]
 	path = submodules/dump-things-service-mirror
-	url = https://hub.psychoinformatics.de/orinoco/dump-things-service-mirror.git
+	url = https://github.com/leej3/dump-things-service-mirror.git
 	branch = master
 [submodule "submodules/find-things"]
 	path = submodules/find-things
-	url = https://hub.psychoinformatics.de/orinoco/find-things.git
+	url = https://github.com/leej3/find-things.git
 	branch = main
 [submodule "submodules/flatson"]
 	path = submodules/flatson
-	url = https://hub.psychoinformatics.de/orinoco/flatson.git
+	url = https://github.com/leej3/flatson.git
 	branch = main
 [submodule "submodules/flatson-js"]
 	path = submodules/flatson-js
-	url = https://hub.psychoinformatics.de/orinoco/flatson-js.git
+	url = https://github.com/leej3/flatson-js.git
 	branch = main
 [submodule "submodules/flatsonpy"]
 	path = submodules/flatsonpy
-	url = https://hub.psychoinformatics.de/orinoco/flatsonpy.git
+	url = https://github.com/leej3/flatsonpy.git
 	branch = main
 [submodule "submodules/flow"]
 	path = submodules/flow
-	url = https://hub.psychoinformatics.de/orinoco/flow.git
+	url = https://github.com/leej3/flow.git
 	branch = main
 [submodule "submodules/psyinf-pool-files-public"]
 	path = submodules/psyinf-pool-files-public
-	url = https://hub.psychoinformatics.de/orinoco/psyinf-pool-files-public.git
+	url = https://github.com/leej3/psyinf-pool-files-public.git
 	branch = main
 [submodule "submodules/query-things"]
 	path = submodules/query-things
-	url = https://hub.psychoinformatics.de/orinoco/query-things.git
+	url = https://github.com/leej3/query-things.git
 	branch = main
 [submodule "submodules/research-information-ui-assets"]
 	path = submodules/research-information-ui-assets
-	url = https://hub.psychoinformatics.de/orinoco/research-information-ui-assets.git
+	url = https://github.com/leej3/research-information-ui-assets.git
 	branch = main
 [submodule "submodules/shacl-tulip"]
 	path = submodules/shacl-tulip
-	url = https://hub.psychoinformatics.de/orinoco/shacl-tulip.git
+	url = https://github.com/leej3/shacl-tulip.git
 	branch = main
 [submodule "submodules/some-things"]
 	path = submodules/some-things
-	url = https://hub.psychoinformatics.de/orinoco/some-things.git
+	url = https://github.com/leej3/some-things.git
 	branch = main
 [submodule "submodules/things-enrichment-tools"]
 	path = submodules/things-enrichment-tools
-	url = https://hub.psychoinformatics.de/orinoco/things-enrichment-tools.git
+	url = https://github.com/leej3/things-enrichment-tools.git
 	branch = main
 [submodule "submodules/things-graph-renderer"]
 	path = submodules/things-graph-renderer
-	url = https://hub.psychoinformatics.de/orinoco/things-graph-renderer.git
+	url = https://github.com/leej3/things-graph-renderer.git
 	branch = main
 [submodule "submodules/things-schemas"]
 	path = submodules/things-schemas
-	url = https://hub.psychoinformatics.de/orinoco/things-schemas.git
+	url = https://github.com/leej3/things-schemas.git
 	branch = main
 [submodule "submodules/tools"]
 	path = submodules/tools
-	url = https://hub.psychoinformatics.de/orinoco/tools.git
+	url = https://github.com/leej3/tools.git
 	branch = main
 [submodule "submodules/www-from-model"]
 	path = submodules/www-from-model
-	url = https://github.com/con/www-from-model.git
+	url = https://github.com/leej3/www-from-model.git
 	branch = main
 [submodule "submodules/pool.psychoinformatics.de-ui"]
 	path = submodules/pool.psychoinformatics.de-ui
-	url = https://github.com/con/pool.psychoinformatics.de-ui.git
+	url = https://github.com/leej3/pool.psychoinformatics.de-ui.git
 	branch = codex/local-deployment
