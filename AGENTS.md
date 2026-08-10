@@ -16,6 +16,13 @@
 - Update parent submodule pins deliberately and keep credentials outside every
   repository.
 
+## User preferences
+
+- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+  for every commit subject and body.
+- Keep commit messages, logs, and documentation prose wrapped to approximately
+  80 columns; avoid long unwrapped lines.
+
 ## Commit co-authorship
 
 Every commit authored by Codex must include:
