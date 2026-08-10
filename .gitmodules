@@ -66,10 +66,6 @@
 	path = submodules/shacl-tulip
 	url = https://hub.psychoinformatics.de/orinoco/shacl-tulip.git
 	branch = main
-[submodule "submodules/shacl-vue"]
-	path = submodules/shacl-vue
-	url = https://github.com/con/shacl-vue.git
-	branch = codex/local-editor-compatibility
 [submodule "submodules/some-things"]
 	path = submodules/some-things
 	url = https://hub.psychoinformatics.de/orinoco/some-things.git
@@ -94,3 +90,7 @@
 	path = submodules/www-from-model
 	url = https://github.com/con/www-from-model.git
 	branch = main
+[submodule "submodules/pool.psychoinformatics.de-ui"]
+	path = submodules/pool.psychoinformatics.de-ui
+	url = https://github.com/con/pool.psychoinformatics.de-ui.git
+	branch = codex/local-deployment

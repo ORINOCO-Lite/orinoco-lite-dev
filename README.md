@@ -38,17 +38,38 @@ On macOS ARM, conda-forge does not currently publish Git Annex, so Pixi uses
 the host `git-annex` executable (for example, installed with Homebrew). The
 Linux Pixi environment includes Git Annex `10.20260601` directly in its lock.
 
-For local editing, run `pixi run serve-shacl-vue` in a second terminal. It
-prepares and serves the pinned `submodules/shacl-vue` checkout at
-`http://127.0.0.1:3000/`; the Pixi-controlled site builds rewrite the “Edit
-this record” links to that local instance while preserving the record query
-parameters. The static site still has no write backend, so this provides the
-local editor UI and form state, not persistence to the generated snapshot. The
-SHACL Vue checkout is pinned to the CON mirror's
-`codex/local-editor-compatibility` branch at the parent gitlink; its
-`show_all_fields` fix is therefore visible as a normal submodule commit. The
-Pixi task only synchronizes that tracked checkout and installs its locked npm
-dependencies.
+The local editor is a complete service-backed deployment, not a demo-data
+preview. Prepare it once, then use separate terminals for the services and
+the site:
+
+```console
+pixi run prepare-local-stack       # fetch/cache the current upstream public pool
+pixi run serve-dump-things         # Dump Things: http://127.0.0.1:8111/
+pixi run seed-local-pool           # copy the snapshot into public/protected
+pixi run serve-git-annex           # git-annex p2p HTTP: http://127.0.0.1:8122/
+pixi run serve-shacl-vue           # upstream pool UI: http://127.0.0.1:3000/
+pixi run serve                    # generated site: http://127.0.0.1:8767/
+```
+
+The first task downloads the upstream public `Thing` collection into ignored
+`build/local-stack` runtime state (use `pixi run refresh-local-pool` to fetch a
+new snapshot). `seed-local-pool` loads those records into both local Dump
+Things collections. The editor UI is the tracked
+`submodules/pool.psychoinformatics.de-ui` deployment branch, with its nested
+SHACL Vue checkout and generated schema assets tracked in submodule history.
+Its service URLs, token mode, and git-annex p2p URL all point at the local
+services above; it does not use bundled demo RDF records or the remote
+Psychoinformatics service. Enter the generated token from
+`build/local-stack/editor-token` in the UI's token settings.
+
+Edit links in the generated site preserve their upstream query parameters and
+open the local editor. Reads go through local Dump Things, writes go to the
+protected incoming view, and the curated/public view remains unchanged until
+the normal curation operation—matching upstream semantics. Uploaded files are
+stored by the local git-annex repository, not by a substitute file directory.
+Run `pixi run check-local-stack` to verify the service, record, schema, and UI
+configuration contracts. All runtime data, stores, tokens, and annex content
+are ignored under `build/`; no credentials or snapshot records are committed.
 
 The next milestone is a small, connected CON website preview built on the
 `orinoco-lite` branch of `centerforopenneuroscience.org`. It will combine

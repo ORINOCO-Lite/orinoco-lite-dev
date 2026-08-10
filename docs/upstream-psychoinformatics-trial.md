@@ -3,7 +3,7 @@
 Status: local reproduction and deployment prototype complete; no production
 site, DNS, or GitHub Pages setting changed
 
-Date: 2026-08-06
+Date: 2026-08-10
 
 Branch: `codex/upstream-psychoinformatics-trial`, created from parent `main` at
 `47bdf2f396e462d6622a166d2ba6c29f6a273b7c`
@@ -213,34 +213,58 @@ GitHub Actions, but this trial deliberately did not enable Pages or publish an
 external preview. This avoids claiming a shared Pages environment or changing
 any production domain before review.
 
-## Local SHACL Vue editor bridge
+## Local SHACL Vue and service-backed editor
 
 The upstream edit footer originally hard-codes
 `https://pool.psychoinformatics.de/ui/`. Pixi-controlled local builds set
 `SHACL_VUE_URL=http://127.0.0.1:3000/`; the generated-artifact adapter rewrites
 the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true`
 query parameter. The production Pages workflow leaves the upstream URL as its
-default, so this local bridge does not alter a deployed public site.
+default, so this local stack does not alter the static deployment.
 
-`pixi run serve-shacl-vue` synchronizes and initializes the pinned `shacl-vue`
-checkout from the CON GitHub mirror, installs the locked npm dependencies, and
-serves the app at port 3000. The parent gitlink points to
-`d5790a4431f7773a2e29fbb0d26e542ed0311ec5`, a submodule commit that fixes the
-upstream `show_all_fields` ref initialization. This keeps the compatibility
-change reviewable in the submodule history rather than hiding it in a root
-preparation script. Browser testing confirmed that a generated edit link opens
-the local app and selects the `dlthings:Thing` view with the requested PID
-query.
+The editor is now deployed with the upstream service architecture locally:
 
-This is currently a local editor UI bridge, not a complete local curation
-backend. The pinned app configuration uses its bundled demonstration RDF data
-and has `use_service=false`; the upstream website's current record snapshot is
-not loaded into that RDF graph. Consequently, an upstream PID can open the
-local app but cannot be fetched or persisted there without either a local
-Dump Things-compatible service or a future migration of the canonical records
-into the SHACL Vue input graph. The browser check exposed this boundary as
-expected `get-record`/missing-record errors rather than silently presenting a
-working editor for nonexistent local data.
+1. `pixi run prepare-local-stack` downloads the public `Thing` collection from
+   the upstream pool API into ignored `build/local-stack` state. The measured
+   snapshot contains 4,978 records. `pixi run refresh-local-pool` explicitly
+   refreshes that snapshot.
+2. `pixi run serve-dump-things` runs the pinned Dump Things service
+   (`9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`) against a generated local
+   configuration and the pinned Things Schemas YAML. `pixi run seed-local-pool`
+   loads the snapshot into both local `public` and `protected` collections.
+3. `pixi run serve-git-annex` exposes an actual local git-annex repository at
+   `http://127.0.0.1:8122/git-annex`, using the same p2p-over-HTTP path shape as
+   the upstream uploader. Uploads are keyed and stored by git-annex; they are
+   not written to a demo-data directory.
+4. `pixi run serve-shacl-vue` builds and serves the tracked
+   `submodules/pool.psychoinformatics.de-ui` deployment branch at port 3000.
+   Its nested SHACL Vue checkout is pinned to
+   `d5790a4431f7773a2e29fbb0d26e542ed0311ec5`, where the compatibility fix is a
+   normal submodule commit. The deployment branch tracks its local service
+   configuration, generated schema assets, and local git-annex target as
+   reviewable commits.
+
+The pool UI uses `use_service: true` and `use_token: true`, with read/write
+URLs pointing to the local Dump Things `public`/`protected` collections. Its
+`config_default_xyzri.yaml` keeps `data_url` empty so no bundled RDF records
+are mistaken for the source of truth; schema, shape, and prefix assets are
+served from the tracked deployment checkout. Direct local API calls use the
+same `/record` and `/records` route forms consumed upstream.
+
+Browser verification opened a generated dataset edit link, fetched the real
+record through local Dump Things, changed its title, and submitted it. The
+protected incoming view contained the new title while protected curated and
+public remained at the old title, demonstrating the upstream curation
+boundary. `pixi run check-local-stack` checks these service, record, schema,
+and configuration contracts without requiring a browser.
+
+This is a faithful local deployment of the service interactions, with two
+explicit scope limits: the local protected collection is seeded from the
+public upstream snapshot rather than private records requiring credentials,
+and the local git-annex repository is a single-process development service,
+not a production Forgejo host. Neither limitation is hidden behind bundled
+demo data or a disabled backend; both are visible in the generated runtime
+configuration and Git history.
 
 ## Annex boundary and GitHub-only reproducibility
 

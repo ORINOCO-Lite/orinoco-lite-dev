@@ -137,14 +137,25 @@ github_pages_project_path_trial:
     console_warnings: 0
 
 local_editor_bridge:
+  pool_ui_pin: 808600558358f77d4b7b68fd44ed5d2d4fa47f67
+  pool_ui_branch: codex/local-deployment
   shacl_vue_pin: d5790a4431f7773a2e29fbb0d26e542ed0311ec5
   shacl_vue_url: http://127.0.0.1:3000/
+  dump_things_service_pin: 9f101d97c7f15d491f602db5a9c33ad9a19ad8bf
+  dump_things_url: http://127.0.0.1:8111
+  local_gitannex_url: http://127.0.0.1:8122/git-annex
+  source_public_snapshot_records: 4978
+  local_public_curated_records: 4978
+  local_protected_curated_records: 4978
   edit_urls_rewritten: 953
   browser_route_status: 200
-  browser_selected_class: dlthings:Thing
+  browser_selected_class: xyzri:XYZDataset
   browser_record_pid_query: xyzrins:datasets/studyforrest
-  local_service_backend: false
-  local_record_persistence: false
+  browser_form_opened: true
+  browser_submit_status: successful
+  local_service_backend: true
+  local_record_persistence: true
+  curation_semantics: incoming_overlay_until_curated
 
 known_upstream_snapshot_issues:
   html_missing_targets:
