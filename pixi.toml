@@ -12,11 +12,12 @@ nodejs = ">=22,<23"
 git-annex = "==10.20260601"
 
 [tasks]
-build = { cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8767/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
+checkout-submodules = { cmd = "git submodule sync --recursive && git submodule update --init --recursive" }
+build = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8767/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
 serve = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/upstream-local" }
-build-pages = { cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8766/orinoco-lite-dev/", DESTINATION = "build/pages-preview/orinoco-lite-dev", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
+build-pages = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8766/orinoco-lite-dev/", DESTINATION = "build/pages-preview/orinoco-lite-dev", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
 serve-pages = { depends-on = ["build-pages"], cmd = "python3 -m http.server 8766 --directory build/pages-preview" }
 audit-pages = { cmd = "python3 tools/adapt_upstream_pages.py build/pages-preview/orinoco-lite-dev --base-path /orinoco-lite-dev/ --edit-url http://127.0.0.1:3000/ --check-only" }
-install-shacl-vue = { cmd = "git submodule sync -- submodules/shacl-vue && git submodule update --init --depth 1 -- submodules/shacl-vue && npm --prefix submodules/shacl-vue ci" }
+install-shacl-vue = { depends-on = ["checkout-submodules"], cmd = "npm --prefix submodules/shacl-vue ci" }
 serve-shacl-vue = { depends-on = ["install-shacl-vue"], cmd = "npm --prefix submodules/shacl-vue run dev -- --host 127.0.0.1 --port 3000" }
 test = "python3 -m unittest discover -s tests -p 'test_*.py'"

@@ -25,7 +25,9 @@ It rebuilds the complete pinned Psychoinformatics snapshot locally and carries
 a generated-artifact adapter for GitHub Pages project paths without changing
 the upstream website source.
 
-The trial is Pixi-controlled. From this worktree, `pixi run serve` builds and
+The trial is Pixi-controlled. `pixi run checkout-submodules` synchronizes and
+fully checks out every pinned submodule, including nested submodules. From this
+worktree, `pixi run serve` builds and
 serves a root-local preview at `http://127.0.0.1:8767/`; `pixi run serve-pages`
 builds and serves the GitHub Pages project-path preview at
 `http://127.0.0.1:8766/orinoco-lite-dev/`. Use `pixi run build`,
