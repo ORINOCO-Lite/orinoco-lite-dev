@@ -29,4 +29,11 @@ install-pool-ui = { depends-on = ["checkout-submodules"], cmd = "npm --prefix su
 build-pool-ui = { depends-on = ["install-pool-ui"], cmd = "make -C submodules/pool.psychoinformatics.de-ui build-ui" }
 serve-shacl-vue = { depends-on = ["build-pool-ui"], cmd = "python3 -m http.server 3000 --directory submodules/pool.psychoinformatics.de-ui/dist/ui" }
 check-local-stack = { cmd = "python3 tools/check_local_stack.py" }
+format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
+install-hooks = { cmd = "git config core.hooksPath .githooks" }
+check-format = { cmd = "pre-commit run --all-files" }
 test = "python3 -m unittest discover -s tests -p 'test_*.py'"
+
+[pypi-dependencies]
+snapper-fmt = "==0.8.1"
+pre-commit = "==4.3.0"
