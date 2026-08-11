@@ -7,13 +7,12 @@ platforms = ["osx-arm64", "linux-64"]
 python = ">=3.12,<3.13"
 hugo = "==0.154.5"
 nodejs = ">=22,<23"
-uv = ">=0.12,<0.13"
 
 [target.linux-64.dependencies]
 git-annex = "==10.20260601"
 
 [tasks]
-checkout-submodules = { cmd = "git submodule sync --recursive && git submodule update --init --recursive" }
+checkout-submodules = "python3 tools/checkout_submodules.py"
 build = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8767/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
 serve = { depends-on = ["build", "prepare-local-stack", "build-pool-ui"], cmd = "tools/serve_local_stack.sh" }
 serve-static = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/upstream-local" }
@@ -37,3 +36,8 @@ test = "python3 -m unittest discover -s tests -p 'test_*.py'"
 [pypi-dependencies]
 snapper-fmt = "==0.8.1"
 pre-commit = "==4.3.0"
+dump-things-service = { path = "submodules/dump-things-service" }
+linkml = "==1.11.1"
+linkml-runtime = "==1.11.1"
+pydantic = "==2.13.4"
+rdflib = "==7.6.0"

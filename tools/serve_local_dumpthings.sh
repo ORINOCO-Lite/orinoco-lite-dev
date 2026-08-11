@@ -10,9 +10,7 @@ if [[ ! -f "$stack_dir/dumpthings.yaml" || ! -f "$stack_dir/admin-token" ]]; the
 fi
 
 export DTS_ADMIN_TOKEN="$(<"$stack_dir/admin-token")"
-exec uv run --no-project --python 3.12 \
-  --with "$root_dir/submodules/dump-things-service" \
-  dump-things-service "$stack_dir/store" \
+exec dump-things-service "$stack_dir/store" \
   --config "$stack_dir/dumpthings.yaml" \
   --host 127.0.0.1 \
   --port 8111 \

@@ -50,6 +50,26 @@ class LocalStackContractTests(unittest.TestCase):
         owl = (POOL_UI / "dlschemas_owl.ttl").read_text(encoding="utf-8")
         self.assertIn("XYZDataset", owl)
 
+    def test_pixi_pins_local_dump_things_runtime(self) -> None:
+        pixi = (ROOT / "pixi.toml").read_text(encoding="utf-8")
+        self.assertIn(
+            'dump-things-service = { path = "submodules/dump-things-service" }',
+            pixi,
+        )
+        for package, version in (
+            ("linkml", "1.11.1"),
+            ("linkml-runtime", "1.11.1"),
+            ("pydantic", "2.13.4"),
+            ("rdflib", "7.6.0"),
+        ):
+            self.assertIn(f'{package} = "=={version}"', pixi)
+
+        launcher = (ROOT / "tools" / "serve_local_dumpthings.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("uv run", launcher)
+        self.assertIn("exec dump-things-service", launcher)
+
 
 if __name__ == "__main__":
     unittest.main()
