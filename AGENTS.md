@@ -1,19 +1,22 @@
 # Agent instructions
 
-- Read `docs/orinoco-lite-plan.md` and `docs/clean-migration.md` before working and follow their active scope.
+- Read `docs/orinoco-lite-plan.md`, `docs/clean-migration.md`, and `docs/full-con-migration.md` before working and follow the active milestone.
 - Do not begin work listed as deferred or excluded from the current milestone.
-- The active effort is the local-only clean migration on the parent `codex/clean-migration` branch.
-- Implement the site in `submodules/centerforopenneuroscience.org` on its `codex/clean-migration` branch, based directly on upstream website commit `5b401e0c478a4409442b3a8a285bd3efd5d30e05`.
-- Direct upstream ancestry is an intentional exception only for that site branch.
-Do not apply it to `master`, `legacy-site`, `orinoco-lite`, or any other CON branch.
+- The active effort is the local-only full CON migration on the parent `codex/full-con-migration` branch.
+- Implement the site in `submodules/centerforopenneuroscience.org` on its `codex/full-con-migration` branch, rebased onto reviewed upstream website commit `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`.
+- Preserve the accepted parent and site `codex/clean-migration` branches as immutable checkpoints.
+Do not amend, rebase, or move them.
+- Direct upstream ancestry is an intentional exception only for the accepted clean-migration site branch and its full-migration successor.
+Do not apply it to `master`, `legacy-site`, `orinoco-lite`, or another CON branch.
 - Preserve the legacy CON history, preservation refs, and completed `orinoco-lite` effort unchanged.
 - Keep `submodules/www-from-model` `main` available to mirror `upstream/main`.
-- Keep exactly two CON site commits above the reviewed upstream base: one build-profile contract commit and one content-and-projection snapshot commit.
-Amend those commits rather than accumulating cleanup commits.
-- Keep the clean-migration profile, collections, canonical homepage root, references, and projection isolated from the upstream snapshot.
+- On the successor site branch, use ordinary focused commits for reviewed hand-authored profile and content batches.
+Keep one terminal, regenerable projection commit containing generated outputs only; replace or amend it after changes instead of committing generated churn into content batches.
+- Keep the CON profile, collections, canonical homepage root, references, and projection isolated from the upstream snapshot.
+- Make reviewed YAML in the clean site tree the sole canonical content source.
+Treat legacy website history and `submodules/dump-research-info` only as migration evidence, never as normal build-time dependencies.
 - Use the pinned source Things Schema and the `dlthings:*` CURIE contract in `docs/explaining-schema-issues.md`.
 Do not use the vendored resolved schema, LinkML trial, or later Things Schemas candidates.
-- Treat `submodules/dump-research-info` as a migration input, not a production runtime dependency.
 - Do not require a continuously running metadata service for builds or deployed sites.
 - Keep this effort local-only.
 Do not push, publish Pages, change DNS, alter production, or update any remote configuration.

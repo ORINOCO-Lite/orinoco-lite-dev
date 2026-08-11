@@ -1,199 +1,130 @@
 # Orinoco Lite execution plan
 
-Status: active — local clean-migration trial
+Status: active — local full CON migration
 
 ## Outcome
 
-The long-term Orinoco Lite outcome remains a self-contained lab repository with human-editable YAML metadata, editorial content, and a deterministic static website.
-Git pull requests will eventually provide the review and publication boundary, without requiring a continuously running metadata service.
+The long-term Orinoco Lite outcome is a self-contained lab repository with human-editable YAML metadata, editorial content, and a deterministic static website.
+Git pull requests may eventually provide the review and publication boundary without requiring a continuously running metadata service.
 
-The active effort is narrower.
-It layers the reviewed CON vertical slice onto a current upstream website base, proves the local service and static build paths, and establishes a small downstream commit stack that can be rebased as upstream changes.
+The accepted **clean migration** proved the upstream-compatible metadata, isolated collection, editor, static deployment, browser acceptance, and rebase strategy on a connected CON vertical slice.
+Its frozen contract remains in [`docs/clean-migration.md`](clean-migration.md).
 
-This effort is named **clean migration**.
-Its decision-complete implementation contract is [`docs/clean-migration.md`](clean-migration.md).
+The active **full CON migration** expands that architecture into a populated CON website.
+Its implementation contract is [`docs/full-con-migration.md`](full-con-migration.md).
 
-## Current repository roles
+## Repository roles
 
 | Repository or branch | Current role |
 | --- | --- |
-| Parent `codex/clean-migration` | Local coordination, component pins, tests, and deliberate site gitlink |
-| CON site `codex/clean-migration` | Direct-upstream experimental site with exactly two downstream commits |
-| CON site `master` and preservation refs | Legacy production history; unchanged reference material |
-| CON site `orinoco-lite` | Completed legacy-derived vertical slice; unchanged migration input |
-| `www-from-model` `main` | Clean mirror of `upstream/main` and source of reviewed base commits |
-| `dump-research-info` | Reviewed migration evidence; never a build-time data source |
+| Parent `codex/clean-migration` | Immutable accepted coordination checkpoint |
+| CON site `codex/clean-migration` | Immutable accepted two-commit site checkpoint |
+| Parent `codex/full-con-migration` | Active local tooling, tests, policy, and deliberate site gitlink |
+| CON site `codex/full-con-migration` | Active direct-upstream content-migration successor |
+| CON site `master` and preservation refs | Legacy production history and migration evidence; unchanged |
+| CON site `orinoco-lite` | Completed legacy-derived vertical slice; unchanged evidence |
+| `www-from-model` `main` | Clean mirror of `upstream/main` and source of reviewed bases |
+| `dump-research-info` | Structured migration evidence; never a normal build-time source |
 | Orinoco submodules | Explicitly pinned schema, service, qri, UI, and graph components |
 
-The active site branch starts directly from upstream website commit `5b401e0c478a4409442b3a8a285bd3efd5d30e05`.
-This ancestry is intentional so the two downstream site commits can be replayed onto a reviewed newer upstream commit.
+The full-migration site branch uses reviewed upstream commit `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`.
+The single upstream change after the accepted `5b401e0` base is a reviewed Forgejo CI path-to-URL correction; it does not alter presentation or generated content.
 
-## Repository and branch policy
+## History and authority policy
 
-The normal Orinoco Lite policy keeps CON website history descended from legacy CON `master` and adopts upstream code selectively.
-That remains the policy for `master`, `legacy-site`, `orinoco-lite`, and all future production work unless a later decision changes it.
+Direct upstream ancestry remains an intentional, narrow exception for the accepted clean-migration site branch and its full-migration successor.
+It does not change the ancestry or production status of `master`, `legacy-site`, `orinoco-lite`, or preservation refs.
 
-The site branch `codex/clean-migration` is the sole exception.
-It has direct `www-from-model` ancestry and must not be merged into, used to rewrite, or substituted for the preserved legacy-derived branches during this effort.
+The clean-migration branches do not move.
+The active site successor uses:
 
-Preserve unchanged:
+1. the accepted foundation replayed onto the reviewed upstream base;
+2. ordinary focused commits for hand-authored profile and content batches; and
+3. one terminal regenerable projection commit containing generated outputs only.
 
-- legacy CON `master` and all preservation refs;
-- the completed `orinoco-lite` branch and its evidence;
-- `www-from-model` `main` as a clean upstream mirror; and
-- all unrelated parent submodule pins.
+Clean-site YAML is the sole canonical metadata authority.
+The legacy website and `dump-research-info` may supply evidence for a reviewed migration decision, but neither participates in a normal build.
+Editorial Markdown, configuration, and declared assets in the clean-site tree are similarly authoritative for the static presentation.
 
-The clean-migration site branch contains exactly two commits above its reviewed upstream base:
+## Active milestones
 
-1. A **build-profile commit** owns the isolated CON configuration, path and projection manifests, asset manifest, account-mirror transport, and synchronization policy.
-2. A **content-and-snapshot commit** owns the canonical and reference YAML, including the homepage project, editorial material, branding and assets, provenance, and committed deterministic projection.
+### 1. Generalize the vertical-slice contracts
 
-Within the second commit, hand-authored inputs and generated outputs remain in distinct profile paths so they can be reviewed and regenerated independently.
+Replace exact vertical-slice lists in projection, stack, graph, editor-link, asset, and test tooling with one executable profile manifest.
+Preserve the accepted person, project, publication, instrument, organization, and homepage root as representative regression assertions.
 
-Fixups are amended into the appropriate commit.
-Do not accumulate a third site commit.
-The parent coordination repository may update the site gitlink only after all local acceptance and rebase checks pass.
+The generalized contract must drive canonical inventory, renderable classes, routes, visibility and ordering, reference closure, native relationship integrity, assets, and acceptance expectations.
+Split metadata-projection invalidation from static-site assembly invalidation so editorial-only changes do not force a metadata reprojection.
 
-## Active clean-migration scope
+This milestone is complete only when the generalized implementation reproduces the accepted slice deterministically and passes the full unit, build, service, and Playwright suite.
 
-### Data and content
+### 2. Restore legacy-equivalent public coverage
 
-Use the connected CON vertical slice already reviewed in the completed `orinoco-lite` effort:
+Migrate the reviewed public experience in coherent batches, beginning with the legacy evidence inventory of 33 visible people and 23 featured projects.
+Then restore the homepage, navigation, contact/support and other essential editorial pages, CON branding, portraits, and project imagery.
 
-- the Center for Open Neuroscience organization;
-- one representative person;
-- one project;
-- one publication;
-- one instrument or output needed by the connected slice;
-- their native relationships and typed identifiers;
-- representative reviewed media; and
-- enough editorial content to assess the homepage and primary navigation.
+The counts are reconciliation baselines, not quotas.
+Record reviewed merges, exclusions, additions, and unresolved identities.
+Preserve public ordering and editorial intent where supported by evidence, while using upstream information architecture and avoiding a broad template fork or pixel-level theme rewrite.
 
-Migration evidence may be copied deliberately from `dump-research-info` or the completed vertical slice.
-The clean site tree must become the complete build input.
-No normal build may join independently changing repositories or contact the German pool for CON records.
+Every batch includes provenance, native relationships, reference closure, asset status, and acceptance expectations.
+Generated files remain isolated in the terminal projection commit.
 
-### Schema and record contract
+## Contracts retained from clean migration
 
-Use the source root schema from Things Schemas commit `d26ea413` with the released LinkML, LinkML Runtime, Pydantic, and RDFLib versions pinned in the parent Pixi environment.
+The successor keeps these proven boundaries:
 
-The native `Association`, `Attribution`, `Generation`, `DOI`, and `ISSN` designators use their exact `dlthings:*` CURIE spellings.
-The verified contract, negative full-URI behavior, and excluded LinkML/schema candidates are recorded in [`docs/explaining-schema-issues.md`](explaining-schema-issues.md).
+- source-schema validation with exact `dlthings:*` CURIEs;
+- canonical `xyzrins:.` project root and a distinct CON organization record;
+- four isolated local service collections;
+- `con-public` as the sole CON projection source;
+- `con-protected` as the anonymous-read, token-limited local edit boundary;
+- explicit-only upstream reference interfaces;
+- deterministic root and project-path static builds;
+- content-derived graph cache identities;
+- Chromium and WebKit browser acceptance; and
+- no persistent metadata service for the deployed static artifact.
 
-Do not validate against the completed vertical slice's vendored resolved static schema.
-Do not import the LinkML discriminator trial or the later Things Schemas identity candidate.
-
-### Isolated local collections
-
-The local service has four named collections with no cross-profile joins:
-
-| Collection | Contents and consumer |
-| --- | --- |
-| `upstream-public` | Curated German public snapshot for explicit upstream reference checks |
-| `upstream-protected` | Local protected/incoming counterpart for explicit upstream editor checks |
-| `con-public` | Six canonical CON records plus reference records; sole qri publication input |
-| `con-protected` | CON incoming/edit boundary used by SHACL Vue |
-
-The German snapshot is seeded only into the two `upstream-*` collections.
-Canonical CON records, including the homepage project, and projection reference records are loaded only into the two `con-*` collections. qri reads `con-public`.
-SHACL Vue reads and writes through `con-protected` for the default CON editing path.
-
-The default local interfaces are the CON editor/service profile and the generated CON static site.
-Upstream service, editor, snapshot, and static-site references remain available only through explicit upstream-named tasks, URLs, or arguments.
-An unqualified default must never expose or project the German snapshot.
-
-For the local editor, `con-protected` permits anonymous reads of reviewed curated CON records through a dedicated read-only identity.
-Writes still require the ignored `local_editor` token and may reach only the CON `local-editor` incoming boundary.
-Here, `protected` describes the incoming edit boundary rather than confidential curated content.
-
-### Homepage project and CON organization
-
-Following upstream, `xyzrins:.` is a canonical `xyzri:XYZProject` that provides the homepage and root for project selection.
-It represents the CON website and has an explicit native association with the separate CON organization record `ror:04tfhh831`.
-
-The homepage project may remain minimal until the vertical slice expands.
-The organization remains available in the graph without a dedicated detail page, matching the current upstream presentation behavior.
-
-### Local interfaces and deployment boundary
-
-The supported interfaces for this effort are local:
-
-- a one-command default CON service/editor/static stack;
-- a faster static-only CON build and local server;
-- explicit upstream reference build and service commands; and
-- deterministic validation, projection, link, graph, and path audits;
-- an explicit browser-dependency installation command; and
-- a Playwright acceptance suite separate from the fast unit-test command.
-
-No action in this effort may push a branch or tag, open a pull request, enable or publish GitHub Pages, modify DNS, change a production domain, or update the deployed CON website.
-Remote reads needed to review upstream or hydrate already identified assets do not authorize remote writes.
-
-## Acceptance criteria
-
-The clean migration is locally accepted only when all of these are true:
-
-- the site branch is exactly two commits above the reviewed upstream base;
-- profile contracts, hand-authored inputs, and generated projection outputs remain isolated in their declared paths;
-- Hugo configuration, layouts, page templates, and graph code come from the rebased clean-site ancestry, while the sibling mirror is used only for byte-identical annex/theme hydration;
-- every CON record validates through the pinned live Dump Things path;
-- the five native CURIE fixtures survive JSON-to-RDF-to-JSON conversion and live validation;
-- invalid records and unsupported full-URI designators fail closed;
-- qri reads only `con-public` and generates the expected connected pages;
-- the German snapshot exists only in `upstream-public` and `upstream-protected`;
-- the default editor uses `con-protected` and the default static site is CON;
-- upstream references require explicit selection;
-- repeated generation produces an equivalent projection and clean manifest;
-- internal links, Pages-style base paths, graph nodes, and graph edges pass their audits;
-- graph scripts and data use one audited content-derived cache identity so a same-origin upstream-to-CON switch cannot reuse the German graph;
-- anonymous editor reads populate the concrete Yaroslav person form, while anonymous writes remain forbidden;
-- a disposable browser-driven edit lands only in the CON protected incoming boundary and leaves no probe record behind;
-- Chromium and Playwright WebKit pass the cache and anonymous-editor browser scenarios without leaking local credentials into test artifacts;
-- no persistent metadata process is required after static generation;
-- the legacy, preservation, and `orinoco-lite` refs remain unchanged; and
-- no remote, Pages, DNS, domain, or production state changed.
+Expected inventory and graph totals now derive from the reviewed profile manifest rather than fixed slice counts.
+Tests must continue to detect German data leakage, stale generated products, invalid native targets, unsafe editor writes, broken assets, and process or credential residue.
 
 ## Upstream synchronization
 
-Upstream changes are never merged automatically.
-For each candidate base, follow the exact local rebase drill in [`docs/clean-migration.md`](clean-migration.md):
+Upstream changes are reviewed before use.
+Preserve the current successor tip, inspect the candidate upstream range, remove the terminal generated commit from the replay, rebase hand-authored commits, regenerate one terminal projection commit, inspect `range-diff` and both content digests, and run complete local acceptance.
+Update the parent site gitlink only after all checks pass.
 
-1. review the upstream range and record the proposed base;
-2. replay exactly the two site commits with `rebase --onto`;
-3. regenerate and amend the projection commit;
-4. inspect `range-diff` for both downstream commits;
-5. run the complete acceptance suite; and
-6. update the parent site gitlink deliberately only after acceptance.
+Never rewrite the accepted clean-migration branches during this drill.
+Prefer adapting CON profile/content to a new upstream convention over adding a compatibility layer.
 
-Do not push the rebased branch or parent gitlink during this effort.
+## Local-only boundary
 
-## Explicitly deferred work
+This phase may create local branches, safety refs, generated state, and local test services.
+It may read remotes to review upstream or retrieve already identified public assets.
 
-The following work is outside the active clean migration:
+It must not push, open or update pull requests, publish Pages, change repository settings, alter DNS or production hosting, write to public metadata services, or store credentials in a repository.
 
-- full migration of all CON records and legacy editorial content;
-- production cutover, DNS, custom domains, redirects, or Pages publication;
-- pull-request previews, branch protection, CODEOWNERS, and deployment permissions;
-- GitHub Issue Forms, a GitHub App, OAuth, or other hosted editing services;
-- production SHACL Vue authentication or a persistent metadata service;
-- support for full-URI type designators;
-- adoption of experimental LinkML or Things Schemas candidate commits;
-- detailed ROR presentation;
-- complete visual redesign or pixel-level legacy parity;
-- durable mirroring of every upstream annex object;
-- extraction of `orinoco-lite-action` or creation of a lab template;
-- a separate canonical metadata repository;
-- published JSONL or RDF contracts;
-- grants, CVs, annual reports, and other secondary projections;
-- broad upstream refactoring or contribution work; and
-- production branch ancestry, merge, or replacement decisions.
+## Deferred work
 
-Resolve each item only when a later phase depends on it.
+Do not expand the active milestones to include:
+
+- the broader Zotero collection or bulk publication migration;
+- GitHub Pages, previews, production cutover, DNS, redirects, or custom domains;
+- pull-request editing, GitHub Apps, OAuth, hosted authentication, or branch protection;
+- a persistent hosted metadata service;
+- experimental LinkML/schema branches or full-URI type support;
+- grants, CVs, annual reports, and secondary projections;
+- pixel-level legacy parity or a broad upstream template fork;
+- a separate metadata repository or published RDF/JSONL contract; or
+- unrelated upstream contribution work.
+
+Revisit Zotero after the people, project, editorial, and asset reconciliation is accepted.
+Treat deployment and pull-request editing as later separately authorized phases.
 
 ## Handoff
 
-Work only on the parent and site `codex/clean-migration` branches.
-Preserve the two-site-commit contract and the four-collection isolation model.
-Use the source-schema CURIE path, keep default interfaces CON-focused, and make all upstream references explicit.
+Work only on the parent and site `codex/full-con-migration` branches.
+Preserve all accepted and legacy refs, keep clean YAML authoritative, complete contract generalization before bulk migration, and retain a single regenerable terminal projection commit.
 
-Complete local acceptance and the rebase drill before proposing a parent gitlink update.
+Run complete local acceptance and the rebase drill before changing the parent site gitlink.
 Do not push or deploy.

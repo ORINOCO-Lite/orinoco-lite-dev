@@ -1,13 +1,12 @@
-# Clean migration development workspace
+# Full CON migration development workspace
 
-This repository coordinates the local-only **clean migration** experiment for the Center for Open Neuroscience website.
-It layers a small reviewed CON metadata slice onto the pinned upstream `www-from-model` implementation while keeping the CON-specific layer isolated and easy to rebase.
+This repository coordinates the local-only **full CON migration** for the Center for Open Neuroscience website.
+It expands the accepted clean-migration vertical slice into a populated site while keeping canonical content isolated, deterministic, and easy to rebase onto reviewed upstream changes.
 
-The active parent branch is `codex/clean-migration`.
-Its `submodules/centerforopenneuroscience.org` gitlink selects the site branch of the same name, which has exactly two commits above upstream website commit `5b401e0c478a4409442b3a8a285bd3efd5d30e05`:
+The active parent and site branches are `codex/full-con-migration`, using reviewed upstream website commit `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`.
 
-1. an isolated build-profile contract; and
-2. the canonical CON content and deterministic projection snapshot.
+The parent and site `codex/clean-migration` branches remain immutable accepted checkpoints.
+The successor uses focused hand-authored content commits followed by one terminal, regenerable projection commit.
 
 Legacy CON branches, tags, and the completed `orinoco-lite` prototype remain unchanged.
 Nothing in this effort is pushed or deployed.
@@ -17,6 +16,7 @@ Nothing in this effort is pushed or deployed.
 Read the active execution plan and implementation contract before changing the site:
 
 - [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
+- [`docs/full-con-migration.md`](docs/full-con-migration.md)
 - [`docs/clean-migration.md`](docs/clean-migration.md)
 - [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md)
 
@@ -31,6 +31,7 @@ The main local interfaces are:
 
 ```console
 pixi run build                  # deterministic backend-free CON artifact
+pixi run verify-static          # require a byte-identical repeat build
 pixi run serve-static           # CON artifact only, at 127.0.0.1:8767
 pixi run serve                  # full CON editor/service/static stack
 pixi run verify-con-projection  # two renders, both matching the Git snapshot
@@ -43,7 +44,8 @@ pixi run test-all               # unit and browser acceptance
 pixi run check-format           # repository formatting hooks
 ```
 
-`pixi run build` verifies the committed projection digest, hydrates only the manifest-declared annex assets, assembles the CON Hugo source in ignored build state, and requires two byte-identical static builds.
+`pixi run build` verifies the committed projection digest, hydrates only the manifest-declared annex assets, and assembles the CON Hugo source in ignored build state.
+`pixi run verify-static` also requires a byte-identical repeat build.
 The resulting `build/con-site` directory needs no metadata backend.
 
 Projection updates are explicit:
@@ -54,7 +56,10 @@ pixi run update-con-projection  # replace the reviewed Git snapshot
 pixi run verify-con-projection  # regenerate twice and compare with Git
 ```
 
-A normal build fails closed when canonical records, profile configuration, editorial content, assets, upstream presentation inputs, renderer code, Pixi pins, or component commits change without a corresponding snapshot refresh.
+A normal build fails closed when relevant canonical records, profile configuration, editorial content, assets, upstream presentation inputs, renderer code, Pixi pins, or component commits change without the corresponding projection or site-assembly refresh.
+
+Reviewed YAML in the clean site profile is the sole canonical metadata source.
+The legacy website and `dump-research-info` are migration evidence only and do not participate in a normal build.
 
 ## Local collection boundary
 
@@ -64,7 +69,7 @@ The full stack uses four separate collections:
 | --- | --- |
 | `upstream-public` | Cached German public snapshot |
 | `upstream-protected` | Local protected counterpart of that snapshot |
-| `con-public` | Six canonical CON records and four references |
+| `con-public` | Manifest-declared canonical CON and reference records |
 | `con-protected` | CON editor incoming boundary |
 
 The editor reads and writes only through `con-protected`.
@@ -99,10 +104,8 @@ On Linux, Playwright may report missing host browser libraries; this workspace d
 
 ## Reproducibility boundary
 
-Pixi locks Hugo, Python, Dump Things, qri, LinkML, LinkML Runtime, Pydantic, RDFLib, and their transitive dependencies.
-Linux also receives Git Annex `10.20260601` from the lock.
-
-Conda-forge does not publish Git Annex for macOS ARM, so the macOS path uses the host executable and rejects any version other than the trial-recorded `10.20260420`.
+Pixi locks Hugo, Python, Dump Things, qri, LinkML, LinkML Runtime, Pydantic, RDFLib, Git Annex `10.20260601`, and their transitive dependencies.
+Linux uses the Conda package; macOS ARM uses the pinned Python wheel in the same Pixi environment.
 Asset retrieval uses read-only URLs without adding remotes or changing shared worktree configuration.
 
 The native metadata contract is explicit `dlthings:*` CURIEs against the pinned source Things Schema.
@@ -110,5 +113,8 @@ Full-URI type designators, unknown CURIEs, dangling native targets, and generic 
 
 ## Scope boundary
 
-This experiment does not publish GitHub Pages, configure pull-request editing, change DNS, update production, run a persistent hosted metadata service, or migrate the remaining CON content.
-The documented rebase drill reviews a candidate upstream range, rebases exactly the two site commits, regenerates the projection, inspects `range-diff`, reruns acceptance, and only then updates the parent gitlink locally.
+This phase generalizes the proven profile and migrates the legacy-equivalent people, project, editorial, branding, and asset experience.
+The broader Zotero collection is deferred.
+
+It does not publish GitHub Pages, configure pull-request editing, change DNS, update production, or run a persistent hosted metadata service.
+The documented rebase drill reviews a candidate upstream range, replays the hand-authored site commits without their terminal generated commit, regenerates the projection, inspects `range-diff`, reruns acceptance, and only then updates the parent gitlink locally.

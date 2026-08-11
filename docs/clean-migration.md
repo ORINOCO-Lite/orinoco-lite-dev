@@ -1,6 +1,6 @@
 # Clean migration implementation contract
 
-Status: active, local-only execution specification
+Status: accepted local-only checkpoint; superseded for active development by [`full-con-migration.md`](full-con-migration.md)
 
 Reviewed upstream base: `5b401e0c478a4409442b3a8a285bd3efd5d30e05`
 
@@ -10,10 +10,10 @@ Site branch: `codex/clean-migration` in `submodules/centerforopenneuroscience.or
 
 ## Purpose
 
-The clean migration tests a deliberately different history strategy from the completed `orinoco-lite` vertical slice.
+The clean migration tested a deliberately different history strategy from the completed `orinoco-lite` vertical slice.
 The site branch descends directly from the reviewed `www-from-model` upstream commit and carries a minimal CON layer that can be replayed onto later reviewed upstream commits.
 
-The experiment must answer four questions locally:
+The experiment answered four questions locally:
 
 1. Can the real CON vertical slice validate and project through the pinned upstream stack while using the source-schema CURIE contract?
 2. Can the default service/editor and static interfaces show CON data without mixing in the German snapshot?
@@ -22,7 +22,7 @@ The experiment must answer four questions locally:
 
 ## Exception boundary
 
-Direct upstream ancestry is allowed only for the site branch `codex/clean-migration`.
+Direct upstream ancestry is allowed for the accepted site branch `codex/clean-migration` and its explicitly authorized `codex/full-con-migration` successor.
 It is not a new repository-wide history policy.
 
 Do not modify, rebase, force-update, merge into, or replace:
@@ -33,8 +33,8 @@ Do not modify, rebase, force-update, merge into, or replace:
 - the clean `www-from-model` mirror branch; or
 - any production or deployment ref.
 
-The direct-upstream branch is an experimental local integration branch.
-Its accepted result informs a later branch and production decision; it does not make that decision itself.
+These direct-upstream branches are local integration branches.
+The accepted clean-migration result informs its successor and a later production decision; it does not make that production decision itself.
 
 ## Git topology and two-commit rule
 
@@ -414,4 +414,5 @@ Do not expand this effort to include:
 - secondary projections; or
 - upstream contribution work.
 
-The clean migration ends with a locally accepted two-commit site branch and a deliberately reviewed local parent gitlink.
+The clean migration ended with a locally accepted two-commit site branch and a deliberately reviewed local parent gitlink.
+Its former deferred full-content work is governed by [`full-con-migration.md`](full-con-migration.md); it remains outside this frozen checkpoint.
