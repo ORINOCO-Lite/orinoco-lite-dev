@@ -26,5 +26,15 @@ class PlaywrightContractTests(unittest.TestCase):
         self.assertIn("reuseExistingServer: false", config)
         self.assertIn("workers: 1", config)
 
+    def test_authenticated_spec_disables_secret_bearing_artifacts(self) -> None:
+        source = (ROOT / "tests/browser/authenticated-editor.spec.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("trace: 'off'", source)
+        self.assertIn("screenshot: 'off'", source)
+        self.assertIn("video: 'off'", source)
+        self.assertNotIn("editor-token?", source)
+
+
 if __name__ == "__main__":
     unittest.main()

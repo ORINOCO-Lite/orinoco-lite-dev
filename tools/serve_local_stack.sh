@@ -11,14 +11,22 @@ names=()
 
 cleanup() {
   trap - EXIT INT TERM
-  for pid in "${pids[@]:-}"; do
+  for pid in "${pids[@]}"; do
     kill "$pid" 2>/dev/null || true
   done
-  for pid in "${pids[@]:-}"; do
+  for pid in "${pids[@]}"; do
     wait "$pid" 2>/dev/null || true
   done
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+for required_dir in "$stack_dir/ui" "$root_dir/build/con-site"; do
+  if [[ ! -d "$required_dir" ]]; then
+    echo "Missing local-stack input directory: $required_dir" >&2
+    exit 1
+  fi
+done
 
 start_background() {
   local name="$1"
@@ -61,12 +69,14 @@ wait_for_url "Dump Things" "http://127.0.0.1:8111/server"
 python3 "$root_dir/tools/seed_local_pool.py"
 
 start_background git-annex python3 "$root_dir/tools/serve_local_gitannex.py"
-start_background shacl-vue python3 -m http.server 3000 --directory "$root_dir/submodules/pool.psychoinformatics.de-ui/dist/ui"
+start_background shacl-vue python3 -m http.server 3000 \
+  --directory "$stack_dir/ui"
 wait_for_url "SHACL Vue" "http://127.0.0.1:3000/config.yaml"
 python3 "$root_dir/tools/check_local_stack.py"
 
-start_background hugo-site python3 -m http.server 8767 --directory "$root_dir/build/upstream-local"
-wait_for_url "Hugo site" "http://127.0.0.1:8767/"
+start_background con-site python3 -m http.server 8767 \
+  --directory "$root_dir/build/con-site"
+wait_for_url "CON site" "http://127.0.0.1:8767/"
 echo "Local deployment is ready at http://127.0.0.1:8767/"
 echo "Press Ctrl-C to stop all local services."
 

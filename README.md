@@ -64,7 +64,7 @@ The full stack uses four separate collections:
 | --- | --- |
 | `upstream-public` | Cached German public snapshot |
 | `upstream-protected` | Local protected counterpart of that snapshot |
-| `con-public` | Five CON records, generated site root, and four references |
+| `con-public` | Six canonical CON records and four references |
 | `con-protected` | CON editor incoming boundary |
 
 The editor reads and writes only through `con-protected`.
