@@ -35,6 +35,8 @@ pixi run verify-static          # require a byte-identical repeat build
 pixi run serve-static           # CON artifact only, at 127.0.0.1:8767
 pixi run serve                  # full CON editor/service/static stack
 pixi run verify-con-projection  # two renders, both matching the Git snapshot
+pixi run update-con-assembly    # accept reviewed static-assembly inputs
+pixi run verify-con-assembly    # verify the second committed digest
 pixi run build-upstream         # explicit German upstream reference build
 pixi run serve-upstream         # explicit upstream reference server
 pixi run test                   # focused contract tests
@@ -54,9 +56,16 @@ Projection updates are explicit:
 pixi run render-con-projection  # candidate in ignored build state
 pixi run update-con-projection  # replace the reviewed Git snapshot
 pixi run verify-con-projection  # regenerate twice and compare with Git
+pixi run update-con-assembly    # refresh only the static-input digest
+pixi run verify-con-assembly    # reject stale static inputs
 ```
 
+While preparing a successor before the parent gitlink moves, a developer may set `CON_SITE_ROOT` to that local site checkout for render/update work.
+This is only a temporary workspace override; no absolute successor path belongs in Pixi configuration or committed manifests.
+Final build and acceptance run without that override after the parent gitlink points at the reviewed successor tip, and require the site checkout to be clean with exactly one terminal projection snapshot commit.
+
 A normal build fails closed when relevant canonical records, profile configuration, editorial content, assets, upstream presentation inputs, renderer code, Pixi pins, or component commits change without the corresponding projection or site-assembly refresh.
+Metadata changes refresh both digests; editorial, styling, or asset-only changes refresh only the assembly digest.
 
 Reviewed YAML in the clean site profile is the sole canonical metadata source.
 The legacy website and `dump-research-info` are migration evidence only and do not participate in a normal build.

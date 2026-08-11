@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import hashlib
 import json
+import os
 import re
 import sys
 import uuid
@@ -14,8 +15,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import SplitResult, parse_qs, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
+SITE = Path(
+    os.environ.get(
+        "CON_SITE_ROOT",
+        ROOT / "submodules" / "centerforopenneuroscience.org",
+    )
+).resolve()
 STACK = ROOT / "build" / "local-stack"
 UPSTREAM_SNAPSHOT = STACK / "pool" / "public-thing.jsonl"
 CON_RECORDS = ROOT / "build" / "con-projection" / "records.jsonl"
@@ -34,16 +43,15 @@ LEGACY_COLLECTIONS = ("public", "protected")
 EDIT_LINK = re.compile(r"href=(?:\"(?P<double>[^\"]+)\"|'(?P<single>[^']+)')")
 PROBE_CLASS = "XYZProject"
 LEGACY_PROBE_PID = "xyzrins:projects/_clean-migration-write-probe"
+PROBE_PID_PREFIX = f"{LEGACY_PROBE_PID}-"
 CON_PERSON_PID = "xyzrins:persons/yaroslav-halchenko"
-EXPECTED_EDIT_PIDS = frozenset(
+REPRESENTATIVE_EDIT_PIDS = frozenset(
     {
-        "xyzrins:.",
         CON_PERSON_PID,
         "xyzrins:projects/datalad",
-        "xyzrins:publications/datalad-joss-2021",
-        "xyzrins:instruments/datalad",
     }
 )
+PROJECTION_CONTRACT = SITE / "profiles" / "con" / "projection.yaml"
 EDIT_QUERY_KEYS = frozenset({"sh:NodeShape", "pid", "edit"})
 
 
@@ -134,13 +142,9 @@ def manifest_records(path: Path) -> dict[str, dict]:
                     f"{path}:{line_number}: invalid stack JSONL envelope"
                 ) from error
             if not isinstance(record, dict):
-                raise RuntimeError(
-                    f"{path}:{line_number}: record must be an object"
-                )
+                raise RuntimeError(f"{path}:{line_number}: record must be an object")
             if not isinstance(pid, str) or not pid:
-                raise RuntimeError(
-                    f"{path}:{line_number}: record pid must be a string"
-                )
+                raise RuntimeError(f"{path}:{line_number}: record pid must be a string")
             if pid in records:
                 raise RuntimeError(
                     f"{path}:{line_number}: duplicate record pid {pid!r}"
@@ -151,6 +155,84 @@ def manifest_records(path: Path) -> dict[str, dict]:
     return records
 
 
+def manifest_envelopes(path: Path) -> dict[str, dict]:
+    """Load the generated service envelopes, retaining their class names."""
+    envelopes: dict[str, dict] = {}
+    with path.open(encoding="utf-8") as stream:
+        for line_number, line in enumerate(stream, start=1):
+            try:
+                item = json.loads(line)
+                class_name = item["class_name"]
+                record = item["record"]
+                pid = record["pid"]
+            except (json.JSONDecodeError, KeyError, TypeError) as error:
+                raise RuntimeError(
+                    f"{path}:{line_number}: invalid stack JSONL envelope"
+                ) from error
+            if not isinstance(class_name, str) or not class_name:
+                raise RuntimeError(f"{path}:{line_number}: class_name must be a string")
+            if not isinstance(record, dict) or not isinstance(pid, str) or not pid:
+                raise RuntimeError(
+                    f"{path}:{line_number}: record and pid must be valid"
+                )
+            schema_type = record.get("schema_type")
+            if schema_type != f"xyzri:{class_name}":
+                raise RuntimeError(
+                    f"{path}:{line_number}: class_name {class_name!r} does not "
+                    f"match schema_type {schema_type!r}"
+                )
+            if pid in envelopes:
+                raise RuntimeError(
+                    f"{path}:{line_number}: duplicate record pid {pid!r}"
+                )
+            envelopes[pid] = item
+    if not envelopes:
+        raise RuntimeError(f"{path}: manifest has no records")
+    return envelopes
+
+
+def expected_edit_pids(
+    records_path: Path = CON_RECORDS,
+    projection_path: Path = PROJECTION_CONTRACT,
+) -> frozenset[str]:
+    """Derive the editable route closure from records and render policy."""
+    try:
+        contract = yaml.safe_load(projection_path.read_text(encoding="utf-8"))
+        render = contract["render"]
+        pages = render["pages"]
+        homepage_pid = render["homepage"]["pid"]
+    except (OSError, KeyError, TypeError, yaml.YAMLError) as error:
+        raise RuntimeError(
+            f"Invalid CON projection contract: {projection_path}"
+        ) from error
+    if not isinstance(pages, dict) or not pages:
+        raise RuntimeError("CON projection contract declares no rendered classes")
+    rendered_types = set(pages)
+    if not all(
+        isinstance(schema_type, str) and schema_type.startswith("xyzri:")
+        for schema_type in rendered_types
+    ):
+        raise RuntimeError("CON rendered class designators must be xyzri CURIEs")
+    if not isinstance(homepage_pid, str) or not homepage_pid:
+        raise RuntimeError("CON projection homepage pid is invalid")
+
+    envelopes = manifest_envelopes(records_path)
+    expected = frozenset(
+        pid
+        for pid, item in envelopes.items()
+        if item["record"]["schema_type"] in rendered_types
+    )
+    if homepage_pid not in expected:
+        raise RuntimeError(f"CON homepage {homepage_pid!r} is not a rendered record")
+    missing_smoke = REPRESENTATIVE_EDIT_PIDS - expected
+    if missing_smoke:
+        raise RuntimeError(
+            "Representative CON edit fixtures are not rendered: "
+            f"{sorted(missing_smoke)!r}"
+        )
+    return expected
+
+
 def curated_records(collection: str, token: str) -> dict[str, dict]:
     records: dict[str, dict] = {}
     page = 1
@@ -158,9 +240,7 @@ def curated_records(collection: str, token: str) -> dict[str, dict]:
         query = urlencode({"page": page, "size": 100})
         url = f"{SERVICE_URL}/{collection}/curated/records/p/?{query}"
         payload = request_json("GET", url, token)
-        if not isinstance(payload, dict) or not isinstance(
-            payload.get("items"), list
-        ):
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
             raise RuntimeError(f"Unexpected paginated response from {url}")
         for record in payload["items"]:
             pid = record.get("pid") if isinstance(record, dict) else None
@@ -212,9 +292,7 @@ def check_seed_separation(token: str) -> dict[str, int]:
         actual = curated_records(collection, token)
         if actual != expected_records:
             difference = describe_difference(expected_records, actual)
-            raise RuntimeError(
-                f"Curated records differ in {collection}: {difference}"
-            )
+            raise RuntimeError(f"Curated records differ in {collection}: {difference}")
         counts[collection] = len(actual)
     return counts
 
@@ -244,18 +322,14 @@ def check_editor_ui() -> None:
         "https://pool.psychoinformatics.de/api/",
     ):
         if forbidden in config:
-            raise RuntimeError(
-                f"SHACL Vue unexpectedly references {forbidden!r}"
-            )
+            raise RuntimeError(f"SHACL Vue unexpectedly references {forbidden!r}")
     for required in (
         "use_service: true",
         "use_token: true",
         "http://127.0.0.1:8122/git-annex",
     ):
         if required not in config:
-            raise RuntimeError(
-                f"SHACL Vue configuration is missing {required!r}"
-            )
+            raise RuntimeError(f"SHACL Vue configuration is missing {required!r}")
     for required in ("xyzrins:", "dlschemas_owl.ttl", "data_url: ''"):
         if required not in external:
             raise RuntimeError(
@@ -263,7 +337,11 @@ def check_editor_ui() -> None:
             )
 
 
-def check_static_edit_links() -> int:
+def check_static_edit_links(
+    expected_pids: frozenset[str] | None = None,
+) -> int:
+    if expected_pids is None:
+        expected_pids = expected_edit_pids()
     links: list[tuple[str, SplitResult, dict[str, list[str]]]] = []
     for path in sorted(CON_SITE.rglob("*.html")):
         source = path.read_text(encoding="utf-8")
@@ -298,12 +376,10 @@ def check_static_edit_links() -> int:
             )
         linked_pids.append(query["pid"][0])
     actual_pids = set(linked_pids)
-    if actual_pids != EXPECTED_EDIT_PIDS or len(linked_pids) != len(
-        EXPECTED_EDIT_PIDS
-    ):
+    if actual_pids != expected_pids or len(linked_pids) != len(expected_pids):
         raise RuntimeError(
-            "CON static edit links do not match the expected record set: "
-            f"expected={sorted(EXPECTED_EDIT_PIDS)!r}, "
+            "CON static edit links do not match the rendered record set: "
+            f"expected={sorted(expected_pids)!r}, "
             f"actual={sorted(linked_pids)!r}"
         )
     return len(links)
@@ -315,9 +391,7 @@ def incoming_record(
     pid: str,
 ) -> object | None:
     query = urlencode({"pid": pid})
-    url = (
-        f"{SERVICE_URL}/{collection}/incoming/local-editor/record?{query}"
-    )
+    url = f"{SERVICE_URL}/{collection}/incoming/local-editor/record?{query}"
     return request_json("GET", url, token, missing_ok=True)
 
 
@@ -345,22 +419,53 @@ def check_anonymous_con_read() -> None:
 
 def delete_incoming_record(collection: str, token: str, pid: str) -> None:
     query = urlencode({"pid": pid})
-    url = (
-        f"{SERVICE_URL}/{collection}/incoming/local-editor/record?{query}"
-    )
+    url = f"{SERVICE_URL}/{collection}/incoming/local-editor/record?{query}"
     request_json("DELETE", url, token, missing_ok=True)
 
 
+def incoming_probe_pids(collection: str, token: str) -> set[str]:
+    """Find every reserved probe left by an interrupted acceptance run."""
+    found: set[str] = set()
+    page = 1
+    while True:
+        query = urlencode({"page": page, "size": 100})
+        url = f"{SERVICE_URL}/{collection}/incoming/local-editor/records/p/?{query}"
+        payload = request_json("GET", url, token, missing_ok=True)
+        if payload is None:
+            return found
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+            raise RuntimeError(f"Unexpected paginated incoming response from {url}")
+        for record in payload["items"]:
+            pid = record.get("pid") if isinstance(record, dict) else None
+            if not isinstance(pid, str):
+                raise RuntimeError(f"Incoming record without a pid in {collection}")
+            if pid == LEGACY_PROBE_PID or pid.startswith(PROBE_PID_PREFIX):
+                found.add(pid)
+        pages = int(payload.get("pages", 1))
+        if page >= pages:
+            return found
+        page += 1
+
+
 def prove_write_isolation(editor_token: str, seed_token: str) -> None:
-    probe_pid = (
-        "xyzrins:projects/_clean-migration-write-probe-"
-        f"{uuid.uuid4().hex}"
+    canonical_pids = set(manifest_envelopes(CON_RECORDS))
+    collisions = sorted(
+        pid
+        for pid in canonical_pids
+        if pid == LEGACY_PROBE_PID or pid.startswith(PROBE_PID_PREFIX)
     )
+    if collisions:
+        raise RuntimeError(
+            f"Canonical records use the reserved acceptance PID namespace: {collisions}"
+        )
+    probe_pid = f"{PROBE_PID_PREFIX}{uuid.uuid4().hex}"
     probe = {"pid": probe_pid, "schema_type": "xyzri:XYZProject"}
     url = f"{SERVICE_URL}/con-protected/record/{PROBE_CLASS}"
-    cleanup_pids = (LEGACY_PROBE_PID, probe_pid)
+    cleanup_pids = {LEGACY_PROBE_PID, probe_pid}
+    for collection in COLLECTIONS:
+        cleanup_pids.update(incoming_probe_pids(collection, seed_token))
     try:
-        for stale_pid in cleanup_pids:
+        for stale_pid in sorted(cleanup_pids):
             for collection in COLLECTIONS:
                 delete_incoming_record(collection, seed_token, stale_pid)
         for collection in sorted(COLLECTIONS):
@@ -376,12 +481,12 @@ def prove_write_isolation(editor_token: str, seed_token: str) -> None:
             for collection in COLLECTIONS
         }
         protected_record = incoming["con-protected"]
-        if not isinstance(protected_record, dict) or protected_record.get(
-            "pid"
-        ) != probe_pid:
+        if (
+            not isinstance(protected_record, dict)
+            or protected_record.get("pid") != probe_pid
+        ):
             raise RuntimeError(
-                "Editor write did not land in "
-                "con-protected/incoming/local-editor"
+                "Editor write did not land in con-protected/incoming/local-editor"
             )
         leaked = {
             collection: record
@@ -389,19 +494,15 @@ def prove_write_isolation(editor_token: str, seed_token: str) -> None:
             if collection != "con-protected" and record is not None
         }
         if leaked:
-            raise RuntimeError(
-                f"Editor write leaked into incoming areas: {leaked}"
-            )
+            raise RuntimeError(f"Editor write leaked into incoming areas: {leaked}")
         curated = {
             collection: curated_record(collection, seed_token, probe_pid)
             for collection in COLLECTIONS
         }
         if any(record is not None for record in curated.values()):
-            raise RuntimeError(
-                f"Editor write leaked into curated areas: {curated}"
-            )
+            raise RuntimeError(f"Editor write leaked into curated areas: {curated}")
     finally:
-        for stale_pid in cleanup_pids:
+        for stale_pid in sorted(cleanup_pids):
             for collection in COLLECTIONS:
                 delete_incoming_record(collection, seed_token, stale_pid)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import tomllib
 import unittest
 
 
@@ -19,8 +20,13 @@ class PlaywrightContractTests(unittest.TestCase):
     def test_browser_runtime_and_artifacts_stay_in_ignored_build_state(self) -> None:
         pixi = (ROOT / "pixi.toml").read_text(encoding="utf-8")
         self.assertIn('PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers"', pixi)
-        self.assertIn('install-browser-tests =', pixi)
-        self.assertIn('test-browser =', pixi)
+        self.assertIn("install-browser-tests =", pixi)
+        self.assertIn("test-browser =", pixi)
+        tasks = tomllib.loads(pixi)["tasks"]
+        self.assertIn(
+            "install-browser-tests",
+            tasks["test-browser"]["depends-on"],
+        )
         config = (ROOT / "playwright.config.mjs").read_text(encoding="utf-8")
         self.assertIn("build/playwright", config)
         self.assertIn("reuseExistingServer: false", config)

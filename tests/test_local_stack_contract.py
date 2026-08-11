@@ -33,6 +33,11 @@ class LocalStackContractTests(unittest.TestCase):
         )
         self.assertIn(
             'build = { depends-on = ["checkout-submodules"], cmd = '
+            '"python3 tools/build_con_site.py" }',
+            pixi,
+        )
+        self.assertIn(
+            'verify-static = { depends-on = ["checkout-submodules"], cmd = '
             '"python3 tools/build_con_site.py --repeat-destination '
             'build/con-site-repeat" }',
             pixi,
@@ -48,6 +53,8 @@ class LocalStackContractTests(unittest.TestCase):
             "render-con-projection",
             "update-con-projection",
             "verify-con-projection",
+            "update-con-assembly",
+            "verify-con-assembly",
             "prepare-local-stack",
             "refresh-local-pool",
             "serve-dump-things",
@@ -103,6 +110,9 @@ class LocalStackContractTests(unittest.TestCase):
         self.assertNotIn('"remote",\n            "add"', assets)
         self.assertNotIn('"config",\n        "core.worktree"', assets)
         self.assertIn("annex_from_url", assets)
+        self.assertIn('"pixi",\n        "run",\n        "git",', assets)
+        self.assertIn('f"--work-tree={repository.resolve()}"', assets)
+        self.assertNotIn('["git-annex", "version"]', assets)
 
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
             encoding="utf-8"

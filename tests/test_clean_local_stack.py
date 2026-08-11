@@ -38,9 +38,10 @@ def write_manifest(path: Path, *items: str | dict) -> None:
             if isinstance(item, str)
             else item
         )
+        class_name = record["schema_type"].rsplit(":", 1)[-1]
         lines.append(
             json.dumps(
-                {"class_name": "XYZProject", "record": record},
+                {"class_name": class_name, "record": record},
                 sort_keys=True,
             )
         )
@@ -173,16 +174,10 @@ use_service: true
             service = (stack / "dumpthings.yaml").read_text(encoding="utf-8")
             for collection in PREPARE.COLLECTIONS:
                 self.assertIn(f"  {collection}:\n", service)
-                self.assertTrue(
-                    (stack / "store" / collection / "curated").is_dir()
-                )
-                self.assertTrue(
-                    (stack / "store" / collection / "incoming").is_dir()
-                )
+                self.assertTrue((stack / "store" / collection / "curated").is_dir())
+                self.assertTrue((stack / "store" / collection / "incoming").is_dir())
             self.assertEqual(service.count("default_token: local_reader"), 3)
-            self.assertEqual(
-                service.count("default_token: local_con_reader"), 1
-            )
+            self.assertEqual(service.count("default_token: local_con_reader"), 1)
             self.assertNotIn("local_denied", service)
             self.assertEqual(
                 {path.name for path in removed},
@@ -208,9 +203,9 @@ use_service: true
             self.assertNotIn("upstream-", con_reader)
             self.assertNotIn("WRITE", con_reader)
             self.assertEqual(con_reader.count("mode:"), 1)
-            editor = service.split("  local_editor:", 1)[1].split(
-                "  local_seeder:", 1
-            )[0]
+            editor = service.split("  local_editor:", 1)[1].split("  local_seeder:", 1)[
+                0
+            ]
             self.assertIn("con-protected:", editor)
             self.assertIn("mode: WRITE_COLLECTION", editor)
             self.assertIn("incoming_label: local-editor", editor)
@@ -221,9 +216,7 @@ use_service: true
             seeder = service.split("  local_seeder:", 1)[1]
             for collection in PREPARE.COLLECTIONS:
                 self.assertIn(f"      {collection}:\n", seeder)
-            runtime = (stack / "ui" / "config.yaml").read_text(
-                encoding="utf-8"
-            )
+            runtime = (stack / "ui" / "config.yaml").read_text(encoding="utf-8")
             con_url = "http://127.0.0.1:8111/con-protected/"
             self.assertEqual(runtime.count(con_url), 2)
             self.assertNotIn("127.0.0.1:8111/public/", runtime)
@@ -399,16 +392,23 @@ use_service: true
             if method == "POST":
                 written = body
                 return body
-            if (
-                written is not None
-                and "/con-protected/incoming/local-editor/" in url
-            ):
+            if written is not None and "/con-protected/incoming/local-editor/" in url:
                 return written
             return None
 
         with (
             mock.patch.object(CHECK, "request_json", side_effect=request),
             mock.patch.object(CHECK, "expect_rejected") as rejected,
+            mock.patch.object(
+                CHECK,
+                "manifest_envelopes",
+                return_value={"xyzrins:.": {}},
+            ),
+            mock.patch.object(
+                CHECK,
+                "incoming_probe_pids",
+                return_value={f"{CHECK.PROBE_PID_PREFIX}stale"},
+            ),
             mock.patch.object(
                 CHECK.uuid,
                 "uuid4",
@@ -422,10 +422,7 @@ use_service: true
         self.assertEqual(post[2], "editor-token")
         self.assertEqual(rejected.call_count, 7)
         probe = {
-            "pid": (
-                "xyzrins:projects/"
-                "_clean-migration-write-probe-unit-probe"
-            ),
+            "pid": ("xyzrins:projects/_clean-migration-write-probe-unit-probe"),
             "schema_type": "xyzri:XYZProject",
         }
         for collection in (
@@ -449,8 +446,40 @@ use_service: true
             )
         self.assertGreaterEqual(
             sum(call[0] == "DELETE" for call in calls),
-            8,
+            24,
         )
+        self.assertTrue(
+            any(call[0] == "DELETE" and "stale" in call[1] for call in calls)
+        )
+
+    def test_write_probe_namespace_cannot_collide_with_canonical_data(self) -> None:
+        collision = f"{CHECK.PROBE_PID_PREFIX}canonical"
+        with mock.patch.object(
+            CHECK,
+            "manifest_envelopes",
+            return_value={collision: {}},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "reserved acceptance PID"):
+                CHECK.prove_write_isolation("editor-token", "seed-token")
+
+    def test_stale_write_probes_are_discovered_without_human_edits(self) -> None:
+        stale = f"{CHECK.PROBE_PID_PREFIX}interrupted"
+        pages = (
+            {
+                "items": [
+                    {"pid": "xyzrins:projects/human-pending-edit"},
+                    {"pid": CHECK.LEGACY_PROBE_PID},
+                ],
+                "pages": 2,
+            },
+            {"items": [{"pid": stale}], "pages": 2},
+        )
+        with mock.patch.object(CHECK, "request_json", side_effect=pages) as request:
+            self.assertEqual(
+                CHECK.incoming_probe_pids("con-protected", "seed-token"),
+                {CHECK.LEGACY_PROBE_PID, stale},
+            )
+        self.assertEqual(request.call_count, 2)
 
     def test_ui_links_and_supervisor_default_to_con(self) -> None:
         config = """use_service: true
@@ -463,15 +492,23 @@ service_base_url:
 gitannex_p2phttp_url: http://127.0.0.1:8122/git-annex
 """
         external = "xyzrins:\ndlschemas_owl.ttl\ndata_url: ''\n"
+        expected_pids = frozenset(
+            {
+                "xyzrins:.",
+                CHECK.CON_PERSON_PID,
+                "xyzrins:projects/datalad",
+                "xyzrins:persons/new-member",
+            }
+        )
         with tempfile.TemporaryDirectory() as temporary:
             site = Path(temporary)
-            for index, pid in enumerate(sorted(CHECK.EXPECTED_EDIT_PIDS)):
+            for index, pid in enumerate(sorted(expected_pids)):
                 page = site / str(index)
                 page.mkdir()
                 query_pid = pid.replace(":", "%3A").replace("/", "%2F")
                 (page / "index.html").write_text(
                     '<a href="http://127.0.0.1:3000/'
-                    '?sh%3ANodeShape=dlthings%3AThing&amp;pid='
+                    "?sh%3ANodeShape=dlthings%3AThing&amp;pid="
                     f'{query_pid}&amp;edit=true">edit</a>',
                     encoding="utf-8",
                 )
@@ -485,8 +522,8 @@ gitannex_p2phttp_url: http://127.0.0.1:8122/git-annex
             ):
                 CHECK.check_editor_ui()
                 self.assertEqual(
-                    CHECK.check_static_edit_links(),
-                    len(CHECK.EXPECTED_EDIT_PIDS),
+                    CHECK.check_static_edit_links(expected_pids),
+                    len(expected_pids),
                 )
 
     def test_edit_links_reject_credentials_and_unknown_records(self) -> None:
@@ -509,7 +546,7 @@ gitannex_p2phttp_url: http://127.0.0.1:8122/git-annex
                     RuntimeError,
                     "credential-free",
                 ):
-                    CHECK.check_static_edit_links()
+                    CHECK.check_static_edit_links(frozenset({CHECK.CON_PERSON_PID}))
 
             unknown_query = (
                 "sh%3ANodeShape=dlthings%3AThing&amp;"
@@ -519,9 +556,72 @@ gitannex_p2phttp_url: http://127.0.0.1:8122/git-annex
             with mock.patch.object(CHECK, "CON_SITE", site):
                 with self.assertRaisesRegex(
                     RuntimeError,
-                    "expected record set",
+                    "rendered record set",
                 ):
-                    CHECK.check_static_edit_links()
+                    CHECK.check_static_edit_links(frozenset({CHECK.CON_PERSON_PID}))
+
+    def test_edit_pid_closure_comes_from_records_and_render_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            records = root / "records.jsonl"
+            projection = root / "projection.yaml"
+            write_manifest(
+                records,
+                {
+                    "pid": "xyzrins:.",
+                    "schema_type": "xyzri:XYZProject",
+                },
+                {
+                    "pid": "xyzrins:projects/datalad",
+                    "schema_type": "xyzri:XYZProject",
+                },
+                {
+                    "pid": CHECK.CON_PERSON_PID,
+                    "schema_type": "xyzri:XYZPerson",
+                },
+                {
+                    "pid": "xyzrins:persons/new-member",
+                    "schema_type": "xyzri:XYZPerson",
+                },
+                {
+                    "pid": "marcrel:aut",
+                    "schema_type": "xyzri:XYZAgentRole",
+                },
+            )
+            projection.write_text(
+                """render:
+  pages:
+    xyzri:XYZProject: project.md.j2
+    xyzri:XYZPerson: person.md.j2
+  homepage:
+    pid: xyzrins:.
+""",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                CHECK.expected_edit_pids(records, projection),
+                {
+                    "xyzrins:.",
+                    "xyzrins:projects/datalad",
+                    CHECK.CON_PERSON_PID,
+                    "xyzrins:persons/new-member",
+                },
+            )
+
+            without_datalad = root / "without-datalad.jsonl"
+            write_manifest(
+                without_datalad,
+                {
+                    "pid": "xyzrins:.",
+                    "schema_type": "xyzri:XYZProject",
+                },
+                {
+                    "pid": CHECK.CON_PERSON_PID,
+                    "schema_type": "xyzri:XYZPerson",
+                },
+            )
+            with self.assertRaisesRegex(RuntimeError, "Representative"):
+                CHECK.expected_edit_pids(without_datalad, projection)
 
     def test_anonymous_read_targets_curated_yaroslav_record(self) -> None:
         record = {"pid": CHECK.CON_PERSON_PID}

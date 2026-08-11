@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,14 +7,26 @@ import { expect, test } from '@playwright/test';
 import { startStaticServer } from './static-server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const EXPECTED_CON_PIDS = new Set([
-  'ror:04tfhh831',
-  'xyzrins:.',
-  'xyzrins:instruments/datalad',
+const CON_SITE_ROOT = process.env.CON_SITE_ROOT ?? path.join(
+  ROOT,
+  'submodules/centerforopenneuroscience.org',
+);
+const COMMITTED_GRAPH = path.join(
+  CON_SITE_ROOT,
+  'profiles/con/projection/static/graph.json',
+);
+const REPRESENTATIVE_CON_PIDS = [
   'xyzrins:persons/yaroslav-halchenko',
   'xyzrins:projects/datalad',
-  'xyzrins:publications/datalad-joss-2021',
-]);
+];
+
+async function expectedCONGraph() {
+  return JSON.parse(await readFile(COMMITTED_GRAPH, 'utf8'));
+}
+
+function edgePairs(graph) {
+  return graph.edges.map((edge) => `${edge.source}\0${edge.target}`).sort();
+}
 
 function graphResponse(page) {
   return page.waitForResponse((response) => {
@@ -33,6 +46,7 @@ test(
       'upstream',
     );
     try {
+      const expected = await expectedCONGraph();
       const firstGraph = graphResponse(page);
       await page.goto(`${fixture.origin}/`);
       const upstreamResponse = await firstGraph;
@@ -51,8 +65,14 @@ test(
       const con = await conResponse.json();
       expect(conURL.searchParams.get('v')).toMatch(/^[0-9a-f]{64}$/);
       expect(conURL.href).not.toBe(upstreamURL.href);
-      expect(new Set(con.nodes.map((node) => node.id))).toEqual(EXPECTED_CON_PIDS);
-      expect(con.edges).toHaveLength(7);
+      expect(new Set(con.nodes.map((node) => node.id))).toEqual(
+        new Set(expected.nodes.map((node) => node.id)),
+      );
+      expect(edgePairs(con)).toEqual(edgePairs(expected));
+      expect(con.edges).toHaveLength(expected.edges.length);
+      for (const pid of REPRESENTATIVE_CON_PIDS) {
+        expect(con.nodes.some((node) => node.id === pid)).toBe(true);
+      }
       expect(con.nodes.map((node) => node.label)).not.toEqual(
         expect.arrayContaining(['PsyInf', 'FZJ', 'M.Hanke']),
       );
@@ -78,13 +98,13 @@ test('project-path graph resources and routes resolve', async ({ page }) => {
   const fixture = await startStaticServer(
     { con: path.join(ROOT, 'build/con-site-project') },
     'con',
-    { mountPath: '/clean-migration/' },
+    { mountPath: '/full-con-migration/' },
   );
   try {
     const graph = graphResponse(page);
-    await page.goto(`${fixture.origin}/clean-migration/`);
+    await page.goto(`${fixture.origin}/full-con-migration/`);
     const response = await graph;
-    expect(new URL(response.url()).pathname).toBe('/clean-migration/graph.json');
+    expect(new URL(response.url()).pathname).toBe('/full-con-migration/graph.json');
     expect(new URL(response.url()).searchParams.get('v')).toMatch(
       /^[0-9a-f]{64}$/,
     );
@@ -93,9 +113,11 @@ test('project-path graph resources and routes resolve', async ({ page }) => {
       .first()
       .getAttribute('href');
     const personPath = new URL(personHref).pathname;
-    expect(personPath).toBe('/clean-migration/persons/yaroslav-halchenko/');
+    expect(personPath).toBe('/full-con-migration/persons/yaroslav-halchenko/');
     await page.goto(`${fixture.origin}${personPath}`);
-    await expect(page).toHaveURL(/\/clean-migration\/persons\/yaroslav-halchenko\/$/);
+    await expect(page).toHaveURL(
+      /\/full-con-migration\/persons\/yaroslav-halchenko\/$/,
+    );
     await expect(
       page.getByRole('heading', { name: 'Yaroslav Halchenko' }),
     ).toBeVisible();
