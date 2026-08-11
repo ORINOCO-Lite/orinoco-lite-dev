@@ -1,250 +1,199 @@
 # Orinoco Lite execution plan
 
-Status: active
+Status: active — local clean-migration trial
 
 ## Outcome
 
-Enable a lab to create one GitHub repository, add structured research metadata and editorial content, and deploy a static lab website through GitHub Pages.
-The lab should not need to understand or operate the underlying Orinoco services.
+The long-term Orinoco Lite outcome remains a self-contained lab repository with human-editable YAML metadata, editorial content, and a deterministic static website.
+Git pull requests will eventually provide the review and publication boundary, without requiring a continuously running metadata service.
 
-Canonical metadata is human-editable YAML in Git.
-GitHub pull requests provide the authentication, review, and publication boundary.
-The same records may later support websites, graphs, grants, CVs, annual reports, and other projections.
+The active effort is narrower.
+It layers the reviewed CON vertical slice onto a current upstream website base, proves the local service and static build paths, and establishes a small downstream commit stack that can be rebased as upstream changes.
 
-## Current repository map
+This effort is named **clean migration**.
+Its decision-complete implementation contract is [`docs/clean-migration.md`](clean-migration.md).
 
-| Repository | Current role |
+## Current repository roles
+
+| Repository or branch | Current role |
 | --- | --- |
-| [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Development workspace, architecture, component pins, and integration coordination |
-| [`con/www-from-model`](https://github.com/con/www-from-model) | Clean GitHub mirror of upstream history and staging point for reusable changes |
-| [`www/www-from-model`](https://hub.psychoinformatics.de/www/www-from-model) | Upstream metadata-driven Hugo website |
-| `centerforopenneuroscience.org` | Final CON repository for canonical metadata, content, presentation, and deployment |
-| `dump-research-info` | Source of reviewed CON metadata and migration/provenance logic |
-| Orinoco repositories | Upstream schemas, Dump Things, `qri`, graph, UI, and enrichment components |
-| `con/orinoco-lite-action` | Future released build and deployment implementation; not yet extracted |
-| `con/orinoco-lite-template` | Future minimal lab starter; not yet created |
+| Parent `codex/clean-migration` | Local coordination, component pins, tests, and deliberate site gitlink |
+| CON site `codex/clean-migration` | Direct-upstream experimental site with exactly two downstream commits |
+| CON site `master` and preservation refs | Legacy production history; unchanged reference material |
+| CON site `orinoco-lite` | Completed legacy-derived vertical slice; unchanged migration input |
+| `www-from-model` `main` | Clean mirror of `upstream/main` and source of reviewed base commits |
+| `dump-research-info` | Reviewed migration evidence; never a build-time data source |
+| Orinoco submodules | Explicitly pinned schema, service, qri, UI, and graph components |
 
-The coordination repository currently pins 24 independently usable component repositories under `submodules/`.
-Their present location does not imply that all are runtime dependencies.
-Directory reorganization is not required before the first website slice.
+The active site branch starts directly from upstream website commit `5b401e0c478a4409442b3a8a285bd3efd5d30e05`.
+This ancestry is intentional so the two downstream site commits can be replayed onto a reviewed newer upstream commit.
 
 ## Repository and branch policy
 
-The existing `centerforopenneuroscience.org` repository remains the durable CON website repository.
-Preserve its current source history as:
+The normal Orinoco Lite policy keeps CON website history descended from legacy CON `master` and adopts upstream code selectively.
+That remains the policy for `master`, `legacy-site`, `orinoco-lite`, and all future production work unless a later decision changes it.
 
-- `legacy-site`, a branch at the pre-Orinoco Lite site tip; and
-- `legacy-site-2026-07-31`, an immutable baseline tag.
+The site branch `codex/clean-migration` is the sole exception.
+It has direct `www-from-model` ancestry and must not be merged into, used to rewrite, or substituted for the preserved legacy-derived branches during this effort.
 
-Create `orinoco-lite` from the existing CON `master` branch.
-This preserves normal CON ancestry and permits ordinary fork-based pull requests.
-Import only the useful `www-from-model` scaffolding in focused, attributed commits.
+Preserve unchanged:
 
-The local `submodules/www-from-model` repository keeps:
+- legacy CON `master` and all preservation refs;
+- the completed `orinoco-lite` branch and its evidence;
+- `www-from-model` `main` as a clean upstream mirror; and
+- all unrelated parent submodule pins.
 
-- `origin`: `https://github.com/con/www-from-model.git`;
-- `upstream`: `https://hub.psychoinformatics.de/www/www-from-model.git`; and
-- `main`: a clean mirror of `upstream/main`.
+The clean-migration site branch contains exactly two commits above its reviewed upstream base:
 
-Track the last reviewed `www-from-model` commit explicitly.
-Review subsequent upstream changes against that commit, then copy, adapt, or cherry-pick only the parts that remain useful.
-The CON branch is never rebased onto the complete upstream website history.
+1. A **build-profile commit** owns the isolated CON configuration, path and projection manifests, asset manifest, account-mirror transport, and synchronization policy.
+2. A **content-and-snapshot commit** owns the canonical and reference YAML, including the homepage project, editorial material, branding and assets, provenance, and committed deterministic projection.
 
-Keep changes separated where practical:
+Within the second commit, hand-authored inputs and generated outputs remain in distinct profile paths so they can be reviewed and regenerated independently.
 
-- CON metadata, existing content, assets, theme changes, and adopted scaffold code belong on `orinoco-lite`.
-- Generally useful fixes belong on focused branches in `con/www-from-model` and should be offered upstream narrowly.
-- Released Orinoco Lite behavior will eventually be extracted into a separate, versioned action rather than maintained as permanent CON-specific patches.
+Fixups are amended into the appropriate commit.
+Do not accumulate a third site commit.
+The parent coordination repository may update the site gitlink only after all local acceptance and rebase checks pass.
 
-The parent repository pins explicit component commits.
-Updating an upstream reference must not silently change a released lab build.
+## Active clean-migration scope
 
-## Architectural decisions
+### Data and content
 
-- A lab starts from a small GitHub template, not a fork of this coordination repository.
-- The default topology is one self-contained repository containing metadata, website content, configuration, and deployment.
-- A separate metadata repository is an optional later topology for cases with distinct permissions, release schedules, or independently managed consumers.
-- The public site is a deterministic static projection and requires no continuously running metadata backend.
-- Dump Things may run locally and ephemerally in CI to preserve upstream validation and projection behavior.
-- JSONL is an internal adapter when required by `qri`, not a second canonical format.
-- RDF is generated only when an identified consumer requires it.
-- Direct Git editing and pull requests are the complete initial editing path.
-- GitHub Issue Forms, SHACL-vue, a GitHub App, and an OAuth broker are possible later improvements, not first-milestone dependencies.
-- GitHub Pages is the initial preview and deployment target.
-
-## First milestone: CON vertical slice
-
-### Goal
-
-Produce a GitHub Pages preview from one small, connected set of real CON records using as much of the upstream `www-from-model` pipeline as practical.
-This milestone establishes the actual metadata, generator, theme, and workflow boundaries before they are generalized.
-
-### Minimum data slice
-
-Include:
+Use the connected CON vertical slice already reviewed in the completed `orinoco-lite` effort:
 
 - the Center for Open Neuroscience organization;
-- one person;
+- one representative person;
 - one project;
-- publications
-- the relationships connecting those records;
-- one or more representative depictions or assets; and
-- enough editorial content to evaluate the homepage and primary navigation.
+- one publication;
+- one instrument or output needed by the connected slice;
+- their native relationships and typed identifiers;
+- representative reviewed media; and
+- enough editorial content to assess the homepage and primary navigation.
 
-Use records that already have reviewed evidence in `dump-research-info` and content or assets already present in `centerforopenneuroscience.org`.
+Migration evidence may be copied deliberately from `dump-research-info` or the completed vertical slice.
+The clean site tree must become the complete build input.
+No normal build may join independently changing repositories or contact the German pool for CON records.
 
-### Execution sequence
+### Schema and record contract
 
-1. Fully hydrate the legacy `centerforopenneuroscience.org` history and preserve its current tip as `legacy-site` and `legacy-site-2026-07-31`.
-2. Create `orinoco-lite` from the existing CON `master`, push it to a writable fork, and open a draft pull request without changing production deployment.
-3. Capture the current deployed site output, representative screenshots, public URL inventory, and essential visual design values for comparison.
-4. Identify the exact metadata collection, schema release, templates, scripts, and build entry points worth adopting from `www-from-model`.
-5. Import the minimum useful Hugo, Congo, projection, and build scaffolding in separate commits with explicit upstream provenance.
-6. Select the minimum connected CON records and their source evidence.
-7. Transform those records into individual upstream-compatible YAML files on `orinoco-lite`.
-8. Preserve the corresponding editorial content, assets, URLs, and design values from the existing CON tree.
-9. Adapt the build so required Dump Things behavior runs ephemerally during CI rather than depending on a dedicated service.
-10. Use `qri` and Hugo to produce the static website.
-11. Add a repository-local GitHub Actions workflow that publishes a GitHub Pages preview from the prototype branch.
-12. Record necessary divergence and keep reusable fixes isolated for possible contribution.
+Use the source root schema from Things Schemas commit `d26ea413` with the released LinkML, LinkML Runtime, Pydantic, and RDFLib versions pinned in the parent Pixi environment.
 
-The production build must consume the combined candidate tree.
-It must not continually join independently changing data from `dump-research-info` and content from `centerforopenneuroscience.org`.
+The native `Association`, `Attribution`, `Generation`, `DOI`, and `ISSN` designators use their exact `dlthings:*` CURIE spellings.
+The verified contract, negative full-URI behavior, and excluded LinkML/schema candidates are recorded in [`docs/explaining-schema-issues.md`](explaining-schema-issues.md).
 
-### Exit criteria
+Do not validate against the completed vertical slice's vendored resolved static schema.
+Do not import the LinkML discriminator trial or the later Things Schemas identity candidate.
 
-- One canonical metadata change deterministically changes the preview site.
-- The selected records validate through the upstream Orinoco path.
-- Invalid records stop publication.
-- The website builds without contacting a persistent metadata service.
-- The preview contains the selected organization, person, project, output, relationships, and representative assets.
-- The build uses only files in the candidate lab repository plus pinned build dependencies.
-- CON-specific and potentially reusable changes remain distinguishable.
-- No production DNS, domain, or existing-site deployment is changed.
+### Isolated local collections
 
-## Metadata and build contract
+The local service has four named collections with no cross-profile joins:
 
-- Store approved entities as individual YAML records following the filesystem and schema conventions selected from upstream Orinoco.
-- Use `.dumpthings.yaml` collection configuration where required by that upstream layout.
-- Preserve source observations, retrieval details, candidates, reconciliation decisions, and reviewed additions separately from approved public records.
-- Maintain stable identifiers and explicit relationships during migration.
-- Pin a compatible schema and toolchain for every reproducible build.
-- Run Dump Things ephemerally in CI using the upstream Orinoco validation path.
-Direct LinkML validation may provide an earlier, faster check, but it is not the sole publication gate unless its scope is shown to match the required Dump Things checks.
-- Convert validated records to JSONL transiently when `qri` requires its stream interface.
-- Generate RDF only for a named editor, graph, or interoperability consumer.
-- Treat generated Hugo content, caches, JSONL, RDF, and pages as build artifacts rather than canonical records.
-- Keep editorial Markdown, theme overrides, media, redirects, and site configuration with the lab website.
+| Collection | Contents and consumer |
+| --- | --- |
+| `upstream-public` | Curated German public snapshot for explicit upstream reference checks |
+| `upstream-protected` | Local protected/incoming counterpart for explicit upstream editor checks |
+| `con-public` | Six canonical CON records plus reference records; sole qri publication input |
+| `con-protected` | CON incoming/edit boundary used by SHACL Vue |
 
-## Final lab repository organization
+The German snapshot is seeded only into the two `upstream-*` collections.
+Canonical CON records, including the homepage project, and projection reference records are loaded only into the two `con-*` collections. qri reads `con-public`.
+SHACL Vue reads and writes through `con-protected` for the default CON editing path.
 
-The exact class directories will follow the selected upstream collection, but the stable responsibility boundaries are:
+The default local interfaces are the CON editor/service profile and the generated CON static site.
+Upstream service, editor, snapshot, and static-site references remain available only through explicit upstream-named tasks, URLs, or arguments.
+An unqualified default must never expose or project the German snapshot.
 
-```text
-metadata/                 canonical YAML records and collection configuration
-content/                  human-authored editorial content
-assets/                   branding, logos, fonts, and processed assets
-static/                   static files copied into the site
-layouts/                  CON-specific Hugo overrides
-config/                   Hugo, Congo, navigation, and color configuration
-provenance/               import manifest and legacy URL mapping
-.github/workflows/        validation, preview, and Pages deployment
-README.md                 editing and deployment instructions
-UPSTREAM.md               source repository, base commit, and sync policy
-```
+For the local editor, `con-protected` permits anonymous reads of reviewed curated CON records through a dedicated read-only identity.
+Writes still require the ignored `local_editor` token and may reach only the CON `local-editor` incoming boundary.
+Here, `protected` describes the incoming edit boundary rather than confidential curated content.
 
-Generated metadata pages and projection files should be produced in a build workspace or ignored generated directory, not committed alongside canonical records.
+### Homepage project and CON organization
 
-## Explicit first-milestone non-goals
+Following upstream, `xyzrins:.` is a canonical `xyzri:XYZProject` that provides the homepage and root for project selection.
+It represents the CON website and has an explicit native association with the separate CON organization record `ror:04tfhh831`.
 
-- Full migration of all CON records.
-- Production cutover or DNS changes.
-- Pixel-level parity with the existing CON website.
-- Extraction of `orinoco-lite-action`.
-- Creation of `orinoco-lite-template` or Copier prompts.
-- A separate canonical metadata repository.
-- GitHub App, OAuth broker, or direct graphical writes.
-- Published JSONL or RDF without an identified consumer.
-- Grant, CV, annual-report, or other secondary projections.
-- Reorganization or wholesale updating of every tracked submodule.
-- Broad upstream refactoring.
+The homepage project may remain minimal until the vertical slice expands.
+The organization remains available in the graph without a dedicated detail page, matching the current upstream presentation behavior.
 
-## Later phases
+### Local interfaces and deployment boundary
 
-### 2. Complete CON migration
+The supported interfaces for this effort are local:
 
-- Migrate all accepted records from `dump-research-info` into canonical YAML.
-- Preserve source snapshots, evidence, review decisions, merge policy, and identifiers.
-- Compare record counts, persistent identifiers, relationships, and approved assets before retiring any migration path.
-- Keep `dump-research-info` available as migration history until parity is accepted.
+- a one-command default CON service/editor/static stack;
+- a faster static-only CON build and local server;
+- explicit upstream reference build and service commands; and
+- deterministic validation, projection, link, graph, and path audits;
+- an explicit browser-dependency installation command; and
+- a Playwright acceptance suite separate from the fast unit-test command.
 
-Exit: the candidate lab repository is the single canonical source for accepted CON metadata and website content.
+No action in this effort may push a branch or tag, open a pull request, enable or publish GitHub Pages, modify DNS, change a production domain, or update the deployed CON website.
+Remote reads needed to review upstream or hydrate already identified assets do not authorize remote writes.
 
-### 3. Website completion and cutover
+## Acceptance criteria
 
-- Complete content and presentation work based on the proven vertical slice.
-- Account for existing public URLs, redirects, assets, attribution, and accessibility.
-- Establish branch protection, reviewers, Pages ownership, and deployment permissions.
-- Review the static preview before changing the production domain.
+The clean migration is locally accepted only when all of these are true:
 
-Exit: the candidate can replace the existing CON deployment without losing required content, URLs, or provenance.
+- the site branch is exactly two commits above the reviewed upstream base;
+- profile contracts, hand-authored inputs, and generated projection outputs remain isolated in their declared paths;
+- Hugo configuration, layouts, page templates, and graph code come from the rebased clean-site ancestry, while the sibling mirror is used only for byte-identical annex/theme hydration;
+- every CON record validates through the pinned live Dump Things path;
+- the five native CURIE fixtures survive JSON-to-RDF-to-JSON conversion and live validation;
+- invalid records and unsupported full-URI designators fail closed;
+- qri reads only `con-public` and generates the expected connected pages;
+- the German snapshot exists only in `upstream-public` and `upstream-protected`;
+- the default editor uses `con-protected` and the default static site is CON;
+- upstream references require explicit selection;
+- repeated generation produces an equivalent projection and clean manifest;
+- internal links, Pages-style base paths, graph nodes, and graph edges pass their audits;
+- graph scripts and data use one audited content-derived cache identity so a same-origin upstream-to-CON switch cannot reuse the German graph;
+- anonymous editor reads populate the concrete Yaroslav person form, while anonymous writes remain forbidden;
+- a disposable browser-driven edit lands only in the CON protected incoming boundary and leaves no probe record behind;
+- Chromium and Playwright WebKit pass the cache and anonymous-editor browser scenarios without leaking local credentials into test artifacts;
+- no persistent metadata process is required after static generation;
+- the legacy, preservation, and `orinoco-lite` refs remain unchanged; and
+- no remote, Pages, DNS, domain, or production state changed.
 
-### 4. Reusable action and lab template
+## Upstream synchronization
 
-- Extract validation, projection, Hugo build, and Pages deployment from the working CON implementation into `con/orinoco-lite-action`.
-- Expose one tagged reusable workflow with conventional paths and pinned dependencies.
-- Obtain Pages URL and base-path information from GitHub Pages configuration rather than requiring users to calculate it.
-- Create `con/orinoco-lite-template` with the canonical directory skeleton, example records, lab configuration, and a short caller workflow.
-- Add Copier only if prompted initialization materially improves setup after the plain GitHub template works.
-- Test the release in a new independent lab repository.
+Upstream changes are never merged automatically.
+For each candidate base, follow the exact local rebase drill in [`docs/clean-migration.md`](clean-migration.md):
 
-Exit: a lab can replace example metadata and deploy without understanding the Orinoco toolchain.
+1. review the upstream range and record the proposed base;
+2. replay exactly the two site commits with `rebase --onto`;
+3. regenerate and amend the projection commit;
+4. inspect `range-diff` for both downstream commits;
+5. run the complete acceptance suite; and
+6. update the parent site gitlink deliberately only after acceptance.
 
-### 5. Editing and additional projections
+Do not push the rebased branch or parent gitlink during this effort.
 
-- Document direct file and pull-request editing first.
-- Evaluate Issue Forms for bounded metadata additions.
-- Configure SHACL-vue for validation and export before introducing direct writes.
-- Consider a GitHub App and stateless OAuth broker only if the editing benefit justifies operating an external endpoint.
-- Add RDF, grants, CVs, annual reports, and other projections only for concrete consumers.
+## Explicitly deferred work
 
-Exit: additional interfaces preserve the same canonical records and Git review boundary.
+The following work is outside the active clean migration:
 
-## Upstream synchronization and contribution policy
+- full migration of all CON records and legacy editorial content;
+- production cutover, DNS, custom domains, redirects, or Pages publication;
+- pull-request previews, branch protection, CODEOWNERS, and deployment permissions;
+- GitHub Issue Forms, a GitHub App, OAuth, or other hosted editing services;
+- production SHACL Vue authentication or a persistent metadata service;
+- support for full-URI type designators;
+- adoption of experimental LinkML or Things Schemas candidate commits;
+- detailed ROR presentation;
+- complete visual redesign or pixel-level legacy parity;
+- durable mirroring of every upstream annex object;
+- extraction of `orinoco-lite-action` or creation of a lab template;
+- a separate canonical metadata repository;
+- published JSONL or RDF contracts;
+- grants, CVs, annual reports, and other secondary projections;
+- broad upstream refactoring or contribution work; and
+- production branch ancestry, merge, or replacement decisions.
 
-- Check upstream component heads on a deliberate schedule.
-- Never auto-merge upstream updates.
-- Summarize relevant component changes and test candidate pins before release.
-- Ensure action tags pin reproducible dependency versions.
-- Develop reusable fixes on focused branches in the relevant repository.
-- Submit only narrow, generally useful changes upstream.
-- Keep CON-specific policy, metadata, content, and presentation downstream.
+Resolve each item only when a later phase depends on it.
 
-## Deferred decisions
+## Handoff
 
-These do not block the first vertical slice:
+Work only on the parent and site `codex/clean-migration` branches.
+Preserve the two-site-commit contract and the four-collection isolation model.
+Use the source-schema CURIE path, keep default interfaces CON-focused, and make all upstream references explicit.
 
-- final ownership and naming of the action and template repositories;
-- the public product documentation entry point;
-- the exact template configuration and optional Copier questions;
-- whether guided editing begins with Issue Forms or SHACL-vue export;
-- whether an external OAuth broker is ever acceptable;
-- criteria for splitting metadata into a separate repository;
-- published RDF or JSONL contracts;
-- metadata licensing, CODEOWNERS, and long-term review policy;
-- production Pages, DNS, and domain ownership; and
-- the final pull-request preview experience.
-
-Resolve each decision immediately before the phase that depends on it.
-Do not block the vertical slice waiting for speculative answers.
-
-## Handoff for the next thread
-
-Implement only the first milestone above.
-The primary implementation repository is `submodules/centerforopenneuroscience.org` on `orinoco-lite`.
-Preserve `legacy-site` for content and visual comparison, push implementation commits to the `leej3` fork.
-Use `submodules/www-from-model` as the clean upstream mirror and `submodules/dump-research-info` only as a migration input.
-Keep track of your progress in docs/milestone-1-progress.md.
-
-Do not begin by generalizing the action, creating more architecture documents, or reorganizing all submodules.
-First prove one real record-to-website path.
+Complete local acceptance and the rebase drill before proposing a parent gitlink update.
+Do not push or deploy.
