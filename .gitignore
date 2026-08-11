@@ -1,6 +1,7 @@
 # Local deployment output and credentials.
 /build/
 /dist/
+/node_modules/
 *.env
 !.env.example
 __pycache__/

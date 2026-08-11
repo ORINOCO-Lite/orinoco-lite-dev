@@ -13,31 +13,49 @@ git-annex = "==10.20260601"
 
 [tasks]
 checkout-submodules = "python3 tools/checkout_submodules.py"
-build = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8767/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
-serve = { depends-on = ["build", "prepare-local-stack", "build-pool-ui"], cmd = "tools/serve_local_stack.sh" }
-serve-static = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/upstream-local" }
+build = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --repeat-destination build/con-site-repeat" }
+build-con-project-path = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --destination build/con-site-project --base-url http://127.0.0.1:8767/clean-migration/" }
+serve = { depends-on = ["build", "prepare-local-stack"], cmd = "tools/serve_local_stack.sh" }
+serve-static = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/con-site" }
+render-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py render" }
+update-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py update" }
+verify-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py verify" }
+check-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py check-snapshot" }
+hydrate-con-assets = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_assets.py" }
+build-upstream = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8768/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
+serve-upstream = { depends-on = ["build-upstream"], cmd = "python3 -m http.server 8768 --directory build/upstream-local" }
 build-pages = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8766/orinoco-lite-dev/", DESTINATION = "build/pages-preview/orinoco-lite-dev", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
 serve-pages = { depends-on = ["build-pages"], cmd = "python3 -m http.server 8766 --directory build/pages-preview" }
 audit-pages = { cmd = "python3 tools/adapt_upstream_pages.py build/pages-preview/orinoco-lite-dev --base-path /orinoco-lite-dev/ --edit-url http://127.0.0.1:3000/ --check-only" }
-prepare-local-stack = { depends-on = ["checkout-submodules"], cmd = "python3 tools/prepare_local_stack.py" }
+prepare-local-stack = { depends-on = ["checkout-submodules", "build-pool-ui"], cmd = "python3 tools/prepare_local_stack.py" }
 serve-dump-things = { depends-on = ["prepare-local-stack"], cmd = "tools/serve_local_dumpthings.sh" }
 serve-git-annex = { depends-on = ["prepare-local-stack"], cmd = "python3 tools/serve_local_gitannex.py" }
 seed-local-pool = { depends-on = ["prepare-local-stack"], cmd = "python3 tools/seed_local_pool.py" }
-refresh-local-pool = { depends-on = ["checkout-submodules"], cmd = "REFRESH_UPSTREAM_POOL=1 python3 tools/prepare_local_stack.py" }
+refresh-local-pool = { depends-on = ["checkout-submodules", "build-pool-ui"], cmd = "REFRESH_UPSTREAM_POOL=1 python3 tools/prepare_local_stack.py" }
 install-pool-ui = { depends-on = ["checkout-submodules"], cmd = "npm --prefix submodules/pool.psychoinformatics.de-ui/shacl-vue ci" }
 build-pool-ui = { depends-on = ["install-pool-ui"], cmd = "make -C submodules/pool.psychoinformatics.de-ui build-ui" }
-serve-shacl-vue = { depends-on = ["build-pool-ui"], cmd = "python3 -m http.server 3000 --directory submodules/pool.psychoinformatics.de-ui/dist/ui" }
+serve-shacl-vue = { depends-on = ["prepare-local-stack"], cmd = "python3 -m http.server 3000 --directory build/local-stack/ui" }
 check-local-stack = { cmd = "python3 tools/check_local_stack.py" }
 format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
 install-hooks = { cmd = "git config core.hooksPath .githooks" }
 check-format = { cmd = "pre-commit run --all-files" }
 test = "python3 -m unittest discover -s tests -p 'test_*.py'"
+install-browser-tests = { cmd = "npm ci && npx playwright install chromium webkit", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+test-browser = { depends-on = ["build", "build-upstream", "build-con-project-path", "prepare-local-stack"], cmd = "npm run test:browser", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+test-all = { depends-on = ["test", "test-browser"] }
 
 [pypi-dependencies]
 snapper-fmt = "==0.8.1"
 pre-commit = "==4.3.0"
 dump-things-service = { path = "submodules/dump-things-service" }
+dump-things-pyclient = { path = "submodules/dump-things-pyclient" }
+query-things = { path = "submodules/query-things" }
+jinja2 = "==3.1.6"
+pyyaml = "==6.0.2"
 linkml = "==1.11.1"
 linkml-runtime = "==1.11.1"
 pydantic = "==2.13.4"
 rdflib = "==7.6.0"
+
+[pypi-options.dependency-overrides]
+dump-things-pyclient = { path = "submodules/dump-things-pyclient" }

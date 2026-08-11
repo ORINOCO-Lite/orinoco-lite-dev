@@ -1,74 +1,114 @@
-# Orinoco Lite development
+# Clean migration development workspace
 
-This repository is the development and integration workspace for Orinoco Lite.
-It tracks upstream Orinoco components, records architectural decisions, and coordinates development of a GitHub-native lab website workflow.
+This repository coordinates the local-only **clean migration** experiment for the Center for Open Neuroscience website.
+It layers a small reviewed CON metadata slice onto the pinned upstream `www-from-model` implementation while keeping the CON-specific layer isolated and easy to rebase.
 
-Lab websites do not build or deploy from this repository.
-The first implementation will live on the `orinoco-lite` branch of the existing [`centerforopenneuroscience.org`](https://github.com/leej3/centerforopenneuroscience.org) repository.
-That branch continues the established CON history while selectively adopting useful scaffolding from upstream [`www-from-model`](https://hub.psychoinformatics.de/www/www-from-model).
+The active parent branch is `codex/clean-migration`.
+Its `submodules/centerforopenneuroscience.org` gitlink selects the site branch of the same name, which has exactly two commits above upstream website commit `5b401e0c478a4409442b3a8a285bd3efd5d30e05`:
 
-[`leej3/www-from-model`](https://github.com/leej3/www-from-model) remains a clean GitHub mirror and integration reference for that upstream history.
+1. an isolated build-profile contract; and
+2. the canonical CON content and deterministic projection snapshot.
+
+Legacy CON branches, tags, and the completed `orinoco-lite` prototype remain unchanged.
+Nothing in this effort is pushed or deployed.
 
 ## Start here
 
-The canonical implementation and handoff document is [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md).
+Read the active execution plan and implementation contract before changing the site:
 
-The separate current-upstream reproduction branch is documented in [`docs/upstream-psychoinformatics-trial.md`](docs/upstream-psychoinformatics-trial.md).
-It rebuilds the complete pinned Psychoinformatics snapshot locally and carries a generated-artifact adapter for GitHub Pages project paths without changing the upstream website source.
+- [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
+- [`docs/clean-migration.md`](docs/clean-migration.md)
+- [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md)
 
-All recursive submodule URLs in this branch resolve to public mirrors under [`leej3`](https://github.com/leej3), except `dump-research-info`, which remains the CON-owned migration input at `github.com/con/dump-research-info`.
-The account mirrors preserve the upstream refs needed by the pinned checkout; nested pool UI, theme, and schema dependencies are mirrored there as well.
-
-The trial is Pixi-controlled.
-`pixi run checkout-submodules` synchronizes and fully checks out every pinned submodule, including nested submodules.
-From this worktree, `pixi run serve` builds and serves a root-local preview at `http://127.0.0.1:8767/`; `pixi run serve-pages` builds and serves the GitHub Pages project-path preview at `http://127.0.0.1:8766/orinoco-lite-dev/`.
-Use `pixi run build`, `pixi run build-pages`, `pixi run audit-pages`, and `pixi run test` for the corresponding non-server tasks.
-
-Documentation uses Snapper semantic line breaks to keep prose diffs small.
-Run `pixi run install-hooks` once per checkout to enable the Pixi-controlled pre-commit hook.
-Use `pixi run check-format` to check all tracked files or `pixi run format-docs` to format the repository's Markdown documentation.
-
-On macOS ARM, conda-forge does not currently publish Git Annex, so Pixi uses the host `git-annex` executable (for example, installed with Homebrew).
-The Linux Pixi environment includes Git Annex `10.20260601` directly in its lock.
-
-The local editor is a complete service-backed deployment, not a demo-data preview.
-Start the whole deployment with one command:
+Install the locked environment and fully initialize every recursive development checkout:
 
 ```console
-pixi run serve                     # prepare, build, seed, and serve everything
+pixi install --locked
+pixi run checkout-submodules
 ```
 
-Pixi runs the setup and build dependencies before the supervisor starts Dump Things, seeds both local collections, starts the git-annex and SHACL Vue services, checks their contracts, and serves the generated site.
-The initial run downloads the upstream public `Thing` collection into ignored `build/local-stack` runtime state; use `pixi run refresh-local-pool` to fetch a new snapshot.
-Press Ctrl-C to stop every child service.
-Individual `serve-dump-things`, `serve-git-annex`, `serve-shacl-vue`, and `seed-local-pool` tasks remain available for debugging, and `pixi run serve-static` starts only the generated-site HTTP server.
+The main local interfaces are:
 
-The editor UI is the tracked `submodules/pool.psychoinformatics.de-ui` deployment branch, with its nested SHACL Vue checkout and generated schema assets tracked in submodule history.
-Its service URLs, token mode, and git-annex p2p URL all point at the local services above; it does not use bundled demo RDF records or the remote Psychoinformatics service.
-Enter the generated token from `build/local-stack/editor-token` in the UI's token settings.
-
-Edit links in the generated site preserve their upstream query parameters and open the local editor.
-Reads go through local Dump Things, writes go to the protected incoming view, and the curated/public view remains unchanged until the normal curation operation—matching upstream semantics. Uploaded files are stored by the local git-annex repository, not by a substitute file directory. Run `pixi run check-local-stack` to verify the service, record, schema, and UI configuration contracts. All runtime data, stores, tokens, and annex content are ignored under `build/`; no credentials or snapshot records are committed.
-
-The next milestone is a small, connected CON website preview built on the `orinoco-lite` branch of `centerforopenneuroscience.org`.
-It will combine reviewed metadata migrated from `dump-research-info` with selected content, assets, and visual identity preserved from the legacy website.
-
-```mermaid
-flowchart LR
-    U["Upstream Orinoco repositories"] --> D["orinoco-lite-dev"]
-    W["Upstream www-from-model"] --> M["leej3/www-from-model mirror"]
-    M -. "selected code and fixes" .-> I["centerforopenneuroscience.org orinoco-lite branch"]
-    C["Legacy CON branch, tag, content, and assets"] --> I
-    R["Reviewed CON research metadata"] --> I
-    I --> A["GitHub Actions build"]
-    A --> P["GitHub Pages preview"]
-    I --> F["Future reusable action and lab template"]
+```console
+pixi run build                  # deterministic backend-free CON artifact
+pixi run serve-static           # CON artifact only, at 127.0.0.1:8767
+pixi run serve                  # full CON editor/service/static stack
+pixi run verify-con-projection  # two renders, both matching the Git snapshot
+pixi run build-upstream         # explicit German upstream reference build
+pixi run serve-upstream         # explicit upstream reference server
+pixi run test                   # focused contract tests
+pixi run install-browser-tests  # one-time Chromium and WebKit setup
+pixi run test-browser           # managed local browser acceptance
+pixi run test-all               # unit and browser acceptance
+pixi run check-format           # repository formatting hooks
 ```
 
-## Core constraints
+`pixi run build` verifies the committed projection digest, hydrates only the manifest-declared annex assets, assembles the CON Hugo source in ignored build state, and requires two byte-identical static builds.
+The resulting `build/con-site` directory needs no metadata backend.
 
-- Canonical metadata is stored as human-editable YAML in Git.
-- Pull requests are the review and publication boundary.
-- Dump Things may run ephemerally during CI, but no persistent metadata server is required for a deployed lab website.
-- Generated pages and projections are build artifacts, not canonical records.
-- CON-specific content remains downstream; narrow reusable improvements may be contributed upstream.
+Projection updates are explicit:
+
+```console
+pixi run render-con-projection  # candidate in ignored build state
+pixi run update-con-projection  # replace the reviewed Git snapshot
+pixi run verify-con-projection  # regenerate twice and compare with Git
+```
+
+A normal build fails closed when canonical records, profile configuration, editorial content, assets, upstream presentation inputs, renderer code, Pixi pins, or component commits change without a corresponding snapshot refresh.
+
+## Local collection boundary
+
+The full stack uses four separate collections:
+
+| Collection | Contents |
+| --- | --- |
+| `upstream-public` | Cached German public snapshot |
+| `upstream-protected` | Local protected counterpart of that snapshot |
+| `con-public` | Five CON records, generated site root, and four references |
+| `con-protected` | CON editor incoming boundary |
+
+The editor reads and writes only through `con-protected`.
+The projection reads only `con-public`.
+The cached German records are never seeded into either CON collection.
+Tokens, stores, downloaded snapshots, hydrated annex objects, and generated sites stay under ignored `build/` state.
+
+Curated records in `con-protected` are readable without a token so that an Edit link can populate the concrete SHACL Vue form.
+The collection name describes its incoming edit boundary, not confidential curated data.
+Submitting a change still requires the ignored token in `build/local-stack/editor-token`, and that token can write only to `con-protected/incoming/local-editor`.
+
+## Browser acceptance
+
+Browser dependencies are deliberately separate from the fast unit suite.
+The first browser run needs network access to install the exactly locked Playwright package plus its Chromium and WebKit revisions:
+
+```console
+pixi run install-browser-tests
+pixi run test-browser
+```
+
+The browser suite owns ports `8111`, `8122`, `3000`, and `8767` and refuses to reuse an already running stack.
+Stop `pixi run serve` before starting it.
+Playwright supervises the stack and verifies that all child services stop when the suite ends.
+
+Chromium and WebKit exercise the real upstream-to-CON same-origin graph-cache transition and the Yaroslav editor link.
+A separate Chromium scenario edits a disposable record through SHACL Vue, checks the CON incoming boundary, and cleans the record before and after the test.
+It never modifies Yaroslav's real incoming record or records a credential in a URL, trace, screenshot, or video.
+
+Playwright WebKit is useful Safari-like coverage, but it is not the system Safari browser.
+On Linux, Playwright may report missing host browser libraries; this workspace does not install system packages or invoke `--with-deps` automatically.
+
+## Reproducibility boundary
+
+Pixi locks Hugo, Python, Dump Things, qri, LinkML, LinkML Runtime, Pydantic, RDFLib, and their transitive dependencies.
+Linux also receives Git Annex `10.20260601` from the lock.
+
+Conda-forge does not publish Git Annex for macOS ARM, so the macOS path uses the host executable and rejects any version other than the trial-recorded `10.20260420`.
+Asset retrieval uses read-only URLs without adding remotes or changing shared worktree configuration.
+
+The native metadata contract is explicit `dlthings:*` CURIEs against the pinned source Things Schema.
+Full-URI type designators, unknown CURIEs, dangling native targets, and generic `AttributeSpecification` relationship bridges are rejected.
+
+## Scope boundary
+
+This experiment does not publish GitHub Pages, configure pull-request editing, change DNS, update production, run a persistent hosted metadata service, or migrate the remaining CON content.
+The documented rebase drill reviews a candidate upstream range, rebases exactly the two site commits, regenerates the projection, inspects `range-diff`, reruns acceptance, and only then updates the parent gitlink locally.

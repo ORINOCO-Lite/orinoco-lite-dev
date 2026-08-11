@@ -31,8 +31,8 @@ toolchain:
     version: 0.154.5
     edition: extended
     tested_binary_sha256: 0e76db72687d544c79c4df8cb17d55a7e625eba943e76f5e9d73b1ac42b3a062
-  local_git_annex: 10.20260420
-  github_actions_git_annex: 10.20260717
+  local_git_annex: "10.20260420"
+  github_actions_git_annex: "10.20260717"
   local_uv: 0.12.1
   github_actions:
     checkout: 3d3c42e5aac5ba805825da76410c181273ba90b1

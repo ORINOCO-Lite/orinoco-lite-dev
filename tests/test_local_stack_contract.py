@@ -10,16 +10,44 @@ class LocalStackContractTests(unittest.TestCase):
     def test_pixi_exposes_all_local_services(self) -> None:
         pixi = (ROOT / "pixi.toml").read_text(encoding="utf-8")
         self.assertIn(
-            'serve = { depends-on = ["build", "prepare-local-stack", '
-            '"build-pool-ui"], cmd = "tools/serve_local_stack.sh" }',
+            'serve = { depends-on = ["build", "prepare-local-stack"], '
+            'cmd = "tools/serve_local_stack.sh" }',
+            pixi,
+        )
+        self.assertIn(
+            'prepare-local-stack = { depends-on = ["checkout-submodules", '
+            '"build-pool-ui"], cmd = "python3 tools/prepare_local_stack.py" }',
+            pixi,
+        )
+        self.assertIn(
+            'refresh-local-pool = { depends-on = ["checkout-submodules", '
+            '"build-pool-ui"], cmd = "REFRESH_UPSTREAM_POOL=1 python3 '
+            'tools/prepare_local_stack.py" }',
+            pixi,
+        )
+        self.assertIn(
+            'serve-shacl-vue = { depends-on = ["prepare-local-stack"], '
+            'cmd = "python3 -m http.server 3000 --directory '
+            'build/local-stack/ui" }',
+            pixi,
+        )
+        self.assertIn(
+            'build = { depends-on = ["checkout-submodules"], cmd = '
+            '"python3 tools/build_con_site.py --repeat-destination '
+            'build/con-site-repeat" }',
             pixi,
         )
         self.assertIn(
             'serve-static = { depends-on = ["build"], cmd = '
-            '"python3 -m http.server 8767 --directory build/upstream-local" }',
+            '"python3 -m http.server 8767 --directory build/con-site" }',
             pixi,
         )
         for task in (
+            "build-upstream",
+            "serve-upstream",
+            "render-con-projection",
+            "update-con-projection",
+            "verify-con-projection",
             "prepare-local-stack",
             "refresh-local-pool",
             "serve-dump-things",
@@ -69,6 +97,19 @@ class LocalStackContractTests(unittest.TestCase):
         )
         self.assertNotIn("uv run", launcher)
         self.assertIn("exec dump-things-service", launcher)
+
+    def test_annex_hydration_does_not_persist_transport_configuration(self) -> None:
+        assets = (ROOT / "tools" / "con_assets.py").read_text(encoding="utf-8")
+        self.assertNotIn('"remote",\n            "add"', assets)
+        self.assertNotIn('"config",\n        "core.worktree"', assets)
+        self.assertIn("annex_from_url", assets)
+
+        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("remote add", builder)
+        self.assertIn("restore_local_state", builder)
+        self.assertIn("--no-write-fetch-head", builder)
 
 
 if __name__ == "__main__":

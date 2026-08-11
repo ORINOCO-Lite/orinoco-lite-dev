@@ -8,6 +8,30 @@ destination=${DESTINATION:-$repository_root/build/upstream-psychoinformatics}
 edit_url=${SHACL_VUE_URL:-https://pool.psychoinformatics.de/ui/}
 annex_commit=010ca44f751d2ab60b9d4ad58c5931d1804e3c9e
 upstream_url=https://hub.psychoinformatics.de/www/www-from-model.git
+annex_remote_name=clean-migration-upstream-$$
+annex_remote_ref=refs/remotes/$annex_remote_name/git-annex
+
+original_core_worktree=
+had_core_worktree=false
+if original_core_worktree=$(git -C "$site_root" config --get core.worktree 2>/dev/null); then
+  had_core_worktree=true
+fi
+
+restore_local_state() {
+  git -C "$site_root" update-ref -d "$annex_remote_ref" 2>/dev/null || true
+  git -C "$site_root" config --remove-section \
+    "remote.$annex_remote_name" 2>/dev/null || true
+  if [[ "$had_core_worktree" == true ]]; then
+    git -C "$site_root" config core.worktree "$original_core_worktree"
+  else
+    git -C "$site_root" config --unset-all core.worktree 2>/dev/null || true
+  fi
+}
+trap restore_local_state EXIT
+
+site_git() {
+  git -c core.worktree="$site_root" -C "$site_root" "$@"
+}
 
 base_url=${base_url%/}/
 destination=$(python3 -c \
@@ -26,30 +50,23 @@ base_path=$(python3 -c \
 
 git -C "$repository_root" submodule sync -- submodules/www-from-model
 if git -C "$site_root" rev-parse --git-dir >/dev/null 2>&1; then
-  git -C "$site_root" config core.worktree "$site_root"
-  if [[ -n "$(git -C "$site_root" status --porcelain)" ]]; then
+  if [[ -n "$(site_git status --porcelain)" ]]; then
     echo "Refusing to update a modified www-from-model worktree" >&2
     exit 2
   fi
 fi
 git -C "$repository_root" submodule update --init --depth 1 -- submodules/www-from-model
-git -C "$site_root" config core.worktree "$site_root"
-git -C "$site_root" submodule update --init --depth 1 -- themes/congo
+site_git submodule update --init --depth 1 -- themes/congo
 
-if git -C "$site_root" remote get-url upstream >/dev/null 2>&1; then
-  test "$(git -C "$site_root" remote get-url upstream)" = "$upstream_url"
-else
-  git -C "$site_root" remote add upstream "$upstream_url"
-fi
-
-git -C "$site_root" fetch --depth 1 \
-  origin "+$annex_commit:refs/remotes/origin/git-annex"
-git -C "$site_root" fetch --depth 1 \
-  upstream "+$annex_commit:refs/remotes/upstream/git-annex"
-git -C "$site_root" config --replace-all annex.private true
-git -C "$site_root" annex init
-git -C "$site_root" annex get .
-test -z "$(git -C "$site_root" annex find --not --in=here)"
+site_git fetch --no-write-fetch-head \
+  "$upstream_url" "+$annex_commit:$annex_remote_ref"
+site_git -c annex.private=true annex init
+site_git \
+  -c annex.private=true \
+  -c remote.$annex_remote_name.url="$upstream_url" \
+  -c remote.$annex_remote_name.fetch=+refs/heads/\*:refs/remotes/$annex_remote_name/\* \
+  annex get --from "$annex_remote_name" .
+test -z "$(site_git -c annex.private=true annex find --not --in=here)"
 
 hugo version | grep -q 'hugo v0\.154\.5.*extended'
 hugo \

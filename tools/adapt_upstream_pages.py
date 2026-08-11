@@ -10,6 +10,7 @@ the pinned upstream source tree remains byte-for-byte unchanged.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -27,7 +28,19 @@ HTML_URL_RE = re.compile(
     r")",
     re.IGNORECASE,
 )
-GRAPH_FETCH_RE = re.compile(r"fetch\((?P<quote>[\"'])/graph\.json(?P=quote)\)")
+GRAPH_FETCH_RE = re.compile(
+    r"(?P<prefix>\bfetch\(\s*)(?P<quote>[\"'])"
+    r"(?P<url>/[^\"']*graph\.json(?:\?[^\"']*)?)(?P=quote)"
+)
+GRAPH_SCRIPT_SRC_RE = re.compile(
+    r"(?P<prefix>\bsrc\s*=\s*)"
+    r"(?:"
+    r"(?P<quote>[\"'])(?P<quoted>/[^\"']*graph\.js(?:\?[^\"']*)?)(?P=quote)"
+    r"|"
+    r"(?P<bare>/[^\s>]*graph\.js(?:\?[^\s>]*)?)"
+    r")",
+    re.IGNORECASE,
+)
 EDIT_HREF_RE = re.compile(
     r"(?P<prefix>\bhref\s*=\s*)(?P<quote>[\"'])"
     r"(?P<url>https?://[^\"']+/ui/)",
@@ -40,6 +53,7 @@ DEFAULT_EDIT_URL = "https://pool.psychoinformatics.de/ui/"
 class AdaptationStats:
     html_files_changed: int = 0
     html_urls_rewritten: int = 0
+    graph_html_urls_versioned: int = 0
     graph_script_urls_rewritten: int = 0
     graph_node_urls_rewritten: int = 0
     webmanifest_urls_rewritten: int = 0
@@ -101,16 +115,85 @@ def rewrite_html(text: str, base_path: str) -> tuple[str, int]:
     return HTML_URL_RE.sub(replace, text), rewrites
 
 
-def rewrite_graph_script(text: str, base_path: str) -> tuple[str, int]:
+def graph_resource_url(base_path: str, filename: str, bundle_key: str | None) -> str:
+    """Return the canonical root-local URL for a graph bundle resource."""
+
+    url = f"{base_path}{filename}"
+    return url if bundle_key is None else f"{url}?v={bundle_key}"
+
+
+def rewrite_graph_script(
+    text: str, base_path: str, bundle_key: str | None = None
+) -> tuple[str, int]:
+    """Normalize every graph data fetch to one optionally versioned URL."""
+
     rewrites = 0
+    expected_url = graph_resource_url(base_path, "graph.json", bundle_key)
 
     def replace(match: re.Match[str]) -> str:
         nonlocal rewrites
+        if match.group("url") == expected_url:
+            return match.group(0)
         rewrites += 1
         quote = match.group("quote")
-        return f"fetch({quote}{base_path}graph.json{quote})"
+        return f"{match.group('prefix')}{quote}{expected_url}{quote}"
 
     return GRAPH_FETCH_RE.sub(replace, text), rewrites
+
+
+def rewrite_graph_html_urls(
+    text: str, base_path: str, bundle_key: str
+) -> tuple[str, int]:
+    """Give every generated graph script reference the bundle cache key."""
+
+    rewrites = 0
+    expected_url = graph_resource_url(base_path, "graph.js", bundle_key)
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal rewrites
+        current_url = match.group("quoted") or match.group("bare")
+        if current_url == expected_url:
+            return match.group(0)
+        rewrites += 1
+        quote = match.group("quote") or ""
+        return f"{match.group('prefix')}{quote}{expected_url}{quote}"
+
+    return GRAPH_SCRIPT_SRC_RE.sub(replace, text), rewrites
+
+
+def graph_bundle_key(graph_script: str, graph_data: str) -> str:
+    """Hash a canonical manifest of the unversioned graph bundle bytes."""
+
+    entries = []
+    for path, text in (("graph.js", graph_script), ("graph.json", graph_data)):
+        content = text.encode("utf-8")
+        entries.append(
+            {
+                "path": path,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+    manifest = json.dumps(
+        {"files": entries, "version": 1},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(manifest).hexdigest()
+
+
+def expected_graph_bundle(site_dir: Path, base_path: str) -> tuple[str, str] | None:
+    """Return the expected cache key and unversioned script, if complete."""
+
+    graph_script_path = site_dir / "graph.js"
+    graph_data_path = site_dir / "graph.json"
+    if not graph_script_path.is_file() or not graph_data_path.is_file():
+        return None
+    graph_script = graph_script_path.read_text(encoding="utf-8")
+    unversioned_script, _ = rewrite_graph_script(graph_script, base_path)
+    graph_data = graph_data_path.read_text(encoding="utf-8")
+    return graph_bundle_key(unversioned_script, graph_data), unversioned_script
 
 
 def rewrite_edit_urls(text: str, edit_url: str) -> tuple[str, int]:
@@ -163,11 +246,27 @@ def rewrite_webmanifest_data(data: object, base_path: str) -> int:
 def audit_site(
     site_dir: Path, base_path: str, edit_url: str = DEFAULT_EDIT_URL
 ) -> list[str]:
-    """Return root-path leaks that would escape a Pages project path."""
+    """Return path, edit-link, and graph-bundle contract violations."""
 
     base_path = normalize_base_path(base_path)
     edit_url = normalize_edit_url(edit_url)
     violations: list[str] = []
+    graph_script_path = site_dir / "graph.js"
+    graph_data_path = site_dir / "graph.json"
+    graph_script_exists = graph_script_path.is_file()
+    graph_data_exists = graph_data_path.is_file()
+    bundle = expected_graph_bundle(site_dir, base_path)
+    expected_script_url: str | None = None
+    expected_data_url: str | None = None
+    if graph_script_exists != graph_data_exists:
+        missing = "graph.json" if graph_script_exists else "graph.js"
+        violations.append(f"site: graph bundle is missing {missing}")
+    if bundle is not None:
+        bundle_key, _ = bundle
+        expected_script_url = graph_resource_url(base_path, "graph.js", bundle_key)
+        expected_data_url = graph_resource_url(base_path, "graph.json", bundle_key)
+
+    graph_html_references = 0
     for html_path in sorted(site_dir.rglob("*.html")):
         text = html_path.read_text(encoding="utf-8")
         for match in HTML_URL_RE.finditer(text):
@@ -179,14 +278,37 @@ def audit_site(
                 violations.append(
                     f"{html_path.relative_to(site_dir)}: edit URL {match.group('url')}"
                 )
+        for match in GRAPH_SCRIPT_SRC_RE.finditer(text):
+            graph_html_references += 1
+            url = match.group("quoted") or match.group("bare")
+            if expected_script_url is None:
+                violations.append(
+                    f"{html_path.relative_to(site_dir)}: graph script URL {url} "
+                    "has no complete graph bundle"
+                )
+            elif url != expected_script_url:
+                violations.append(
+                    f"{html_path.relative_to(site_dir)}: graph script URL {url} "
+                    f"(expected {expected_script_url})"
+                )
 
-    graph_script = site_dir / "graph.js"
-    if graph_script.is_file() and base_path != "/":
-        for match in GRAPH_FETCH_RE.finditer(graph_script.read_text(encoding="utf-8")):
-            violations.append(f"graph.js: /graph.json ({match.start()})")
+    if bundle is not None and graph_html_references == 0:
+        violations.append("site: graph.js has no HTML script reference")
 
-    graph_data_path = site_dir / "graph.json"
-    if graph_data_path.is_file():
+    if graph_script_exists:
+        graph_script = graph_script_path.read_text(encoding="utf-8")
+        graph_fetches = list(GRAPH_FETCH_RE.finditer(graph_script))
+        if not graph_fetches:
+            violations.append("graph.js: missing graph.json fetch")
+        elif expected_data_url is not None:
+            for match in graph_fetches:
+                if match.group("url") != expected_data_url:
+                    violations.append(
+                        f"graph.js: graph data URL {match.group('url')} "
+                        f"(expected {expected_data_url})"
+                    )
+
+    if graph_data_exists:
         graph_data = json.loads(graph_data_path.read_text(encoding="utf-8"))
         if not isinstance(graph_data, dict) or not isinstance(
             graph_data.get("nodes"), list
@@ -229,24 +351,6 @@ def adapt_site(
 
     stats = AdaptationStats()
 
-    for html_path in sorted(site_dir.rglob("*.html")):
-        original = html_path.read_text(encoding="utf-8")
-        rewritten, count = rewrite_html(original, base_path)
-        rewritten, edit_count = rewrite_edit_urls(rewritten, edit_url)
-        if count or edit_count:
-            html_path.write_text(rewritten, encoding="utf-8")
-            stats.html_files_changed += 1
-            stats.html_urls_rewritten += count
-            stats.edit_urls_rewritten += edit_count
-
-    graph_script = site_dir / "graph.js"
-    if graph_script.is_file() and base_path != "/":
-        original = graph_script.read_text(encoding="utf-8")
-        rewritten, count = rewrite_graph_script(original, base_path)
-        if count:
-            graph_script.write_text(rewritten, encoding="utf-8")
-            stats.graph_script_urls_rewritten += count
-
     graph_data_path = site_dir / "graph.json"
     if graph_data_path.is_file():
         graph_data = json.loads(graph_data_path.read_text(encoding="utf-8"))
@@ -258,6 +362,33 @@ def adapt_site(
                 encoding="utf-8",
             )
             stats.graph_node_urls_rewritten += count
+
+    graph_script_path = site_dir / "graph.js"
+    bundle = expected_graph_bundle(site_dir, base_path)
+    bundle_key: str | None = None
+    if bundle is not None:
+        bundle_key, _ = bundle
+        original = graph_script_path.read_text(encoding="utf-8")
+        rewritten, count = rewrite_graph_script(original, base_path, bundle_key)
+        if count:
+            graph_script_path.write_text(rewritten, encoding="utf-8")
+            stats.graph_script_urls_rewritten += count
+
+    for html_path in sorted(site_dir.rglob("*.html")):
+        original = html_path.read_text(encoding="utf-8")
+        rewritten, count = rewrite_html(original, base_path)
+        rewritten, edit_count = rewrite_edit_urls(rewritten, edit_url)
+        graph_count = 0
+        if bundle_key is not None:
+            rewritten, graph_count = rewrite_graph_html_urls(
+                rewritten, base_path, bundle_key
+            )
+        if rewritten != original:
+            html_path.write_text(rewritten, encoding="utf-8")
+            stats.html_files_changed += 1
+            stats.html_urls_rewritten += count
+            stats.edit_urls_rewritten += edit_count
+            stats.graph_html_urls_versioned += graph_count
 
     webmanifest_path = site_dir / "site.webmanifest"
     if webmanifest_path.is_file():

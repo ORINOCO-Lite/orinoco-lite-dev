@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,36 @@ from tools.adapt_upstream_pages import (
     normalize_base_path,
     prefix_root_url,
 )
+
+
+VERSION_RE = re.compile(r"\?v=([0-9a-f]{64})")
+
+
+def write_graph_site(site_dir: Path, *, label: str = "Example") -> None:
+    (site_dir / "index.html").write_text(
+        '<script type="module" src="/graph.js"></script>', encoding="utf-8"
+    )
+    (site_dir / "graph.js").write_text(
+        'async function load(){return fetch("/graph.json")}', encoding="utf-8"
+    )
+    (site_dir / "graph.json").write_text(
+        json.dumps(
+            {
+                "nodes": [
+                    {"id": "example", "label": label, "url": "/persons/example"}
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def graph_version(site_dir: Path) -> str:
+    match = VERSION_RE.search((site_dir / "index.html").read_text(encoding="utf-8"))
+    if match is None:
+        raise AssertionError("site index has no graph bundle version")
+    return match.group(1)
 
 
 class AdaptUpstreamPagesTests(unittest.TestCase):
@@ -41,14 +72,35 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             (site_dir / "index.html").write_text(
                 '<script src="/graph.js"></script>', encoding="utf-8"
             )
-            self.assertEqual(
-                audit_site(site_dir, "/orinoco-lite-dev"), ["index.html: /graph.js"]
+            violations = audit_site(site_dir, "/orinoco-lite-dev")
+            self.assertIn("index.html: /graph.js", violations)
+            self.assertIn(
+                "index.html: graph script URL /graph.js has no complete graph bundle",
+                violations,
             )
 
-    def test_root_base_path_allows_root_urls(self) -> None:
+    def test_root_base_path_requires_and_adds_graph_versions(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             site_dir = Path(temp_dir)
-            (site_dir / "graph.js").write_text('fetch("/graph.json")', encoding="utf-8")
+            write_graph_site(site_dir)
+
+            before = audit_site(site_dir, "/")
+            self.assertTrue(
+                any("graph script URL /graph.js" in violation for violation in before)
+            )
+            self.assertTrue(
+                any("graph data URL /graph.json" in violation for violation in before)
+            )
+
+            stats = adapt_site(site_dir, "/")
+            key = graph_version(site_dir)
+            self.assertEqual(len(key), 64)
+            self.assertEqual(stats.graph_html_urls_versioned, 1)
+            self.assertEqual(stats.graph_script_urls_rewritten, 1)
+            self.assertIn(
+                f'fetch("/graph.json?v={key}")',
+                (site_dir / "graph.js").read_text(encoding="utf-8"),
+            )
             self.assertEqual(audit_site(site_dir, "/"), [])
 
     def test_edit_url_rewrite_is_configurable_and_idempotent(self) -> None:
@@ -118,22 +170,155 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             )
 
             before = audit_site(site_dir, "/orinoco-lite-dev")
-            self.assertEqual(len(before), 7)
+            self.assertGreaterEqual(len(before), 7)
 
             stats = adapt_site(site_dir, "/orinoco-lite-dev")
+            key = graph_version(site_dir)
             self.assertEqual(stats.html_files_changed, 2)
             self.assertEqual(stats.html_urls_rewritten, 4)
+            self.assertEqual(stats.graph_html_urls_versioned, 1)
             self.assertEqual(stats.graph_script_urls_rewritten, 1)
             self.assertEqual(stats.graph_node_urls_rewritten, 1)
             self.assertEqual(stats.webmanifest_urls_rewritten, 1)
+            self.assertIn(
+                f'src=/orinoco-lite-dev/graph.js?v={key}',
+                (site_dir / "index.html").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                f'fetch("/orinoco-lite-dev/graph.json?v={key}")',
+                (site_dir / "graph.js").read_text(encoding="utf-8"),
+            )
             self.assertEqual(audit_site(site_dir, "/orinoco-lite-dev"), [])
 
             # A second pass proves that deployment retries are deterministic.
+            before_second = {
+                path.relative_to(site_dir): path.read_bytes()
+                for path in site_dir.rglob("*")
+                if path.is_file()
+            }
             second = adapt_site(site_dir, "/orinoco-lite-dev")
             self.assertEqual(second.html_urls_rewritten, 0)
+            self.assertEqual(second.graph_html_urls_versioned, 0)
             self.assertEqual(second.graph_script_urls_rewritten, 0)
             self.assertEqual(second.graph_node_urls_rewritten, 0)
             self.assertEqual(second.webmanifest_urls_rewritten, 0)
+            self.assertEqual(
+                before_second,
+                {
+                    path.relative_to(site_dir): path.read_bytes()
+                    for path in site_dir.rglob("*")
+                    if path.is_file()
+                },
+            )
+
+    def test_root_and_project_paths_have_distinct_bundle_keys(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as root_temp,
+            tempfile.TemporaryDirectory() as project_temp,
+        ):
+            root_site = Path(root_temp)
+            project_site = Path(project_temp)
+            write_graph_site(root_site)
+            write_graph_site(project_site)
+
+            adapt_site(root_site, "/")
+            adapt_site(project_site, "/clean-migration/")
+
+            self.assertNotEqual(graph_version(root_site), graph_version(project_site))
+            self.assertEqual(audit_site(root_site, "/"), [])
+            self.assertEqual(audit_site(project_site, "/clean-migration/"), [])
+
+    def test_distinct_graph_bytes_produce_distinct_resource_urls(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as first_temp,
+            tempfile.TemporaryDirectory() as second_temp,
+        ):
+            first_site = Path(first_temp)
+            second_site = Path(second_temp)
+            write_graph_site(first_site, label="First graph")
+            write_graph_site(second_site, label="Second graph")
+
+            adapt_site(first_site, "/")
+            adapt_site(second_site, "/")
+
+            first_index = (first_site / "index.html").read_text(encoding="utf-8")
+            second_index = (second_site / "index.html").read_text(encoding="utf-8")
+            self.assertNotEqual(graph_version(first_site), graph_version(second_site))
+            self.assertNotEqual(first_index, second_index)
+
+    def test_audit_rejects_stale_bundle_versions_after_data_change(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            write_graph_site(site_dir)
+            adapt_site(site_dir, "/")
+            old_key = graph_version(site_dir)
+
+            graph_path = site_dir / "graph.json"
+            graph_path.write_text(
+                graph_path.read_text(encoding="utf-8").replace("Example", "Changed"),
+                encoding="utf-8",
+            )
+
+            violations = audit_site(site_dir, "/")
+            self.assertTrue(
+                any(
+                    f"graph script URL /graph.js?v={old_key}" in violation
+                    for violation in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    f"graph data URL /graph.json?v={old_key}" in violation
+                    for violation in violations
+                )
+            )
+
+    def test_audit_rejects_unversioned_and_mismatched_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            write_graph_site(site_dir)
+            adapt_site(site_dir, "/")
+            key = graph_version(site_dir)
+
+            index_path = site_dir / "index.html"
+            index_path.write_text(
+                index_path.read_text(encoding="utf-8").replace(
+                    f"/graph.js?v={key}", "/graph.js"
+                ),
+                encoding="utf-8",
+            )
+            script_path = site_dir / "graph.js"
+            script_path.write_text(
+                script_path.read_text(encoding="utf-8").replace(key, "0" * 64),
+                encoding="utf-8",
+            )
+
+            violations = audit_site(site_dir, "/")
+            self.assertTrue(
+                any(
+                    "graph script URL /graph.js (expected" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    f"graph data URL /graph.json?v={'0' * 64} (expected" in item
+                    for item in violations
+                )
+            )
+
+    def test_audit_rejects_missing_graph_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            write_graph_site(site_dir)
+            (site_dir / "index.html").write_text(
+                "<main>No graph</main>", encoding="utf-8"
+            )
+            (site_dir / "graph.js").write_text("const graph = true", encoding="utf-8")
+
+            violations = audit_site(site_dir, "/")
+            self.assertIn("site: graph.js has no HTML script reference", violations)
+            self.assertIn("graph.js: missing graph.json fetch", violations)
 
 
 if __name__ == "__main__":
