@@ -139,6 +139,8 @@ class PagesEditorTests(unittest.TestCase):
         self.assertNotIn("rev-parse --abbrev-ref", vite)
         self.assertIn('BUILD_GIT_BRANCH="pinned"', makefile)
         self.assertIn("const branch = 'pinned';", vite)
+        self.assertEqual(makefile.count("rm -rf $(RUNTIME_PLUGIN_DIR)"), 2)
+        self.assertEqual(makefile.count("cp -r $(PLUGIN_DIR) $(RUNTIME_PLUGIN_DIR)"), 2)
 
     def test_static_rdf_is_canonical_across_blank_node_order(self) -> None:
         first = """

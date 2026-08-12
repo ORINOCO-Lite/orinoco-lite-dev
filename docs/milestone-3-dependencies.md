@@ -4,7 +4,7 @@ Status: implementation candidate
 
 Nested SHACL Vue commit: `3be33196f0eb7a65817df78b88ea40ecbb5eca11`
 
-Pool UI wrapper commit: `744b04181a0b19555522d9f446e82d7cb36e5fb5`
+Pool UI wrapper commit: `93961ace8d4ceaea088ccc04526a9bc5428139a6`
 
 ## Outcome
 
@@ -47,3 +47,5 @@ The static patch-download work applies that narrow hardening without introducing
 The final nested commit includes both the dependency refresh and the static patch-download editor.
 The wrapper commit pins that exact nested tree and uses a deterministic build timestamp derived from committed history.
 Both nested and wrapper build labels use the stable value `pinned` rather than the checkout-local branch name, so a branch worktree and a detached recursive checkout produce the same bytes.
+The wrapper also removes its generated runtime-plugin destination before every copy.
+This prevents a second build from nesting the plugins beneath the first build's output, and makes fresh recursive checkouts match established worktrees.
