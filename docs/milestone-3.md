@@ -1,6 +1,6 @@
 # Milestone 3: publications and public preview
 
-Status: active
+Status: implementation complete; draft human review open
 
 Parent branch: `codex/milestone-3`
 
@@ -133,3 +133,6 @@ The source relates them through a generic publishing placeholder rather than a c
 Typed ISSNs remain on the publications, and the unresolved activity/venue decision remains visible in the decision register.
 
 The candidate site projection contains 186 canonical records, 13 reference records, 186 graph nodes, 467 native edges, and 185 rendered record pages.
+
+The implementation, publication evidence, and bounded debt are recorded in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
+The draft pull request and public preview are review surfaces; this status does not imply final human content approval or a production cutover.

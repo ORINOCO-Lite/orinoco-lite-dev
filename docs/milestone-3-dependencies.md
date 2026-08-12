@@ -1,6 +1,6 @@
 # Milestone 3 SHACL Vue dependency review
 
-Status: implementation candidate
+Status: implementation complete; bounded exception awaiting human review
 
 Nested SHACL Vue commit: `3be33196f0eb7a65817df78b88ea40ecbb5eca11`
 

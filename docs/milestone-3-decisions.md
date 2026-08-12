@@ -1,6 +1,6 @@
 # Milestone 3 decision register
 
-Status: active
+Status: implementation complete; draft human review open
 
 This register distinguishes decisions already authorized by the user from questions that require human review.
 Implementations must preserve unresolved source evidence and fail closed rather than invent an answer.
@@ -48,7 +48,9 @@ The Zotero importer retains the reviewed source decisions already recorded in `s
 | M3-Q015 | Should the `github-pages` environment require named deployment reviewers? | Use ordinary repository controls without inventing a reviewer policy; add environment protection only after maintainers choose the approvers. |
 | M3-Q016 | May deployment configuration or schema-authored markup become writable by untrusted users in a later hosted editor? | Treat those inputs as trusted, pinned build inputs in this static preview; require an explicit sanitization boundary before making them user-controlled. |
 | M3-Q017 | Is the stable documentation toolchain's four-item development-only advisory exception acceptable until VitePress publishes a supported patched line? | Keep documentation out of the deployed runtime, require a zero-finding production audit, and do not force an unsupported Vite or VitePress alpha override. |
+| M3-Q018 | May the preview editor continue loading the Roboto font from Google? | Allow it in this review preview, but vendor or remove the font before claiming an offline or independently archived deployment. |
 
 ## Completion updates
 
-Add exact ingestion totals, exclusions, dependency-audit results, preview URL, workflow run, pull request, and any newly surfaced questions here before Milestone 3 is marked accepted.
+The exact ingestion totals, exclusions, dependency-audit results, public review links, workflow evidence, and remaining debt are recorded in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
+Questions M3-Q001 through M3-Q018 remain open for human review; none is silently resolved by the preview implementation.

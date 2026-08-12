@@ -1,6 +1,6 @@
 # Milestone 3 static editing handoff
 
-Status: implementation candidate
+Status: implementation complete; draft human review open
 
 ## Outcome
 

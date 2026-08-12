@@ -1,6 +1,6 @@
 # Milestone 3 GitHub Pages preview
 
-Status: implementation candidate; publication awaits the Milestone 3 branch
+Status: implementation complete; draft human review open
 
 Target repository: `con/orinoco-lite-dev`
 
@@ -101,8 +101,9 @@ No component pull request is required by this milestone.
 5. Push `codex/milestone-3` in `con/orinoco-lite-dev` and open one draft pull request to `main`.
 6. Let that branch push publish the shared preview and record its workflow run and deployed URL in the Milestone 3 acceptance report.
 
-The Pages endpoint currently returns `404`, meaning it was not configured at the time this contract was written.
-Repository configuration is an explicit publication step, not something a pull-request workflow silently enables.
+Pages is configured for GitHub Actions and the public preview is available at `https://con.github.io/orinoco-lite-dev/`.
+The `github-pages` environment admits `main` and the temporary `codex/milestone-3` review branch.
+The temporary branch policy and workflow trigger are review scaffolding, not a production branch policy.
 
 ## Acceptance
 
