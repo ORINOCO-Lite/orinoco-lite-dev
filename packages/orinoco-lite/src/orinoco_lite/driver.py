@@ -25,6 +25,10 @@ PASSTHROUGH_ENVIRONMENT = {
     "XDG_CACHE_HOME",
     "XDG_CONFIG_HOME",
 }
+RUNTIME_SAFETY_ENVIRONMENT = {
+    # The runtime is verified before every command and must remain immutable.
+    "PYTHONDONTWRITEBYTECODE": "1",
+}
 
 
 def _expand_token(token: str, values: Mapping[str, str]) -> str:
@@ -57,6 +61,7 @@ def driver_environment(
     environment["PYTHONPATH"] = engine_path
     if additions:
         environment.update(additions)
+    environment.update(RUNTIME_SAFETY_ENVIRONMENT)
     return environment
 
 
