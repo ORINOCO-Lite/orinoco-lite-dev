@@ -27,6 +27,7 @@ from .integrity import sha256_file
 
 MANIFEST_HEADER = "# orinoco-lite projection manifest v2"
 PROJECTION_ALGORITHM = "orinoco-projection-v2"
+PROJECTION_CONTROL_SIDECAR = ".gitattributes"
 FORBIDDEN_BRIDGE_PREDICATES = {
     "dcterms:contributor",
     "dcterms:creator",
@@ -36,6 +37,16 @@ FORBIDDEN_BRIDGE_PREDICATES = {
     "schema:memberOf",
     "schema:subjectOf",
 }
+
+
+def _is_projection_control_sidecar(output: Path, path: Path) -> bool:
+    """Recognize the one reviewed, non-generated projection control file."""
+
+    return (
+        not path.is_symlink()
+        and path.is_file()
+        and path.relative_to(output).as_posix() == PROJECTION_CONTROL_SIDECAR
+    )
 
 
 @dataclass(frozen=True)
@@ -586,7 +597,12 @@ def projection_manifest(
         f"pin:algorithm@{PROJECTION_ALGORITHM}"
     )
     for path in sorted(output.rglob("*")):
-        if path.is_file() and path.name != "SHA256SUMS" and "provenance" not in path.parts:
+        if (
+            path.is_file()
+            and path.name != "SHA256SUMS"
+            and "provenance" not in path.parts
+            and not _is_projection_control_sidecar(output, path)
+        ):
             lines.append(
                 f"{sha256_file(path)}  output:{path.relative_to(output).as_posix()}"
             )
@@ -696,7 +712,9 @@ def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
         expected_files = {
             path.relative_to(output).as_posix(): path
             for path in output.rglob("*")
-            if path.is_file() and "provenance" not in path.parts
+            if path.is_file()
+            and "provenance" not in path.parts
+            and not _is_projection_control_sidecar(output, path)
         }
         candidate_files = {
             path.relative_to(candidate).as_posix(): path
@@ -733,6 +751,14 @@ def update_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
     preserve_backup = False
     try:
         report = render_projection(workspace, runtime_root, staging)
+        control_sidecar = destination / PROJECTION_CONTROL_SIDECAR
+        if control_sidecar.exists() or control_sidecar.is_symlink():
+            if control_sidecar.is_symlink() or not control_sidecar.is_file():
+                raise DriverError(
+                    "Projection control sidecar must be a regular file: "
+                    f"{control_sidecar}"
+                )
+            shutil.copyfile(control_sidecar, staging / PROJECTION_CONTROL_SIDECAR)
         historical = destination / "provenance"
         if historical.is_dir():
             shutil.copytree(historical, staging / "provenance")

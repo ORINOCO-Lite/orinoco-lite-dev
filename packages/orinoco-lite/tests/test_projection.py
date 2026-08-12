@@ -284,6 +284,44 @@ class GenericProjectionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(DriverError, "stale"):
             verify_projection(self.workspace, self.runtime)
 
+    def test_update_preserves_projection_control_sidecar_and_active_ledger(self) -> None:
+        projection = self.root / "generated/projection"
+        projection.mkdir()
+        sidecar = projection / ".gitattributes"
+        sidecar_bytes = b"* annex.largefiles=nothing\n"
+        sidecar.write_bytes(sidecar_bytes)
+
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
+            update_projection(self.workspace, self.runtime)
+            report = verify_projection(self.workspace, self.runtime)
+
+        self.assertEqual(sidecar.read_bytes(), sidecar_bytes)
+        self.assertTrue((projection / "SHA256SUMS").is_file())
+        self.assertNotIn(
+            "output:.gitattributes",
+            (projection / "SHA256SUMS").read_text(encoding="utf-8"),
+        )
+        self.assertTrue(report["deterministic"])
+
+    def test_verify_rejects_arbitrary_undeclared_sidecar(self) -> None:
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
+            update_projection(self.workspace, self.runtime)
+
+        projection = self.root / "generated/projection"
+        undeclared = projection / ".undeclared-sidecar"
+        undeclared.write_text("must remain in deterministic scope\n", encoding="utf-8")
+        (projection / "SHA256SUMS").write_text(
+            projection_manifest(self.workspace, self.runtime, projection),
+            encoding="utf-8",
+        )
+
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
+            with self.assertRaisesRegex(
+                DriverError,
+                r"deterministic regeneration: \.undeclared-sidecar",
+            ):
+                verify_projection(self.workspace, self.runtime)
+
     def test_double_failure_preserves_recovery_backup(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
             update_projection(self.workspace, self.runtime)
