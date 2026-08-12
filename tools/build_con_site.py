@@ -845,6 +845,17 @@ def published_html_routes(site: Path) -> set[str]:
     return routes
 
 
+def quicklink_references(site: Path) -> list[str]:
+    """Return built HTML/JavaScript files that retain Quicklink prefetching."""
+    references: list[str] = []
+    for path in sorted(site.rglob("*")):
+        if not path.is_file() or path.suffix not in {".html", ".js"}:
+            continue
+        if b"quicklink" in path.read_bytes().lower():
+            references.append(path.relative_to(site).as_posix())
+    return references
+
+
 def declared_taxonomy_routes() -> frozenset[str]:
     """Derive framework-owned list routes from the pinned upstream config."""
     taxonomies = tomllib.loads(TAXONOMY_CONFIG.read_text(encoding="utf-8"))
@@ -969,6 +980,11 @@ def verify_site(
         raise BuildError(
             "Upstream institutional branding leaked into the CON artifact: "
             f"links={leaked_links}, assets={leaked_assets}"
+        )
+    quicklink_files = quicklink_references(site)
+    if quicklink_files:
+        raise BuildError(
+            f"Quicklink prefetching leaked into the CON artifact: {quicklink_files}"
         )
     base_path = urlsplit(base_url).path or "/"
     expected_explore = f"{base_path.rstrip('/')}/explore"

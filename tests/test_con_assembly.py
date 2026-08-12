@@ -58,6 +58,11 @@ class CONAssemblyTests(unittest.TestCase):
         ]
         self.assertEqual(layout_sources, ["profiles/con/layouts", "layouts"])
 
+        params = tomllib.loads(
+            (BUILD.SITE / "config/con/params.toml").read_text(encoding="utf-8")
+        )
+        self.assertIs(params.get("enableQuicklink"), False)
+
         assembly = BUILD.load_yaml(BUILD.ASSEMBLY_SPEC)
         self.assertIn(
             "profiles/con/layouts",
@@ -71,6 +76,17 @@ class CONAssemblyTests(unittest.TestCase):
                 transformations.search(text),
                 f"CON layout invokes platform-dependent image processing: {relative}",
             )
+
+    def test_quicklink_artifact_scan_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            site = Path(temporary)
+            (site / "index.html").write_text("<main>CON</main>\n", encoding="utf-8")
+            self.assertEqual(BUILD.quicklink_references(site), [])
+
+            script = site / "js/main.js"
+            script.parent.mkdir()
+            script.write_text("quicklink.listen();\n", encoding="utf-8")
+            self.assertEqual(BUILD.quicklink_references(site), ["js/main.js"])
 
     def test_manifest_tracks_site_parent_and_component_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
