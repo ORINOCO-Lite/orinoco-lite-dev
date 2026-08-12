@@ -428,6 +428,7 @@ class CONPagesTests(unittest.TestCase):
             command.count("refs/heads/codex/clean-migration:${checkpoint_ref}"),
             2,
         )
+        self.assertEqual(command.count("--no-recurse-submodules"), 2)
         self.assertIn(
             'test "$(git rev-parse "${checkpoint_ref}")" = '
             '"${parent_checkpoint}"',

@@ -46,12 +46,13 @@ jobs:
           readonly site_checkpoint=a122e506de9e4a13473edbe8d74a950d74032a16
           readonly checkpoint_ref=refs/remotes/origin/codex/clean-migration
 
-          git fetch --no-tags origin \
+          git fetch --no-tags --no-recurse-submodules origin \
             refs/heads/codex/clean-migration:${checkpoint_ref}
           test "$(git rev-parse "${checkpoint_ref}")" = "${parent_checkpoint}"
 
-          git -C submodules/centerforopenneuroscience.org fetch --no-tags \
-            origin refs/heads/codex/clean-migration:${checkpoint_ref}
+          git -C submodules/centerforopenneuroscience.org fetch \
+            --no-tags --no-recurse-submodules origin \
+            refs/heads/codex/clean-migration:${checkpoint_ref}
           test "$(git -C submodules/centerforopenneuroscience.org \
             rev-parse "${checkpoint_ref}")" = "${site_checkpoint}"
 
