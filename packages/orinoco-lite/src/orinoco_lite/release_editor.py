@@ -4,19 +4,39 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from .errors import DriverError
 
 
-def _run(arguments: Sequence[str | Path], cwd: Path) -> None:
+GIT_IDENTITY = {
+    "GIT_AUTHOR_NAME": "Orinoco release",
+    "GIT_AUTHOR_EMAIL": "release@example.invalid",
+    "GIT_COMMITTER_NAME": "Orinoco release",
+    "GIT_COMMITTER_EMAIL": "release@example.invalid",
+    "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z",
+    "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
+}
+
+
+def _run(
+    arguments: Sequence[str | Path],
+    cwd: Path,
+    *,
+    environment: Mapping[str, str] | None = None,
+) -> None:
+    process_environment = os.environ.copy()
+    if environment is not None:
+        process_environment.update(environment)
     try:
         result = subprocess.run(
             [str(item) for item in arguments],
             cwd=cwd,
+            env=process_environment,
             capture_output=True,
             text=True,
             check=False,
@@ -28,8 +48,41 @@ def _run(arguments: Sequence[str | Path], cwd: Path) -> None:
 
 
 def _git(repository: Path, *arguments: str) -> None:
-    _run(["git", "-c", "user.name=Orinoco release", "-c",
-          "user.email=release@example.invalid", *arguments], repository)
+    _run(
+        [
+            "git",
+            "-c",
+            "user.name=Orinoco release",
+            "-c",
+            "user.email=release@example.invalid",
+            *arguments,
+        ],
+        repository,
+        environment=GIT_IDENTITY,
+    )
+
+
+def _initialize_repository(repository: Path, source_commit: str) -> str:
+    """Create deterministic Git metadata for one copied editor component."""
+
+    git_marker = repository / ".git"
+    if git_marker.exists():
+        git_marker.unlink() if git_marker.is_file() else shutil.rmtree(git_marker)
+    _run(["git", "init", "-q"], repository, environment=GIT_IDENTITY)
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-qm", f"pinned source {source_commit}")
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        env={**os.environ, **GIT_IDENTITY},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    commit = result.stdout.strip()
+    if result.returncode or len(commit) != 40:
+        raise DriverError("Could not create deterministic editor Git metadata")
+    return commit
 
 
 def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, Any]:
@@ -113,18 +166,7 @@ def build_editor(
         (shacl, "3be33196f0eb7a65817df78b88ea40ecbb5eca11"),
         (pool_ui, "93961ace8d4ceaea088ccc04526a9bc5428139a6"),
     ):
-        git_marker = repository / ".git"
-        if git_marker.exists():
-            git_marker.unlink() if git_marker.is_file() else shutil.rmtree(git_marker)
-        _run(["git", "init", "-q"], repository)
-        _git(repository, "add", ".")
-        _git(
-            repository,
-            "commit",
-            "-qm",
-            f"pinned source {commit}",
-            "--date=2000-01-01T00:00:00Z",
-        )
+        _initialize_repository(repository, commit)
     shutil.copyfile(overlay / "review-bundle.js", module)
     shutil.copyfile(overlay / "review-bundle.test.js", test)
     _run(["npm", "ci"], shacl)
