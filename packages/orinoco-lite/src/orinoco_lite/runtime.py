@@ -14,6 +14,7 @@ import tempfile
 from typing import Any, Mapping, Sequence
 from urllib.request import Request, urlopen
 
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
 import yaml
 
 from .config import CONFIG_CONTRACT_VERSION, EngineLock, WorkspaceConfig
@@ -40,6 +41,7 @@ MAX_RUNTIME_BYTES = 2 * 1024 * 1024 * 1024
 class RuntimeManifest:
     path: Path
     release: str
+    compatibility: Mapping[str, Any]
     commands: Mapping[str, tuple[str, ...]]
     files: tuple[Mapping[str, Any], ...]
     raw: Mapping[str, Any]
@@ -106,6 +108,17 @@ def load_runtime_manifest(path: Path) -> RuntimeManifest:
         raise IntegrityError(
             f"Runtime does not support config contract {CONFIG_CONTRACT_VERSION}"
         )
+    hugo = compatibility.get("hugo")
+    if not isinstance(hugo, str) or not hugo or hugo != hugo.strip():
+        raise IntegrityError(
+            "Runtime compatibility.hugo must be a non-empty PEP 440 specifier"
+        )
+    try:
+        SpecifierSet(hugo)
+    except InvalidSpecifier as error:
+        raise IntegrityError(
+            "Runtime compatibility.hugo must be a valid PEP 440 specifier"
+        ) from error
 
     commands_value = raw.get("commands")
     if not isinstance(commands_value, dict):
@@ -163,6 +176,7 @@ def load_runtime_manifest(path: Path) -> RuntimeManifest:
     return RuntimeManifest(
         path=path.resolve(),
         release=release,
+        compatibility=dict(compatibility),
         commands=commands,
         files=tuple(files),
         raw=raw,

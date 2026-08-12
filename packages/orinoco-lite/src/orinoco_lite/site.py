@@ -5,17 +5,29 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import subprocess
 import sys
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
+
 from .assets import hydrate_asset_cache, load_assets, verify_asset
 from .config import load_config_path
-from .errors import ConfigurationError, DriverError
+from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
+from .runtime import MANIFEST_NAME, load_runtime_manifest
+
+
+HUGO_VERSION = re.compile(
+    r"^hugo\s+v?(?P<version>[0-9]+(?:\.[0-9]+){2})"
+    r"(?P<variants>(?:\+[A-Za-z0-9.-]+)*)(?:\s|$)",
+    re.IGNORECASE,
+)
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
@@ -144,6 +156,41 @@ def _run(command: Sequence[str | Path], *, cwd: Path) -> str:
     return result.stdout
 
 
+def _require_compatible_hugo(
+    output: str,
+    specifier: str,
+    *,
+    runtime_release: str,
+) -> Version:
+    match = HUGO_VERSION.match(output.strip())
+    if match is None:
+        raise DriverError(f"Could not determine Hugo version from: {output.strip()}")
+    variants = {
+        item.lower()
+        for item in match.group("variants").split("+")
+        if item
+    }
+    if "extended" not in variants:
+        raise DriverError(f"Orinoco Lite requires Hugo Extended: {output.strip()}")
+    version = Version(match.group("version"))
+    if version not in SpecifierSet(specifier):
+        raise DriverError(
+            f"Orinoco runtime {runtime_release} requires Hugo {specifier}; "
+            f"found {version}"
+        )
+    return version
+
+
+def _preflight_hugo(runtime_root: Path, *, cwd: Path) -> Version:
+    manifest = load_runtime_manifest(runtime_root / MANIFEST_NAME)
+    output = _run(["hugo", "version"], cwd=cwd)
+    return _require_compatible_hugo(
+        output,
+        str(manifest.compatibility["hugo"]),
+        runtime_release=manifest.release,
+    )
+
+
 def build_site(
     config: Path,
     runtime_root: Path,
@@ -157,6 +204,7 @@ def build_site(
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ConfigurationError("Build base URL must be an absolute HTTP(S) URL")
     base_url = base_url.rstrip("/") + "/"
+    _preflight_hugo(runtime_root, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
@@ -165,9 +213,6 @@ def build_site(
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    version = _run(["hugo", "version"], cwd=workspace.root)
-    if "extended" not in version.lower():
-        raise DriverError(f"Orinoco Lite requires Hugo Extended: {version.strip()}")
     _run(
         [
             "hugo",
@@ -245,7 +290,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         report = build_site(args.config, args.runtime, args.destination, args.base_url)
-    except (ConfigurationError, DriverError) as error:
+    except (ConfigurationError, DriverError, IntegrityError) as error:
         print(f"orinoco build: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, sort_keys=True))

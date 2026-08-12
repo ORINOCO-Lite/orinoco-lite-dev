@@ -43,6 +43,7 @@ release: 0.1.0
 source_root: source
 compatibility:
   config: [1]
+  hugo: ">=0.154,<0.155"
 commands:
   validate: ["{python}", "{runtime}/drivers/validate.py"]
 licenses:
@@ -99,6 +100,22 @@ provenance:
         self.assertEqual(
             report["provenance"]["source_inventory"]["engine"]["commit"], commit
         )
+
+    def test_hugo_compatibility_requires_a_valid_specifier(self) -> None:
+        original = self.spec.read_text(encoding="utf-8")
+        for label, replacement in (
+            ("missing", ""),
+            ("empty", '  hugo: ""\n'),
+            ("malformed", '  hugo: "not a version range"\n'),
+        ):
+            with self.subTest(label=label):
+                self.spec.write_text(
+                    original.replace('  hugo: ">=0.154,<0.155"\n', replacement),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(IntegrityError, "compatibility.hugo"):
+                    assemble_runtime(self.spec, self.root / f"{label}.tar.gz")
+        self.spec.write_text(original, encoding="utf-8")
 
     def test_directory_tampering_is_rejected(self) -> None:
         archive = self.root / "runtime.tar.gz"

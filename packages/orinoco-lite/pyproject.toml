@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orinoco-lite"
-version = "0.1.2"
+version = "0.1.3"
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,6 +14,7 @@ dependencies = [
   "Jinja2==3.1.6",
   "linkml==1.11.1",
   "linkml-runtime==1.11.1",
+  "packaging==26.3",
   "pydantic==2.13.4",
   "PyYAML==6.0.2",
   "rdflib==7.6.0",
