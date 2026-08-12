@@ -16,6 +16,9 @@ Implementations must preserve unresolved source evidence and fail closed rather 
 | M3-D005 | Browser editing remains credential-free. | SHACL Vue loads public static data and downloads a review bundle; a local authenticated checkout prepares any later PR. |
 | M3-D006 | Hosted authentication and direct pull-request creation remain deferred. | No OAuth, GitHub App, browser token, or persistent metadata write service is introduced. |
 | M3-D007 | Production dependency advisories are resolved by updating the pinned SHACL Vue stack. | Exact dependency and lockfile changes must pass upstream and parent browser regression tests; unsupported overrides are not used, and any development-only exception is recorded separately. |
+| M3-Q011 (resolved) | Downloaded editor patches target the canonical paths in `centerforopenneuroscience.org`. | The site repository owns the canonical YAML and its active branch remains a direct, rebasable descendant of `www-from-model`; the account mirror is transport, not a competing source of truth. |
+| M3-Q013 (resolved) | Keep canonical content in the site repository and update its gitlink deliberately in the coordinating parent. | This is ordinary submodule coordination within the multi-repository parent, not a special two-repository architecture. Legacy CON branches and tags remain permanently reachable as disconnected history and are not merged into the upstream-derived branch. |
+| M3-Q014 (resolved) | Publishing canonical YAML verbatim in the static editor catalog is acceptable. | The records are already public website inputs; the catalog intentionally makes bulk access and reuse more convenient, subject to the normal rule that private or embargoed material must never enter canonical public YAML. |
 
 ## Existing source-policy decisions retained
 
@@ -41,10 +44,7 @@ The Zotero importer retains the reviewed source decisions already recorded in `s
 | M3-Q008 | Is continued read-only remote custody sufficient for the sixteen annex-backed assets? | Hydrate by exact key and digest for the preview; do not claim durable custody. |
 | M3-Q009 | After review, should the preview replace the production custom-domain site? | Do not change DNS, redirects, `CNAME`, or production settings in Milestone 3. |
 | M3-Q010 | Who may approve canonical publication and editorial changes after the draft PR is opened? | Require ordinary human PR review; do not encode an unapproved CODEOWNERS or branch-protection policy. |
-| M3-Q011 | Which public site repository should receive a patch downloaded by the static editor? | Generate a repository-relative patch at the pinned site commit, but do not claim a contribution target until the CON repository or account mirror is selected. |
 | M3-Q012 | Should Pages continue to deploy from `codex/milestone-3` after review? | Use that branch only to bootstrap the pre-merge preview; then remove its push trigger and deploy only from `main`. |
-| M3-Q013 | Should canonical content retain the site-repository plus parent-gitlink review boundary? | Preserve the proven two-repository ownership in this milestone; consider moving content only as a separately reviewed architecture change. |
-| M3-Q014 | May the Pages editor publish a bulk catalog containing the canonical YAML verbatim? | Permit it because the YAML is already public website input, but call out the increased convenience of bulk download during human review. |
 | M3-Q015 | Should the `github-pages` environment require named deployment reviewers? | Use ordinary repository controls without inventing a reviewer policy; add environment protection only after maintainers choose the approvers. |
 | M3-Q016 | May deployment configuration or schema-authored markup become writable by untrusted users in a later hosted editor? | Treat those inputs as trusted, pinned build inputs in this static preview; require an explicit sanitization boundary before making them user-controlled. |
 | M3-Q017 | Is the stable documentation toolchain's four-item development-only advisory exception acceptable until VitePress publishes a supported patched line? | Keep documentation out of the deployed runtime, require a zero-finding production audit, and do not force an unsupported Vite or VitePress alpha override. |
@@ -53,4 +53,5 @@ The Zotero importer retains the reviewed source decisions already recorded in `s
 ## Completion updates
 
 The exact ingestion totals, exclusions, dependency-audit results, public review links, workflow evidence, and remaining debt are recorded in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
-Questions M3-Q001 through M3-Q018 remain open for human review; none is silently resolved by the preview implementation.
+Questions M3-Q011, M3-Q013, and M3-Q014 are resolved above.
+All other M3 questions remain open for human review; none is silently resolved by the preview implementation.

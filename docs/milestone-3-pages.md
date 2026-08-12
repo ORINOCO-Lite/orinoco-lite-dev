@@ -63,10 +63,14 @@ That catalog contains the exact public canonical YAML, its site-repository-relat
 It is enough for a browser-only editor to generate a reviewable patch without an API call.
 It intentionally excludes service endpoints, access tokens, automatic pushes, and automatic pull-request creation.
 
-A downloaded patch changes paths in the `centerforopenneuroscience.org` repository because that repository currently owns canonical YAML.
-The parent repository contains only its gitlink.
-A future one-click contribution flow therefore needs an explicit decision about the public contribution target and the subsequent parent-gitlink update.
-The current milestone does not disguise that two-repository review boundary.
+A downloaded patch changes canonical paths in `centerforopenneuroscience.org`.
+That repository intentionally owns the CON metadata, editorial content, and site overlay on a branch descended directly from `www-from-model`.
+The branch can continue to rebase onto reviewed upstream changes without merging the unrelated legacy CON ancestry.
+Legacy branches and tags remain permanently reachable in the same repository as preserved history.
+
+`orinoco-lite-dev` remains the multi-repository coordinator and records the selected site commit as a gitlink, just as it records its other component versions.
+After a reviewed site change, deliberately advancing that gitlink is ordinary submodule coordination rather than a separate architectural ownership decision.
+The account mirror exists to transport the upstream-derived site branch; it is not an alternative canonical repository.
 
 ## Actions security boundary
 
@@ -122,13 +126,10 @@ Publication is acceptable when all of the following hold:
 
 These decisions are deliberately surfaced rather than hidden in deployment code:
 
-1. **Patch contribution repository.** Choose whether downloaded patches and eventual component pull requests target `con/centerforopenneuroscience.org` or the account mirror used to make the direct-upstream branch reachable.
-2. **Publication branch after review.** Decide whether Pages should deploy only from `main` after Milestone 3 merges.
+1. **Publication branch after review.** Decide whether Pages should deploy only from `main` after Milestone 3 merges.
 The recommended default is yes; the milestone branch trigger is a temporary preview bootstrap.
-3. **Two-repository review.** Decide whether content remains canonical in the site repository, requiring a site change followed by a parent gitlink change, or moves into the parent in a later milestone.
-This milestone preserves the proven site-repository ownership.
-4. **Public source catalog.** Confirm that publishing canonical YAML verbatim in the editor catalog is acceptable.
-It is already public website input, but the catalog makes bulk download convenient.
-5. **Environment protection.** Choose the reviewers, if any, required by the `github-pages` environment before a manual or `main` deployment proceeds.
+2. **Environment protection.** Choose the reviewers, if any, required by the `github-pages` environment before a manual or `main` deployment proceeds.
+
+Repository placement and public-catalog policy are resolved: canonical content and downloaded patches belong to the upstream-derived branch in `centerforopenneuroscience.org`; its legacy refs remain preserved; the parent records the chosen site commit; and publishing the already-public canonical YAML as a convenient bulk editor catalog is accepted.
 
 Hosted authentication, automatic branch creation, automatic pull-request submission, custom domains, redirects, and production DNS remain deferred.

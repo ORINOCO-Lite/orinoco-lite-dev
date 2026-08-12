@@ -71,6 +71,10 @@ The supported handoff is:
 The browser receives no GitHub credential.
 Direct pull-request creation, OAuth, GitHub Apps, hosted tokens, and branch-protection policy remain a later milestone.
 
+Canonical CON content lives in the upstream-derived branch of `centerforopenneuroscience.org` and remains rebasable onto reviewed `www-from-model` changes.
+The repository also preserves its unrelated legacy branches and tags without merging them into that ancestry.
+`orinoco-lite-dev` coordinates this site and its other submodules through deliberate gitlink pins.
+
 ### SHACL Vue dependency refresh
 
 Update the pinned pool UI and nested SHACL Vue dependencies, commit the exact lockfile, run the upstream unit/build suite and the parent Playwright suite, and record any advisory that cannot be removed without an unsupported behavior change.

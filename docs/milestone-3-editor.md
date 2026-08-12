@@ -44,6 +44,11 @@ Review and commit the resulting YAML in the site repository.
 A parent change then deliberately advances the site gitlink.
 Milestone 3 does not automate either commit or open a component pull request.
 
+This repository placement is settled.
+`centerforopenneuroscience.org` owns the canonical CON content on its upstream-derived, rebasable site branch; the account mirror is only a transport for that branch.
+The parent gitlink update is ordinary component-version coordination among the parent's many submodules.
+Legacy CON branches and tags remain preserved as separate reachable history in the site repository.
+
 ## Security and publication boundary
 
 - the browser performs only static `GET` and `HEAD` requests;

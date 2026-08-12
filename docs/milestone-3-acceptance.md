@@ -63,6 +63,11 @@ SHACL Vue loads digest-bound public records and shapes, saves changes only to an
 The checked-in local helper verifies the site commit, source digest, PID, class, path, schema, native relationship closure, and clean checkout before showing or applying canonical YAML changes.
 It does not create a branch or pull request.
 
+Canonical YAML and downloaded patches belong to the upstream-derived site branch in `centerforopenneuroscience.org`.
+That branch remains rebasable onto reviewed `www-from-model` changes, while the repository's unrelated legacy CON branches and tags remain permanently reachable without being merged into the active ancestry.
+The parent gitlink is the normal version pin for this site component within the larger coordinating repository.
+Publishing the same public YAML in the editor catalog is accepted as an intentional convenience for bulk access and reuse.
+
 Playwright covers the project-path navigation, record load, edit, save, download, and local dry-run validation.
 It also proves that the browser sends no write request and ignores or removes service-token state in static mode.
 
@@ -115,8 +120,6 @@ The complete decision register is [`milestone-3-decisions.md`](milestone-3-decis
 In particular, maintainers must decide:
 
 - which unresolved creators, venues, tags, duplicates, and supporting people to promote;
-- whether the static editor's patches should target the CON repository or the account mirror, and whether the two-repository content/gitlink boundary stays;
-- whether canonical YAML may remain available as the editor's bulk public catalog;
 - whether named Pages deployment reviewers are required;
 - whether to remove the temporary milestone-branch deployment after merge;
 - whether the external font and development-only advisory exceptions are acceptable; and
