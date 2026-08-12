@@ -58,8 +58,8 @@ pixi run build
 pixi run serve
 pixi run test
 pixi run test-all
-pixi run update-orinoco --check
-pixi run update-orinoco --to <version>
+pixi run update-check
+pixi run update-orinoco -- --to-template <version> <reviewed coordinates>
 ```
 
 An optional `serve-full-stack` interface may expose the four-collection local Dump Things and SHACL Vue stack.
