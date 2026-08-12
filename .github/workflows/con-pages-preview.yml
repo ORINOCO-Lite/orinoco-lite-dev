@@ -44,7 +44,7 @@ jobs:
           cache: true
           cache-write: ${{ github.event_name != 'pull_request' }}
           locked: true
-          pixi-version: 0.73.0
+          pixi-version: v0.73.0
 
       - name: Run focused contracts
         run: pixi run test-pages
