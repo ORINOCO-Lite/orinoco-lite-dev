@@ -148,8 +148,11 @@ jobs:
             --output "release/dist-repeat/orinoco-runtime-$version.tar.gz"
           cmp "release/dist/orinoco-runtime-$version.tar.gz" \
             "release/dist-repeat/orinoco-runtime-$version.tar.gz"
-          find release/dist -maxdepth 1 -type f ! -name SHA256SUMS \
-            -print0 | sort -z | xargs -0 sha256sum > release/dist/SHA256SUMS
+          (
+            cd release/dist
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' \
+              | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
 
       - name: Attest the release artifact checksums
         id: attestation
