@@ -22,7 +22,7 @@ The component branches exist only so a public recursive checkout can resolve the
 | Component | Branch | Accepted commit |
 | --- | --- | --- |
 | Parent coordinator | `codex/milestone-3` | recorded by the draft PR head |
-| CON site | `codex/milestone-3` | `71d531b4fe3b760c5003a7091b88687029caf3e3` |
+| CON site | `codex/milestone-3` | `bf8ff0ee786c0f5f517a398607f952db0783a013` |
 | Zotero ingestion | `codex/milestone-3-zotero` | `062da59cb5a00ca128b3df895426a54088bfc625` |
 | Pool UI wrapper | `codex/milestone-3-dependency-refresh` | `93961ace8d4ceaea088ccc04526a9bc5428139a6` |
 | SHACL Vue | `codex/milestone-3-dependency-refresh` | `3be33196f0eb7a65817df78b88ea40ecbb5eca11` |
@@ -84,6 +84,10 @@ It verifies every one of the 28 recursive gitlinks and all public component orig
 Two editor builds and two complete Pages builds are byte-identical.
 The branch checkout and detached recursive checkout produce the same editor and Pages trees.
 Profile-local presentation overrides use the reviewed source images directly rather than invoking Hugo's platform-dependent responsive-image encoder, so Linux and macOS do not generate competing derived pixels.
+
+The final local gate produced two identical 144-file editor bundles and two identical 444-file Pages artifacts.
+The backend-free site subset has digest `79ee8d328f1b6ac8fedd280651b216de4e7ae14cbc7efcc72e8234a553bc4150`; the complete pre-publication payload has digest `0fc838920d2ce66fc065c61f47316c9e9caac14737aa19d600d6e95a1dcebd72`.
+Hugo processed zero images, while the 186-node graph and 185 edit routes remain unchanged.
 
 The uploaded archive includes the audited root dotfiles so its file counts and hashes match `publication.json`.
 Pull-request runs build and upload an artifact but cannot enter the deploy job.
