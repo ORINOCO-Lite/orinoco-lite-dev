@@ -40,6 +40,7 @@ class CONAssemblyTests(unittest.TestCase):
             Path("_partials/picture.html"),
             Path("_partials/taxonomy-list-grid.html"),
             Path("_partials/taxonomy-list-vertical-item.html"),
+            Path("_shortcodes/artwork-preview.html"),
         }
         actual = {
             path.relative_to(profile_layouts)
