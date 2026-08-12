@@ -43,6 +43,8 @@ UPSTREAM_BASELINE_MANIFEST = (
 )
 CACHE = ROOT / "build" / "con-assets"
 EXPECTED_ANNEX_VERSION = "10.20260601"
+ANNEX_BUILD_NAME = "CON static build"
+ANNEX_BUILD_EMAIL = "con-static-build@example.invalid"
 ASSET_PREFIX = PurePosixPath("profiles/con/assets")
 LINK_PREFIXES = {
     "projection_links": PurePosixPath("profiles/con/projection/content"),
@@ -128,6 +130,10 @@ def annex_command(repository: Path, *arguments: str) -> list[str]:
         "pixi",
         "run",
         "git",
+        "-c",
+        f"user.name={ANNEX_BUILD_NAME}",
+        "-c",
+        f"user.email={ANNEX_BUILD_EMAIL}",
         f"--git-dir={git_dir}",
         f"--work-tree={repository.resolve()}",
         "annex",
@@ -919,7 +925,7 @@ def hydrate_annex_asset(spec: AssetSpec) -> Path:
         return destination
 
     temporary = destination.with_name(
-        f".{destination.name}.download-{os.getpid()}-{secrets.token_hex(8)}"
+        f".download-{os.getpid()}-{secrets.token_hex(8)}-{destination.name}"
     )
     request = Request(
         spec.retrieval["object_url"],

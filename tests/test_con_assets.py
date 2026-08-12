@@ -182,6 +182,9 @@ class CONAssetTests(unittest.TestCase):
 
             self.assertEqual(set(files), set(declaration["assets"]))
             self.assertEqual(annex_key.call_count, 1)
+            hydrated_temporary = annex_key.call_args.args[0]
+            self.assertTrue(hydrated_temporary.name.startswith(".download-"))
+            self.assertTrue(hydrated_temporary.name.endswith("-person.jpg"))
             temporary_flags = secure_open.call_args.args[1]
             self.assertTrue(temporary_flags & os.O_EXCL)
             self.assertTrue(temporary_flags & os.O_NOFOLLOW)
@@ -541,10 +544,13 @@ class CONAssetTests(unittest.TestCase):
         ):
             command = ASSETS.annex_command(Path("/tmp/example"), "version")
         self.assertEqual(command[:3], ["pixi", "run", "git"])
+        self.assertIn(f"user.name={ASSETS.ANNEX_BUILD_NAME}", command)
+        self.assertIn(f"user.email={ASSETS.ANNEX_BUILD_EMAIL}", command)
         self.assertIn(
             f"--work-tree={Path('/tmp/example').resolve()}",
             command,
         )
+        self.assertNotIn("--global", command)
         self.assertNotIn("core.worktree", " ".join(command))
 
     def test_annex_payload_verification_supports_md5e_and_sha256e(self) -> None:
