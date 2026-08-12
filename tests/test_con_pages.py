@@ -387,6 +387,7 @@ class CONPagesTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", text)
         self.assertIn("cache-write: ${{ github.event_name != 'pull_request' }}", text)
         self.assertIn("submodules: recursive", text)
+        self.assertIn("include-hidden-files: true", text)
         self.assertIn("github.event_name == 'push'", text)
         self.assertNotIn("github.event_name == 'pull_request' ||", text)
         for action in (
