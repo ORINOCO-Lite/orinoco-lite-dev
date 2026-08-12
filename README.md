@@ -1,7 +1,20 @@
-# Full CON migration development workspace
+# Orinoco Lite engineering workspace
+
+The active effort is **Milestone 4: single-repository distribution**.
+It extracts the proven Orinoco Lite static-site and content workflow into a versioned engine, runtime release, template, and complete downstream test consumer.
+Start with [`docs/milestone-4.md`](docs/milestone-4.md).
+
+The engineering workspace remains multi-repository.
+The supported downstream experience does not: `test-orinoco-downstream-website` contains the complete accepted Milestone 3 CON profile in one ordinary repository and receives framework changes through reviewable update pull requests.
+
+The real `centerforopenneuroscience.org` repository is read-only evidence in this milestone.
+No branch, ref, file, setting, workflow, deployment, or domain change is permitted there.
+
+## Historical Milestone 1–3 workspace
 
 This repository coordinates the local-only **full CON migration** for the Center for Open Neuroscience website.
 It expands the accepted clean-migration vertical slice into a populated site while keeping canonical content isolated, deterministic, and easy to rebase onto reviewed upstream changes.
+Canonical CON content lives in the upstream-derived `centerforopenneuroscience.org` site branch; preserved legacy refs remain separate reachable history, and this parent coordinates the selected site version through its gitlink alongside its other submodules.
 
 The active parent and site branches are `codex/full-con-migration`, using reviewed upstream website commit `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`.
 
