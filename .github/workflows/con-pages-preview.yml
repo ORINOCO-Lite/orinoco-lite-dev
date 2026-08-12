@@ -38,6 +38,23 @@ jobs:
           persist-credentials: false
           submodules: recursive
 
+      - name: Verify the accepted clean-migration checkpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          readonly parent_checkpoint=f54cf5fdb2b5ae4bf03fe6939246316fd9ec818d
+          readonly site_checkpoint=a122e506de9e4a13473edbe8d74a950d74032a16
+          readonly checkpoint_ref=refs/remotes/origin/codex/clean-migration
+
+          git fetch --no-tags origin \
+            refs/heads/codex/clean-migration:${checkpoint_ref}
+          test "$(git rev-parse "${checkpoint_ref}")" = "${parent_checkpoint}"
+
+          git -C submodules/centerforopenneuroscience.org fetch --no-tags \
+            origin refs/heads/codex/clean-migration:${checkpoint_ref}
+          test "$(git -C submodules/centerforopenneuroscience.org \
+            rev-parse "${checkpoint_ref}")" = "${site_checkpoint}"
+
       - name: Install the locked Pixi environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:

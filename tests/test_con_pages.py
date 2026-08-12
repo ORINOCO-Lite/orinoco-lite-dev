@@ -398,6 +398,46 @@ class CONPagesTests(unittest.TestCase):
         ):
             self.assertIn(action, text)
 
+    def test_workflow_fetches_and_verifies_accepted_checkpoints(self) -> None:
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows/con-pages-preview.yml").read_text(
+                encoding="utf-8"
+            )
+        )
+        steps = workflow["jobs"]["build"]["steps"]
+        names = [step["name"] for step in steps]
+        checkpoint_index = names.index(
+            "Verify the accepted clean-migration checkpoints"
+        )
+        self.assertLess(
+            names.index("Check out the pinned recursive source tree"),
+            checkpoint_index,
+        )
+        self.assertLess(checkpoint_index, names.index("Run focused contracts"))
+
+        command = steps[checkpoint_index]["run"]
+        self.assertIn(
+            "parent_checkpoint=f54cf5fdb2b5ae4bf03fe6939246316fd9ec818d",
+            command,
+        )
+        self.assertIn(
+            "site_checkpoint=a122e506de9e4a13473edbe8d74a950d74032a16",
+            command,
+        )
+        self.assertEqual(
+            command.count("refs/heads/codex/clean-migration:${checkpoint_ref}"),
+            2,
+        )
+        self.assertIn(
+            'test "$(git rev-parse "${checkpoint_ref}")" = '
+            '"${parent_checkpoint}"',
+            command,
+        )
+        self.assertIn(
+            'rev-parse "${checkpoint_ref}")" = "${site_checkpoint}"',
+            command,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

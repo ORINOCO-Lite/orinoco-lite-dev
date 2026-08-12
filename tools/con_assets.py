@@ -746,22 +746,13 @@ def annex_hashdir(key: str) -> PurePosixPath:
 
 
 def canonical_annex_pointer_target(spec: AssetSpec) -> str:
-    """Calculate the exact symlink text git-annex uses for this worktree."""
+    """Calculate the portable symlink text committed for an annex asset."""
     if not spec.annex_key:
         raise AssetError(f"{spec.destination}: annex key is absent")
     pointer = SITE.joinpath(*PurePosixPath(spec.destination).parts)
-    git_dir = Path(
-        git(
-            SITE,
-            "rev-parse",
-            "--git-dir",
-            action="Locate the site Git directory",
-        )
-    )
-    if not git_dir.is_absolute():
-        git_dir = SITE / git_dir
     object_path = (
-        git_dir
+        SITE
+        / ".git"
         / "annex"
         / "objects"
         / Path(*annex_hashdir(spec.annex_key).parts)

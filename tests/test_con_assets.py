@@ -478,6 +478,35 @@ class CONAssetTests(unittest.TestCase):
                     spec,
                 )
 
+    def test_annex_pointer_is_independent_of_submodule_git_directory(self) -> None:
+        spec = ASSETS.asset_specs(manifest())["profiles/con/assets/img/person.jpg"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            site = root / "site"
+            site.mkdir()
+            administrative_git_dir = root / "parent/.git/modules/site"
+            administrative_git_dir.mkdir(parents=True)
+            site.joinpath(".git").write_text(
+                f"gitdir: {administrative_git_dir}\n",
+                encoding="utf-8",
+            )
+            hashdir = PurePosixPath("ab/cd")
+            destination = site / spec.destination
+            expected = canonical_pointer(
+                site,
+                destination,
+                spec.annex_key,
+                hashdir,
+            )
+            with (
+                mock.patch.object(ASSETS, "SITE", site),
+                mock.patch.object(ASSETS, "annex_hashdir", return_value=hashdir),
+            ):
+                actual = ASSETS.canonical_annex_pointer_target(spec)
+
+            self.assertEqual(actual, expected)
+            self.assertNotIn(str(administrative_git_dir), actual)
+
     def test_runtime_and_annex_commands_are_pixi_scoped(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
