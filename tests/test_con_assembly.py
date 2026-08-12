@@ -3,8 +3,10 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import re
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest import mock
 
@@ -30,6 +32,45 @@ BUILD = load_tool("build_con_site")
 
 
 class CONAssemblyTests(unittest.TestCase):
+    def test_con_layout_overrides_are_preferred_digest_bound_and_static(self) -> None:
+        profile_layouts = BUILD.SITE / "profiles/con/layouts"
+        expected = {
+            Path("term.html"),
+            Path("_partials/article-link.html"),
+            Path("_partials/picture.html"),
+            Path("_partials/taxonomy-list-grid.html"),
+            Path("_partials/taxonomy-list-vertical-item.html"),
+        }
+        actual = {
+            path.relative_to(profile_layouts)
+            for path in profile_layouts.rglob("*.html")
+        }
+        self.assertEqual(actual, expected)
+
+        module = tomllib.loads(
+            (BUILD.SITE / "config/con/module.toml").read_text(encoding="utf-8")
+        )
+        layout_sources = [
+            mount["source"]
+            for mount in module["mounts"]
+            if mount.get("target") == "layouts"
+        ]
+        self.assertEqual(layout_sources, ["profiles/con/layouts", "layouts"])
+
+        assembly = BUILD.load_yaml(BUILD.ASSEMBLY_SPEC)
+        self.assertIn(
+            "profiles/con/layouts",
+            assembly["digest"]["scope"],
+        )
+
+        transformations = re.compile(r"\.(?:Resize|Fit|Fill|Crop|Process)\b")
+        for relative in sorted(expected):
+            text = (profile_layouts / relative).read_text(encoding="utf-8")
+            self.assertIsNone(
+                transformations.search(text),
+                f"CON layout invokes platform-dependent image processing: {relative}",
+            )
+
     def test_manifest_tracks_site_parent_and_component_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
