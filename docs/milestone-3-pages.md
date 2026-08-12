@@ -39,7 +39,7 @@ build/pages-preview/orinoco-lite-dev/
 The Hugo base URL and graph, navigation, asset, and edit links all use `/orinoco-lite-dev/`.
 The generated site points edit links at `/orinoco-lite-dev/edit/`; loopback URLs and the German editor URL are rejected from the uploaded artifact.
 
-`pixi run verify-pages` creates the complete artifact twice and requires byte-identical file manifests.
+`pixi run verify-pages` compiles the pinned SHACL Vue editor twice independently, requires those bundles to be byte-identical, then creates the complete Pages artifact twice and requires byte-identical file manifests.
 `pixi run audit-pages` checks an existing artifact without rebuilding it.
 `pixi run serve-pages` provides a local project-path preview at `http://127.0.0.1:8766/orinoco-lite-dev/`; that local origin is never embedded in the public files.
 

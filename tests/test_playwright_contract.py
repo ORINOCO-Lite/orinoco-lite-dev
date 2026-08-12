@@ -21,7 +21,9 @@ class PlaywrightContractTests(unittest.TestCase):
         pixi = (ROOT / "pixi.toml").read_text(encoding="utf-8")
         self.assertIn('PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers"', pixi)
         self.assertIn("install-browser-tests =", pixi)
+        self.assertIn("install-pages-browser-tests =", pixi)
         self.assertIn("test-browser =", pixi)
+        self.assertIn("test-pages-browser =", pixi)
         tasks = tomllib.loads(pixi)["tasks"]
         self.assertIn(
             "install-browser-tests",
@@ -30,6 +32,7 @@ class PlaywrightContractTests(unittest.TestCase):
         config = (ROOT / "playwright.config.mjs").read_text(encoding="utf-8")
         self.assertIn("build/playwright", config)
         self.assertIn("reuseExistingServer: false", config)
+        self.assertIn("PLAYWRIGHT_STATIC_ONLY", config)
         self.assertIn("workers: 1", config)
 
     def test_authenticated_spec_disables_secret_bearing_artifacts(self) -> None:

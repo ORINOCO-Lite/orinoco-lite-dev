@@ -30,9 +30,14 @@ verify-con-assembly = { depends-on = ["checkout-submodules"], cmd = "python3 too
 hydrate-con-assets = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_assets.py" }
 build-upstream = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8768/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
 serve-upstream = { depends-on = ["build-upstream"], cmd = "python3 -m http.server 8768 --directory build/upstream-local" }
-build-pages = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8766/orinoco-lite-dev/", DESTINATION = "build/pages-preview/orinoco-lite-dev", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
+build-pages-editor = { depends-on = ["build-pool-ui"], cmd = "python3 tools/build_pages_editor.py" }
+build-pages = { depends-on = ["checkout-submodules", "build-pages-editor"], cmd = "python3 tools/build_con_pages.py --require-editor" }
+verify-pages-editor = { depends-on = ["install-pool-ui"], cmd = "python3 tools/build_pages_editor.py --repeat-destination build/pages-editor-repeat" }
+verify-pages = { depends-on = ["checkout-submodules", "verify-pages-editor"], cmd = "python3 tools/build_con_pages.py --require-editor --repeat-destination build/pages-preview-repeat/orinoco-lite-dev" }
 serve-pages = { depends-on = ["build-pages"], cmd = "python3 -m http.server 8766 --directory build/pages-preview" }
-audit-pages = { cmd = "python3 tools/adapt_upstream_pages.py build/pages-preview/orinoco-lite-dev --base-path /orinoco-lite-dev/ --edit-url http://127.0.0.1:3000/ --check-only" }
+audit-pages = { cmd = "python3 tools/build_con_pages.py --require-editor --check-only" }
+test-pages = "python3 -m unittest tests.test_con_pages tests.test_pages_editor"
+review-editor-bundle = "python3 tools/apply_editor_bundle.py"
 prepare-local-stack = { depends-on = ["checkout-submodules", "build-pool-ui"], cmd = "python3 tools/prepare_local_stack.py" }
 serve-dump-things = { depends-on = ["prepare-local-stack"], cmd = "tools/serve_local_dumpthings.sh" }
 serve-git-annex = { depends-on = ["prepare-local-stack"], cmd = "python3 tools/serve_local_gitannex.py" }
@@ -47,7 +52,9 @@ install-hooks = { cmd = "git config core.hooksPath .githooks" }
 check-format = { cmd = "pre-commit run --all-files" }
 test = "python3 -m unittest discover -s tests -p 'test_*.py'"
 install-browser-tests = { cmd = "npm ci && npx playwright install chromium webkit", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
-test-browser = { depends-on = ["build", "build-upstream", "build-con-project-path", "prepare-local-stack", "install-browser-tests"], cmd = "npm run test:browser", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+install-pages-browser-tests = { cmd = "npm ci && npx playwright install chromium", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+test-pages-browser = { depends-on = ["verify-pages", "install-pages-browser-tests"], cmd = "npx playwright test tests/browser/static-editor.spec.mjs --project=chromium", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers", PLAYWRIGHT_STATIC_ONLY = "1" } }
+test-browser = { depends-on = ["build", "build-upstream", "build-con-project-path", "build-pages", "prepare-local-stack", "install-browser-tests"], cmd = "npm run test:browser", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
 test-all = { depends-on = ["test", "verify-con-projection", "verify-con-assembly", "verify-static", "test-browser"] }
 
 [pypi-dependencies]

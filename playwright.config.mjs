@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const buildRoot = 'build/playwright';
+const staticOnly = process.env.PLAYWRIGHT_STATIC_ONLY === '1';
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -22,16 +23,18 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'off',
   },
-  webServer: {
-    command: 'tools/serve_local_stack.sh',
-    url: 'http://127.0.0.1:8767/',
-    reuseExistingServer: false,
-    timeout: 240_000,
-    gracefulShutdown: {
-      signal: 'SIGTERM',
-      timeout: 15_000,
-    },
-  },
+  webServer: staticOnly
+    ? undefined
+    : {
+        command: 'tools/serve_local_stack.sh',
+        url: 'http://127.0.0.1:8767/',
+        reuseExistingServer: false,
+        timeout: 240_000,
+        gracefulShutdown: {
+          signal: 'SIGTERM',
+          timeout: 15_000,
+        },
+      },
   projects: [
     {
       name: 'chromium',

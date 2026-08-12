@@ -2,9 +2,9 @@
 
 Status: implementation candidate
 
-Nested SHACL Vue commit: `02d7ab109401eb5680a25df7a7bbbe9074e7465a`
+Nested SHACL Vue commit: `a4d59e38c909da512fe766b297a39e6e56680aac`
 
-Pool UI wrapper commit: `8cf0f1713cbf1775d63d5b85689515260d98ea4d`
+Pool UI wrapper commit: `32124ffae5c7121669d45ad195754d5851b8c36a`
 
 ## Outcome
 

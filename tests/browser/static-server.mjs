@@ -10,6 +10,7 @@ const CONTENT_TYPES = new Map([
   ['.json', 'application/json; charset=utf-8'],
   ['.png', 'image/png'],
   ['.svg', 'image/svg+xml'],
+  ['.ttl', 'text/turtle; charset=utf-8'],
   ['.webmanifest', 'application/manifest+json'],
 ]);
 
@@ -43,6 +44,7 @@ export async function startStaticServer(profiles, initialProfile, options = {}) 
     const root = profiles[activeProfile];
     const file = resolveRequest(root, url.pathname, mountPath);
     requests.push({
+      method: request.method,
       profile: activeProfile,
       path: url.pathname,
       search: url.search,
