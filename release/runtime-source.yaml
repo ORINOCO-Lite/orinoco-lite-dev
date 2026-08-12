@@ -1,0 +1,131 @@
+format: orinoco-lite-runtime-source
+spec_version: 1
+release: 0.1.0
+compatibility:
+  config: [1]
+  minimum_python: "3.12"
+  hugo: ">=0.154,<0.155"
+  schema_profile: things-schemas/demo-research-information@d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
+
+commands:
+  validate:
+    - "{python}"
+    - -m
+    - orinoco_lite.runtime_validate
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+  projection-update:
+    - "{python}"
+    - -m
+    - orinoco_lite.projection_cli
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - update
+  projection-verify:
+    - "{python}"
+    - -m
+    - orinoco_lite.projection_cli
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - verify
+  build:
+    - "{python}"
+    - -m
+    - orinoco_lite.site
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - --destination
+    - "{destination}"
+    - --base-url
+    - "{base_url}"
+  editor-apply:
+    - "{python}"
+    - -m
+    - orinoco_lite.editor
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - --bundle
+    - "{bundle}"
+  assets-hydrate:
+    - "{python}"
+    - -m
+    - orinoco_lite.asset_cli
+    - --config
+    - "{config}"
+    - hydrate
+  assets-verify:
+    - "{python}"
+    - -m
+    - orinoco_lite.asset_cli
+    - --config
+    - "{config}"
+    - verify
+
+licenses:
+  - licenses/README.md
+  - licenses/pool-ui-MIT.txt
+  - licenses/things-schemas-MIT.txt
+  - licenses/editor-dependencies/inventory.json
+
+resources:
+  - source: packages/orinoco-lite/src/orinoco_lite
+    destination: engine/orinoco_lite
+  - source: tools/adapt_upstream_pages.py
+    destination: drivers/adapt_pages.py
+  - source: release/runtime-licenses/README.md
+    destination: licenses/README.md
+  - source: submodules/pool.psychoinformatics.de-ui/LICENSE
+    destination: licenses/pool-ui-MIT.txt
+  - source: submodules/things-schemas/LICENSE
+    destination: licenses/things-schemas-MIT.txt
+  - source: build/runtime-schema
+    destination: schema
+  - source: submodules/pool.psychoinformatics.de-ui/dlschemas_owl.ttl
+    destination: editor-schema/dlschemas_owl.ttl
+  - source: submodules/pool.psychoinformatics.de-ui/dlschemas_shacl.ttl
+    destination: editor-schema/dlschemas_shacl.ttl
+  - source: submodules/pool.psychoinformatics.de-ui/config_default_xyzri.yaml
+    destination: editor-schema/config_default_xyzri.yaml
+  - source: build/runtime-editor-shell
+    destination: editor-shell
+  - source: build/runtime-editor-licenses
+    destination: licenses/editor-dependencies
+
+provenance:
+  source_repository: https://github.com/con/orinoco-lite-dev
+  component_commits:
+    pool_ui: 93961ace8d4ceaea088ccc04526a9bc5428139a6
+    things_schemas: d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
+  notes:
+    - Runtime contents are assembled only from the exact pinned source tree.
+    - The runtime is content and presentation neutral; downstream sites own presentation.
+    - Component license texts are bundled; the parent project remains license-neutral.
+  source_inventory:
+    engine:
+      commit: release-source
+      license: not-declared
+    page_adapter:
+      commit: release-source
+      license: not-declared
+    editor_shell:
+      commit: 93961ace8d4ceaea088ccc04526a9bc5428139a6
+      shacl_vue_commit: 3be33196f0eb7a65817df78b88ea40ecbb5eca11
+      license: MIT
+      license_path: licenses/pool-ui-MIT.txt
+      overlay: release/editor-v2/review-bundle.js
+    schema:
+      commit: d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
+      profile: demo-research-information/unreleased
+      license: MIT
+      license_path: licenses/things-schemas-MIT.txt
+      closure_inventory: schema/source-inventory.json

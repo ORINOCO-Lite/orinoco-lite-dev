@@ -1,0 +1,173 @@
+"""Build a generic editor shell and complete dependency-license inventory."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import shutil
+import subprocess
+from typing import Any, Sequence
+
+from .errors import DriverError
+
+
+def _run(arguments: Sequence[str | Path], cwd: Path) -> None:
+    try:
+        result = subprocess.run(
+            [str(item) for item in arguments],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise DriverError(f"Editor build command is missing: {arguments[0]}") from error
+    if result.returncode:
+        raise DriverError((result.stderr or result.stdout).strip())
+
+
+def _git(repository: Path, *arguments: str) -> None:
+    _run(["git", "-c", "user.name=Orinoco release", "-c",
+          "user.email=release@example.invalid", *arguments], repository)
+
+
+def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, Any]:
+    packages: list[dict[str, Any]] = []
+    licenses = destination / "texts"
+    licenses.mkdir(parents=True, exist_ok=True)
+    for manifest in sorted(node_modules.glob("*/package.json")) + sorted(
+        node_modules.glob("@*/*/package.json")
+    ):
+        try:
+            value = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise DriverError(f"Editor dependency manifest is invalid: {manifest}") from error
+        name = value.get("name")
+        version = value.get("version")
+        license_value = value.get("license") or value.get("licenses")
+        if not isinstance(name, str) or not isinstance(version, str):
+            raise DriverError(f"Editor dependency lacks identity metadata: {manifest}")
+        package_licenses: list[str] = []
+        for pattern in (
+            "LICENSE*",
+            "license*",
+            "LICENCE*",
+            "licence*",
+            "COPYING*",
+            "NOTICE*",
+        ):
+            for source in sorted(manifest.parent.glob(pattern)):
+                if not source.is_file() or source.is_symlink():
+                    continue
+                safe_name = "".join(
+                    character if character.isalnum() or character in ".-_" else "-"
+                    for character in name
+                )
+                target_name = f"{safe_name}-{version}-{source.name}"
+                target = licenses / target_name
+                if not target.exists():
+                    shutil.copyfile(source, target)
+                package_licenses.append(f"texts/{target_name}")
+        if not license_value and not package_licenses:
+            raise DriverError(
+                f"Editor dependency has no declared license or license text: {manifest}"
+            )
+        if not license_value:
+            license_value = "SEE-LICENSE-FILE"
+        packages.append(
+            {
+                "license": license_value,
+                "license_files": sorted(set(package_licenses)),
+                "name": name,
+                "version": version,
+            }
+        )
+    packages.sort(key=lambda item: (item["name"], item["version"]))
+    inventory = {
+        "format": "orinoco-editor-dependency-inventory",
+        "packages": packages,
+        "version": 1,
+    }
+    (destination / "inventory.json").write_text(
+        json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return inventory
+
+
+def build_editor(
+    pool_ui: Path,
+    overlay: Path,
+    shell: Path,
+    licenses: Path,
+) -> dict[str, Any]:
+    shacl = pool_ui / "shacl-vue"
+    module = shacl / "src" / "modules" / "review-bundle.js"
+    test = shacl / "tests" / "orinoco-review-bundle-v2.test.js"
+    if not module.is_file() or not overlay.is_dir():
+        raise DriverError("Pinned pool UI or Orinoco editor overlay is missing")
+    # The release workflow operates only on a copied source tree. Give each
+    # copied component deterministic Git metadata because the reviewed Vite
+    # configuration records `git rev-parse` values in the generic shell.
+    for repository, commit in (
+        (shacl, "3be33196f0eb7a65817df78b88ea40ecbb5eca11"),
+        (pool_ui, "93961ace8d4ceaea088ccc04526a9bc5428139a6"),
+    ):
+        git_marker = repository / ".git"
+        if git_marker.exists():
+            git_marker.unlink() if git_marker.is_file() else shutil.rmtree(git_marker)
+        _run(["git", "init", "-q"], repository)
+        _git(repository, "add", ".")
+        _git(
+            repository,
+            "commit",
+            "-qm",
+            f"pinned source {commit}",
+            "--date=2000-01-01T00:00:00Z",
+        )
+    shutil.copyfile(overlay / "review-bundle.js", module)
+    shutil.copyfile(overlay / "review-bundle.test.js", test)
+    _run(["npm", "ci"], shacl)
+    _run(["npm", "run", "test", "--", "--run", test], shacl)
+    _run(["make", "build-ui"], pool_ui)
+    if shell.exists():
+        shutil.rmtree(shell)
+    shutil.copytree(pool_ui / "dist" / "ui", shell)
+    for name in (
+        "config.json",
+        "config.yaml",
+        "dlschemas_data.ttl",
+        "dlschemas_owl.ttl",
+        "dlschemas_shacl.ttl",
+        "config_default_xyzri.yaml",
+    ):
+        (shell / name).unlink(missing_ok=True)
+    if licenses.exists():
+        shutil.rmtree(licenses)
+    licenses.mkdir(parents=True)
+    inventory = _dependency_inventory(shacl / "node_modules", licenses)
+    return {"dependencies": len(inventory["packages"]), "shell": str(shell)}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pool-ui", type=Path, required=True)
+    parser.add_argument("--overlay", type=Path, required=True)
+    parser.add_argument("--shell", type=Path, required=True)
+    parser.add_argument("--licenses", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        result = build_editor(
+            args.pool_ui.resolve(),
+            args.overlay.resolve(),
+            args.shell.resolve(),
+            args.licenses.resolve(),
+        )
+    except DriverError as error:
+        parser.exit(1, f"orinoco editor release: {error}\n")
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
