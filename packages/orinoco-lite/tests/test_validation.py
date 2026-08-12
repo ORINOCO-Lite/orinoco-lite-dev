@@ -60,6 +60,32 @@ class DownstreamValidationTests(unittest.TestCase):
         self.assertEqual(report["reference_records"], 1)
         self.assertEqual(report["canonical_classes"], {"xyzri:XYZPerson": 1})
 
+    def test_record_source_control_markers_are_not_records(self) -> None:
+        for relative in (
+            "metadata/records/.dumpthings.yaml",
+            "metadata/reference/.dumpthings.yaml",
+        ):
+            (self.root / relative).write_text(
+                "type: records\nnamespace: fixture\n", encoding="utf-8"
+            )
+        report = validate_workspace(load_workspace(self.root))
+        self.assertEqual(report["canonical_records"], 1)
+        self.assertEqual(report["reference_records"], 1)
+
+    def test_other_yaml_at_or_below_record_source_remains_fail_closed(self) -> None:
+        cases = (
+            "metadata/records/ordinary.yaml",
+            "metadata/records/.review.yaml",
+            "metadata/records/XYZPerson/.dumpthings.yaml",
+        )
+        for relative in cases:
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                path.write_text("type: records\n", encoding="utf-8")
+                with self.assertRaisesRegex(ConfigurationError, "pid and schema_type"):
+                    validate_workspace(load_workspace(self.root))
+                path.unlink()
+
     def test_duplicate_pid_across_reference_closure_fails(self) -> None:
         (self.root / "metadata/reference/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:persons/test\nschema_type: xyzri:XYZAgentRole\n",

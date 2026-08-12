@@ -47,6 +47,7 @@ class WorkspaceConfigTests(unittest.TestCase):
 
     def test_defaults_resolve_relative_to_consumer(self) -> None:
         workspace = load_workspace(self.root)
+        self.assertEqual(workspace.site_name, "Test Orinoco downstream")
         self.assertEqual(
             workspace.path("canonical").resolve(),
             (self.root / "metadata/records").resolve(),

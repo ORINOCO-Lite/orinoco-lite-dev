@@ -192,7 +192,10 @@ def verify_runtime_directory(
     expected_tree_sha256: str | None = None,
 ) -> RuntimeReport:
     root = root.resolve()
-    if root.name == RUNTIME_ROOT_NAME and root.is_dir():
+    root_metadata = (root / MANIFEST_NAME, root / CHECKSUMS_NAME)
+    if root.is_dir() and (
+        root.name == RUNTIME_ROOT_NAME or all(path.is_file() for path in root_metadata)
+    ):
         runtime_root = root
     elif (root / RUNTIME_ROOT_NAME).is_dir():
         runtime_root = (root / RUNTIME_ROOT_NAME).resolve()

@@ -16,6 +16,7 @@ from .integrity import tree_sha256
 
 
 RECORD_SUFFIXES = {".yaml", ".yml"}
+RECORD_SOURCE_CONTROL_NAME = ".dumpthings.yaml"
 MAX_RECORD_BYTES = 10 * 1024 * 1024
 REQUIRED_INPUT_PATHS = (
     "canonical",
@@ -63,6 +64,17 @@ def _load_record(path: Path) -> dict[str, Any]:
     return value
 
 
+def _record_files(root: Path) -> Iterator[Path]:
+    """Yield records while excluding only the source root's control marker."""
+
+    control = root / RECORD_SOURCE_CONTROL_NAME
+    for path in _files(root):
+        if path == control:
+            continue
+        if path.suffix.lower() in RECORD_SUFFIXES:
+            yield path
+
+
 def _gitlinks(root: Path) -> list[str]:
     if not (root / ".git").exists():
         return []
@@ -107,11 +119,7 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     categories: dict[str, list[tuple[Path, dict[str, Any]]]] = {}
     for category in ("canonical", "reference"):
         root = workspace.path(category)
-        records = [
-            (path, _load_record(path))
-            for path in _files(root)
-            if path.suffix.lower() in RECORD_SUFFIXES
-        ]
+        records = [(path, _load_record(path)) for path in _record_files(root)]
         categories[category] = records
     if not categories["canonical"]:
         raise ConfigurationError("Canonical metadata inventory is empty")

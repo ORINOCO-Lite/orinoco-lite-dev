@@ -205,8 +205,8 @@ def load_workspace(
     site = raw.get("site")
     if not isinstance(site, dict):
         raise ConfigurationError("orinoco.yaml site must be a mapping")
-    name = site.get("name")
-    if not isinstance(name, str) or not name.strip():
+    site_name = site.get("name")
+    if not isinstance(site_name, str) or not site_name.strip():
         raise ConfigurationError("orinoco.yaml site.name must be a non-empty string")
     base_url = _absolute_http_url(
         site.get("base_url", "http://127.0.0.1:8767/"),
@@ -265,7 +265,7 @@ def load_workspace(
         root=resolved_root,
         config_path=config_path,
         lock_path=lock_path,
-        site_name=name.strip(),
+        site_name=site_name.strip(),
         base_url=base_url,
         paths=paths,
         command_aliases=normalized_aliases,
