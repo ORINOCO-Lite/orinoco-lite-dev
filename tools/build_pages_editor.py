@@ -13,6 +13,8 @@ from typing import Any, Sequence
 
 from dump_things_service import Format
 from dump_things_service.converter import FormatConverter
+from rdflib import Graph
+from rdflib.compare import to_canonical_graph
 
 from build_con_site import (
     BuildError,
@@ -115,8 +117,25 @@ def static_records_turtle() -> tuple[str, int]:
             raise BuildError(
                 f"Could not render editor RDF for {source.record['pid']}: {error}"
             ) from error
-        rendered.append(turtle.strip())
-    return "\n\n".join(rendered) + "\n", len(records)
+        rendered.append(turtle)
+    return canonical_turtle(rendered), len(records)
+
+
+def canonical_turtle(snippets: Sequence[str]) -> str:
+    """Return deterministic RDF accepted by a Turtle parser.
+
+    RDFLib's Turtle serializer can emit equivalent blank-node properties and
+    repeated values in process-dependent order.  Canonical blank-node labels
+    plus sorted N-Triples make the byte stream stable.  N-Triples is a strict
+    subset of Turtle, so SHACL Vue can continue to load ``records.ttl``.
+    """
+
+    graph = Graph()
+    for snippet in snippets:
+        graph.parse(data=snippet, format="turtle")
+    serialized = to_canonical_graph(graph).serialize(format="nt")
+    lines = sorted(line for line in serialized.splitlines() if line.strip())
+    return "\n".join(lines) + "\n"
 
 
 def tree_digest(root: Path) -> str:

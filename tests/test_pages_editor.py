@@ -140,6 +140,21 @@ class PagesEditorTests(unittest.TestCase):
         self.assertIn('BUILD_GIT_BRANCH="pinned"', makefile)
         self.assertIn("const branch = 'pinned';", vite)
 
+    def test_static_rdf_is_canonical_across_blank_node_order(self) -> None:
+        first = """
+            @prefix ex: <https://example.test/> .
+            ex:root ex:values [ ex:name "second" ], [ ex:name "first" ] .
+        """
+        second = """
+            @prefix ex: <https://example.test/> .
+            ex:root ex:values [ ex:name "first" ], [ ex:name "second" ] .
+        """
+
+        self.assertEqual(
+            BUILDER.canonical_turtle([first]),
+            BUILDER.canonical_turtle([second]),
+        )
+
     def test_bundle_reader_rejects_extra_fields_and_oversized_input(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "bundle.json"
