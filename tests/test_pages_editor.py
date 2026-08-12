@@ -130,6 +130,16 @@ class PagesEditorTests(unittest.TestCase):
                 with self.assertRaisesRegex(BUILDER.BuildError, "byte-identical"):
                     BUILDER.verify_editor_builds(first, second, source)
 
+    def test_editor_build_identity_does_not_depend_on_checkout_branch(self) -> None:
+        makefile = (BUILDER.UI / "Makefile").read_text(encoding="utf-8")
+        vite = (BUILDER.UI / "shacl-vue/vite.config.app.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("rev-parse --abbrev-ref", makefile)
+        self.assertNotIn("rev-parse --abbrev-ref", vite)
+        self.assertIn('BUILD_GIT_BRANCH="pinned"', makefile)
+        self.assertIn("const branch = 'pinned';", vite)
+
     def test_bundle_reader_rejects_extra_fields_and_oversized_input(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "bundle.json"
