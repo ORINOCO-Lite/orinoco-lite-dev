@@ -1,6 +1,6 @@
 # Milestone 4: single-repository distribution
 
-Status: active implementation
+Status: implementation complete; comprehensive human review open
 
 Parent engineering branch: `codex/milestone-4`
 
@@ -11,6 +11,8 @@ Reviewed upstream website base: `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`
 Planning source: [`milestone-4-prompt.md`](milestone-4-prompt.md)
 
 Decision register: [`milestone-4-decisions.md`](milestone-4-decisions.md)
+
+Prioritized human-review queue: [`human-review-decisions.md`](human-review-decisions.md)
 
 ## Outcome
 

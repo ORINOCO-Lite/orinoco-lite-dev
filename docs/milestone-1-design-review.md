@@ -78,7 +78,7 @@ Those are useful results and should be retained.
 
 The missing product invariant is stronger:
 
-> Adding a valid, connected record should produce its page, place it in the > appropriate class navigation, create its forward and reverse navigation, > and add its graph node and edges without editing Python, templates, class > indexes, or acceptance constants.
+> Adding a valid, connected record should produce its page, place it in the > appropriate class navigation, create its forward and reverse navigation, and > add its graph node and edges without editing Python, templates, class indexes, > or acceptance constants.
 
 The current candidate does not satisfy that invariant.
 A sixth record fails unless it is added to `scripts/enrich_projection.py`; it would not automatically appear in a class index; and no graph artifact is generated.

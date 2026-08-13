@@ -2,6 +2,9 @@
 
 Status: implementation complete; draft human review open
 
+**Historical editor contract.** The credential-free review-bundle principle remains current, but the released engine and downstream template now own the supported bundle/application interface.
+See [`milestone-4.md`](milestone-4.md).
+
 ## Outcome
 
 The Pages preview includes the production SHACL Vue interface under `/orinoco-lite-dev/edit/`, but it has no backend, authentication flow, service token, or GitHub credential.

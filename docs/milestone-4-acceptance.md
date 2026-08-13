@@ -1,11 +1,15 @@
 # Milestone 4 acceptance record
 
-Status: not accepted; human merge and default-branch publication are pending
+Status: technical test-consumer publication complete; comprehensive human acceptance open
 
-The engine, runtime, and final template are published, and the complete accepted Milestone 3 site and test contract are present in the public test consumer.
-Replacement pull request 2 is ready for review after correcting three basic local-use defects found in the superseded pull request 1.
-Acceptance still awaits its human review and merge, successful validation and Pages deployment from the updated default branch, and verification of the published project-path site.
-The update must not merge automatically.
+The engine and runtime are published, the template has been exercised through subsequent immutable maintenance releases, and the complete accepted Milestone 3 site and test contract are present in the public test consumer.
+Replacement pull request 2 was reviewed and merged after correcting the three basic local-use defects found in superseded pull request 1.
+Pull request 3 then exercised a normal framework maintenance update, and pull request 4 applied a site-owned presentation change.
+Project Pages now serves the reviewed default branch at the public project path.
+
+The remaining acceptance boundary is the comprehensive human review of the engineering architecture, governance, licensing, production-graduation, and content questions in [`human-review-decisions.md`](human-review-decisions.md).
+Technical acceptance of the distribution must remain distinct from approval of the content or a future production cutover.
+Updates still must not merge automatically.
 
 This record distinguishes immutable release evidence from exploratory runs that failed closed.
 A discovery failure is not acceptance evidence.
@@ -22,10 +26,12 @@ A discovery failure is not acceptance evidence.
 | Accepted parent Milestone 2 | `7ce44a28c13954e514c8b7e9ab6f1eaade77d891` |
 | Accepted site Milestone 2 | `d60f274b4bf8af3e513d83d1727cfe3e6c9bb8af` |
 | Milestone 4 engine/runtime source | `1e1001ead15f5a96ef56bc2e18be92070922244f` |
-| Milestone 4 template source | `76a11c5a2c3792d8e5a0d6ebe65c7f20c824bb96` |
-| Consumer update | `652c7702d9b62126013f003cc4742969d5400347` |
+| Milestone 4 template baseline source | `76a11c5a2c3792d8e5a0d6ebe65c7f20c824bb96` |
+| Current template maintenance source | `28aecf3c850fbd0e17ba0a6f0bcce721bd25ba88` |
+| Reviewed consumer compatibility update | `652c7702d9b62126013f003cc4742969d5400347` |
+| Current reviewed consumer default branch | `63ce7761adcfe596ff18b8ae3f2be6e585abc999` |
 
-Git history identifies the commit containing this pending-acceptance ledger; the source-coordinate table intentionally avoids a self-reference.
+Git history identifies the commit containing this open-review ledger; the source-coordinate table intentionally avoids a self-reference.
 
 ## Engine and runtime release
 
@@ -50,7 +56,7 @@ Engine/runtime `v0.1.8` and `v0.1.9` remain immutable but are superseded discove
 They established page-to-editor binding, canonical-PID accessibility, and the full hosted compatibility path.
 Local use of the `v0.1.9` consumer then exposed the recursion-boundary and build-origin defects addressed in `v0.1.10`.
 
-The reusable workflow and action pin is source commit `1e1001ead15f5a96ef56bc2e18be92070922244f` for the final template update.
+The reusable workflow and action pin is source commit `1e1001ead15f5a96ef56bc2e18be92070922244f` for the reviewed template update line.
 
 ### Recursive schema diagnosis
 
@@ -104,16 +110,17 @@ Its terminal hosted compatibility evidence was:
 | Rendered/publication-tree SHA | `8a8bc1660897c7d2346e463e0704230a078784f9` |
 | Source CI | run `31662096753`: Linux and macOS 14 passed |
 
-The final template is the immutable [`v0.1.8` release][template-release] with GitHub release ID `370011385`:
+Template [`v0.1.8`][template-v018-release] is the immutable distribution baseline that introduced the final engine/runtime `v0.1.10` compatibility contract.
+It has GitHub release ID `370011385`:
 
-| Final template `v0.1.8` coordinate | Exact value |
+| Baseline template `v0.1.8` coordinate | Exact value |
 | --- | --- |
 | Annotated tag object | `052dc4335f8848f52c5f663330100d78125b0761` |
 | Source commit | `76a11c5a2c3792d8e5a0d6ebe65c7f20c824bb96` |
 | Source-tree SHA | `c73b45972c96ad6069d505eaaeb813b12d9ab6ea` |
 | Generated `github-template` commit | `3af523ed5c2372e8df1296144b0897a497a0b598` |
 | Rendered/publication-tree SHA | `58636171863224c2b832847fe8399f7b82872401` |
-| Source CI | [run `31714605299`][template-run]: Linux job `94495988212` passed; macOS 14 job `94495988130` remains queued with no runner assigned |
+| Source CI | [run `31714605299`][template-v018-run]: Linux job `94495988212` and macOS 14 job `94495988130` passed |
 
 The generated publication tree exactly equals the source `github-template` subtree.
 Template `v0.1.8` targets engine and runtime `v0.1.10`, retains the Pages and macOS compatibility corrections, and changes local `build` and `build-repeat` to the host-neutral root base `/`.
@@ -122,7 +129,13 @@ The Pages workflow still supplies the explicit project-path base and remains def
 
 Local source checks passed 24/24 and rendered-template checks passed 25/25.
 A disposable update rehearsal preserved all 1,101 protected paths, passed 68 consumer tests, produced equal 561-file builds, checked 62 same-origin references through each loopback hostname, and passed Chromium 2/2 and WebKit 2/2.
-The final hosted source-CI result is recorded after the macOS job reaches a terminal state.
+Subsequent immutable template maintenance releases exercised the real updater path.
+The current release is [`v0.1.11`][template-release], release ID `370066378`.
+Annotated tag object `deacdf9f0edc8c6219ab8541b4bbb185ddf052e4` peels to source commit `28aecf3c850fbd0e17ba0a6f0bcce721bd25ba88`; its `github-template` subtree and the publication branch have the identical tree `d17f6e34011b73be505c18dc8c7fb6fb337234a1`.
+Source CI [run `31722216813`][template-run] passed on Linux job `94521713149` and macOS 14 job `94521713044`.
+
+The tag/default-answer/changelog identity inconsistency discovered during this documentation review is an implementation follow-up, not a new architecture decision.
+New-site creation should use the next internally aligned release; the existing consumer's reviewed pin remains explicit and auditable.
 
 ## Public test consumer
 
@@ -136,7 +149,10 @@ Its recorded default-branch coordinates are:
 | Active projection release ledger | `7df4f6add97a756fd2794a2737bc28f932edc444` |
 | Reviewed `v0.1.3` updater bootstrap | `a369cdeafe59c23e599ed4c2cb85d7ab5ebed08d` |
 | Offline acceptance seam | `6fb267e24efc8a6759b783c23b1f0fa4e3da8194` |
-| Final updater and Pages bootstrap on current `main` | `d437ae085573737155740853134ab37a03476d4e` |
+| Final updater and Pages bootstrap | `d437ae085573737155740853134ab37a03476d4e` |
+| Reviewed compatibility merge | `3ad859aebaa1653f16b21a6e3555462b369e9de1` |
+| Reviewed template-maintenance merge | `db6c19262e93b8ddd8848a82e327cfb1037374e4` |
+| Current site-presentation merge | `63ce7761adcfe596ff18b8ae3f2be6e585abc999` |
 
 On replacement pull-request head `652c7702d9b62126013f003cc4742969d5400347`, `orinoco-site-bundle.json` records 1,092 files and 21,745,331 bytes and has SHA-256 `c77fc77a1ae416112d7ccf88c4296cdf7046d722868d248cb9824e3dfb5a12cf`.
 It classifies 867 initialized site-owned paths, 205 generated paths, and 20 consumer-test paths.
@@ -151,23 +167,24 @@ The full local consumer suite passed 54/54 tests, including the offline seam; in
 
 The earlier automated update run succeeded and stopped at the required human-review boundary, but local use exposed the three defects documented in this record.
 Pull request 1 was closed without merge and is superseded discovery evidence.
-Replacement pull request 2 contains its reviewed update, the materialized presentation payloads, and the `v0.1.8`/`v0.1.10` update:
+Replacement pull request 2 contained its reviewed update, the materialized presentation payloads, and the `v0.1.8`/`v0.1.10` update:
 
-| Current consumer coordinate | Exact value or remaining gate |
+| Consumer publication coordinate | Exact value or result |
 | --- | --- |
 | Superseded update workflow | [run `31662120512`][superseded-update-run]: passed and opened pull request 1 |
 | Replacement update pull request | [`con/test-orinoco-downstream-website#2`][consumer-update-pr] |
 | Update branch and commit | `automation/orinoco-framework-update` at `652c7702d9b62126013f003cc4742969d5400347` |
-| Independent pull-request validation | [run `31715026535`][final-validate-run]: Linux job `94497450004` passed; macOS 14 job `94497449873` remains queued with no runner assigned |
-| Human review and merge commit | **PENDING** |
-| Default-branch validation run | **PENDING** |
-| Default-branch Pages run | **PENDING** |
-| Published project Pages proof | **PENDING** |
+| Independent pull-request validation | [run `31715026535`][final-validate-run]: Linux job `94497450004` and macOS 14 job `94497449873` passed |
+| Human review and merge commit | John recorded `LGTM!`; merge commit `3ad859aebaa1653f16b21a6e3555462b369e9de1` |
+| Template maintenance pull request | [`#3`][consumer-template-pr], validation [run `31722702460`][template-update-validate-run], merge `db6c19262e93b8ddd8848a82e327cfb1037374e4` |
+| Site presentation pull request | [`#4`][consumer-presentation-pr], merge `63ce7761adcfe596ff18b8ae3f2be6e585abc999` |
+| Default-branch Pages | [run `31725057404`][current-pages-run] passed build and deploy |
+| Published project Pages | <https://con.github.io/test-orinoco-downstream-website/> returned the reviewed project-path site |
 
-The replacement pull request is attributed as an AI-generated draft, has the `dependencies` and `orinoco-update` labels, has no automatic approval or merge path, and requires human review.
+The replacement pull request was attributed as an AI-generated draft, carried the `dependencies` and `orinoco-update` labels, and had no automatic approval or merge path.
 Its finalized update ledger is `ready-for-review`: validation passed, conflicts, migrations, and `site_owned.changed` are all empty, and all 1,101 protected hashes remain equal to the post-materialization baseline.
 The ledger has SHA-256 `ecf28964ef1c4214f10813fbcb52803aaa5b7ae68b077f3716980dc0de7db070` and binds template `v0.1.8`, engine/runtime `v0.1.10`, and reusable-workflow source `1e1001ead15f5a96ef56bc2e18be92070922244f`.
-The final hosted validation result is recorded after the macOS job reaches a terminal state.
+Both hosted platforms completed the compatibility pull-request validation successfully before its merge.
 
 The complete local suite on exact head `652c7702d9b62126013f003cc4742969d5400347` passed all 68 Python tests, verified all 71 declared assets, the 186 canonical and 13 reference records, the 199-record/185-page projection, the 186-node/467-edge graph, and all 754 runtime resources.
 Two root-relative local builds each contained 561 files and had tree SHA-256 `50d8719ea08627e76c568e54edae5b04c6d6c55fcc6206bd0c5f81ac13b5eeba`.
@@ -257,7 +274,7 @@ Consumer `main` requires one approving review, approval of the most recent push,
 Consumer Pages is configured for workflow deployment at <https://con.github.io/test-orinoco-downstream-website/> with HTTPS enabled.
 It has no `CNAME`, custom domain, or production-domain configuration.
 The Pages workflow builds and deploys only reviewed default-branch code.
-That correction is active in the consumer bootstrap, but neither the pull-request branch nor updated default branch has produced the final Pages deployment.
+The current reviewed default branch produced the successful Pages deployment recorded above; no pull-request branch deployed.
 Labels `dependencies` and `orinoco-update` are available for update review.
 
 ## User-level and engineering scenarios
@@ -278,13 +295,13 @@ A separate actual user-interface bundle was exported and applied with `orinoco e
 Exact binary rollback passed.
 An ordinary framework revert at local commit `ceae6b46` in a disposable clone restored parent tree `2beee32de5a4842955f624023f7054ca981e1a82` exactly.
 
-The terminal fresh-clone scenario still needs the pull request's human review and merge and the default-main Pages result.
-A local rehearsal cannot substitute for those hosted publication boundaries.
+The terminal fresh-clone scenario, human review boundary, framework-maintenance update, default-branch Pages deployment, and public project-path result have now all been exercised in the test consumer.
+They prove the distribution mechanism; they do not substitute for the separate production-graduation decisions.
 
 The engineering workspace continues to retain the accepted upstream review, comparison, package, runtime, and release path.
 Those operations remain outside the consumer interface.
 Git history supplies the terminal engineering documentation coordinate.
-Only the human publication boundary and its default-branch hosted evidence remain pending with the acceptance decision.
+The open boundary is now the comprehensive human decision about engineering merge, governance, licensing, content semantics, and any future production graduation.
 
 Opening the draft engineering pull request triggered legacy Milestone 3 preview run `31663064883` before the Milestone 4 exclusion was present.
 That hosted workflow completed a read-only recursive checkout and checkpoint verification of the pinned site repository before it was cancelled.
@@ -302,13 +319,16 @@ The final recorded no-touch check for `centerforopenneuroscience.org` is:
 No Milestone 4 operation wrote a file, ref, setting, workflow, deployment, Pages source, default branch, DNS record, or custom domain in the real-site repository.
 Do not replace the sorted-ref digest above with a digest computed from a differently formatted ref listing.
 
-## Remaining acceptance gates
+## Remaining human acceptance
 
-Milestone 4 remains unaccepted until all of the following are recorded:
+The test-consumer publication gates are complete.
+Milestone 4 remains under human review until the P0 items in [`human-review-decisions.md`](human-review-decisions.md) record:
 
-1. have a human review and merge pull request 2 without changing site-owned content;
-2. record successful validation and Pages deployment from updated `main`;
-3. verify the published project-path site and editor review-bundle behavior.
+1. the disposition of engineering pull request 5 and the technical distribution architecture;
+2. the licensing authority and interim or permanent posture for each released and redistributed surface; and
+3. the disposition of the legacy Milestone 3 engineering Pages preview.
+
+Production graduation remains a later decision and is not required to accept the test-consumer distribution mechanism.
 
 [engine-release]: https://github.com/con/orinoco-lite-dev/releases/tag/v0.1.10
 
@@ -316,17 +336,29 @@ Milestone 4 remains unaccepted until all of the following are recorded:
 
 [template-repository]: https://github.com/con/orinoco-lite-template
 
-[template-release]: https://github.com/con/orinoco-lite-template/releases/tag/v0.1.8
+[template-release]: https://github.com/con/orinoco-lite-template/releases/tag/v0.1.11
 
-[template-run]: https://github.com/con/orinoco-lite-template/actions/runs/31714605299
+[template-v018-release]: https://github.com/con/orinoco-lite-template/releases/tag/v0.1.8
+
+[template-v018-run]: https://github.com/con/orinoco-lite-template/actions/runs/31714605299
+
+[template-run]: https://github.com/con/orinoco-lite-template/actions/runs/31722216813
 
 [consumer-repository]: https://github.com/con/test-orinoco-downstream-website
 
 [consumer-update-pr]: https://github.com/con/test-orinoco-downstream-website/pull/2
 
+[consumer-template-pr]: https://github.com/con/test-orinoco-downstream-website/pull/3
+
+[consumer-presentation-pr]: https://github.com/con/test-orinoco-downstream-website/pull/4
+
 [superseded-update-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31662120512
 
 [final-validate-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31715026535
+
+[template-update-validate-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31722702460
+
+[current-pages-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31725057404
 
 [update-v012-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31650656485
 

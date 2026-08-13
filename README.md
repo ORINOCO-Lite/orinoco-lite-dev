@@ -1,142 +1,138 @@
 # Orinoco Lite engineering workspace
 
-The active effort is **Milestone 4: single-repository distribution**.
-It extracts the proven Orinoco Lite static-site and content workflow into a versioned engine, runtime release, template, and complete downstream test consumer.
-Start with [`docs/milestone-4.md`](docs/milestone-4.md).
+Orinoco Lite turns reviewed, schema-backed records and editorial inputs into a deterministic static website with a credential-free review-bundle editor.
+This repository is the **engineering and release layer**: it integrates pinned upstream components, publishes the `orinoco-lite` engine and runtime, and owns the cross-repository acceptance evidence.
 
-The engineering workspace remains multi-repository.
-The supported downstream experience does not: `test-orinoco-downstream-website` contains the complete accepted Milestone 3 CON profile in one ordinary repository and receives framework changes through reviewable update pull requests.
+The supported website experience is deliberately simpler than this workspace.
+A downstream site is one ordinary Git repository with no submodules, no gitlinks, and no need to understand the component history retained here.
 
-The real `centerforopenneuroscience.org` repository is read-only evidence in this milestone.
-No branch, ref, file, setting, workflow, deployment, or domain change is permitted there.
+## Architecture
 
-## Historical Milestone 1–3 workspace
+```mermaid
+flowchart TB
+    subgraph engineering["Engineering and release — con/orinoco-lite-dev"]
+        components["Pinned component sources<br/>and compatibility fixtures"]
+        engine["orinoco-lite wheel<br/>CLI and integrity boundary"]
+        runtime["Checksummed runtime<br/>schema, renderer, editor"]
+        workflow["SHA-pinned reusable CI"]
+        components --> engine
+        components --> runtime
+    end
 
-This repository coordinates the local-only **full CON migration** for the Center for Open Neuroscience website.
-It expands the accepted clean-migration vertical slice into a populated site while keeping canonical content isolated, deterministic, and easy to rebase onto reviewed upstream changes.
-Canonical CON content lives in the upstream-derived `centerforopenneuroscience.org` site branch; preserved legacy refs remain separate reachable history, and this parent coordinates the selected site version through its gitlink alongside its other submodules.
+    subgraph distribution["Distribution — con/orinoco-lite-template"]
+        copier["Versioned Copier source<br/>framework ownership + updater"]
+        snapshot["Generated GitHub-template tree"]
+        copier -->|mechanical render| snapshot
+    end
 
-The active parent and site branches are `codex/full-con-migration`, using reviewed upstream website commit `a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8`.
+    subgraph downstream["Downstream site — one ordinary Git repository"]
+        facade["Template-owned facade<br/>Pixi tasks, workflows, update tools"]
+        content["Site-owned inputs<br/>metadata, editorial, assets, policy"]
+        pipeline["validate → project → build → audit"]
+        output["Static site + editor + project Pages"]
+        update["Reviewable framework-update PR"]
+        facade --> pipeline
+        content --> pipeline
+        pipeline --> output
+        facade --> update
+        update -.->|must preserve| content
+    end
 
-The parent and site `codex/clean-migration` branches remain immutable accepted checkpoints.
-The successor uses focused hand-authored content commits followed by one terminal, regenerable projection commit.
+    engine -->|immutable URL + digest| copier
+    runtime -->|immutable URL + digest| copier
+    workflow -->|full commit SHA| copier
+    workflow -->|runs the locked consumer facade| pipeline
+    copier -->|Copier create or update| facade
+    snapshot -->|GitHub template create| facade
+```
 
-Legacy CON branches, tags, and the completed `orinoco-lite` prototype remain unchanged.
-Nothing in this effort is pushed or deployed.
+The arrows express release and update direction, not repository nesting.
+The engineering workspace may remain multi-repository; the template and every supported consumer are independently usable repositories.
 
-## Start here
+## Repository map
 
-Read the active execution plan and implementation contract before changing the site:
+| Layer | Repository | Owns | Start here |
+| --- | --- | --- | --- |
+| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-4.md`](docs/milestone-4.md) and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Distribution | [`con/orinoco-lite-template`](https://github.com/con/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/con/orinoco-lite-template#readme) |
+| Integration consumer | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and end-to-end tests | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
 
-- [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
-- [`docs/full-con-migration.md`](docs/full-con-migration.md)
-- [`docs/clean-migration.md`](docs/clean-migration.md)
-- [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md)
+The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
+It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.
 
-Install the locked environment and fully initialize every recursive development checkout:
+## Review now
+
+The current human-review entry point is [`docs/human-review-decisions.md`](docs/human-review-decisions.md).
+It prioritizes every open human choice, separates those choices from mechanical implementation follow-ups, and links back to the detailed milestone evidence.
+
+Supporting records are:
+
+- [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) for exact releases, test results, hosted runs, parity counts, and remaining gates;
+- [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for accepted Milestone 4 architecture decisions;
+- [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
+- [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the implementation diff under review.
+
+## Stable downstream interface
+
+Normal site maintainers should use the commands exposed by their checked template release, not commands from this engineering workspace:
+
+```console
+pixi install --frozen
+pixi run validate
+pixi run build
+pixi run serve
+pixi run test-all
+pixi run update-check
+```
+
+The consumer's `orinoco.lock` is the release authority.
+It binds the engine wheel, runtime archive, and reusable workflow to immutable coordinates and digests.
+The template owns update mechanics; the site owns its content and declared extension surfaces.
+Framework updates stop at a pull request and never merge themselves.
+
+## Working in this repository
+
+Package-focused work is the normal starting point for Milestone 4 engine changes and does not initialize the legacy site stack:
 
 ```console
 pixi install --locked
+PYTHONPATH=packages/orinoco-lite/src \
+  python -m unittest discover -s packages/orinoco-lite/tests -v
+```
+
+The broader historical and integration suites require every recursive gitlink, including preservation and real-site evidence.
+Run that full checkout only when the task explicitly needs and authorizes that scope; it is not part of the normal Milestone 4 package workflow:
+
+```console
 pixi run checkout-submodules
+pixi run test
 ```
 
-The main local interfaces are:
+Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
+That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.
+Do not reproduce that release boundary with an ad hoc local archive.
 
-```console
-pixi run build                  # deterministic backend-free CON artifact
-pixi run verify-static          # require a byte-identical repeat build
-pixi run serve-static           # CON artifact only, at 127.0.0.1:8767
-pixi run serve                  # full CON editor/service/static stack
-pixi run verify-con-projection  # two renders, both matching the Git snapshot
-pixi run update-con-assembly    # accept reviewed static-assembly inputs
-pixi run verify-con-assembly    # verify the second committed digest
-pixi run build-upstream         # explicit German upstream reference build
-pixi run serve-upstream         # explicit upstream reference server
-pixi run test                   # focused contract tests
-pixi run install-browser-tests  # one-time Chromium and WebKit setup
-pixi run test-browser           # managed local browser acceptance
-pixi run test-all               # unit and browser acceptance
-pixi run check-format           # repository formatting hooks
-```
+## Ownership and safety boundaries
 
-`pixi run build` verifies the committed projection digest, hydrates only the manifest-declared annex assets, and assembles the CON Hugo source in ignored build state.
-`pixi run verify-static` also requires a byte-identical repeat build.
-The resulting `build/con-site` directory needs no metadata backend.
+- Reviewed YAML is the canonical metadata source.
+Generated projection files remain committed so stale output, review, and rollback are explicit.
+- Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
+- The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
+See [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md).
+- Credentials, stores, hydrated caches, browser downloads, and build output are local ignored state.
+- The real-site repository, its refs, settings, Pages configuration, DNS, and production domain remain outside this milestone.
 
-Projection updates are explicit:
+## Historical evidence
 
-```console
-pixi run render-con-projection  # candidate in ignored build state
-pixi run update-con-projection  # replace the reviewed Git snapshot
-pixi run verify-con-projection  # regenerate twice and compare with Git
-pixi run update-con-assembly    # refresh only the static-input digest
-pixi run verify-con-assembly    # reject stale static inputs
-```
+Milestones 1–3 explain how the accepted content and behavior were derived.
+They are preserved as evidence, not as current operating instructions:
 
-While preparing a successor before the parent gitlink moves, a developer may set `CON_SITE_ROOT` to that local site checkout for render/update work.
-This is only a temporary workspace override; no absolute successor path belongs in Pixi configuration or committed manifests.
-Final build and acceptance run without that override after the parent gitlink points at the reviewed successor tip, and require the site checkout to be clean with exactly one terminal projection snapshot commit.
+- [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
+- [`docs/clean-migration.md`](docs/clean-migration.md)
+- [`docs/full-con-migration.md`](docs/full-con-migration.md)
+- [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
+- [`docs/milestone-3.md`](docs/milestone-3.md)
+- [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
 
-A normal build fails closed when relevant canonical records, profile configuration, editorial content, assets, upstream presentation inputs, renderer code, Pixi pins, or component commits change without the corresponding projection or site-assembly refresh.
-Metadata changes refresh both digests; editorial, styling, or asset-only changes refresh only the assembly digest.
-
-Reviewed YAML in the clean site profile is the sole canonical metadata source.
-The legacy website and `dump-research-info` are migration evidence only and do not participate in a normal build.
-
-## Local collection boundary
-
-The full stack uses four separate collections:
-
-| Collection | Contents |
-| --- | --- |
-| `upstream-public` | Cached German public snapshot |
-| `upstream-protected` | Local protected counterpart of that snapshot |
-| `con-public` | Manifest-declared canonical CON and reference records |
-| `con-protected` | CON editor incoming boundary |
-
-The editor reads and writes only through `con-protected`.
-The projection reads only `con-public`.
-The cached German records are never seeded into either CON collection.
-Tokens, stores, downloaded snapshots, hydrated annex objects, and generated sites stay under ignored `build/` state.
-
-Curated records in `con-protected` are readable without a token so that an Edit link can populate the concrete SHACL Vue form.
-The collection name describes its incoming edit boundary, not confidential curated data.
-Submitting a change still requires the ignored token in `build/local-stack/editor-token`, and that token can write only to `con-protected/incoming/local-editor`.
-
-## Browser acceptance
-
-Browser dependencies are deliberately separate from the fast unit suite.
-The first browser run needs network access to install the exactly locked Playwright package plus its Chromium and WebKit revisions:
-
-```console
-pixi run install-browser-tests
-pixi run test-browser
-```
-
-The browser suite owns ports `8111`, `8122`, `3000`, and `8767` and refuses to reuse an already running stack.
-Stop `pixi run serve` before starting it.
-Playwright supervises the stack and verifies that all child services stop when the suite ends.
-
-Chromium and WebKit exercise the real upstream-to-CON same-origin graph-cache transition and the Yaroslav editor link.
-A separate Chromium scenario edits a disposable record through SHACL Vue, checks the CON incoming boundary, and cleans the record before and after the test.
-It never modifies Yaroslav's real incoming record or records a credential in a URL, trace, screenshot, or video.
-
-Playwright WebKit is useful Safari-like coverage, but it is not the system Safari browser.
-On Linux, Playwright may report missing host browser libraries; this workspace does not install system packages or invoke `--with-deps` automatically.
-
-## Reproducibility boundary
-
-Pixi locks Hugo, Python, Dump Things, qri, LinkML, LinkML Runtime, Pydantic, RDFLib, Git Annex `10.20260601`, and their transitive dependencies.
-Linux uses the Conda package; macOS ARM uses the pinned Python wheel in the same Pixi environment.
-Asset retrieval uses read-only URLs without adding remotes or changing shared worktree configuration.
-
-The native metadata contract is explicit `dlthings:*` CURIEs against the pinned source Things Schema.
-Full-URI type designators, unknown CURIEs, dangling native targets, and generic `AttributeSpecification` relationship bridges are rejected.
-
-## Scope boundary
-
-This phase generalizes the proven profile and migrates the legacy-equivalent people, project, editorial, branding, and asset experience.
-The broader Zotero collection is deferred.
-
-It does not publish GitHub Pages, configure pull-request editing, change DNS, update production, or run a persistent hosted metadata service.
-The documented rebase drill reviews a candidate upstream range, replays the hand-authored site commits without their terminal generated commit, regenerates the projection, inspects `range-diff`, reruns acceptance, and only then updates the parent gitlink locally.
+Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
+Current work follows Milestone 4 and the versioned template.

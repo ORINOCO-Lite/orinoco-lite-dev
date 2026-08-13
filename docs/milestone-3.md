@@ -2,6 +2,9 @@
 
 Status: implementation complete; draft human review open
 
+**Historical milestone record.** Milestone 4 supersedes this document's branch, preview, and operating instructions.
+Preserve it as derivation evidence; use [`milestone-4.md`](milestone-4.md) for current architecture and [`human-review-decisions.md`](human-review-decisions.md) for open questions.
+
 Parent branch: `codex/milestone-3`
 
 Site branch: `codex/milestone-3`

@@ -2,6 +2,9 @@
 
 Status: implementation complete; draft human review open
 
+**Historical preview record.** Milestone 4 uses an ordinary downstream repository and default-branch-only project Pages.
+Do not reuse this document's temporary milestone-branch deployment instructions.
+
 Target repository: `con/orinoco-lite-dev`
 
 Target project URL: `https://con.github.io/orinoco-lite-dev/`
