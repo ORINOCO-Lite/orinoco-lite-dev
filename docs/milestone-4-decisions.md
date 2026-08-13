@@ -1,6 +1,6 @@
 # Milestone 4 decision register
 
-Status: active implementation
+Status: active implementation; human merge and default-branch publication are pending
 
 ## Accepted decisions
 
@@ -25,10 +25,12 @@ Status: active implementation
 | M4-I001 | Initial supported platforms are macOS 14 ARM64 and Linux x86-64. | Add a platform only after complete release and consumer acceptance runs there. |
 | M4-I002 | Retain exact digest-based read-only hydration for the 16 annex-backed assets. | Replace only after an immutable asset-custody release proves byte parity. |
 | M4-I003 | Put CON-specific Zotero source, policy, provenance, and helpers under `integrations/zotero`. | Extract generic logic into the engine when a second consumer proves the interface. |
-| M4-I004 | Use repository `GITHUB_TOKEN` with least privilege and explicit workflow approval for update PRs. | Consider a narrowly scoped GitHub App only if unattended validation becomes a reviewed requirement. |
-| M4-I005 | Pull requests build and upload a preview artifact; only the reviewed default branch deploys shared Pages. | Change only after a separately reviewed per-PR preview design. |
+| M4-I004 | Keep default workflow permissions read-only. Enable GitHub's combined “create and approve pull requests” repository switch (`can_approve_pull_request_reviews=true`) so `GITHUB_TOKEN` can create a review PR; grant writes only to the update job, and never approve or merge in automation. | Consider a narrowly scoped GitHub App only if unattended validation becomes a reviewed requirement. |
+| M4-I005 | Pull requests run validation, while the Pages workflow builds and deploys only the reviewed default branch. The default-branch-only correction is active in the consumer bootstrap and final template `v0.1.7`; default-main deployment evidence remains pending human merge. | Change only after a separately reviewed per-PR preview design. |
 | M4-I006 | The update command runs the same pinned updater locally and in automation. | A remote-only updater is not a supported public interface. |
-| M4-I007 | Editor review bundles use a new single-consumer binding while Milestone 3 bundle v1 remains a rollback fixture. | Remove v1 support only after real-site graduation is separately accepted. |
+| M4-I007 | Editor review bundles use a new single-consumer binding. Static page links carry the canonical PID into the editor, and record-selection controls expose that PID in their accessible names, while Milestone 3 bundle v1 remains a rollback fixture. | Remove v1 support only after real-site graduation is separately accepted. |
+| M4-I008 | Protect generated template branch `github-template`, template source branch `main`, and consumer `main` against force pushes and deletion and require linear history. The two `main` branches additionally require one approval, latest-push approval, stale-review dismissal, and conversation resolution, with administrator enforcement disabled. | Retain these controls. The authorized administrator bypass used for terminal template maintenance does not authorize bypassing human review of the consumer update. |
+| M4-I009 | Keep the macOS 14 Playwright/WebKit compatibility overlay introduced in template `v0.1.7` framework-owned and update-safe. | Remove it only after the released browser/runtime combination passes the complete consumer contract without the overlay. |
 
 ## Carried Milestone 3 decisions
 
