@@ -7,7 +7,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from orinoco_lite.release_editor import GIT_IDENTITY, _initialize_repository
+from orinoco_lite.errors import DriverError
+from orinoco_lite.release_editor import (
+    GIT_IDENTITY,
+    SUBMISSION_ARIA_BINDING,
+    _apply_submission_accessibility_patch,
+    _initialize_repository,
+)
 
 
 class DeterministicEditorGitTests(unittest.TestCase):
@@ -55,6 +61,48 @@ class DeterministicEditorGitTests(unittest.TestCase):
                         GIT_IDENTITY["GIT_COMMITTER_NAME"],
                         GIT_IDENTITY["GIT_COMMITTER_EMAIL"],
                     ],
+                )
+
+
+class SubmissionAccessibilityOverlayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.source_root = Path(__file__).resolve().parents[3]
+        self.shacl = (
+            self.source_root
+            / "submodules/pool.psychoinformatics.de-ui/shacl-vue"
+        )
+        self.component = self.shacl / "src/components/SubmitComp.vue"
+        self.patch = self.source_root / "release/editor-v2/SubmitComp.vue.patch"
+
+    def test_reviewed_patch_applies_and_binds_the_canonical_pid_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            copied = Path(temporary) / "shacl-vue"
+            target = copied / "src/components/SubmitComp.vue"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(self.component.read_bytes())
+
+            _apply_submission_accessibility_patch(copied, target, self.patch)
+
+            source = target.read_text(encoding="utf-8")
+            self.assertEqual(source.count(SUBMISSION_ARIA_BINDING), 1)
+            self.assertIn(
+                "import { buildReviewBundle, recordSubmissionLabel,",
+                source,
+            )
+            self.assertIn("recordIri: record.node_iri", source)
+            self.assertIn("prefixes: allPrefixes", source)
+
+    def test_missing_accessibility_patch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            component = root / "src/components/SubmitComp.vue"
+            component.parent.mkdir(parents=True)
+            component.write_text("<template />\n", encoding="utf-8")
+            with self.assertRaisesRegex(DriverError, "patch is missing"):
+                _apply_submission_accessibility_patch(
+                    root,
+                    component,
+                    root / "missing.patch",
                 )
 
 

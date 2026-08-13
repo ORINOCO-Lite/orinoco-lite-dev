@@ -20,8 +20,12 @@ vi.mock('@/modules/utils', () => ({
     },
 }));
 
-const { buildReviewBundle, reviewBundleFilename, validateRecordCatalog } =
-    await import('../src/modules/review-bundle');
+const {
+    buildReviewBundle,
+    recordSubmissionLabel,
+    reviewBundleFilename,
+    validateRecordCatalog,
+} = await import('../src/modules/review-bundle');
 
 const { namedNode, literal, quad } = DataFactory;
 const PID = 'xyzrins:persons/example';
@@ -44,6 +48,19 @@ const catalog = {
 };
 
 describe('Orinoco review bundles', () => {
+    it('names submission controls with the canonical catalog PID', () => {
+        expect(
+            recordSubmissionLabel({
+                classLabel: 'Person',
+                recordIri: IRI,
+                recordLabel: 'Example person',
+                prefixes: { xyzrins: 'https://example.test/r/' },
+            })
+        ).toBe(
+            'Person: Example person: xyzrins:persons/example: ' + IRI
+        );
+    });
+
     it('binds selected RDF to flattened immutable source coordinates', async () => {
         const graph = new Store([
             quad(IRI, namedNode('http://www.w3.org/2000/01/rdf-schema#label'), literal('Changed label')),

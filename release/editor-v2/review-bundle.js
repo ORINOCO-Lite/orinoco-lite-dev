@@ -5,6 +5,23 @@ import { getRecordQuads, quadsToTTL, toCURIE } from '@/modules/utils';
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 2;
 
+export function recordSubmissionLabel({
+    classLabel,
+    recordIri,
+    recordLabel,
+    prefixes,
+}) {
+    const pid = toCURIE(recordIri, prefixes);
+    return [classLabel, recordLabel, pid, recordIri]
+        .filter(
+            (value, index, values) =>
+                typeof value === 'string' &&
+                value.length &&
+                values.indexOf(value) === index
+        )
+        .join(': ');
+}
+
 function requireString(value, label) {
     if (typeof value !== 'string' || !value.length) {
         throw new Error(`Record catalog has an invalid ${label}`);

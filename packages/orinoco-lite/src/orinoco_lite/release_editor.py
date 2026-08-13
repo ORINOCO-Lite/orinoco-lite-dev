@@ -21,6 +21,7 @@ GIT_IDENTITY = {
     "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z",
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
 }
+SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
 
 
 def _run(
@@ -83,6 +84,27 @@ def _initialize_repository(repository: Path, source_commit: str) -> str:
     if result.returncode or len(commit) != 40:
         raise DriverError("Could not create deterministic editor Git metadata")
     return commit
+
+
+def _apply_submission_accessibility_patch(
+    shacl: Path,
+    component: Path,
+    patch_path: Path,
+) -> None:
+    """Apply and verify the reviewed, source-level accessibility overlay."""
+
+    if patch_path.is_symlink() or not patch_path.is_file():
+        raise DriverError("Editor submission accessibility patch is missing")
+    _run(["git", "apply", "--unidiff-zero", "--check", patch_path], shacl)
+    _run(["git", "apply", "--unidiff-zero", patch_path], shacl)
+    source = component.read_text(encoding="utf-8")
+    if (
+        source.count(SUBMISSION_ARIA_BINDING) != 1
+        or "return recordSubmissionLabel({" not in source
+        or "recordIri: record.node_iri" not in source
+        or "prefixes: allPrefixes" not in source
+    ):
+        raise DriverError("Editor submission accessibility patch is incomplete")
 
 
 def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, Any]:
@@ -156,8 +178,13 @@ def build_editor(
 ) -> dict[str, Any]:
     shacl = pool_ui / "shacl-vue"
     module = shacl / "src" / "modules" / "review-bundle.js"
+    submit_component = shacl / "src" / "components" / "SubmitComp.vue"
     test = shacl / "tests" / "orinoco-review-bundle-v2.test.js"
-    if not module.is_file() or not overlay.is_dir():
+    if (
+        not module.is_file()
+        or not submit_component.is_file()
+        or not overlay.is_dir()
+    ):
         raise DriverError("Pinned pool UI or Orinoco editor overlay is missing")
     # The release workflow operates only on a copied source tree. Give each
     # copied component deterministic Git metadata because the reviewed Vite
@@ -169,6 +196,11 @@ def build_editor(
         _initialize_repository(repository, commit)
     shutil.copyfile(overlay / "review-bundle.js", module)
     shutil.copyfile(overlay / "review-bundle.test.js", test)
+    _apply_submission_accessibility_patch(
+        shacl,
+        submit_component,
+        overlay / "SubmitComp.vue.patch",
+    )
     _run(["npm", "ci"], shacl)
     _run(["npm", "run", "test", "--", "--run", test], shacl)
     _run(["make", "build-ui"], pool_ui)
