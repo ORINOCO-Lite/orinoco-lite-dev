@@ -225,6 +225,11 @@ Those operations remain outside the consumer interface.
 Git history supplies the terminal engineering documentation coordinate.
 Only the human publication boundary and its default-branch hosted evidence remain pending with the acceptance decision.
 
+Opening the draft engineering pull request triggered legacy Milestone 3 preview run `31663064883` before the Milestone 4 exclusion was present.
+That hosted workflow completed a read-only recursive checkout and checkpoint verification of the pinned site repository before it was cancelled.
+It made no repository, ref, setting, Pages, or deployment change, and its deploy job did not run.
+The Milestone 4 branch now skips that legacy pull-request workflow so a later review synchronization cannot repeat the checkout.
+
 ## Real-site no-touch invariant
 
 The final recorded no-touch check for `centerforopenneuroscience.org` is:

@@ -31,6 +31,7 @@ Status: active implementation; human merge and default-branch publication are pe
 | M4-I007 | Editor review bundles use a new single-consumer binding. Static page links carry the canonical PID into the editor, and record-selection controls expose that PID in their accessible names, while Milestone 3 bundle v1 remains a rollback fixture. | Remove v1 support only after real-site graduation is separately accepted. |
 | M4-I008 | Protect generated template branch `github-template`, template source branch `main`, and consumer `main` against force pushes and deletion and require linear history. The two `main` branches additionally require one approval, latest-push approval, stale-review dismissal, and conversation resolution, with administrator enforcement disabled. | Retain these controls. The authorized administrator bypass used for terminal template maintenance does not authorize bypassing human review of the consumer update. |
 | M4-I009 | Keep the macOS 14 Playwright/WebKit compatibility overlay introduced in template `v0.1.7` framework-owned and update-safe. | Remove it only after the released browser/runtime combination passes the complete consumer contract without the overlay. |
+| M4-I010 | Skip the legacy Milestone 3 Pages-preview workflow on the Milestone 4 engineering pull request. | Retain the exclusion so review synchronizations cannot recursively check out the real-site repository. |
 
 ## Carried Milestone 3 decisions
 
