@@ -13,11 +13,19 @@ annex_remote_ref=refs/remotes/$annex_remote_name/git-annex
 
 original_core_worktree=
 had_core_worktree=false
-if original_core_worktree=$(git -C "$site_root" config --get core.worktree 2>/dev/null); then
+site_initialized=false
+if [[ "$(git -C "$site_root" rev-parse --show-toplevel 2>/dev/null || true)" == "$site_root" ]]; then
+  site_initialized=true
+fi
+if [[ "$site_initialized" == true ]] && \
+    original_core_worktree=$(git -C "$site_root" config --get core.worktree 2>/dev/null); then
   had_core_worktree=true
 fi
 
 restore_local_state() {
+  if [[ "$(git -C "$site_root" rev-parse --show-toplevel 2>/dev/null || true)" != "$site_root" ]]; then
+    return
+  fi
   git -C "$site_root" update-ref -d "$annex_remote_ref" 2>/dev/null || true
   git -C "$site_root" config --remove-section \
     "remote.$annex_remote_name" 2>/dev/null || true
@@ -49,7 +57,7 @@ base_path=$(python3 -c \
   "$base_url")
 
 git -C "$repository_root" submodule sync -- submodules/www-from-model
-if git -C "$site_root" rev-parse --git-dir >/dev/null 2>&1; then
+if [[ "$site_initialized" == true ]]; then
   if [[ -n "$(site_git status --porcelain)" ]]; then
     echo "Refusing to update a modified www-from-model worktree" >&2
     exit 2

@@ -92,21 +92,36 @@ Framework updates stop at a pull request and never merge themselves.
 
 ## Working in this repository
 
-Package-focused work is the normal starting point for Milestone 4 engine changes and does not initialize the legacy site stack:
+Pixi 0.76 or newer is required.
+The root environment is deliberately package-focused and contains no local dependency on a submodule, so it can install before any component checkout:
 
 ```console
 pixi install --locked
-PYTHONPATH=packages/orinoco-lite/src \
-  python -m unittest discover -s packages/orinoco-lite/tests -v
+pixi run test
 ```
 
-The broader historical and integration suites require every recursive gitlink, including preservation and real-site evidence.
-Run that full checkout only when the task explicitly needs and authorizes that scope; it is not part of the normal Milestone 4 package workflow:
+Submodules remain the source-level dependency and compatibility-fixture pins for engineering integration.
+`checkout-submodules` is idempotent: it synchronizes URLs, initializes every recursive gitlink recorded by the current parent commit, restores exact detached commits, unshallows development history, and verifies the result.
+Use it before cross-component work.
+To update an upstream dependency, advance and commit its gitlink on a review branch, then run this command and the relevant integration checks against that recorded candidate:
 
 ```console
 pixi run checkout-submodules
-pixi run test
 ```
+
+Integration entry points may perform a narrower checkout automatically.
+The German reference site's static preview is the first such command:
+
+```console
+pixi run serve-upstream-static
+```
+
+Its executable, Hugo, and git-annex dependencies are declared in [`tools/upstream_static.py`](tools/upstream_static.py) and resolved from the adjacent lock, independently of the root environment.
+The builder initializes only the exact `www-from-model` and nested Congo gitlinks needed by that artifact, so the command works from recursive and non-recursive clones alike.
+Use `build-upstream-static` for the same deterministic build without starting the HTTP server.
+
+The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
+They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
 That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.

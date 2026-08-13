@@ -104,15 +104,15 @@ The other Orinoco submodules are diagnostic or refresh inputs, not static runtim
 
 ## Local reproduction
 
-The repeatable entry point is:
+The current repeatable entry point is a locked standalone Pixi script:
 
 ```bash
-BASE_URL=http://127.0.0.1:1313/ \
-  tools/build_upstream_site.sh
-python3 -m http.server 1313 --directory build/upstream-psychoinformatics
+pixi run serve-upstream-static
 ```
 
-The script:
+It serves the result at `http://127.0.0.1:8768/`.
+`pixi run build-upstream-static` performs the same build without starting a server.
+The script's inline environment pins Python, Hugo, and git-annex independently of the root engineering environment, then the builder:
 
 1. checks out only the pinned upstream site and Congo theme;
 2. pins annex metadata at `010ca44f...`;
@@ -176,14 +176,18 @@ The upstream edit footer originally hard-codes `https://pool.psychoinformatics.d
 Pixi-controlled local builds set `SHACL_VUE_URL=http://127.0.0.1:3000/`; the generated-artifact adapter rewrites the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true` query parameter.
 The production Pages workflow leaves the upstream URL as its default, so this local stack does not alter the static deployment.
 
-The editor is now deployed with the upstream service architecture locally.
-The one-command entry point is:
+The editor was also deployed with the upstream service architecture locally during this historical trial.
+The accepted one-command entry point was:
 
 ```bash
 pixi run serve
 ```
 
-Its Pixi dependencies perform the recursive checkout, upstream snapshot preparation, Hugo build, and pool UI build.
+That legacy task surface is preserved in Git history but is not maintained on `main` after Milestone 4 separated the engine, template, and ordinary downstream site.
+Use `serve-upstream-static` for the supported reference deployment.
+Reintroducing a service-backed upstream command requires its own isolated dependency environment and acceptance contract; it must not revive the former CON-coupled root environment.
+
+Historically, its Pixi dependencies performed the recursive checkout, upstream snapshot preparation, Hugo build, and pool UI build.
 The `serve_local_stack.sh` supervisor then starts Dump Things, seeds both local collections, starts the git-annex and SHACL Vue services, checks their contracts, and serves the generated site.
 All child logs are written below `build/local-stack/logs/`; Ctrl-C stops the complete stack.
 The individual service tasks below remain useful when debugging a single component, while `pixi run serve-static` serves only the generated Hugo output.

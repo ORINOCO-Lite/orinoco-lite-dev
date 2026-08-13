@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+import re
+import tomllib
+import unittest
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = ROOT / "pixi.toml"
+SCRIPT = ROOT / "tools" / "upstream_static.py"
+SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
+WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
+
+
+class DevelopmentEnvironmentTests(unittest.TestCase):
+    def test_root_environment_is_engine_only_and_bootstrappable(self) -> None:
+        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        workspace = manifest["workspace"]
+        self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
+        self.assertEqual(manifest["dependencies"], {"python": ">=3.12,<3.13"})
+        self.assertEqual(
+            manifest["pypi-dependencies"]["orinoco-lite"],
+            {"path": "packages/orinoco-lite", "editable": True},
+        )
+        serialized = MANIFEST.read_text(encoding="utf-8")
+        for forbidden in (
+            'path = "submodules/',
+            'hugo =',
+            'git-annex =',
+            'nodejs =',
+            'serve =',
+            'build =',
+            'serve-static =',
+        ):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_upstream_tasks_use_the_locked_standalone_script(self) -> None:
+        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
+        self.assertEqual(
+            tasks["build-upstream-static"],
+            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build',
+        )
+        self.assertEqual(
+            tasks["serve-upstream-static"],
+            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve',
+        )
+        self.assertTrue(SCRIPT_LOCK.is_file())
+        lock = yaml.safe_load(SCRIPT_LOCK.read_text(encoding="utf-8"))
+        self.assertEqual(lock["version"], 7)
+        self.assertEqual(set(lock["environments"]), {"default"})
+
+    def test_script_metadata_is_exact_and_platform_complete(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        match = re.search(r"^# /// script\n(?P<body>.*?)^# ///$", source, re.M | re.S)
+        self.assertIsNotNone(match)
+        metadata = "\n".join(
+            line.removeprefix("# ") if line != "#" else ""
+            for line in match.group("body").splitlines()
+        )
+        document = tomllib.loads(metadata)
+        self.assertEqual(document["requires-python"], ">=3.12,<3.13")
+        pixi = document["tool"]["pixi"]
+        self.assertEqual(pixi["dependencies"]["hugo"], "==0.154.5")
+        self.assertEqual(
+            pixi["target"]["linux-64"]["dependencies"]["git-annex"],
+            "==10.20260601",
+        )
+        self.assertEqual(
+            pixi["target"]["osx-arm64-macos-14-0"]["pypi-dependencies"][
+                "git-annex"
+            ],
+            "==10.20260601",
+        )
+        ast.parse(source)
+
+    def test_builder_performs_a_targeted_exact_checkout(self) -> None:
+        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "submodule update --init --depth 1 -- submodules/www-from-model",
+            builder,
+        )
+        self.assertIn("submodule update --init --depth 1 -- themes/congo", builder)
+        self.assertNotIn("submodule update --init --recursive", builder)
+        self.assertIn("restore_local_state", builder)
+        self.assertIn("--no-write-fetch-head", builder)
+
+    def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("submodules: false", workflow)
+        self.assertIn("pixi-version: v0.76.2", workflow)
+        install = workflow.index("frozen: true")
+        tests = workflow.index("run: pixi run test")
+        build = workflow.index("run: pixi run build-upstream-static")
+        self.assertLess(install, tests)
+        self.assertLess(tests, build)
+
+
+if __name__ == "__main__":
+    unittest.main()

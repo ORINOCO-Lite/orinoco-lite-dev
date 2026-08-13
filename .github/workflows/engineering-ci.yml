@@ -1,0 +1,47 @@
+name: Engineering environment
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Engine without submodules (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - macos-14
+    steps:
+      - name: Check out only the parent repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - name: Install the locked engine environment
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          cache: true
+          frozen: true
+          pixi-version: v0.76.2
+
+      - name: Verify the root environment and standalone script locks
+        run: |
+          pixi lock --check
+          pixi lock --script tools/upstream_static.py --check
+
+      - name: Run submodule-independent tests
+        run: pixi run test
+
+      - name: Build the pinned upstream static site from a non-recursive clone
+        run: pixi run build-upstream-static
