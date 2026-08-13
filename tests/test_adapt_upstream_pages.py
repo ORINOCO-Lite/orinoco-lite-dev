@@ -7,6 +7,8 @@ from pathlib import Path
 from tools.adapt_upstream_pages import (
     adapt_site,
     audit_site,
+    editor_link_hrefs,
+    editor_link_url,
     normalize_base_path,
     prefix_root_url,
 )
@@ -127,6 +129,119 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             self.assertEqual(
                 adapt_site(site_dir, "/", local_edit_url).edit_urls_rewritten, 0
             )
+
+    def test_record_page_without_footer_link_gets_bound_editor_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            pid = "xyzrins:projects/space & query?"
+            page = site_dir / "projects" / "escaped" / "index.html"
+            page.parent.mkdir(parents=True)
+            page.write_text(
+                "<html><body><main>Consumer footer override</main>"
+                f'<script>const limitGraphRootNodeId="{pid}"</script>'
+                "</body></html>",
+                encoding="utf-8",
+            )
+            edit_url = "https://con.github.io/example/edit/"
+
+            before = audit_site(site_dir, "/", edit_url)
+            self.assertEqual(
+                before,
+                [
+                    f"projects/escaped/index.html: record PID {pid} has 0 "
+                    "editor links (expected 1)"
+                ],
+            )
+            stats = adapt_site(site_dir, "/", edit_url)
+            self.assertEqual(stats.edit_links_injected, 1)
+            rendered = page.read_text(encoding="utf-8")
+            self.assertIn("Edit this record</a>", rendered)
+            self.assertIn(
+                "pid=xyzrins%3Aprojects%2Fspace%20%26%20query%3F", rendered
+            )
+            self.assertIn("&amp;edit=true", rendered)
+            self.assertEqual(
+                editor_link_hrefs(rendered), [editor_link_url(edit_url, pid)]
+            )
+            self.assertEqual(audit_site(site_dir, "/", edit_url), [])
+
+            first_bytes = page.read_bytes()
+            second = adapt_site(site_dir, "/", edit_url)
+            self.assertEqual(second.edit_links_injected, 0)
+            self.assertEqual(page.read_bytes(), first_bytes)
+
+    def test_existing_record_editor_link_is_rewritten_without_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            pid = "xyzrins:persons/example"
+            page = site_dir / "index.html"
+            page.write_text(
+                "<html><body>"
+                f"<script>const limitGraphRootNodeId='{pid}';</script>"
+                '<a href="https://pool.psychoinformatics.de/ui/'
+                "?sh%3ANodeShape=dlthings%3AThing&amp;"
+                "pid=xyzrins%3Apersons%2Fexample&amp;edit=true\">"
+                "Edit this record</a></body></html>",
+                encoding="utf-8",
+            )
+            edit_url = "http://127.0.0.1:3000/"
+
+            stats = adapt_site(site_dir, "/", edit_url)
+            rendered = page.read_text(encoding="utf-8")
+            self.assertEqual(stats.edit_urls_rewritten, 1)
+            self.assertEqual(stats.edit_links_injected, 0)
+            self.assertEqual(rendered.count("Edit this record"), 1)
+            self.assertEqual(
+                editor_link_hrefs(rendered), [editor_link_url(edit_url, pid)]
+            )
+            self.assertEqual(audit_site(site_dir, "/", edit_url), [])
+
+    def test_audit_rejects_duplicate_and_mismatched_record_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            pid = "xyzrins:persons/example"
+            wrong_href = editor_link_url(
+                "https://example.test/edit/", "xyzrins:persons/wrong"
+            ).replace("&", "&amp;")
+            page = site_dir / "index.html"
+            page.write_text(
+                "<html><body>"
+                f"<script>const limitGraphRootNodeId = '{pid}';</script>"
+                f'<a href="{wrong_href}">Edit this record</a>'
+                f'<a href="{wrong_href}">Edit this record</a>'
+                "</body></html>",
+                encoding="utf-8",
+            )
+
+            violations = audit_site(site_dir, "/", "https://example.test/edit/")
+            self.assertIn(
+                f"index.html: record PID {pid} has 2 editor links (expected 1)",
+                violations,
+            )
+            self.assertEqual(
+                violations.count(
+                    f"index.html: editor link query is not bound to PID {pid}"
+                ),
+                2,
+            )
+
+    def test_malformed_record_marker_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            (site_dir / "index.html").write_text(
+                "<html><body><script>"
+                "const limitGraphRootNodeId = 'xyzrins:persons/example;"
+                "</script></body></html>",
+                encoding="utf-8",
+            )
+
+            violation = (
+                "index.html: record page must contain exactly one valid "
+                "limitGraphRootNodeId marker"
+            )
+            self.assertIn(violation, audit_site(site_dir, "/"))
+            with self.assertRaisesRegex(RuntimeError, "valid limitGraphRootNodeId"):
+                adapt_site(site_dir, "/")
 
     def test_adapt_site_rewrites_all_upstream_escape_types(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

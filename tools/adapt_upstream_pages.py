@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit
 
 
 HTML_URL_RE = re.compile(
@@ -46,7 +47,25 @@ EDIT_HREF_RE = re.compile(
     r"(?P<url>https?://[^\"']+/ui/)",
     re.IGNORECASE,
 )
+RECORD_MARKER_DECL_RE = re.compile(r"\bconst\s+limitGraphRootNodeId\s*=")
+RECORD_MARKER_RE = re.compile(
+    r"\bconst\s+limitGraphRootNodeId\s*=\s*"
+    r"(?P<quote>[\"'])(?P<pid>[^\"'\\\r\n]+)(?P=quote)\s*;?"
+)
+ANCHOR_RE = re.compile(
+    r"<a\b(?P<attributes>[^>]*)>(?P<body>.*?)</a\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+QUOTED_ATTRIBUTE_RE = re.compile(
+    r"\b(?P<name>href|aria-label)\s*=\s*"
+    r"(?P<quote>[\"'])(?P<value>.*?)(?P=quote)",
+    re.IGNORECASE | re.DOTALL,
+)
+HTML_TAG_RE = re.compile(r"<[^>]+>")
+BODY_CLOSE_RE = re.compile(r"</body\s*>", re.IGNORECASE)
 DEFAULT_EDIT_URL = "https://pool.psychoinformatics.de/ui/"
+EDIT_LINK_LABEL = "Edit this record"
+EDIT_NODE_SHAPE = "dlthings:Thing"
 
 
 @dataclass
@@ -58,6 +77,7 @@ class AdaptationStats:
     graph_node_urls_rewritten: int = 0
     webmanifest_urls_rewritten: int = 0
     edit_urls_rewritten: int = 0
+    edit_links_injected: int = 0
 
 
 def normalize_base_path(value: str) -> str:
@@ -211,6 +231,115 @@ def rewrite_edit_urls(text: str, edit_url: str) -> tuple[str, int]:
     return EDIT_HREF_RE.sub(replace, text), rewrites
 
 
+def record_page_pid(text: str) -> str | None:
+    """Return a generated record page's PID and reject ambiguous markers."""
+
+    declarations = list(RECORD_MARKER_DECL_RE.finditer(text))
+    if not declarations:
+        return None
+    markers = list(RECORD_MARKER_RE.finditer(text))
+    if len(declarations) != 1 or len(markers) != 1:
+        raise ValueError(
+            "record page must contain exactly one valid limitGraphRootNodeId marker"
+        )
+    pid = markers[0].group("pid")
+    if pid != pid.strip() or any(ord(character) < 0x20 for character in pid):
+        raise ValueError("record page PID contains surrounding space or control data")
+    return pid
+
+
+def editor_link_url(edit_url: str, pid: str) -> str:
+    """Return the canonical editor URL with a safely encoded record binding."""
+
+    query = urlencode(
+        (
+            ("sh:NodeShape", EDIT_NODE_SHAPE),
+            ("pid", pid),
+            ("edit", "true"),
+        ),
+        quote_via=quote,
+    )
+    return f"{normalize_edit_url(edit_url)}?{query}"
+
+
+def editor_link_hrefs(text: str) -> list[str]:
+    """Return hrefs of anchors whose accessible label identifies record editing."""
+
+    hrefs: list[str] = []
+    for anchor in ANCHOR_RE.finditer(text):
+        attributes = {
+            match.group("name").lower(): html.unescape(match.group("value"))
+            for match in QUOTED_ATTRIBUTE_RE.finditer(anchor.group("attributes"))
+        }
+        label = attributes.get("aria-label")
+        if label is None:
+            label = HTML_TAG_RE.sub(" ", anchor.group("body"))
+            label = html.unescape(label)
+        if EDIT_LINK_LABEL not in " ".join(label.split()):
+            continue
+        href = attributes.get("href")
+        if href is not None:
+            hrefs.append(href)
+    return hrefs
+
+
+def editor_link_violation(href: str, edit_url: str, pid: str) -> str | None:
+    """Describe why an editor anchor is not bound to the configured record."""
+
+    expected_base = urlsplit(normalize_edit_url(edit_url))
+    actual = urlsplit(href)
+    if (
+        actual.scheme,
+        actual.netloc,
+        actual.path,
+        actual.fragment,
+    ) != (
+        expected_base.scheme,
+        expected_base.netloc,
+        expected_base.path,
+        "",
+    ):
+        base = normalize_edit_url(edit_url)
+        return f"editor link does not use configured base {base}"
+    try:
+        parameters = parse_qsl(
+            actual.query, keep_blank_values=True, strict_parsing=True
+        )
+    except ValueError:
+        return "editor link has a malformed query"
+    expected = [
+        ("sh:NodeShape", EDIT_NODE_SHAPE),
+        ("pid", pid),
+        ("edit", "true"),
+    ]
+    if sorted(parameters) != sorted(expected):
+        return f"editor link query is not bound to PID {pid}"
+    return None
+
+
+def inject_record_editor_link(
+    text: str, edit_url: str
+) -> tuple[str, int]:
+    """Add the generic editor anchor when a valid record page has none."""
+
+    try:
+        pid = record_page_pid(text)
+    except ValueError:
+        return text, 0
+    if pid is None or editor_link_hrefs(text):
+        return text, 0
+    href = html.escape(editor_link_url(edit_url, pid), quote=True)
+    fragment = (
+        '\n<div class="orinoco-record-editor-link text-xs">\n'
+        f'  <a href="{href}" target="_blank" rel="noopener noreferrer">'
+        f"{EDIT_LINK_LABEL}</a>\n"
+        "</div>\n"
+    )
+    if BODY_CLOSE_RE.search(text):
+        return BODY_CLOSE_RE.sub(f"{fragment}</body>", text, count=1), 1
+    return f"{text.rstrip()}{fragment}", 1
+
+
 def rewrite_graph_data(data: object, base_path: str) -> int:
     if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
         raise ValueError("graph.json does not contain a nodes list")
@@ -269,26 +398,43 @@ def audit_site(
     graph_html_references = 0
     for html_path in sorted(site_dir.rglob("*.html")):
         text = html_path.read_text(encoding="utf-8")
+        relative_path = html_path.relative_to(site_dir)
         for match in HTML_URL_RE.finditer(text):
             url = match.group("quoted") or match.group("bare")
             if prefix_root_url(url, base_path) != url:
-                violations.append(f"{html_path.relative_to(site_dir)}: {url}")
+                violations.append(f"{relative_path}: {url}")
         for match in EDIT_HREF_RE.finditer(text):
             if match.group("url") != edit_url:
                 violations.append(
-                    f"{html_path.relative_to(site_dir)}: edit URL {match.group('url')}"
+                    f"{relative_path}: edit URL {match.group('url')}"
                 )
+        try:
+            pid = record_page_pid(text)
+        except ValueError as error:
+            violations.append(f"{relative_path}: {error}")
+        else:
+            if pid is not None:
+                editor_hrefs = editor_link_hrefs(text)
+                if len(editor_hrefs) != 1:
+                    violations.append(
+                        f"{relative_path}: record PID {pid} has "
+                        f"{len(editor_hrefs)} editor links (expected 1)"
+                    )
+                for href in editor_hrefs:
+                    link_violation = editor_link_violation(href, edit_url, pid)
+                    if link_violation is not None:
+                        violations.append(f"{relative_path}: {link_violation}")
         for match in GRAPH_SCRIPT_SRC_RE.finditer(text):
             graph_html_references += 1
             url = match.group("quoted") or match.group("bare")
             if expected_script_url is None:
                 violations.append(
-                    f"{html_path.relative_to(site_dir)}: graph script URL {url} "
+                    f"{relative_path}: graph script URL {url} "
                     "has no complete graph bundle"
                 )
             elif url != expected_script_url:
                 violations.append(
-                    f"{html_path.relative_to(site_dir)}: graph script URL {url} "
+                    f"{relative_path}: graph script URL {url} "
                     f"(expected {expected_script_url})"
                 )
 
@@ -378,6 +524,7 @@ def adapt_site(
         original = html_path.read_text(encoding="utf-8")
         rewritten, count = rewrite_html(original, base_path)
         rewritten, edit_count = rewrite_edit_urls(rewritten, edit_url)
+        rewritten, injected_count = inject_record_editor_link(rewritten, edit_url)
         graph_count = 0
         if bundle_key is not None:
             rewritten, graph_count = rewrite_graph_html_urls(
@@ -388,6 +535,7 @@ def adapt_site(
             stats.html_files_changed += 1
             stats.html_urls_rewritten += count
             stats.edit_urls_rewritten += edit_count
+            stats.edit_links_injected += injected_count
             stats.graph_html_urls_versioned += graph_count
 
     webmanifest_path = site_dir / "site.webmanifest"
