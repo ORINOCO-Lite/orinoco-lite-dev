@@ -182,6 +182,27 @@ The implementation should preserve these rules:
 The static deployment remains a generated projection and requires no continuously running metadata service.
 Dump Things may start ephemerally for validation and projection, then stop before the Hugo artifact is deployed.
 
+## Recursive model-generation compatibility
+
+The source schema's inheritance graph is acyclic.
+It has 82 classes, 98 inheritance edges, and a maximum inheritance depth of five.
+Nevertheless, the pinned LinkML Pydantic generator needs more than Python's default recursion limit while executing its generated module.
+
+This is a generator/runtime interaction, not a cycle in the schema.
+LinkML expands the inlined, type-designated `Thing.relations` range into a union of `Thing` and all 48 descendants.
+That wide recursive union is repeated on the descendant models.
+Serialization and Python compilation succeed, but Pydantic 2.13.4 exhausts the default stack while `Thing.model_rebuild()` constructs the recursive core schema.
+The same failure occurs with LinkML directly, before loading Dump Things patches.
+Dump Things 6.3.6 catches it, raises the process-wide recursion limit from 1,000 to 2,000, and retries.
+
+Orinoco contains that existing fallback at the integration boundary.
+It builds the paired JSON/RDF converters under a lock with a temporary limit of 2,000, then restores the caller's exact prior limit on success or failure.
+This keeps the pinned schema and validation semantics unchanged, avoids a warning during normal builds, and prevents a dependency workaround from leaking global process state.
+
+The durable upstream fix belongs in LinkML's Pydantic generator.
+A named recursive type alias (`TypeAliasType`) for the shared descendant union lets Pydantic compile this schema at the default limit; a plain assignment alias or an added discriminator does not.
+Until an upstream release carries and tests that representation, the narrow Orinoco compatibility boundary remains part of the locked runtime contract.
+
 ## Evidence boundaries
 
 This guide establishes the tested local clean-migration contract.

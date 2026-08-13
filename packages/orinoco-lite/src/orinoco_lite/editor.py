@@ -18,6 +18,7 @@ import yaml
 
 from .config import WorkspaceConfig, load_config_path
 from .errors import ConfigurationError, DriverError
+from .schema_conversion import build_format_converters
 
 
 CATALOG_FORMAT = "orinoco-static-record-sources"
@@ -152,17 +153,11 @@ def _converters(schema: Path):
     if schema.is_symlink() or not schema.is_file():
         raise DriverError("Runtime does not contain the pinned editor schema")
     try:
-        from dump_things_service import Format
-        from dump_things_service.converter import FormatConverter
+        return build_format_converters(schema)
     except ImportError as error:
         raise DriverError(
             "The editor requires the locked dump-things-service conversion dependency"
         ) from error
-    try:
-        return (
-            FormatConverter(str(schema), Format.json, Format.ttl),
-            FormatConverter(str(schema), Format.ttl, Format.json),
-        )
     except Exception as error:
         raise DriverError("Could not load the pinned editor schema") from error
 

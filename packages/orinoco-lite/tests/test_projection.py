@@ -5,6 +5,7 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -86,7 +87,14 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
 
     def test_full_parity_stale_recovery_atomicity_and_patch_compatibility(self) -> None:
         candidate = Path(self.temporary.name) / "candidate"
-        report = render_projection(self.workspace, self.runtime_010, candidate)
+        previous_limit = sys.getrecursionlimit()
+        try:
+            sys.setrecursionlimit(1000)
+            with self.assertNoLogs("dump_things_service", level="WARNING"):
+                report = render_projection(self.workspace, self.runtime_010, candidate)
+            self.assertEqual(sys.getrecursionlimit(), 1000)
+        finally:
+            sys.setrecursionlimit(previous_limit)
         self.assertEqual(
             report,
             {

@@ -99,9 +99,13 @@ def normalize_edit_url(value: str) -> str:
     """Return a URL suitable as the base of a SHACL Vue edit link."""
 
     value = value.strip()
+    if value.startswith("/") and not value.startswith("//"):
+        return normalize_base_path(value)
     parsed = urlsplit(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("edit URL must be an absolute HTTP(S) URL")
+        raise ValueError(
+            "edit URL must be an absolute HTTP(S) URL or root-relative path"
+        )
     if parsed.query or parsed.fragment:
         raise ValueError("edit URL cannot contain a query or fragment")
     return f"{value.rstrip('/')}/"

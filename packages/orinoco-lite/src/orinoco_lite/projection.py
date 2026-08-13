@@ -23,6 +23,7 @@ from .config import WorkspaceConfig
 from .editor import _record_sources
 from .errors import ConfigurationError, DriverError
 from .integrity import sha256_file
+from .schema_conversion import build_format_converters
 
 
 MANIFEST_HEADER = "# orinoco-lite projection manifest v2"
@@ -319,11 +320,7 @@ def validate_semantics(
         for name in schema_view.all_classes()
     }
     try:
-        from dump_things_service import Format
-        from dump_things_service.converter import FormatConverter
-
-        to_ttl = FormatConverter(str(schema), Format.json, Format.ttl)
-        to_json = FormatConverter(str(schema), Format.ttl, Format.json)
+        to_ttl, to_json = build_format_converters(schema)
     except Exception as error:
         raise DriverError("Could not initialize semantic schema conversion") from error
     adjacency: dict[str, set[str]] = {pid: set() for pid in by_pid}

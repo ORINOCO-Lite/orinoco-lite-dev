@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 from typing import Any, Sequence
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
@@ -192,6 +192,42 @@ def _preflight_hugo(runtime_root: Path, *, cwd: Path) -> Version:
     )
 
 
+def normalize_build_base_url(value: str) -> str:
+    """Return an absolute public URL or a host-neutral root-relative path."""
+
+    if not value or value != value.strip():
+        raise ConfigurationError("Build base URL cannot be empty or padded")
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc:
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ConfigurationError(
+                "Build base URL must use HTTP(S) or be a root-relative path"
+            )
+        if parsed.query or parsed.fragment:
+            raise ConfigurationError(
+                "Build base URL cannot contain a query or fragment"
+            )
+        return value.rstrip("/") + "/"
+
+    decoded = unquote(value)
+    if (
+        decoded != value
+        or not decoded.startswith("/")
+        or decoded.startswith("//")
+        or "?" in decoded
+        or "#" in decoded
+        or "\\" in decoded
+        or any(character.isspace() or ord(character) < 0x20 for character in decoded)
+    ):
+        raise ConfigurationError(
+            "Build base URL must use HTTP(S) or be a root-relative path"
+        )
+    parts = [part for part in decoded.split("/") if part]
+    if any(part in {".", ".."} for part in parts):
+        raise ConfigurationError("Build base URL cannot contain path traversal")
+    return "/" if not parts else f"/{'/'.join(parts)}/"
+
+
 def build_site(
     config: Path,
     runtime_root: Path,
@@ -201,10 +237,8 @@ def build_site(
     workspace = load_config_path(config)
     runtime_root = runtime_root.resolve()
     destination = _safe_destination(workspace, destination)
+    base_url = normalize_build_base_url(base_url)
     parsed = urlsplit(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ConfigurationError("Build base URL must be an absolute HTTP(S) URL")
-    base_url = base_url.rstrip("/") + "/"
     _preflight_hugo(runtime_root, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
@@ -250,7 +284,7 @@ def build_site(
                 adapter,
                 destination,
                 "--base-path",
-                parsed.path or "/",
+                parsed.path or base_url,
                 "--edit-url",
                 f"{base_url}edit/",
             ],

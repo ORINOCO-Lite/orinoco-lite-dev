@@ -10,6 +10,7 @@ from tools.adapt_upstream_pages import (
     editor_link_hrefs,
     editor_link_url,
     normalize_base_path,
+    normalize_edit_url,
     prefix_root_url,
 )
 
@@ -129,6 +130,48 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             self.assertEqual(
                 adapt_site(site_dir, "/", local_edit_url).edit_urls_rewritten, 0
             )
+
+    def test_root_relative_edit_url_is_normalized_and_fail_closed(self) -> None:
+        self.assertEqual(normalize_edit_url("/edit"), "/edit/")
+        self.assertEqual(normalize_edit_url("/project/edit/"), "/project/edit/")
+        self.assertEqual(
+            normalize_edit_url("https://con.github.io/project/edit/"),
+            "https://con.github.io/project/edit/",
+        )
+        for value in (
+            "edit/",
+            "//example.test/edit/",
+            "/../edit/",
+            "/edit/?query=true",
+            "/edit/#fragment",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    normalize_edit_url(value)
+
+    def test_root_relative_editor_link_stays_on_the_serving_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir)
+            pid = "xyzrins:persons/example"
+            page = site_dir / "index.html"
+            page.write_text(
+                "<html><body>"
+                f"<script>const limitGraphRootNodeId='{pid}';</script>"
+                '<a href="https://pool.psychoinformatics.de/ui/'
+                "?sh%3ANodeShape=dlthings%3AThing&amp;"
+                "pid=xyzrins%3Apersons%2Fexample&amp;edit=true\">"
+                "Edit this record</a></body></html>",
+                encoding="utf-8",
+            )
+
+            stats = adapt_site(site_dir, "/", "/edit/")
+            rendered = page.read_text(encoding="utf-8")
+            self.assertEqual(stats.edit_urls_rewritten, 1)
+            self.assertEqual(
+                editor_link_hrefs(rendered),
+                [editor_link_url("/edit/", pid)],
+            )
+            self.assertEqual(audit_site(site_dir, "/", "/edit/"), [])
 
     def test_record_page_without_footer_link_gets_bound_editor_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

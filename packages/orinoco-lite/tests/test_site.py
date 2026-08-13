@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite import site
-from orinoco_lite.errors import DriverError
+from orinoco_lite.errors import ConfigurationError, DriverError
 
 
 CONFIG = """\
@@ -19,6 +19,112 @@ site:
 
 
 class HugoCompatibilityTests(unittest.TestCase):
+    def test_build_base_url_accepts_host_neutral_and_public_forms(self) -> None:
+        cases = {
+            "/": "/",
+            "/project": "/project/",
+            "/project/": "/project/",
+            "https://con.github.io/example": "https://con.github.io/example/",
+            "http://127.0.0.1:8766/example/": (
+                "http://127.0.0.1:8766/example/"
+            ),
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(site.normalize_build_base_url(value), expected)
+
+    def test_build_base_url_rejects_ambiguous_or_unsafe_forms(self) -> None:
+        for value in (
+            "",
+            "project",
+            "//example.test/project/",
+            "ftp://example.test/project/",
+            "/../escape/",
+            "/%2e%2e/escape/",
+            "/project/?query=true",
+            "/project/#fragment",
+            "/project\\escape/",
+            " /project/",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(ConfigurationError):
+                    site.normalize_build_base_url(value)
+
+    def test_build_passes_host_neutral_and_public_urls_without_rewriting(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "orinoco.yaml"
+            config.write_text(CONFIG, encoding="utf-8")
+            runtime = root / "runtime"
+            adapter = runtime / "drivers" / "adapt_pages.py"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text("# test adapter\n", encoding="utf-8")
+
+            for name, base_url, expected_edit_url in (
+                ("local", "/", "/edit/"),
+                (
+                    "pages",
+                    "https://con.github.io/example/",
+                    "https://con.github.io/example/edit/",
+                ),
+            ):
+                with self.subTest(name=name):
+                    commands: list[list[str]] = []
+
+                    def run(command, *, cwd):
+                        normalized = [str(item) for item in command]
+                        commands.append(normalized)
+                        if normalized[0] == "hugo":
+                            destination = Path(
+                                normalized[normalized.index("--destination") + 1]
+                            )
+                            destination.mkdir(parents=True)
+                            (destination / "index.html").write_text(
+                                "built\n", encoding="utf-8"
+                            )
+                        return ""
+
+                    destination = root / "build" / name
+                    with (
+                        patch.object(site, "_preflight_hugo"),
+                        patch.object(
+                            site,
+                            "_assemble",
+                            return_value={
+                                "copied_assets": 0,
+                                "copied_links": 0,
+                                "hydrated_assets": 0,
+                            },
+                        ),
+                        patch.object(site, "_run", side_effect=run),
+                        patch.object(
+                            site,
+                            "bind_editor",
+                            return_value={"version": 2},
+                        ),
+                    ):
+                        report = site.build_site(
+                            config,
+                            runtime,
+                            destination,
+                            base_url,
+                        )
+
+                    self.assertEqual(report["base_url"], base_url)
+                    hugo = commands[0]
+                    self.assertEqual(hugo[hugo.index("--baseURL") + 1], base_url)
+                    adapter_command = commands[1]
+                    self.assertEqual(
+                        adapter_command[
+                            adapter_command.index("--base-path") + 1
+                        ],
+                        "/" if name == "local" else "/example/",
+                    )
+                    self.assertEqual(
+                        adapter_command[adapter_command.index("--edit-url") + 1],
+                        expected_edit_url,
+                    )
+
     def test_supported_extended_hugo_is_accepted(self) -> None:
         outputs = (
             "hugo v0.154.5+extended darwin/arm64 BuildDate=unknown "
