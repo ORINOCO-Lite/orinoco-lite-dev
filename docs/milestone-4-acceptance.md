@@ -3,7 +3,7 @@
 Status: not accepted; human merge and default-branch publication are pending
 
 The engine, runtime, and final template are published, and the complete accepted Milestone 3 site and test contract are present in the public test consumer.
-The automated update pull request is ready for review.
+Replacement pull request 2 is ready for review after correcting three basic local-use defects found in the superseded pull request 1.
 Acceptance still awaits its human review and merge, successful validation and Pages deployment from the updated default branch, and verification of the published project-path site.
 The update must not merge automatically.
 
@@ -21,39 +21,53 @@ A discovery failure is not acceptance evidence.
 | Accepted site clean migration | `a122e506de9e4a13473edbe8d74a950d74032a16` |
 | Accepted parent Milestone 2 | `7ce44a28c13954e514c8b7e9ab6f1eaade77d891` |
 | Accepted site Milestone 2 | `d60f274b4bf8af3e513d83d1727cfe3e6c9bb8af` |
-| Milestone 4 engine/runtime source | `0a0b0891e4e7ae3648d4e9d7d6e7e988194600aa` |
-| Milestone 4 template source | `9ae15a1deaf044c6a08c3fe9c8a07724ff0dc467` |
-| Consumer update | `8fa32f078f95d736154883cb5deadfe213cbad10` |
+| Milestone 4 engine/runtime source | `1e1001ead15f5a96ef56bc2e18be92070922244f` |
+| Milestone 4 template source | `76a11c5a2c3792d8e5a0d6ebe65c7f20c824bb96` |
+| Consumer update | `652c7702d9b62126013f003cc4742969d5400347` |
 
 Git history identifies the commit containing this pending-acceptance ledger; the source-coordinate table intentionally avoids a self-reference.
 
 ## Engine and runtime release
 
-The immutable [`v0.1.9` release][engine-release] has GitHub release ID `369612145`.
-Annotated tag object `6485f57c5b5fcf0471acc37e524857c0fe55ae8a` peels to source commit `0a0b0891e4e7ae3648d4e9d7d6e7e988194600aa`.
+The immutable [`v0.1.10` release][engine-release] has GitHub release ID `370001522`.
+Annotated tag object `3343df643107b165b6036e67189f010f83859386` peels to source commit `1e1001ead15f5a96ef56bc2e18be92070922244f` with source tree `218d8950e6f5504ca3f667dfef9a0b1db1b030bf`.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `orinoco_lite-0.1.9-py3-none-any.whl` | `c247cb8f63891724d63e86486941d4958517d96e44f01e72999b84c86b6359de` |
-| `orinoco_lite-0.1.9.tar.gz` | `04d50642057ed5200b509ff624a215612d4b5ab44e628d90882e3749723045e2` |
-| `orinoco-runtime-0.1.9.tar.gz` | `7850eb9af3205034fcb97c5034ec0a3811df7d174332c7563d011bb0b5bcbba0` |
-| archived `runtime-manifest.json` | `afef6b7d5a61131cbdb6db6a136e6f381bdf8eb9caf1a641a35df3ef94da07bc` |
-| `orinoco-provenance-bundle.jsonl` | `8058b8f5869b9db417eba3686b6773461efccc24b345448c1e43e4a605dfc65b` |
-| `SHA256SUMS` | `2711ae172d1bb59505e4f6ddbc90d9dc6858a8d93ae8f50a43c5452629011bf6` |
+| `orinoco_lite-0.1.10-py3-none-any.whl` | `1034ae0de2d160a382eca08f5008de7f90b5aa01a864169358f8f73de7e74705` |
+| `orinoco_lite-0.1.10.tar.gz` | `8557f2bc0229e721700e6e70f35b2160fa7c18bc9445272dd3a47667a92b3059` |
+| `orinoco-runtime-0.1.10.tar.gz` | `24416557d2791b2c4959c0a2532abbf523669d466721f009cf92d0ce6b7abbcd` |
+| archived `runtime-manifest.json` | `592a186e08ea472ca569cd4700aca444ecf82ce6bae286920505484fe83800af` |
+| `orinoco-provenance-bundle.jsonl` | `8c1fb617a804e47d29f52bf6266bbd22805f92169f771f52c67bdeeaf60b34ff` |
+| `SHA256SUMS` | `f1d2214accd89c6ccf77b7421c6c6c46c71ddc2dfa9efe66150bb32f31a36c00` |
 
-Release workflow [run `31656953686`][engine-run] succeeded.
-Its provenance attestation binds the checksum subjects to `refs/tags/v0.1.9`, source commit `0a0b0891e4e7ae3648d4e9d7d6e7e988194600aa`, and that workflow run.
-The packaged engine suite passed 38/38 tests. The editor-overlay unit suite passed 3/3 tests, and the overlaid JavaScript review-bundle suite passed in both independent editor builds.
-Those editor builds were byte-identical.
-Two independent runtime assemblies produced the same 753-resource archive, all resources verified against its manifest, and the runtime exposes the seven declared commands.
+Release workflow [run `31712939175`][engine-run] and job `94490313872` succeeded.
+Its provenance attestation binds the checksum subjects to `refs/tags/v0.1.10`, source commit `1e1001ead15f5a96ef56bc2e18be92070922244f`, and that workflow run.
+The packaged engine suite passed 44/44 tests.
+Two independent runtime assemblies produced the same 754-resource archive, every declared payload and internal checksum verified, and the runtime exposes the seven declared commands.
 
-A disposable full-consumer rehearsal used the frozen installation and passed all four configured browser executions across Chromium and WebKit.
-Both the graph and static editor passed in each browser, including selection of a record by an accessibility name containing its canonical PID.
+Engine/runtime `v0.1.8` and `v0.1.9` remain immutable but are superseded discovery evidence.
+They established page-to-editor binding, canonical-PID accessibility, and the full hosted compatibility path.
+Local use of the `v0.1.9` consumer then exposed the recursion-boundary and build-origin defects addressed in `v0.1.10`.
 
-Engine/runtime `v0.1.8` remains immutable but is superseded discovery evidence.
-It established page-to-editor link binding; the subsequent full-consumer browser rehearsal exposed the missing canonical-PID accessibility binding that `v0.1.9` adds through a reviewed, fail-closed source overlay.
+The reusable workflow and action pin is source commit `1e1001ead15f5a96ef56bc2e18be92070922244f` for the final template update.
 
-The reusable workflow and action pin remains source commit `0a0b0891e4e7ae3648d4e9d7d6e7e988194600aa` for the final template update.
+### Recursive schema diagnosis
+
+The pinned stack is LinkML `1.11.1`, LinkML Runtime `1.11.1`, Pydantic `2.13.4`, Dump Things `6.3.6`, and Python `3.12.13`.
+The source schema has 82 classes, 98 inheritance edges, no inheritance cycle, and maximum inheritance depth 5.
+Its recursion is intentional: the inlined `Thing.relations` range can refer to `Thing` or any of its 48 descendants.
+
+The unmodified LinkML `PydanticGenerator` reproduces the failure at Python's default recursion limit without Dump Things patches.
+Generation and Python compilation succeed; executing the generated module fails in Pydantic core schema construction at `Thing.model_rebuild()`.
+LinkML represents the recursive range as a repeatedly expanded union rather than a named recursive type.
+Dump Things does not cause the defect: it catches the failure and raises the process-wide limit from 1,000 to 2,000.
+Orinoco's earlier direct converter construction exposed that behavior.
+
+Engine `v0.1.10` therefore serializes converter construction with a lock, temporarily applies the already-proven limit of 2,000 only while constructing the paired converters, and restores the caller's exact prior limit on success or failure.
+A caller limit already above 2,000 is preserved.
+Full-schema tests start at 1,000, validate all 199 records and the JSON/RDF round trips, emit no recursion warning, and confirm exact restoration.
+This is a scoped integration workaround; the durable upstream correction is for LinkML's Pydantic generator to emit a named recursive alias, which was separately reproduced successfully.
 
 ## Template release
 
@@ -71,25 +85,44 @@ It proved the safe three-way updater and legacy-consumer bootstrap before the pa
 - source CI: Linux passed, while the queued macOS job was cancelled after the release was superseded.
 
 Template `v0.1.4`, `v0.1.5`, and `v0.1.6` are also immutable, superseded discovery evidence.
-They established the complete compatibility update path, then exposed hosted dependency ordering, Chromium graph teardown, and macOS 14 Playwright/WebKit protocol behavior addressed by the terminal template release.
+They established the complete compatibility update path, then exposed hosted dependency ordering, Chromium graph teardown, and macOS 14 Playwright/WebKit protocol behavior addressed in `v0.1.7`.
 
 The superseded `v0.1.6` release has ID `369629347`, source commit `63f62716dcf4065ab8a309e2b0ddb62da2d12d56`, annotated tag object `32b5a0065d45643e94bb1f1e098047b710efe725`, publication commit `633f355900a587a9e65ba3c9ea87c7fdc96217da`, and rendered tree `8505a0866c25ff2005faebb684077883e1ba55ad`.
 Its source CI run `31660181699` passed on Linux and macOS, and updater run `31660256727` produced consumer head `a8fdce6e713c220e2f3ad7381bb5286d79cb059a`.
 Independent consumer validation subsequently exposed the macOS mismatch, so none of those coordinates is terminal acceptance evidence.
 
-The final compatibility template is the immutable [`v0.1.7` release][template-release] with GitHub release ID `369639310`:
+Template `v0.1.7` is immutable but superseded discovery evidence.
+It retained the default-branch-only Pages correction and its ownership-safe macOS 14 browser overlay.
+Its terminal hosted compatibility evidence was:
 
-| Final template `v0.1.7` coordinate | Exact value |
+| Superseded template `v0.1.7` coordinate | Exact value |
 | --- | --- |
 | Annotated tag object | `c0c6c8e3f539828027eb6d92ee26eb76dbc9955c` |
 | Source commit | `9ae15a1deaf044c6a08c3fe9c8a07724ff0dc467` |
 | Source-tree SHA | `89dbdb19b58d16f82da0b0dd30df3c729333f1b1` |
 | Generated `github-template` commit | `8a0b11f953009a7f5cb4e5d499320ee3cfa82393` |
 | Rendered/publication-tree SHA | `8a8bc1660897c7d2346e463e0704230a078784f9` |
-| Source CI | [run `31662096753`][template-run]: Linux and macOS 14 passed |
+| Source CI | run `31662096753`: Linux and macOS 14 passed |
 
-Template `v0.1.7` targets engine and runtime `v0.1.9`, carries the default-branch-only Pages deployment correction, and adds an ownership-safe macOS 14 browser-compatibility overlay.
-Source CI job `94328813822` passed on Linux in 44 seconds, and job `94328813824` passed on macOS 14 in 55 seconds.
+The final template is the immutable [`v0.1.8` release][template-release] with GitHub release ID `370011385`:
+
+| Final template `v0.1.8` coordinate | Exact value |
+| --- | --- |
+| Annotated tag object | `052dc4335f8848f52c5f663330100d78125b0761` |
+| Source commit | `76a11c5a2c3792d8e5a0d6ebe65c7f20c824bb96` |
+| Source-tree SHA | `c73b45972c96ad6069d505eaaeb813b12d9ab6ea` |
+| Generated `github-template` commit | `3af523ed5c2372e8df1296144b0897a497a0b598` |
+| Rendered/publication-tree SHA | `58636171863224c2b832847fe8399f7b82872401` |
+| Source CI | [run `31714605299`][template-run]: Linux job `94495988212` passed; macOS 14 job `94495988130` remains queued with no runner assigned |
+
+The generated publication tree exactly equals the source `github-template` subtree.
+Template `v0.1.8` targets engine and runtime `v0.1.10`, retains the Pages and macOS compatibility corrections, and changes local `build` and `build-repeat` to the host-neutral root base `/`.
+A template-owned verifier rejects any baked loopback origin, serves the complete output on a random loopback port, and checks the entry point and every same-origin root reference through both `127.0.0.1` and `localhost`.
+The Pages workflow still supplies the explicit project-path base and remains default-branch-only.
+
+Local source checks passed 24/24 and rendered-template checks passed 25/25.
+A disposable update rehearsal preserved all 1,101 protected paths, passed 68 consumer tests, produced equal 561-file builds, checked 62 same-origin references through each loopback hostname, and passed Chromium 2/2 and WebKit 2/2.
+The final hosted source-CI result is recorded after the macOS job reaches a terminal state.
 
 ## Public test consumer
 
@@ -105,7 +138,9 @@ Its recorded default-branch coordinates are:
 | Offline acceptance seam | `6fb267e24efc8a6759b783c23b1f0fa4e3da8194` |
 | Final updater and Pages bootstrap on current `main` | `d437ae085573737155740853134ab37a03476d4e` |
 
-`orinoco-site-bundle.json` records 1,092 files and 20,467,655 bytes and has SHA-256 `767116bc7d7e02219677e5cbda76d7de11a9a15f1a39af665a9d93ca1d6523fe`.
+On replacement pull-request head `652c7702d9b62126013f003cc4742969d5400347`, `orinoco-site-bundle.json` records 1,092 files and 21,745,331 bytes and has SHA-256 `c77fc77a1ae416112d7ccf88c4296cdf7046d722868d248cb9824e3dfb5a12cf`.
+It classifies 867 initialized site-owned paths, 205 generated paths, and 20 consumer-test paths.
+Every one of its 1,092 path, size, digest, and ownership entries matches the tracked source snapshot.
 The active 400-line `generated/projection/SHA256SUMS` has SHA-256 `2c80062a38d4201ef97e1a34333477ef4c280af84ca5259fcf92108c619aff00`.
 It covers 210 projection inputs, 187 projection outputs, and two release pins; the reviewed root `.gitattributes` control sidecar is preserved outside the deterministic projection inventory.
 
@@ -114,40 +149,58 @@ Its preparation phase performs a frozen install, verifies the runtime and all de
 Its network-denied phase uses the operating system's network isolation to validate metadata, verify and regenerate the projection, compare two complete builds, exercise the editor bundle, and confirm the tracked snapshot remains unchanged.
 The full local consumer suite passed 54/54 tests, including the offline seam; inventory, ownership, and protected-content diff checks also passed.
 
-The final automated update succeeded and stopped at the required human-review boundary:
+The earlier automated update run succeeded and stopped at the required human-review boundary, but local use exposed the three defects documented in this record.
+Pull request 1 was closed without merge and is superseded discovery evidence.
+Replacement pull request 2 contains its reviewed update, the materialized presentation payloads, and the `v0.1.8`/`v0.1.10` update:
 
-| Final consumer coordinate | Exact value or remaining gate |
+| Current consumer coordinate | Exact value or remaining gate |
 | --- | --- |
-| Update workflow run | [run `31662120512`][final-update-run]: passed |
-| Update pull request | [`con/test-orinoco-downstream-website#1`][consumer-update-pr] |
-| Update branch and commit | `automation/orinoco-framework-update` at `8fa32f078f95d736154883cb5deadfe213cbad10` |
-| Independent pull-request validation | [run `31662399371`][final-validate-run]: Linux and macOS 14 passed |
+| Superseded update workflow | [run `31662120512`][superseded-update-run]: passed and opened pull request 1 |
+| Replacement update pull request | [`con/test-orinoco-downstream-website#2`][consumer-update-pr] |
+| Update branch and commit | `automation/orinoco-framework-update` at `652c7702d9b62126013f003cc4742969d5400347` |
+| Independent pull-request validation | [run `31715026535`][final-validate-run]: Linux job `94497450004` passed; macOS 14 job `94497449873` remains queued with no runner assigned |
 | Human review and merge commit | **PENDING** |
 | Default-branch validation run | **PENDING** |
 | Default-branch Pages run | **PENDING** |
 | Published project Pages proof | **PENDING** |
 
-The pull request is attributed as an AI-generated draft, has no automatic approval or merge path, and requires human review.
-Its generated update commit changes only 14 framework-owned paths.
-The update ledger is `ready-for-review`: validation passed, update conflicts, migrations, and `site_owned.changed` are all empty, and all 1,101 protected site-owned hashes remain equal to the baseline.
+The replacement pull request is attributed as an AI-generated draft, has the `dependencies` and `orinoco-update` labels, has no automatic approval or merge path, and requires human review.
+Its finalized update ledger is `ready-for-review`: validation passed, conflicts, migrations, and `site_owned.changed` are all empty, and all 1,101 protected hashes remain equal to the post-materialization baseline.
+The ledger has SHA-256 `ecf28964ef1c4214f10813fbcb52803aaa5b7ae68b077f3716980dc0de7db070` and binds template `v0.1.8`, engine/runtime `v0.1.10`, and reusable-workflow source `1e1001ead15f5a96ef56bc2e18be92070922244f`.
+The final hosted validation result is recorded after the macOS job reaches a terminal state.
 
-Independent validation ran against exact head `8fa32f078f95d736154883cb5deadfe213cbad10`.
-Linux job `94329743831` passed in 4 minutes 58 seconds, and macOS 14 job `94329743862` passed in 2 minutes 52 seconds.
-Both platforms passed all 64 Python tests, hydrated all 16 digest-addressed assets, verified all 71 asset declarations, verified the 186 canonical and 13 reference records, verified all 753 runtime resources, and produced the same 561-file build tree `94bf42410f4c6868403bf270cf32721f5f7ffb7a64c54c13358e1f19cdb8bdba`.
-Each platform passed Chromium 2/2 and WebKit 2/2.
-Linux verified Playwright `1.62.1`; the ownership-safe macOS compatibility path replaced only ignored packages, verified Playwright `1.61.1`, and then passed both browser projects.
+The complete local suite on exact head `652c7702d9b62126013f003cc4742969d5400347` passed all 68 Python tests, verified all 71 declared assets, the 186 canonical and 13 reference records, the 199-record/185-page projection, the 186-node/467-edge graph, and all 754 runtime resources.
+Two root-relative local builds each contained 561 files and had tree SHA-256 `50d8719ea08627e76c568e54edae5b04c6d6c55fcc6206bd0c5f81ac13b5eeba`.
+Every one of the 62 same-origin references resolved through both loopback hostnames, and no `127.0.0.1`, `localhost`, or `::1` origin was baked into the output.
+The separate explicit Pages-project-path build passed Chromium 2/2 and WebKit 2/2.
+
+Hosted Linux job `94497450004` independently passed the same 68 tests and semantic, projection, asset, and 754-resource runtime contracts without a `RecursionError` or recursion warning.
+Its two root-relative 561-file builds were identical at tree SHA-256 `b19a4fe06ad46ef1aab9db8b264dd9a4ac62d8ba430031a46b7564e9ee62836e`; the dual-host verifier checked 62 references for each hostname, and Chromium 2/2 and WebKit 2/2 passed.
+
+### Ordinary presentation payloads
+
+The flattened presentation framework formerly contained 13 unresolved git-annex pointer blobs, including the main compiled stylesheet.
+Exact size-and-MD5 keys were matched to the same paths at pinned hydrated mirror commit `6c8b9a5b7260dc20dfe1453dd863b353e8f90f06`, then committed as ordinary Git bytes.
+A downstream build or preview no longer needs DataLad or git-annex.
+
+`generated/manifests/framework-import.json` has SHA-256 `17cc75a3e542ad00531ab47c01d3b41ecf361e02b9a58f2ebe5d3cf66b3904d7`.
+It records 72 files and 1,378,923 bytes: 59 byte-identical Git blobs and 13 verified annex-payload materializations.
+Each materialized entry binds the accepted source blob and pointer digest, annex key, expected payload size and MD5, ordinary-Git target SHA-256, and hydrated mirror coordinate.
+Source and build tests reject pointer-form content and verify that the emitted compiled stylesheet is a real payload.
+The full-fidelity manifest has SHA-256 `e5ea9b72ba338158a0158973b198c2c27b48f03af633d0e3006cf648e255a393`; the bound site-import ledger has SHA-256 `3d60139295ccf578f74600b8949c2496f1759a8c0822d6d07bd44251816cf9d9`.
 
 ## Full-fidelity parity
 
 The complete content is present; no representative subset was selected.
-The consumer bundle, local contract checks, and final updater run `31662120512` recorded the following parity evidence:
+The consumer bundle and local contract checks on replacement head `652c7702d9b62126013f003cc4742969d5400347` recorded the following parity evidence:
 
 | Contract | Recorded result |
 | --- | --- |
 | Canonical metadata | 186 records: 33 people, 24 projects including the home record, 126 publications, one instrument, one organization, and one topic |
 | Reference closure | 13 records |
 | Editorial sources | 10 declared sources and routes |
-| Assets | 71 declarations totaling 57,407,085 bytes: 55 Git payloads and 16 digest-addressed annex payloads |
+| Content assets | 71 declarations totaling 57,407,085 bytes: 55 Git payloads and 16 digest-addressed hydrated payloads |
+| Presentation framework | 72 ordinary-Git files; 59 source blobs plus 13 verified former-annex payload materializations |
 | Provenance | 7 ledgers with extraction coordinates |
 | Projection | 199 records and 185 rendered pages |
 | Graph | 186 nodes and 467 native edges |
@@ -155,7 +208,7 @@ The consumer bundle, local contract checks, and final updater run `31662120512` 
 | German isolation | no German route or graph node |
 | Downstream topology | no `.gitmodules`, gitlinks, or component checkout |
 
-The final updater hydrated all 16 annex-backed assets and verified all 71 declarations, the 186-record canonical set and 13-record reference closure, the 199-record/185-page projection, the 186-node/467-edge graph, and all 753 runtime resources before creating the review pull request.
+The local final update hydrated all 16 digest-addressed content assets and verified all 71 declarations, the 186-record canonical set and 13-record reference closure, the 199-record/185-page projection, the 186-node/467-edge graph, all 754 runtime resources, and all 13 ordinary presentation payloads before the replacement review pull request was opened.
 
 ## Test traceability
 
@@ -170,8 +223,8 @@ It maps every required source assertion with no unmapped entry:
 | SHACL Vue editor | 8 definitions |
 | Unmapped | 0 |
 
-The terminal `v0.1.7` update reports no update conflicts or migrations and preserves all 1,101 protected site-owned hashes.
-Independent Linux and macOS 14 validation passed on the exact pull-request commit.
+The terminal `v0.1.8` update reports no update conflicts or migrations and preserves all 1,101 protected site-owned hashes.
+Independent Linux and macOS 14 validation is tracked on the exact pull-request head and recorded only after both jobs reach a terminal state.
 
 ## Failed-closed discovery runs
 
@@ -186,6 +239,7 @@ They did not create an acceptable update and must not be cited as passing accept
 | [`31653114295`][update-v013-run] | Content, assets, projection, graph, runtime, and update transformation passed; strict Hugo verification rejected the packaged revision label and no pull request was created. | Drove compatibility work incorporated in engine/runtime `v0.1.9` and later templates. |
 | [`31658793271`][update-v015-run], attempts 1 and 2 | Both attempts failed closed and created no pull request. After hosted dependencies were corrected, Chromium reached the graph test but hung during teardown because of package-install sequencing. | Drove the terminal dependency ordering and browser teardown correction in template `v0.1.6`. |
 | [`31660582152`][validate-v016-run] | Linux passed, but macOS 14 exposed a Playwright/WebKit protocol mismatch on the exact `v0.1.6` consumer update. | Superseded that update and drove the ownership-safe macOS 14 browser-compatibility overlay in template `v0.1.7`. |
+| Pull request 1 at `8fa32f078f95d736154883cb5deadfe213cbad10` | Hosted Linux and macOS validation passed, but local use exposed a recursive Pydantic model-generation failure, baked `127.0.0.1` origins, and 13 unresolved presentation pointers. | Closed without merge; superseded by engine/runtime `v0.1.10`, template `v0.1.8`, and pull request 2. |
 
 ## Repository and Pages settings
 
@@ -210,8 +264,15 @@ Labels `dependencies` and `orinoco-update` are available for update review.
 
 Existing contracts and terminal local rehearsals cover content-neutral template creation, complete site import, protected-content preservation, validation, projection, build, browser behavior, backend-free editor export and application, and deterministic update rollback.
 
-The two-phase offline acceptance passed on exact pull-request commit `8fa32f078f95d736154883cb5deadfe213cbad10` under the `macos-sandbox` network boundary.
+The earlier two-phase offline acceptance passed on superseded pull-request commit `8fa32f078f95d736154883cb5deadfe213cbad10` under the `macos-sandbox` network boundary.
 It checked 1,126 tracked files and 71 assets, exercised the full semantic and projection contracts, produced two equal 561-file builds with tree `94bf42410f4c6868403bf270cf32721f5f7ffb7a64c54c13358e1f19cdb8bdba`, dry-ran the editor bundle, and left the tracked snapshot unchanged.
+
+The final two-phase offline acceptance passed on exact replacement head `652c7702d9b62126013f003cc4742969d5400347` under the same `macos-sandbox` network boundary.
+It checked 1,128 tracked files and all 71 assets, verified runtime `v0.1.10` and its 754 resources, validated the 186 canonical and 13 reference records, updated and verified the 199-record/185-page projection and 186-node/467-edge graph, and dry-ran the editor bundle.
+Its two root-relative 561-file builds had deterministic tree SHA-256 `7ada89fdae086f2fbac1b5337acc4643f341778bdf3434f56e8b752dafdfb137`, and the tracked snapshot remained unchanged.
+
+That final proof supersedes the earlier offline build evidence.
+Together with the final local suite, it passed with Python's default recursion limit restored, ordinary framework payloads, host-neutral `/` output through both loopback hostnames, and the separately parameterized Pages project path.
 
 A separate actual user-interface bundle was exported and applied with `orinoco editor apply --write`, after which the projection was updated and verified, metadata was validated, and the site was built twice with identical tree prefix `aa5f9bd5`.
 Exact binary rollback passed.
@@ -245,27 +306,27 @@ Do not replace the sorted-ref digest above with a digest computed from a differe
 
 Milestone 4 remains unaccepted until all of the following are recorded:
 
-1. have a human review and merge pull request 1 without changing site-owned content;
+1. have a human review and merge pull request 2 without changing site-owned content;
 2. record successful validation and Pages deployment from updated `main`;
 3. verify the published project-path site and editor review-bundle behavior.
 
-[engine-release]: https://github.com/con/orinoco-lite-dev/releases/tag/v0.1.9
+[engine-release]: https://github.com/con/orinoco-lite-dev/releases/tag/v0.1.10
 
-[engine-run]: https://github.com/con/orinoco-lite-dev/actions/runs/31656953686
+[engine-run]: https://github.com/con/orinoco-lite-dev/actions/runs/31712939175
 
 [template-repository]: https://github.com/con/orinoco-lite-template
 
-[template-release]: https://github.com/con/orinoco-lite-template/releases/tag/v0.1.7
+[template-release]: https://github.com/con/orinoco-lite-template/releases/tag/v0.1.8
 
-[template-run]: https://github.com/con/orinoco-lite-template/actions/runs/31662096753
+[template-run]: https://github.com/con/orinoco-lite-template/actions/runs/31714605299
 
 [consumer-repository]: https://github.com/con/test-orinoco-downstream-website
 
-[consumer-update-pr]: https://github.com/con/test-orinoco-downstream-website/pull/1
+[consumer-update-pr]: https://github.com/con/test-orinoco-downstream-website/pull/2
 
-[final-update-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31662120512
+[superseded-update-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31662120512
 
-[final-validate-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31662399371
+[final-validate-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31715026535
 
 [update-v012-run]: https://github.com/con/test-orinoco-downstream-website/actions/runs/31650656485
 
