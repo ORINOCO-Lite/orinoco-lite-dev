@@ -1,13 +1,6 @@
 name: CON Pages preview
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-      - codex/milestone-3
   workflow_dispatch:
     inputs:
       deploy:
@@ -22,9 +15,6 @@ permissions:
 jobs:
   build:
     name: Build the backend-free CON artifact
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.head_ref != 'codex/milestone-4'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -63,7 +53,7 @@ jobs:
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: true
-          cache-write: ${{ github.event_name != 'pull_request' }}
+          cache-write: true
           locked: true
           pixi-version: v0.73.0
 
@@ -83,8 +73,7 @@ jobs:
     name: Deploy the reviewed Pages artifact
     needs: build
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.deploy)
+      inputs.deploy
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:

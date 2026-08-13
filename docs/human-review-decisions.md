@@ -1,6 +1,6 @@
 # Orinoco Lite human-review decision queue
 
-Status: open for comprehensive human review
+Status: Milestone 4 accepted; production-graduation review remains open
 
 Review snapshot: 2026-08-13
 
@@ -71,7 +71,7 @@ Priorities mean:
 
 ### HR-001 — Accept the distribution and dispose of PR 5
 
-**Status:** open
+**Status:** accepted
 
 **Question:** Does the implemented engine/runtime/template/ordinary-consumer architecture satisfy Milestone 4, and should [`con/orinoco-lite-dev#5`](https://github.com/con/orinoco-lite-dev/pull/5) be merged, returned for named changes, or retained as an unmerged engineering branch?
 
@@ -93,14 +93,14 @@ Keep technical distribution acceptance separate from content and production appr
 
 **Resolution:**
 
-- Outcome:
-- Conditions or requested changes:
-- Decided by / date:
-- Follow-up:
+- Outcome: accept Milestone 4's distribution architecture and merge engineering pull request 5.
+- Conditions or requested changes: record and implement HR-003 and HR-004; keep production content approval and real-site graduation separate.
+- Decided by / date: John Lee / 2026-08-13.
+- Follow-up: continue the atomic P1 review before any production graduation.
 
 ### HR-003 — Establish authority and a project license matrix
 
-**Status:** open
+**Status:** accepted
 
 **Question:** Who has authority to license each surface, what upstream terms or asset-specific exceptions constrain that authority, and under what terms may people use, modify, and redistribute:
 
@@ -123,14 +123,14 @@ Until then, do not publish to a general package index, invite third-party reuse,
 
 **Resolution:**
 
-- Engine/template/content/media rightsholder(s):
-- Upstream constraints and exceptions:
-- Engine/engineering license:
-- Template/updater license:
-- Metadata/editorial license:
-- Media/presentation policy:
-- Interim posture, if permanent terms remain open:
-- Decided by / date:
+- Engine/template/content/media rightsholder(s): Center for Open Neuroscience owns the original work to the extent permitted; accepted contributor rights remain respected.
+- Upstream constraints and exceptions: preserve every upstream license and notice; license CON modifications only to the extent CON has authority.
+- Engine/engineering license: MIT.
+- Template/updater license: MIT.
+- Metadata/editorial license: CC0 1.0 for factual metadata and machine-readable factual projections; CC BY 4.0 for original documentation and editorial prose.
+- Media/presentation policy: item-specific licenses and provenance; no blanket grant for unverified images, portraits, logos, branding, or imported media.
+- Interim posture, if permanent terms remain open: none for original code, documentation, and factual metadata; unverified media remains unlicensed until reviewed.
+- Decided by / date: John Lee / 2026-08-13.
 
 ### HR-004 — Dispose of the legacy engineering Pages preview
 

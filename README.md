@@ -114,6 +114,8 @@ Do not reproduce that release boundary with an ad hoc local archive.
 
 ## Ownership and safety boundaries
 
+- Original Orinoco Lite software is MIT licensed; original documentation is CC BY 4.0, factual metadata is CC0 1.0, and media remains item-specific.
+See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
 - Reviewed YAML is the canonical metadata source.
 Generated projection files remain committed so stale output, review, and rollback are explicit.
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.

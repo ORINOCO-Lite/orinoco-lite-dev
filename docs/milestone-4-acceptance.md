@@ -1,14 +1,14 @@
 # Milestone 4 acceptance record
 
-Status: technical test-consumer publication complete; comprehensive human acceptance open
+Status: Milestone 4 accepted; production graduation remains separate
 
 The engine and runtime are published, the template has been exercised through subsequent immutable maintenance releases, and the complete accepted Milestone 3 site and test contract are present in the public test consumer.
 Replacement pull request 2 was reviewed and merged after correcting the three basic local-use defects found in superseded pull request 1.
 Pull request 3 then exercised a normal framework maintenance update, and pull request 4 applied a site-owned presentation change.
 Project Pages now serves the reviewed default branch at the public project path.
 
-The remaining acceptance boundary is the comprehensive human review of the engineering architecture, governance, licensing, production-graduation, and content questions in [`human-review-decisions.md`](human-review-decisions.md).
-Technical acceptance of the distribution must remain distinct from approval of the content or a future production cutover.
+The Milestone 4 distribution architecture, licensing matrix, and legacy-preview disposition are accepted in [`human-review-decisions.md`](human-review-decisions.md).
+This acceptance remains distinct from approval of the content or a future production cutover.
 Updates still must not merge automatically.
 
 This record distinguishes immutable release evidence from exploratory runs that failed closed.
@@ -319,16 +319,13 @@ The final recorded no-touch check for `centerforopenneuroscience.org` is:
 No Milestone 4 operation wrote a file, ref, setting, workflow, deployment, Pages source, default branch, DNS record, or custom domain in the real-site repository.
 Do not replace the sorted-ref digest above with a digest computed from a differently formatted ref listing.
 
-## Remaining human acceptance
+## Remaining production-graduation review
 
-The test-consumer publication gates are complete.
-Milestone 4 remains under human review until the P0 items in [`human-review-decisions.md`](human-review-decisions.md) record:
+The test-consumer publication gates and all P0 decisions are complete.
+Engineering pull request 5 is accepted for merge, the project license matrix is recorded, and the legacy preview is retained only as frozen evidence with an explicit opt-in engineering-preview path.
 
-1. the disposition of engineering pull request 5 and the technical distribution architecture;
-2. the licensing authority and interim or permanent posture for each released and redistributed surface; and
-3. the disposition of the legacy Milestone 3 engineering Pages preview.
-
-Production graduation remains a later decision and is not required to accept the test-consumer distribution mechanism.
+The P1 decisions in [`human-review-decisions.md`](human-review-decisions.md) remain required before production graduation.
+They do not reopen the accepted single-repository distribution mechanism or authorize a real-site operation.
 
 [engine-release]: https://github.com/con/orinoco-lite-dev/releases/tag/v0.1.10
 

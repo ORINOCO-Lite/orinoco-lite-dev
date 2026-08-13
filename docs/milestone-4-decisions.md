@@ -1,6 +1,6 @@
 # Milestone 4 decision register
 
-Status: implementation complete; comprehensive engineering review open
+Status: Milestone 4 accepted; production-graduation decisions remain open
 
 Consolidated prioritized review queue: [`human-review-decisions.md`](human-review-decisions.md).
 This file remains the authoritative record of accepted Milestone 4 decisions and implementation defaults.
@@ -20,6 +20,8 @@ This file remains the authoritative record of accepted Milestone 4 decisions and
 | M4-D009 | The test repository is public under `con` and uses ordinary project Pages. | Anonymous checkout, template/update review, and public Pages are exercised without a production domain. |
 | M4-D010 | Framework update pull requests never merge automatically. | Human review remains the release-to-site publication boundary. |
 | M4-D011 | The real site repository is read-only throughout Milestone 4. | No file, ref, setting, workflow, deployment, or remote write occurs in `centerforopenneuroscience.org`. |
+| M4-D012 | Original Orinoco Lite software and template code use MIT; factual metadata uses CC0 1.0; original documentation and editorial prose use CC BY 4.0; media remains item-specific. | Preserve all upstream notices and do not infer rights for unverified assets, logos, or branding. |
+| M4-D013 | The legacy Milestone 3 engineering Pages preview is retired as an automatic deployment and retained as frozen evidence. | Candidate engineering previews are explicit opt-in artifacts; the complete downstream consumer remains the supported integration and publication surface. |
 
 ## Implementation defaults
 

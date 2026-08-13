@@ -77,9 +77,9 @@ The diagnosis and removal condition are recorded in [`docs/milestone-4-decisions
 Releases contain a deterministic wheel and source archive, a checksummed runtime archive, a machine-readable source inventory, component license texts, and build provenance.
 The runtime contains the localized schema closure, reviewed renderer, graph support, and static editor required by consumers; it does not expose component checkouts.
 
-The package metadata intentionally does not declare a project-wide license.
-Bundling component licenses does not assign a license to otherwise unlicensed Orinoco Lite code or content.
-Public package-index publication or broader reuse must wait for the project-wide licensing decision in [`docs/human-review-decisions.md`](../../docs/human-review-decisions.md).
+The engine and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
+Bundled component licenses and notices remain authoritative for their own files; the runtime inventory preserves them rather than replacing them with the Orinoco Lite license.
+Documentation, factual metadata, media, and branding use the repository-wide matrix in [`LICENSES.md`](../../LICENSES.md).
 
 ## Development
 

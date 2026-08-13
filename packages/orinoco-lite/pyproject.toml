@@ -7,6 +7,8 @@ name = "orinoco-lite"
 version = "0.1.10"
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Center for Open Neuroscience" }]
 dependencies = [
