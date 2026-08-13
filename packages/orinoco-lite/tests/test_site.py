@@ -20,13 +20,20 @@ site:
 
 class HugoCompatibilityTests(unittest.TestCase):
     def test_supported_extended_hugo_is_accepted(self) -> None:
-        version = site._require_compatible_hugo(
+        outputs = (
             "hugo v0.154.5+extended darwin/arm64 BuildDate=unknown "
             "VendorInfo=conda-forge",
-            ">=0.154,<0.155",
-            runtime_release="0.1.3",
+            "hugo v0.154.5-conda-forge+extended linux/amd64 "
+            "BuildDate=unknown VendorInfo=conda-forge",
         )
-        self.assertEqual(str(version), "0.154.5")
+        for output in outputs:
+            with self.subTest(output=output):
+                version = site._require_compatible_hugo(
+                    output,
+                    ">=0.154,<0.155",
+                    runtime_release="0.1.7",
+                )
+                self.assertEqual(str(version), "0.154.5")
 
     def test_unsupported_or_malformed_hugo_is_rejected(self) -> None:
         cases = (
@@ -37,17 +44,17 @@ class HugoCompatibilityTests(unittest.TestCase):
             ),
             (
                 "too new",
-                "hugo v0.155.0+extended linux/amd64",
+                "hugo v0.155.0-conda-forge+extended linux/amd64",
                 "requires Hugo >=0.154,<0.155; found 0.155.0",
             ),
             (
                 "standard edition",
-                "hugo v0.154.5 linux/amd64",
+                "hugo v0.154.5-conda-forge linux/amd64",
                 "requires Hugo Extended",
             ),
             (
                 "malformed",
-                "hugo development+extended linux/amd64",
+                "hugo v0.154.5-+extended linux/amd64",
                 "Could not determine Hugo version",
             ),
         )
@@ -57,7 +64,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     site._require_compatible_hugo(
                         output,
                         ">=0.154,<0.155",
-                        runtime_release="0.1.3",
+                        runtime_release="0.1.7",
                     )
 
     def test_build_preflight_preserves_existing_outputs_on_failure(self) -> None:

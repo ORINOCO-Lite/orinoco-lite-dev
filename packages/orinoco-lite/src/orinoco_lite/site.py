@@ -25,6 +25,7 @@ from .runtime import MANIFEST_NAME, load_runtime_manifest
 
 HUGO_VERSION = re.compile(
     r"^hugo\s+v?(?P<version>[0-9]+(?:\.[0-9]+){2})"
+    r"(?:-(?P<revision>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
     r"(?P<variants>(?:\+[A-Za-z0-9.-]+)*)(?:\s|$)",
     re.IGNORECASE,
 )
