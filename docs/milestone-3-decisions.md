@@ -47,7 +47,7 @@ The Zotero importer retains the reviewed source decisions already recorded in `s
 | M3-Q008 | Is continued read-only remote custody sufficient for the sixteen annex-backed assets? | Hydrate by exact key and digest for the preview; do not claim durable custody. |
 | M3-Q009 | After review, should the preview replace the production custom-domain site? | Do not change DNS, redirects, `CNAME`, or production settings in Milestone 3. |
 | M3-Q010 | Who may approve canonical publication and editorial changes after the draft PR is opened? | Require ordinary human PR review; do not encode an unapproved CODEOWNERS or branch-protection policy. |
-| M3-Q012 | Should Pages continue to deploy from `codex/milestone-3` after review? | Use that branch only to bootstrap the pre-merge preview; then remove its push trigger and deploy only from `main`. |
+| M3-Q012 (resolved) | Should Pages continue to deploy from `codex/milestone-3` after review? | Retain the branch and deployment history as frozen evidence, disable automatic push and pull-request deployment, and provide only an explicitly dispatched engineering preview. The supported public integration preview is the downstream consumer. |
 | M3-Q015 | Should the `github-pages` environment require named deployment reviewers? | Use ordinary repository controls without inventing a reviewer policy; add environment protection only after maintainers choose the approvers. |
 | M3-Q016 | May deployment configuration or schema-authored markup become writable by untrusted users in a later hosted editor? | Treat those inputs as trusted, pinned build inputs in this static preview; require an explicit sanitization boundary before making them user-controlled. |
 | M3-Q017 | Is the stable documentation toolchain's four-item development-only advisory exception acceptable until VitePress publishes a supported patched line? | Keep documentation out of the deployed runtime, require a zero-finding production audit, and do not force an unsupported Vite or VitePress alpha override. |
@@ -58,3 +58,4 @@ The Zotero importer retains the reviewed source decisions already recorded in `s
 The exact ingestion totals, exclusions, dependency-audit results, public review links, workflow evidence, and remaining debt are recorded in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
 Questions M3-Q011, M3-Q013, and M3-Q014 are resolved above.
 All other M3 questions remain open for human review; none is silently resolved by the preview implementation.
+M3-Q012 is resolved by the HR-004 decision in the consolidated queue.

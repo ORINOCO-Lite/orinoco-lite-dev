@@ -134,24 +134,36 @@ Until then, do not publish to a general package index, invite third-party reuse,
 
 ### HR-004 — Dispose of the legacy engineering Pages preview
 
-**Status:** open
+**Status:** accepted
 
 **Question:** After Milestone 4 review, should the historical `codex/milestone-3` engineering preview be retired, retained as frozen evidence, or kept as an actively supported review surface?
 
 **Current behavior:** The ordinary test consumer is the supported downstream preview.
 M4 prevents the legacy Pages workflow from running on PR 5, but that does not itself decide the older review surface's lifecycle.
 
-**Recommended default:** Retain the branch and deployment history as immutable evidence, remove or disable any continuing deployment trigger, and point users to the test consumer.
+**Decision:** Retain the branch and deployment history as immutable evidence, remove or disable automatic push and pull-request deployment triggers, and provide an explicitly dispatched engineering preview for candidate builds.
+The preview is an ephemeral artifact or manually served build; it is not a downstream update, does not commit generated consumer state, and does not deploy the real site.
+Point supported integration and publication review to the downstream consumer and its framework-update pull requests.
 Do not delete preservation refs.
+
+The engineering preview may use a separate, engineering-owned **production-shaped corpus**: a small frozen corpus derived from real-world content structures, bound to an exact source commit and digest, with provenance and any required rights or de-identification recorded.
+It is not a content selection policy, a replacement for the complete downstream snapshot, or a dependency on the real site or current test consumer.
+
+Engineering validation therefore has three content layers:
+
+- a synthetic fixture for exhaustive pathological and negative cases on every pull request;
+- the production-shaped corpus for messy real-world structures and representative rendering on pull requests or a scheduled engineering run; and
+- the complete downstream consumer for release-candidate, update, browser, rollback, and publication-boundary evidence.
 
 **Evidence:** M3-Q012 in [`milestone-3-decisions.md`](milestone-3-decisions.md) and M4-I010 in [`milestone-4-decisions.md`](milestone-4-decisions.md).
 
 **Resolution:**
 
-- Outcome:
-- Retained URL/ref:
-- Trigger cleanup, if any:
-- Decided by / date:
+- Outcome: accepted with an opt-in engineering preview and a separate production-shaped corpus.
+- Retained URL/ref: historical Milestone 3 branch and artifacts remain frozen evidence; the supported public integration preview remains the downstream consumer.
+- Trigger cleanup, if any: disable automatic legacy preview deployment; expose only an explicit candidate-preview dispatch.
+- Corpus boundary: engineering-owned, immutable, provenance-bound, and rights-reviewed; never coupled to the real site or current consumer.
+- Decided by / date: John Lee / 2026-08-13
 
 ## P1 — before production graduation
 
