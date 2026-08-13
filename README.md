@@ -1,47 +1,140 @@
-# Orinoco Lite development
+# Orinoco Lite engineering workspace
 
-This repository is the development and integration workspace for Orinoco Lite.
-It tracks upstream Orinoco components, records architectural decisions, and
-coordinates development of a GitHub-native lab website workflow.
+Orinoco Lite turns reviewed, schema-backed records and editorial inputs into a deterministic static website with a credential-free review-bundle editor.
+This repository is the **engineering and release layer**: it integrates pinned upstream components, publishes the `orinoco-lite` engine and runtime, and owns the cross-repository acceptance evidence.
 
-Lab websites do not build or deploy from this repository. The first
-implementation will live on the `orinoco-lite` branch of the existing
-[`centerforopenneuroscience.org`](https://github.com/con/centerforopenneuroscience.org)
-repository. That branch continues the established CON history while selectively
-adopting useful scaffolding from upstream
-[`www-from-model`](https://hub.psychoinformatics.de/www/www-from-model).
+The supported website experience is deliberately simpler than this workspace.
+A downstream site is one ordinary Git repository with no submodules, no gitlinks, and no need to understand the component history retained here.
 
-[`con/www-from-model`](https://github.com/con/www-from-model) remains a clean
-GitHub mirror and integration reference for that upstream history.
-
-## Start here
-
-The canonical implementation and handoff document is
-[`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md).
-
-The next milestone is a small, connected CON website preview built on the
-`orinoco-lite` branch of `centerforopenneuroscience.org`. It will combine
-reviewed metadata migrated from `dump-research-info` with selected content,
-assets, and visual identity preserved from the legacy website.
+## Architecture
 
 ```mermaid
-flowchart LR
-    U["Upstream Orinoco repositories"] --> D["orinoco-lite-dev"]
-    W["Upstream www-from-model"] --> M["con/www-from-model mirror"]
-    M -. "selected code and fixes" .-> I["centerforopenneuroscience.org orinoco-lite branch"]
-    C["Legacy CON branch, tag, content, and assets"] --> I
-    R["Reviewed CON research metadata"] --> I
-    I --> A["GitHub Actions build"]
-    A --> P["GitHub Pages preview"]
-    I --> F["Future reusable action and lab template"]
+flowchart TB
+    subgraph engineering["Engineering and release — con/orinoco-lite-dev"]
+        components["Pinned component sources<br/>and compatibility fixtures"]
+        engine["orinoco-lite wheel<br/>CLI and integrity boundary"]
+        runtime["Checksummed runtime<br/>schema, renderer, editor"]
+        workflow["SHA-pinned reusable CI"]
+        components --> engine
+        components --> runtime
+    end
+
+    subgraph distribution["Distribution — con/orinoco-lite-template"]
+        copier["Versioned Copier source<br/>framework ownership + updater"]
+        snapshot["Generated GitHub-template tree"]
+        copier -->|mechanical render| snapshot
+    end
+
+    subgraph downstream["Downstream site — one ordinary Git repository"]
+        facade["Template-owned facade<br/>Pixi tasks, workflows, update tools"]
+        content["Site-owned inputs<br/>metadata, editorial, assets, policy"]
+        pipeline["validate → project → build → audit"]
+        output["Static site + editor + project Pages"]
+        update["Reviewable framework-update PR"]
+        facade --> pipeline
+        content --> pipeline
+        pipeline --> output
+        facade --> update
+        update -.->|must preserve| content
+    end
+
+    engine -->|immutable URL + digest| copier
+    runtime -->|immutable URL + digest| copier
+    workflow -->|full commit SHA| copier
+    workflow -->|runs the locked consumer facade| pipeline
+    copier -->|Copier create or update| facade
+    snapshot -->|GitHub template create| facade
 ```
 
-## Core constraints
+The arrows express release and update direction, not repository nesting.
+The engineering workspace may remain multi-repository; the template and every supported consumer are independently usable repositories.
 
-- Canonical metadata is stored as human-editable YAML in Git.
-- Pull requests are the review and publication boundary.
-- Dump Things may run ephemerally during CI, but no persistent metadata server
-  is required for a deployed lab website.
-- Generated pages and projections are build artifacts, not canonical records.
-- CON-specific content remains downstream; narrow reusable improvements may be
-  contributed upstream.
+## Repository map
+
+| Layer | Repository | Owns | Start here |
+| --- | --- | --- | --- |
+| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-4.md`](docs/milestone-4.md) and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Distribution | [`con/orinoco-lite-template`](https://github.com/con/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/con/orinoco-lite-template#readme) |
+| Integration consumer | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and end-to-end tests | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
+
+The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
+It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.
+
+## Review now
+
+The current human-review entry point is [`docs/human-review-decisions.md`](docs/human-review-decisions.md).
+It prioritizes every open human choice, separates those choices from mechanical implementation follow-ups, and links back to the detailed milestone evidence.
+
+Supporting records are:
+
+- [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) for exact releases, test results, hosted runs, parity counts, and remaining gates;
+- [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for accepted Milestone 4 architecture decisions;
+- [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
+- [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the implementation diff under review.
+
+## Stable downstream interface
+
+Normal site maintainers should use the commands exposed by their checked template release, not commands from this engineering workspace:
+
+```console
+pixi install --frozen
+pixi run validate
+pixi run build
+pixi run serve
+pixi run test-all
+pixi run update-check
+```
+
+The consumer's `orinoco.lock` is the release authority.
+It binds the engine wheel, runtime archive, and reusable workflow to immutable coordinates and digests.
+The template owns update mechanics; the site owns its content and declared extension surfaces.
+Framework updates stop at a pull request and never merge themselves.
+
+## Working in this repository
+
+Package-focused work is the normal starting point for Milestone 4 engine changes and does not initialize the legacy site stack:
+
+```console
+pixi install --locked
+PYTHONPATH=packages/orinoco-lite/src \
+  python -m unittest discover -s packages/orinoco-lite/tests -v
+```
+
+The broader historical and integration suites require every recursive gitlink, including preservation and real-site evidence.
+Run that full checkout only when the task explicitly needs and authorizes that scope; it is not part of the normal Milestone 4 package workflow:
+
+```console
+pixi run checkout-submodules
+pixi run test
+```
+
+Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
+That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.
+Do not reproduce that release boundary with an ad hoc local archive.
+
+## Ownership and safety boundaries
+
+- Original Orinoco Lite software is MIT licensed; original documentation is CC BY 4.0, factual metadata is CC0 1.0, and media remains item-specific.
+See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
+- Reviewed YAML is the canonical metadata source.
+Generated projection files remain committed so stale output, review, and rollback are explicit.
+- Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
+- The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
+See [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md).
+- Credentials, stores, hydrated caches, browser downloads, and build output are local ignored state.
+- The real-site repository, its refs, settings, Pages configuration, DNS, and production domain remain outside this milestone.
+
+## Historical evidence
+
+Milestones 1–3 explain how the accepted content and behavior were derived.
+They are preserved as evidence, not as current operating instructions:
+
+- [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
+- [`docs/clean-migration.md`](docs/clean-migration.md)
+- [`docs/full-con-migration.md`](docs/full-con-migration.md)
+- [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
+- [`docs/milestone-3.md`](docs/milestone-3.md)
+- [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
+
+Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
+Current work follows Milestone 4 and the versioned template.

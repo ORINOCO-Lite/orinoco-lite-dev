@@ -1,0 +1,185 @@
+name: Orinoco release artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version matching release/runtime-source*.yaml
+        required: true
+        type: string
+      source-spec:
+        description: Reviewed runtime source specification
+        required: true
+        default: release/runtime-source.yaml
+        type: string
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  release-artifacts:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Initialize only release-authorized components
+        shell: bash
+        run: |
+          git submodule sync -- \
+            submodules/pool.psychoinformatics.de-ui \
+            submodules/things-schemas
+          git submodule update --init --depth 1 -- \
+            submodules/pool.psychoinformatics.de-ui \
+            submodules/things-schemas
+          git -C submodules/pool.psychoinformatics.de-ui submodule update \
+            --init --depth 1 -- shacl-vue
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12.13"
+
+      - name: Install exact Node and npm toolchain
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22.23.2"
+
+      - name: Verify exact release toolchain
+        shell: bash
+        run: |
+          npm install --global npm@10.9.4
+          test "$(python --version)" = "Python 3.12.13"
+          test "$(node --version)" = "v22.23.2"
+          test "$(npm --version)" = "10.9.4"
+
+      - name: Build package artifacts
+        env:
+          SOURCE_DATE_EPOCH: "0"
+        run: |
+          python -m pip install --disable-pip-version-check \
+            build==1.3.0 PyYAML==6.0.2
+          find release/dist release/dist-repeat -mindepth 1 -delete 2>/dev/null || true
+          mkdir -p release/dist release/dist-repeat
+          python -m build packages/orinoco-lite --outdir release/dist
+          python -m build packages/orinoco-lite --outdir release/dist-repeat
+          PYTHONPATH=packages/orinoco-lite/src python -m orinoco_lite.release_package \
+            release/dist/orinoco_lite-*.tar.gz
+          PYTHONPATH=packages/orinoco-lite/src python -m orinoco_lite.release_package \
+            release/dist-repeat/orinoco_lite-*.tar.gz
+          cmp release/dist/orinoco_lite-*.whl \
+            release/dist-repeat/orinoco_lite-*.whl
+          cmp release/dist/orinoco_lite-*.tar.gz \
+            release/dist-repeat/orinoco_lite-*.tar.gz
+
+      - name: Assemble deterministic runtime archive
+        shell: bash
+        env:
+          INPUT_SPEC: ${{ inputs['source-spec'] }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          version="$INPUT_VERSION"
+          spec="$INPUT_SPEC"
+          if [ -z "$version" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [ -z "$spec" ]; then
+            if [ "$version" = "0.1.0" ]; then
+              spec="release/runtime-source.yaml"
+            elif [ -f "release/runtime-source-v$version.yaml" ]; then
+              spec="release/runtime-source-v$version.yaml"
+            else
+              echo "No reviewed runtime source spec for $version" >&2
+              exit 2
+            fi
+          fi
+          SPEC="$spec" VERSION="$version" python - <<'PY'
+          import os, pathlib, tomllib, yaml
+          value = yaml.safe_load(pathlib.Path(os.environ["SPEC"]).read_text())
+          if str(value.get("release")) != os.environ["VERSION"]:
+              raise SystemExit("runtime spec release does not match requested version")
+          package = tomllib.loads(pathlib.Path("packages/orinoco-lite/pyproject.toml").read_text())
+          if str(package["project"]["version"]) != os.environ["VERSION"]:
+              raise SystemExit("package version does not match requested version")
+          PY
+          editor_source="$(mktemp -d)"
+          cp -R submodules/pool.psychoinformatics.de-ui/. "$editor_source/"
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite.release_editor \
+            --pool-ui "$editor_source" \
+            --overlay release/editor-v2 \
+            --shell build/runtime-editor-shell \
+            --licenses build/runtime-editor-licenses
+          find build/runtime-schema -mindepth 1 -delete 2>/dev/null || true
+          mkdir -p build/runtime-schema
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite.release_schema \
+            --source-root submodules/things-schemas/src \
+            --entry submodules/things-schemas/src/demo-research-information/unreleased.yaml \
+            --destination build/runtime-schema
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite release assemble \
+            --spec "$spec" \
+            --source-commit "$GITHUB_SHA" \
+            --output "release/dist/orinoco-runtime-$version.tar.gz"
+          mv build/runtime-editor-shell build/runtime-editor-shell-first
+          mv build/runtime-editor-licenses build/runtime-editor-licenses-first
+          editor_source_repeat="$(mktemp -d)"
+          cp -R submodules/pool.psychoinformatics.de-ui/. "$editor_source_repeat/"
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite.release_editor \
+            --pool-ui "$editor_source_repeat" \
+            --overlay release/editor-v2 \
+            --shell build/runtime-editor-shell \
+            --licenses build/runtime-editor-licenses
+          diff -qr build/runtime-editor-shell-first build/runtime-editor-shell
+          diff -qr build/runtime-editor-licenses-first build/runtime-editor-licenses
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite release assemble \
+            --spec "$spec" \
+            --source-commit "$GITHUB_SHA" \
+            --output "release/dist-repeat/orinoco-runtime-$version.tar.gz"
+          cmp "release/dist/orinoco-runtime-$version.tar.gz" \
+            "release/dist-repeat/orinoco-runtime-$version.tar.gz"
+          (
+            cd release/dist
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' \
+              | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+      - name: Attest the release artifact checksums
+        id: attestation
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        with:
+          subject-checksums: release/dist/SHA256SUMS
+
+      - name: Include the provenance bundle in the release set
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.attestation.outputs.bundle-path }}
+        run: cp "$ATTESTATION_BUNDLE" release/dist/orinoco-provenance-bundle.jsonl
+
+      - name: Verify the installed wheel and hermetic package contracts
+        run: |
+          echo "Full 199-record parity is consumer-owned and may report an intentional skip here."
+          python -m venv build/release-test
+          build/release-test/bin/pip install --disable-pip-version-check \
+            release/dist/orinoco_lite-*.whl
+          build/release-test/bin/python -c \
+            'import orinoco_lite,sys; assert str(orinoco_lite.__file__).startswith(sys.prefix)'
+          build/release-test/bin/python -m unittest discover \
+            -s packages/orinoco-lite/tests -v 2>&1 | tee build/release-tests.log
+
+      - name: Upload immutable release candidates
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: orinoco-lite-release-candidate
+          path: release/dist
+          if-no-files-found: error
+          retention-days: 14

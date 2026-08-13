@@ -1,0 +1,75 @@
+[workspace]
+name = "orinoco-full-con-migration"
+channels = ["conda-forge"]
+platforms = [{ platform = "osx-arm64", macos = "14.0" }, "linux-64"]
+
+[dependencies]
+python = ">=3.12,<3.13"
+hugo = "==0.154.5"
+nodejs = ">=22,<23"
+
+[target.linux-64.dependencies]
+git-annex = "==10.20260601"
+
+[target.osx-arm64-macos-14-0.pypi-dependencies]
+git-annex = "==10.20260601"
+
+[tasks]
+checkout-submodules = "python3 tools/checkout_submodules.py"
+build = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py" }
+verify-static = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --repeat-destination build/con-site-repeat" }
+build-con-project-path = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --destination build/con-site-project --base-url http://127.0.0.1:8767/full-con-migration/" }
+serve = { depends-on = ["build", "prepare-local-stack"], cmd = "tools/serve_local_stack.sh" }
+serve-static = { depends-on = ["build"], cmd = "python3 -m http.server 8767 --directory build/con-site" }
+render-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py render" }
+update-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py update" }
+verify-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py verify" }
+check-con-projection = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_projection.py check-snapshot" }
+update-con-assembly = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --update-assembly-manifest" }
+verify-con-assembly = { depends-on = ["checkout-submodules"], cmd = "python3 tools/build_con_site.py --check-assembly-manifest" }
+hydrate-con-assets = { depends-on = ["checkout-submodules"], cmd = "python3 tools/con_assets.py" }
+build-upstream = { depends-on = ["checkout-submodules"], cmd = "tools/build_upstream_site.sh", env = { BASE_URL = "http://127.0.0.1:8768/", DESTINATION = "build/upstream-local", SHACL_VUE_URL = "http://127.0.0.1:3000/" } }
+serve-upstream = { depends-on = ["build-upstream"], cmd = "python3 -m http.server 8768 --directory build/upstream-local" }
+build-pages-editor = { depends-on = ["build-pool-ui"], cmd = "python3 tools/build_pages_editor.py" }
+build-pages = { depends-on = ["checkout-submodules", "build-pages-editor"], cmd = "python3 tools/build_con_pages.py --require-editor" }
+verify-pages-editor = { depends-on = ["install-pool-ui"], cmd = "python3 tools/build_pages_editor.py --repeat-destination build/pages-editor-repeat" }
+verify-pages = { depends-on = ["checkout-submodules", "verify-pages-editor"], cmd = "python3 tools/build_con_pages.py --require-editor --repeat-destination build/pages-preview-repeat/orinoco-lite-dev" }
+serve-pages = { depends-on = ["build-pages"], cmd = "python3 -m http.server 8766 --directory build/pages-preview" }
+audit-pages = { cmd = "python3 tools/build_con_pages.py --require-editor --check-only" }
+test-pages = "python3 -m unittest tests.test_con_pages tests.test_pages_editor"
+review-editor-bundle = "python3 tools/apply_editor_bundle.py"
+prepare-local-stack = { depends-on = ["checkout-submodules", "build-pool-ui"], cmd = "python3 tools/prepare_local_stack.py" }
+serve-dump-things = { depends-on = ["prepare-local-stack"], cmd = "tools/serve_local_dumpthings.sh" }
+serve-git-annex = { depends-on = ["prepare-local-stack"], cmd = "python3 tools/serve_local_gitannex.py" }
+seed-local-pool = { depends-on = ["prepare-local-stack"], cmd = "python3 tools/seed_local_pool.py" }
+refresh-local-pool = { depends-on = ["checkout-submodules", "build-pool-ui"], cmd = "REFRESH_UPSTREAM_POOL=1 python3 tools/prepare_local_stack.py" }
+install-pool-ui = { depends-on = ["checkout-submodules"], cmd = "npm --prefix submodules/pool.psychoinformatics.de-ui/shacl-vue ci" }
+build-pool-ui = { depends-on = ["install-pool-ui"], cmd = "make -C submodules/pool.psychoinformatics.de-ui build-ui" }
+serve-shacl-vue = { depends-on = ["prepare-local-stack"], cmd = "python3 -m http.server 3000 --directory build/local-stack/ui" }
+check-local-stack = { cmd = "python3 tools/check_local_stack.py" }
+format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
+install-hooks = { cmd = "git config core.hooksPath .githooks" }
+check-format = { cmd = "pre-commit run --all-files" }
+test = "python3 -m unittest discover -s tests -p 'test_*.py'"
+install-browser-tests = { cmd = "npm ci && npx playwright install chromium webkit", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+install-pages-browser-tests = { cmd = "npm ci && npx playwright install chromium", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+test-pages-browser = { depends-on = ["verify-pages", "install-pages-browser-tests"], cmd = "npx playwright test tests/browser/static-editor.spec.mjs --project=chromium", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers", PLAYWRIGHT_STATIC_ONLY = "1" } }
+test-browser = { depends-on = ["build", "build-upstream", "build-con-project-path", "build-pages", "prepare-local-stack", "install-browser-tests"], cmd = "npm run test:browser", env = { PLAYWRIGHT_BROWSERS_PATH = "build/playwright-browsers" } }
+test-all = { depends-on = ["test", "verify-con-projection", "verify-con-assembly", "verify-static", "test-browser"] }
+
+[pypi-dependencies]
+snapper-fmt = "==0.8.1"
+pre-commit = "==4.3.0"
+dump-things-service = { path = "submodules/dump-things-service" }
+dump-things-pyclient = { path = "submodules/dump-things-pyclient" }
+query-things = { path = "submodules/query-things" }
+jinja2 = "==3.1.6"
+packaging = "==26.3"
+pyyaml = "==6.0.2"
+linkml = "==1.11.1"
+linkml-runtime = "==1.11.1"
+pydantic = "==2.13.4"
+rdflib = "==7.6.0"
+
+[pypi-options.dependency-overrides]
+dump-things-pyclient = { path = "submodules/dump-things-pyclient" }

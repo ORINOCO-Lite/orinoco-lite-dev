@@ -1,0 +1,85 @@
+name: Orinoco consumer CI
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: "Consumer facade task: validate, build, or test-all"
+        type: string
+        required: false
+        default: test-all
+      runner:
+        description: GitHub-hosted runner label
+        type: string
+        required: false
+        default: ubuntu-24.04
+      artifact-name:
+        description: Optional name of an artifact to upload after the task
+        type: string
+        required: false
+        default: ""
+      artifact-path:
+        description: Consumer-relative artifact path
+        type: string
+        required: false
+        default: build/site
+      pixi-version:
+        description: Exact Pixi release used to run the locked consumer
+        type: string
+        required: false
+        default: v0.73.0
+
+permissions:
+  contents: read
+
+jobs:
+  consumer:
+    name: ${{ inputs.command }} (${{ inputs.runner }})
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Validate reusable-workflow inputs
+        shell: bash
+        env:
+          ORINOCO_COMMAND: ${{ inputs.command }}
+          ORINOCO_ARTIFACT_PATH: ${{ inputs['artifact-path'] }}
+        run: |
+          case "$ORINOCO_COMMAND" in
+            validate|build|test-all) ;;
+            *)
+              echo "command must be validate, build, or test-all" >&2
+              exit 2
+              ;;
+          esac
+          case "$ORINOCO_ARTIFACT_PATH" in
+            /*|*..*|*\\*)
+              echo "artifact-path must be a safe repository-relative path" >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Check out the ordinary consumer repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install locked Pixi
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347
+        with:
+          pixi-version: ${{ inputs['pixi-version'] }}
+          cache: true
+          frozen: true
+
+      - name: Run the consumer facade
+        shell: bash
+        env:
+          ORINOCO_COMMAND: ${{ inputs.command }}
+        run: pixi run "$ORINOCO_COMMAND"
+
+      - name: Upload the requested consumer artifact
+        if: ${{ inputs['artifact-name'] != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ inputs['artifact-name'] }}
+          path: ${{ inputs['artifact-path'] }}
+          if-no-files-found: error
+          retention-days: 14

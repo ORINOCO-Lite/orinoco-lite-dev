@@ -1,0 +1,30 @@
+diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
+--- a/src/components/SubmitComp.vue
++++ b/src/components/SubmitComp.vue
+@@ -18,0 +19 @@
++                                :aria-label="accessibleRecordSubmissionLabel(r)"
+@@ -139 +140 @@
+-import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
++import { buildReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
+@@ -174,0 +176,21 @@
++
++function accessibleRecordSubmissionLabel(record) {
++    const classLabel = getDisplayName(
++        record.nodeshape_iri,
++        configVarsMain,
++        allPrefixes,
++        shapesDS.data.nodeShapes[record.nodeshape_iri]
++    );
++    const recordLabel = getRecordDisplayLabel(
++        namedNode(record.node_iri),
++        rdfDS,
++        allPrefixes,
++        configVarsMain
++    );
++    return recordSubmissionLabel({
++        classLabel,
++        prefixes: allPrefixes,
++        recordIri: record.node_iri,
++        recordLabel,
++    });
++}

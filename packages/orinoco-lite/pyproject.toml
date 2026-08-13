@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orinoco-lite"
+version = "0.1.10"
+description = "Location-independent build and release interface for Orinoco Lite sites"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Center for Open Neuroscience" }]
+dependencies = [
+  "dump-things-service==6.3.6",
+  "Jinja2==3.1.6",
+  "linkml==1.11.1",
+  "linkml-runtime==1.11.1",
+  "packaging==26.3",
+  "pydantic==2.13.4",
+  "PyYAML==6.0.2",
+  "rdflib==7.6.0",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+orinoco = "orinoco_lite.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

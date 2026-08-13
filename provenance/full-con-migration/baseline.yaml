@@ -1,0 +1,34 @@
+captured: 2026-08-11
+timezone: America/New_York
+
+accepted_checkpoint:
+  parent_branch: codex/clean-migration
+  parent_commit: f54cf5fdb2b5ae4bf03fe6939246316fd9ec818d
+  site_branch: codex/clean-migration
+  site_commit: a122e506de9e4a13473edbe8d74a950d74032a16
+
+successor:
+  parent_branch: codex/full-con-migration
+  site_branch: codex/full-con-migration
+
+upstream:
+  repository: https://hub.psychoinformatics.de/www/www-from-model.git
+  previous_base: 5b401e0c478a4409442b3a8a285bd3efd5d30e05
+  reviewed_base: a9ac9d5abc3898fd13d9b8392008f0c323c8dcd8
+  review: >-
+    The range contains one CI-only deposit-changes workflow update and no
+    presentation-tree change.
+
+toolchain:
+  git_annex: "10.20260601"
+  osx_arm64_source: pypi-wheel
+  osx_minimum: "14.0"
+  linux_64_source: conda-forge
+
+migration_evidence:
+  legacy_site:
+    repository: https://github.com/con/centerforopenneuroscience.org.git
+    commit: e6e9200a0987a65097afff896105ff838be1659e
+  dump_research_info:
+    repository: https://github.com/con/dump-research-info.git
+    commit: 1c7e99ec6f296d5e6cb6a61e3b786227190802da
