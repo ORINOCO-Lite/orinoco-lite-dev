@@ -81,3 +81,8 @@ Historical scripts may leave the active task surface only when all of the follow
 4. the replacement is exercised from a clean recorded checkout.
 
 Under that rule the old CON-coupled root environment can remain historical, while the static and full upstream modes stay supported engineering tools.
+
+## Next engineering goal
+
+The accepted [`metadata source-adapter goal`](metadata-source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
+Its first downstream proof uses Zotero; a common plugin host becomes a template candidate only after at least two independent adapters and a real metadata review pull request establish a stable contract.
