@@ -92,21 +92,76 @@ Framework updates stop at a pull request and never merge themselves.
 
 ## Working in this repository
 
-Package-focused work is the normal starting point for Milestone 4 engine changes and does not initialize the legacy site stack:
+Pixi 0.76 or newer is required.
+The root environment is deliberately package-focused and contains no local dependency on a submodule, so it can install before any component checkout:
 
 ```console
 pixi install --locked
-PYTHONPATH=packages/orinoco-lite/src \
-  python -m unittest discover -s packages/orinoco-lite/tests -v
+pixi run test
 ```
 
-The broader historical and integration suites require every recursive gitlink, including preservation and real-site evidence.
-Run that full checkout only when the task explicitly needs and authorizes that scope; it is not part of the normal Milestone 4 package workflow:
+Submodules remain the source-level dependency and compatibility-fixture pins for engineering integration.
+`checkout-submodules` is the explicit full recursive setup command: it synchronizes URLs, initializes every gitlink recorded by the current parent commit, restores exact detached commits, unshallows development history, and verifies the result.
+Use it when broad cross-component work needs the complete source graph:
 
 ```console
 pixi run checkout-submodules
-pixi run test
 ```
+
+Named upstream tasks initialize only their own required gitlinks and expose two checkout policies:
+
+| Scope | Recorded pins | Current candidate worktrees |
+| --- | --- | --- |
+| Static reference site | `build-upstream-static`, `serve-upstream-static` | `build-upstream-static-worktree`, `serve-upstream-static-worktree` |
+| Full service-backed stack | `check-upstream`, `serve-upstream` | `check-upstream-worktree`, `serve-upstream-worktree` |
+
+Recorded tasks refuse modified component worktrees, initialize missing submodules recursively, and restore the exact commits in the parent tree.
+They are the known-code reproduction path.
+Worktree tasks initialize only missing repositories and preserve every current component commit plus tracked and untracked candidate change.
+They are the iterative upstream-integration path.
+
+The static commands build only `www-from-model`, its nested Congo theme, and their annexed presentation assets:
+
+```console
+pixi run serve-upstream-static
+```
+
+Its executable, Hugo, and git-annex dependencies are declared in [`tools/upstream_static.py`](tools/upstream_static.py) and resolved from the adjacent lock, independently of the root environment.
+Use `build-upstream-static` for the same deterministic build without starting the HTTP server.
+The full commands add the pool UI, SHACL Vue, Things Schema, and Dump Things service in a second locked inline environment.
+`check-upstream` starts the services, seeds and checks both isolated collections, proves the editor write boundary, checks the static site, and stops; `serve-upstream` leaves that checked deployment running at `http://127.0.0.1:8768/`.
+
+The recorded full-stack task pins every source repository and tool, but its public pool input is not yet an immutable release artifact.
+A fresh checkout fetches the current public `Thing` collection; a prepared checkout reuses its digest-checked ignored cache.
+The historical Milestone 3 capture contained 4,978 records and the 2026-08-14 verification contained 4,979.
+Therefore the static recorded build is byte-reproducible, while the full recorded task currently proves the recorded software stack against an identified pool snapshot rather than recreating one permanent data snapshot.
+
+Compare that prepared cache with the current live public pool without replacing it:
+
+```console
+pixi run diff-upstream-pool
+```
+
+The task compares semantic JSON records by PID, prints added, removed, and changed records with their changed field paths, and writes the complete ignored report to `build/upstream-stack/pool/live-diff.json`.
+Differences are informational because the public pool is live.
+Run `pixi run diff-upstream-pool -- --check` when a nonzero exit on any difference is explicitly required.
+
+To advance upstream dependencies safely:
+
+1. create a review branch and initialize the required repositories;
+2. check out proposed component commits and make any cross-repository edits;
+3. use the corresponding `*-worktree` build or check throughout development;
+4. use `diff-upstream-pool` to separate public data drift from software-stack effects;
+5. commit component changes, then record the reviewed gitlinks in this parent repository;
+6. rerun the recorded commands from a clean checkout; and
+7. manually dispatch `Engineering environment` on the candidate parent ref for a hosted live `check-upstream`, then merge only the parent commit whose recorded tasks and CI establish the next known-good stack.
+
+This keeps checkout automation in the task without letting a validation command silently discard work in progress.
+The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
+The accepted post-Milestone goal in [`docs/metadata-source-adapters.md`](docs/metadata-source-adapters.md) defines how downstream-owned source adapters can produce semantic metadata-review evidence before any common host graduates into the template.
+
+The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
+They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
 That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.
@@ -135,6 +190,7 @@ They are preserved as evidence, not as current operating instructions:
 - [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
 - [`docs/milestone-3.md`](docs/milestone-3.md)
 - [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
+- [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md)
 
 Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
 Current work follows Milestone 4 and the versioned template.

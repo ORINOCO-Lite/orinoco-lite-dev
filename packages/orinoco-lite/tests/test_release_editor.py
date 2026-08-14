@@ -74,7 +74,12 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
         self.component = self.shacl / "src/components/SubmitComp.vue"
         self.patch = self.source_root / "release/editor-v2/SubmitComp.vue.patch"
 
+    def require_source_fixture(self) -> None:
+        if not self.component.is_file():
+            self.skipTest("pinned SHACL Vue source fixture is unavailable")
+
     def test_reviewed_patch_applies_and_binds_the_canonical_pid_helper(self) -> None:
+        self.require_source_fixture()
         with tempfile.TemporaryDirectory() as temporary:
             copied = Path(temporary) / "shacl-vue"
             target = copied / "src/components/SubmitComp.vue"

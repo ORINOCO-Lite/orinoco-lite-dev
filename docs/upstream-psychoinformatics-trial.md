@@ -104,15 +104,15 @@ The other Orinoco submodules are diagnostic or refresh inputs, not static runtim
 
 ## Local reproduction
 
-The repeatable entry point is:
+The current repeatable entry point is a locked standalone Pixi script:
 
 ```bash
-BASE_URL=http://127.0.0.1:1313/ \
-  tools/build_upstream_site.sh
-python3 -m http.server 1313 --directory build/upstream-psychoinformatics
+pixi run serve-upstream-static
 ```
 
-The script:
+It serves the result at `http://127.0.0.1:8768/`.
+`pixi run build-upstream-static` performs the same build without starting a server.
+The script's inline environment pins Python, Hugo, and git-annex independently of the root engineering environment, then the builder:
 
 1. checks out only the pinned upstream site and Congo theme;
 2. pins annex metadata at `010ca44f...`;
@@ -176,41 +176,49 @@ The upstream edit footer originally hard-codes `https://pool.psychoinformatics.d
 Pixi-controlled local builds set `SHACL_VUE_URL=http://127.0.0.1:3000/`; the generated-artifact adapter rewrites the 953 edit links while preserving each `sh:NodeShape`, `pid`, and `edit=true` query parameter.
 The production Pages workflow leaves the upstream URL as its default, so this local stack does not alter the static deployment.
 
-The editor is now deployed with the upstream service architecture locally.
-The one-command entry point is:
+The editor was also deployed with the upstream service architecture locally during the original trial.
+That capability now has a scoped locked entry point:
 
 ```bash
-pixi run serve
+pixi run serve-upstream
 ```
 
-Its Pixi dependencies perform the recursive checkout, upstream snapshot preparation, Hugo build, and pool UI build.
-The `serve_local_stack.sh` supervisor then starts Dump Things, seeds both local collections, starts the git-annex and SHACL Vue services, checks their contracts, and serves the generated site.
-All child logs are written below `build/local-stack/logs/`; Ctrl-C stops the complete stack.
-The individual service tasks below remain useful when debugging a single component, while `pixi run serve-static` serves only the generated Hugo output.
+It initializes the exact recorded site, theme, pool UI, SHACL Vue, Things Schema, and Dump Things gitlinks; resolves their tools in `tools/upstream_full.py` rather than the root environment; builds and checks the site and UI; seeds isolated `public` and `protected` collections; proves the editor write boundary; and serves the result at `http://127.0.0.1:8768/`.
+`check-upstream` runs the same finite acceptance and stops all child processes.
 
-The underlying tasks are:
+Both static and full scopes also expose `*-worktree` tasks.
+Recorded tasks reject modified submodules and restore the commits in the parent tree.
+Worktree tasks initialize missing repositories but preserve current commits, tracked edits, and untracked files, allowing coordinated upstream changes to be tested before their gitlinks are recorded.
+See [`../README.md`](../README.md) for the task matrix and update workflow.
 
-1. `pixi run prepare-local-stack` downloads the public `Thing` collection from the upstream pool API into ignored `build/local-stack` state.
-The measured snapshot contains 4,978 records.
-`pixi run refresh-local-pool` explicitly refreshes that snapshot.
-2. `pixi run serve-dump-things` runs the pinned Dump Things service (`9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`) against a generated local configuration and the pinned Things Schemas YAML.
-`pixi run seed-local-pool` loads the snapshot into both local `public` and `protected` collections.
-3. `pixi run serve-git-annex` exposes an actual local git-annex repository at `http://127.0.0.1:8122/git-annex`, using the same p2p-over-HTTP path shape as the upstream uploader.
+The isolated supervisor writes generated configuration, credentials, stores, snapshots, and logs below ignored `build/upstream-stack/` state; Ctrl-C stops the complete stack.
+The supervisor:
+
+1. downloads or reuses a digest-checked public `Thing` snapshot below `build/upstream-stack`;
+2. runs pinned Dump Things service commit `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf` against generated configuration and the pinned source Things Schema;
+3. seeds the snapshot into both local `public` and `protected` collections;
+4. exposes a local git-annex repository at `http://127.0.0.1:8122/git-annex`, using the same p2p-over-HTTP path shape as the upstream uploader; and
+5. builds and serves the tracked pool UI and nested SHACL Vue source at port 3000.
+
+The measured historical snapshot contained 4,978 records.
+The current task found 4,979 records on 2026-08-14.
+After a full-stack preparation, `pixi run diff-upstream-pool` fetches the current public collection separately and compares it semantically with the digest-checked cache by PID.
+It leaves the cache untouched, prints a bounded added/removed/changed summary with changed JSON-pointer field paths, and writes the full ignored report to `build/upstream-stack/pool/live-diff.json`.
+The command succeeds when differences exist because live data drift is expected; the underlying script's explicit `--check` option is available when a strict equality gate is intended.
 Uploads are keyed and stored by git-annex; they are not written to a demo-data directory.
-4. `pixi run serve-shacl-vue` builds and serves the tracked `submodules/pool.psychoinformatics.de-ui` deployment branch at port 3000.
-Its nested SHACL Vue checkout is pinned to `d5790a4431f7773a2e29fbb0d26e542ed0311ec5`, where the compatibility fix is a normal submodule commit.
+The nested SHACL Vue checkout is pinned to `3be33196f0eb7a65817df78b88ea40ecbb5eca11`.
 The deployment branch tracks its local service configuration, generated schema assets, and local git-annex target as reviewable commits.
 
 The pool UI uses `use_service: true` and `use_token: true`, with read/write URLs pointing to the local Dump Things `public`/`protected` collections.
 Its `config_default_xyzri.yaml` keeps `data_url` empty so no bundled RDF records are mistaken for the source of truth; schema, shape, and prefix assets are served from the tracked deployment checkout.
 Direct local API calls use the same `/record` and `/records` route forms consumed upstream.
 
-Browser verification opened a generated dataset edit link, fetched the real record through local Dump Things, changed its title, and submitted it.
+The original browser verification opened a generated dataset edit link, fetched the real record through local Dump Things, changed its title, and submitted it.
 The protected incoming view contained the new title while protected curated and public remained at the old title, demonstrating the upstream curation boundary.
-`pixi run check-local-stack` checks these service, record, schema, and configuration contracts without requiring a browser.
+The current `check-upstream` task checks the same collection confinement at the API boundary, as well as exact seeded records, schema/UI configuration, and the generated static site.
 
-This is a faithful local deployment of the service interactions, with two explicit scope limits: the local protected collection is seeded from the public upstream snapshot rather than private records requiring credentials, and the local git-annex repository is a single-process development service, not a production Forgejo host.
-Neither limitation is hidden behind bundled demo data or a disabled backend; both are visible in the generated runtime configuration and Git history.
+This is a faithful local deployment of the service interactions, with three explicit scope limits: the local protected collection is seeded from the public upstream snapshot rather than private records requiring credentials; the local git-annex repository is a single-process development service, not a production Forgejo host; and a fresh checkout fetches the current public pool rather than an immutable archived snapshot.
+None is hidden behind bundled demo data or a disabled backend; the limits are visible in generated runtime state and this engineering record.
 
 ## Annex boundary and GitHub-only reproducibility
 

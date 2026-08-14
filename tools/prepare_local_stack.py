@@ -388,7 +388,7 @@ def main() -> int:
     print(f"Dump Things config: {SERVICE_CONFIG}")
     print(f"Editor token: {EDITOR_TOKEN}")
     print(f"Build-only seed token: {SEED_TOKEN}")
-    print(f"CON editor UI: {POOL_UI}")
+    print(f"Editor UI: {POOL_UI}")
     if removed:
         print(
             "Removed obsolete local collection stores: "
