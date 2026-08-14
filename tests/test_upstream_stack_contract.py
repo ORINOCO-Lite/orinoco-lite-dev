@@ -89,6 +89,10 @@ class UpstreamStackContractTests(unittest.TestCase):
             tasks["check-upstream-worktree"],
             "python tools/upstream_full_launcher.py check worktree",
         )
+        self.assertEqual(
+            tasks["diff-upstream-pool"],
+            "python tools/upstream_pool_diff.py",
+        )
         source = (ROOT / "tools" / "upstream_full.py").read_text()
         self.assertIn("[tool.pixi.pypi-dependencies]", source)
         self.assertIn(

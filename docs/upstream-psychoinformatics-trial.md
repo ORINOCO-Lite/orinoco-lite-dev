@@ -202,6 +202,9 @@ The supervisor:
 
 The measured historical snapshot contained 4,978 records.
 The current task found 4,979 records on 2026-08-14.
+After a full-stack preparation, `pixi run diff-upstream-pool` fetches the current public collection separately and compares it semantically with the digest-checked cache by PID.
+It leaves the cache untouched, prints a bounded added/removed/changed summary with changed JSON-pointer field paths, and writes the full ignored report to `build/upstream-stack/pool/live-diff.json`.
+The command succeeds when differences exist because live data drift is expected; the underlying script's explicit `--check` option is available when a strict equality gate is intended.
 Uploads are keyed and stored by git-annex; they are not written to a demo-data directory.
 The nested SHACL Vue checkout is pinned to `3be33196f0eb7a65817df78b88ea40ecbb5eca11`.
 The deployment branch tracks its local service configuration, generated schema assets, and local git-annex target as reviewable commits.

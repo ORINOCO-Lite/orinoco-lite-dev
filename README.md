@@ -136,14 +136,25 @@ A fresh checkout fetches the current public `Thing` collection; a prepared check
 The historical Milestone 3 capture contained 4,978 records and the 2026-08-14 verification contained 4,979.
 Therefore the static recorded build is byte-reproducible, while the full recorded task currently proves the recorded software stack against an identified pool snapshot rather than recreating one permanent data snapshot.
 
+Compare that prepared cache with the current live public pool without replacing it:
+
+```console
+pixi run diff-upstream-pool
+```
+
+The task compares semantic JSON records by PID, prints added, removed, and changed records with their changed field paths, and writes the complete ignored report to `build/upstream-stack/pool/live-diff.json`.
+Differences are informational because the public pool is live.
+Run `pixi run diff-upstream-pool -- --check` when a nonzero exit on any difference is explicitly required.
+
 To advance upstream dependencies safely:
 
 1. create a review branch and initialize the required repositories;
 2. check out proposed component commits and make any cross-repository edits;
 3. use the corresponding `*-worktree` build or check throughout development;
-4. commit component changes, then record the reviewed gitlinks in this parent repository;
-5. rerun the recorded commands from a clean checkout; and
-6. manually dispatch `Engineering environment` on the candidate parent ref for a hosted live `check-upstream`, then merge only the parent commit whose recorded tasks and CI establish the next known-good stack.
+4. use `diff-upstream-pool` to separate public data drift from software-stack effects;
+5. commit component changes, then record the reviewed gitlinks in this parent repository;
+6. rerun the recorded commands from a clean checkout; and
+7. manually dispatch `Engineering environment` on the candidate parent ref for a hosted live `check-upstream`, then merge only the parent commit whose recorded tasks and CI establish the next known-good stack.
 
 This keeps checkout automation in the task without letting a validation command silently discard work in progress.
 The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.

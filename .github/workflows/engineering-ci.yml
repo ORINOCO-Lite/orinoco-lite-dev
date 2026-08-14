@@ -51,7 +51,7 @@ jobs:
       - name: Rebuild without moving the initialized upstream worktrees
         run: pixi run build-upstream-static-worktree
 
-      - name: Run the isolated optional full-stack contracts
+      - name: Run the isolated service-stack contracts
         run: pixi run test-upstream-full
 
   live-upstream:

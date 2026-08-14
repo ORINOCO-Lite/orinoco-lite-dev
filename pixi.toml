@@ -9,7 +9,7 @@ python = ">=3.12,<3.13"
 
 [tasks]
 test-engine = "python -m unittest discover -s packages/orinoco-lite/tests -v"
-test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_restore_annex_status tests.test_upstream_stack_contract tests.test_adapt_upstream_pages -v"
+test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_restore_annex_status tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_adapt_upstream_pages -v"
 test = { depends-on = ["test-engine", "test-development"] }
 checkout-submodules = "python tools/checkout_submodules.py"
 build-upstream-static = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build'
@@ -21,6 +21,7 @@ serve-upstream-worktree = "python tools/upstream_full_launcher.py serve worktree
 check-upstream = "python tools/upstream_full_launcher.py check recorded"
 check-upstream-worktree = "python tools/upstream_full_launcher.py check worktree"
 test-upstream-full = "python tools/upstream_full_launcher.py test recorded"
+diff-upstream-pool = "python tools/upstream_pool_diff.py"
 format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
 install-hooks = { cmd = "git config core.hooksPath .githooks" }
 check-format = { cmd = "pre-commit run --all-files" }

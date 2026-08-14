@@ -8,9 +8,9 @@ It is an audit of carried behavior, not a replacement for the historical evidenc
 Most Milestone 1–3 achievements are present in Milestone 4 at the correct abstraction layer.
 The complete accepted content and supported static-site behavior moved into an ordinary downstream repository, while the reusable implementation moved into the engine, runtime, template, and locked consumer facade.
 
-The audit did find one active gap: the optional service-backed upstream stack was described as engine-retained evidence, but its 19 direct contract assertions were no longer exercised from `main`.
+The audit did find one active gap: the service-backed upstream stack is a required engineering integration capability, but its 19 direct contract assertions were no longer exercised from `main`.
 The scoped upstream tasks restore those 14 service tests and five integration-contract successors in an isolated environment.
-This closes the execution gap without making a metadata service a downstream runtime dependency.
+This closes the engineering execution gap without making a metadata service a downstream runtime dependency.
 
 ## Carried into the supported product
 
@@ -43,6 +43,7 @@ These capabilities remain useful for component development, compatibility checks
 The recorded upstream tasks restore the parent gitlinks automatically and fail closed on modified component worktrees.
 The parallel worktree tasks preserve candidate commits and dirty edits so a cross-repository update can be tested before its gitlinks become the next recorded stack.
 The ordinary pull-request matrix checks both platforms without depending on mutable live pool data; a manual workflow dispatch performs the live recorded full-stack deployment on a selected parent ref.
+`diff-upstream-pool` compares the prepared cache with the current public pool without replacing either, so maintainers can distinguish data drift from a component regression before recording a new stack.
 
 ## Intentionally superseded
 
