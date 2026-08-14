@@ -87,7 +87,10 @@ If multiple adapters then need the same semantic diff implementation, that imple
 ## First proofs
 
 The Zotero proof exercises a maintained public API, stable source item keys, library-version consistency, deterministic transformation, collision policy, and canonical publication comparison.
+Its first implementation is downstream [`con/test-orinoco-downstream-website#7`](https://github.com/con/test-orinoco-downstream-website/pull/7).
+The live review detects the `CON Articles` to `CON Articles & Posters` collection rename, reports the resulting apparent loss of 146 candidates, and blocks evidence refresh before changing tracked state.
 
 A separate one-off DataLad run will compare `con/dump-research-info:data/con_site` with current downstream canonical YAML.
 That exploratory run records exact inputs, commands, and outputs and produces review candidates only.
 It may inform a second adapter, but one provenance run does not by itself define or stabilize the plugin contract.
+The resulting inactive review evidence is the stacked downstream [`#8`](https://github.com/con/test-orinoco-downstream-website/pull/8): 19 source-only candidates, field-level enrichment evidence for 60 matched records, and an exact DataLad rerun with an identical output tree.
