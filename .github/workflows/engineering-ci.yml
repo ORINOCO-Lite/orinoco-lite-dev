@@ -1,6 +1,7 @@
 name: Engineering environment
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -13,7 +14,7 @@ permissions:
 
 jobs:
   engine:
-    name: Engine without submodules (${{ matrix.runner }})
+    name: Engineering contracts (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -39,9 +40,37 @@ jobs:
         run: |
           pixi lock --check
           pixi lock --script tools/upstream_static.py --check
+          pixi lock --script tools/upstream_full.py --check
 
       - name: Run submodule-independent tests
         run: pixi run test
 
       - name: Build the pinned upstream static site from a non-recursive clone
         run: pixi run build-upstream-static
+
+      - name: Rebuild without moving the initialized upstream worktrees
+        run: pixi run build-upstream-static-worktree
+
+      - name: Run the isolated optional full-stack contracts
+        run: pixi run test-upstream-full
+
+  live-upstream:
+    name: Live recorded upstream deployment
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out only the parent repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - name: Install the locked engineering environment
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          cache: true
+          frozen: true
+          pixi-version: v0.76.2
+
+      - name: Reproduce and check the recorded service-backed stack
+        run: pixi run check-upstream

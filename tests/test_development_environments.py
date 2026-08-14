@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "pixi.toml"
 SCRIPT = ROOT / "tools" / "upstream_static.py"
 SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
+FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 
 
@@ -47,10 +48,21 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             tasks["serve-upstream-static"],
             '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve',
         )
+        self.assertEqual(
+            tasks["build-upstream-static-worktree"],
+            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build '
+            "--checkout worktree",
+        )
+        self.assertEqual(
+            tasks["serve-upstream-static-worktree"],
+            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve '
+            "--checkout worktree",
+        )
         self.assertTrue(SCRIPT_LOCK.is_file())
         lock = yaml.safe_load(SCRIPT_LOCK.read_text(encoding="utf-8"))
         self.assertEqual(lock["version"], 7)
         self.assertEqual(set(lock["environments"]), {"default"})
+        self.assertTrue(FULL_SCRIPT_LOCK.is_file())
 
     def test_script_metadata_is_exact_and_platform_complete(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -76,16 +88,16 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         ast.parse(source)
 
-    def test_builder_performs_a_targeted_exact_checkout(self) -> None:
+    def test_builder_never_moves_gitlinks_after_scoped_preparation(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            "submodule update --init --depth 1 -- submodules/www-from-model",
-            builder,
-        )
-        self.assertIn("submodule update --init --depth 1 -- themes/congo", builder)
-        self.assertNotIn("submodule update --init --recursive", builder)
+        self.assertNotIn("submodule update", builder)
+        self.assertIn("restore_annex_status.py", builder)
+        checkout = (ROOT / "tools" / "upstream_checkout.py").read_text()
+        self.assertIn("prepare_static_checkout", checkout)
+        self.assertIn("prepare_full_checkout", checkout)
+        self.assertIn('mode == "recorded"', checkout)
         self.assertIn("restore_local_state", builder)
         self.assertIn("--no-write-fetch-head", builder)
 
@@ -98,6 +110,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         build = workflow.index("run: pixi run build-upstream-static")
         self.assertLess(install, tests)
         self.assertLess(tests, build)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("run: pixi run build-upstream-static-worktree", workflow)
+        self.assertIn("run: pixi run test-upstream-full", workflow)
+        self.assertIn("run: pixi run check-upstream", workflow)
+        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
 
 
 if __name__ == "__main__":

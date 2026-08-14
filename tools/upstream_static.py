@@ -37,6 +37,12 @@ from pathlib import Path
 import subprocess
 from typing import Sequence
 
+from upstream_checkout import (
+    CheckoutMode,
+    UpstreamCheckoutError,
+    prepare_static_checkout,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DESTINATION = ROOT / "build" / "upstream-local"
@@ -80,7 +86,8 @@ def require_script_environment() -> None:
             )
 
 
-def build(*, host: str, port: int) -> None:
+def build(*, host: str, port: int, checkout: CheckoutMode) -> None:
+    prepare_static_checkout(checkout)
     environment = os.environ.copy()
     environment.update(
         {
@@ -92,8 +99,8 @@ def build(*, host: str, port: int) -> None:
     run([ROOT / "tools" / "build_upstream_site.sh"], environment=environment)
 
 
-def serve(*, host: str, port: int) -> None:
-    build(host=host, port=port)
+def serve(*, host: str, port: int, checkout: CheckoutMode) -> None:
+    build(host=host, port=port, checkout=checkout)
     handler = partial(SimpleHTTPRequestHandler, directory=str(DESTINATION))
     server = ThreadingHTTPServer((host, port), handler)
     print(f"Serving the pinned upstream site at http://{host}:{port}/")
@@ -109,16 +116,22 @@ def serve(*, host: str, port: int) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("build", "serve"))
+    parser.add_argument(
+        "--checkout",
+        choices=("recorded", "worktree"),
+        default="recorded",
+        help="restore recorded gitlinks or preserve current initialized worktrees",
+    )
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", default=DEFAULT_PORT, type=int)
     args = parser.parse_args(argv)
     try:
         require_script_environment()
         if args.command == "build":
-            build(host=args.host, port=args.port)
+            build(host=args.host, port=args.port, checkout=args.checkout)
         else:
-            serve(host=args.host, port=args.port)
-    except UpstreamStaticError as error:
+            serve(host=args.host, port=args.port, checkout=args.checkout)
+    except (UpstreamCheckoutError, UpstreamStaticError) as error:
         parser.exit(1, f"upstream-static: {error}\n")
     return 0
 

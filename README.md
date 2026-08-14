@@ -101,24 +101,52 @@ pixi run test
 ```
 
 Submodules remain the source-level dependency and compatibility-fixture pins for engineering integration.
-`checkout-submodules` is idempotent: it synchronizes URLs, initializes every recursive gitlink recorded by the current parent commit, restores exact detached commits, unshallows development history, and verifies the result.
-Use it before cross-component work.
-To update an upstream dependency, advance and commit its gitlink on a review branch, then run this command and the relevant integration checks against that recorded candidate:
+`checkout-submodules` is the explicit full recursive setup command: it synchronizes URLs, initializes every gitlink recorded by the current parent commit, restores exact detached commits, unshallows development history, and verifies the result.
+Use it when broad cross-component work needs the complete source graph:
 
 ```console
 pixi run checkout-submodules
 ```
 
-Integration entry points may perform a narrower checkout automatically.
-The German reference site's static preview is the first such command:
+Named upstream tasks initialize only their own required gitlinks and expose two checkout policies:
+
+| Scope | Recorded pins | Current candidate worktrees |
+| --- | --- | --- |
+| Static reference site | `build-upstream-static`, `serve-upstream-static` | `build-upstream-static-worktree`, `serve-upstream-static-worktree` |
+| Full service-backed stack | `check-upstream`, `serve-upstream` | `check-upstream-worktree`, `serve-upstream-worktree` |
+
+Recorded tasks refuse modified component worktrees, initialize missing submodules recursively, and restore the exact commits in the parent tree.
+They are the known-code reproduction path.
+Worktree tasks initialize only missing repositories and preserve every current component commit plus tracked and untracked candidate change.
+They are the iterative upstream-integration path.
+
+The static commands build only `www-from-model`, its nested Congo theme, and their annexed presentation assets:
 
 ```console
 pixi run serve-upstream-static
 ```
 
 Its executable, Hugo, and git-annex dependencies are declared in [`tools/upstream_static.py`](tools/upstream_static.py) and resolved from the adjacent lock, independently of the root environment.
-The builder initializes only the exact `www-from-model` and nested Congo gitlinks needed by that artifact, so the command works from recursive and non-recursive clones alike.
 Use `build-upstream-static` for the same deterministic build without starting the HTTP server.
+The full commands add the pool UI, SHACL Vue, Things Schema, and Dump Things service in a second locked inline environment.
+`check-upstream` starts the services, seeds and checks both isolated collections, proves the editor write boundary, checks the static site, and stops; `serve-upstream` leaves that checked deployment running at `http://127.0.0.1:8768/`.
+
+The recorded full-stack task pins every source repository and tool, but its public pool input is not yet an immutable release artifact.
+A fresh checkout fetches the current public `Thing` collection; a prepared checkout reuses its digest-checked ignored cache.
+The historical Milestone 3 capture contained 4,978 records and the 2026-08-14 verification contained 4,979.
+Therefore the static recorded build is byte-reproducible, while the full recorded task currently proves the recorded software stack against an identified pool snapshot rather than recreating one permanent data snapshot.
+
+To advance upstream dependencies safely:
+
+1. create a review branch and initialize the required repositories;
+2. check out proposed component commits and make any cross-repository edits;
+3. use the corresponding `*-worktree` build or check throughout development;
+4. commit component changes, then record the reviewed gitlinks in this parent repository;
+5. rerun the recorded commands from a clean checkout; and
+6. manually dispatch `Engineering environment` on the candidate parent ref for a hosted live `check-upstream`, then merge only the parent commit whose recorded tasks and CI establish the next known-good stack.
+
+This keeps checkout automation in the task without letting a validation command silently discard work in progress.
+The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
 
 The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
 They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
@@ -150,6 +178,7 @@ They are preserved as evidence, not as current operating instructions:
 - [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
 - [`docs/milestone-3.md`](docs/milestone-3.md)
 - [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
+- [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md)
 
 Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
 Current work follows Milestone 4 and the versioned template.
