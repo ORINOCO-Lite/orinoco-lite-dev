@@ -67,7 +67,9 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
     _copy_tree(workspace.path("site") / "layouts", assembly / "layouts")
     _copy_tree(workspace.path("site") / "static", assembly / "static")
-    _copy_tree(workspace.path("assets") / "files", assembly / "assets")
+    assets_root = workspace.path("assets")
+    asset_source_prefix = (*PurePosixPath(workspace.paths["assets"]).parts, "files")
+    _copy_tree(assets_root / "files", assembly / "assets")
     _copy_tree(workspace.path("editorial"), assembly / "content")
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
@@ -100,11 +102,14 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
                 hydrated += 1
         verify_asset(source_path, asset)
         source_relative = PurePosixPath(source)
-        if source_relative.parts[:2] != ("assets", "files"):
+        if source_relative.parts[: len(asset_source_prefix)] != asset_source_prefix:
             raise DriverError(
-                f"Asset source is outside the flattened assets/files contract: {source}"
+                "Asset source is outside the configured assets/files contract: "
+                f"{source}"
             )
-        assembled_source = assembly / "assets" / Path(*source_relative.parts[2:])
+        assembled_source = assembly / "assets" / Path(
+            *source_relative.parts[len(asset_source_prefix) :]
+        )
         assembled_source.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source_path, assembled_source)
         copied_sources += 1
@@ -120,8 +125,10 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
                 destination_path = assembly / "static" / Path(*parts[3:])
             elif parts[:2] == ("site", "static"):
                 destination_path = assembly / "static" / Path(*parts[2:])
-            elif parts[:2] == ("assets", "files"):
-                destination_path = assembly / "assets" / Path(*parts[2:])
+            elif parts[: len(asset_source_prefix)] == asset_source_prefix:
+                destination_path = assembly / "assets" / Path(
+                    *parts[len(asset_source_prefix) :]
+                )
             else:
                 raise DriverError(f"Unsupported asset link destination: {destination}")
             destination_path.parent.mkdir(parents=True, exist_ok=True)

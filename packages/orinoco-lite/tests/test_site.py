@@ -7,7 +7,10 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite import site
+from orinoco_lite.assets import Asset
+from orinoco_lite.config import load_config_path
 from orinoco_lite.errors import ConfigurationError, DriverError
+from orinoco_lite.integrity import sha256_file
 
 
 CONFIG = """\
@@ -19,6 +22,49 @@ site:
 
 
 class HugoCompatibilityTests(unittest.TestCase):
+    def test_assembly_respects_configured_asset_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "orinoco.yaml"
+            config.write_text(
+                CONFIG
+                + "paths:\n"
+                + "  assets: custom/assets\n",
+                encoding="utf-8",
+            )
+            source = root / "custom/assets/files/example.txt"
+            source.parent.mkdir(parents=True)
+            source.write_text("asset\n", encoding="utf-8")
+            assembly = root / "build/assembly"
+            asset = Asset(
+                source="custom/assets/files/example.txt",
+                sha256=sha256_file(source),
+                size=source.stat().st_size,
+                availability="available",
+                object_url=None,
+            )
+            workspace = load_config_path(config)
+
+            with patch.object(
+                site,
+                "load_assets",
+                return_value=(
+                    {asset.source: asset},
+                    {"site/static/example.txt": asset.source},
+                ),
+            ):
+                report = site._assemble(workspace, root / "runtime", assembly)
+
+            self.assertEqual(report["copied_assets"], 1)
+            self.assertEqual(
+                (assembly / "assets/example.txt").read_text(encoding="utf-8"),
+                "asset\n",
+            )
+            self.assertEqual(
+                (assembly / "static/example.txt").read_text(encoding="utf-8"),
+                "asset\n",
+            )
+
     def test_build_base_url_accepts_host_neutral_and_public_forms(self) -> None:
         cases = {
             "/": "/",
