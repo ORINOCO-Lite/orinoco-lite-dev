@@ -63,20 +63,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Restore the exact Playwright browser cache
-        if: ${{ inputs.command == 'test-all' }}
-        id: playwright-browser-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: build/playwright-browsers
-          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
-
       - name: Install locked Pixi
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347
         with:
           pixi-version: ${{ inputs['pixi-version'] }}
           cache: true
           frozen: true
+
+      - name: Restore the exact Playwright browser cache
+        if: ${{ inputs.command == 'test-all' }}
+        id: playwright-browser-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/playwright-browsers
+            !build/playwright-browsers/.links
+          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
 
       - name: Run the consumer facade
         shell: bash
@@ -98,8 +100,10 @@ jobs:
           }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: build/playwright-browsers
-          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
+          path: |
+            build/playwright-browsers
+            !build/playwright-browsers/.links
+          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
 
       - name: Upload the requested consumer artifact
         if: ${{ inputs['artifact-name'] != '' }}

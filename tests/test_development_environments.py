@@ -124,8 +124,9 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")
         cache_action = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
         cache_key = (
-            "orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.arch }}-"
-            "chromium-webkit-${{ hashFiles("
+            "orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-"
+            "${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', "
+            "'.orinoco-lite/tests/browser/package.json', "
             "'.orinoco-lite/tests/browser/package-lock.json', "
             "'.orinoco-lite/tools/install_browser_tests.py') }}"
         )
@@ -134,7 +135,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn(f"actions/cache/restore@{cache_action}", workflow)
         self.assertIn(f"actions/cache/save@{cache_action}", workflow)
         self.assertEqual(workflow.count(cache_key), 2)
-        self.assertEqual(workflow.count("path: build/playwright-browsers"), 2)
+        self.assertEqual(workflow.count("build/playwright-browsers\n"), 2)
+        self.assertEqual(
+            workflow.count("!build/playwright-browsers/.links"),
+            2,
+        )
         self.assertNotIn("restore-keys:", workflow)
         self.assertIn("inputs.command == 'test-all'", workflow)
         self.assertIn("github.event_name == 'push'", workflow)
@@ -146,6 +151,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn(
             "steps.playwright-browser-cache.outputs.cache-hit != 'true'",
             workflow,
+        )
+        self.assertLess(
+            workflow.index("Install locked Pixi"),
+            workflow.index("Restore the exact Playwright browser cache"),
         )
         self.assertLess(
             workflow.index("Restore the exact Playwright browser cache"),
