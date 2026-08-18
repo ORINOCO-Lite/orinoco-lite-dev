@@ -36,6 +36,7 @@ jobs:
   consumer:
     name: ${{ inputs.command }} (${{ inputs.runner }})
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
     steps:
       - name: Validate reusable-workflow inputs
         shell: bash
@@ -69,11 +70,54 @@ jobs:
           cache: true
           frozen: true
 
+      - name: Restore the exact Playwright browser cache
+        if: ${{ inputs.command == 'test-all' }}
+        id: playwright-browser-cache
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
+        with:
+          path: |
+            build/playwright-browsers
+            !build/playwright-browsers/.links
+          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
+
+      - name: Bound Linux package mirror operations
+        if: ${{ inputs.command == 'test-all' && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'Acquire::Retries "3";' \
+            'Acquire::http::Timeout "30";' \
+            'Acquire::https::Timeout "30";' \
+            | sudo tee /etc/apt/apt.conf.d/99orinoco-network-bounds >/dev/null
+
       - name: Run the consumer facade
         shell: bash
         env:
           ORINOCO_COMMAND: ${{ inputs.command }}
         run: pixi run "$ORINOCO_COMMAND"
+
+      # PRs may restore the default branch's public browser cache, but only a
+      # successful default-branch push may publish one. This avoids large,
+      # merge-ref-scoped caches while keeping cache misses fully supported.
+      - name: Save the exact Playwright browser cache
+        if: >-
+          ${{
+            success() &&
+            inputs.command == 'test-all' &&
+            github.event_name == 'push' &&
+            github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+            steps.playwright-browser-cache.outputs.cache-hit != 'true'
+          }}
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/playwright-browsers
+            !build/playwright-browsers/.links
+          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
 
       - name: Upload the requested consumer artifact
         if: ${{ inputs['artifact-name'] != '' }}

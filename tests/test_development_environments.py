@@ -14,6 +14,7 @@ SCRIPT = ROOT / "tools" / "upstream_static.py"
 SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
+CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
@@ -118,6 +119,65 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("run: pixi run test-upstream-full", workflow)
         self.assertIn("run: pixi run check-upstream", workflow)
         self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+
+    def test_consumer_ci_bounds_and_reuses_exact_browser_downloads(self) -> None:
+        workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")
+        cache_action = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+        cache_key = (
+            "orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-"
+            "${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', "
+            "'.orinoco-lite/tests/browser/package.json', "
+            "'.orinoco-lite/tests/browser/package-lock.json', "
+            "'.orinoco-lite/tools/install_browser_tests.py') }}"
+        )
+
+        self.assertIn("timeout-minutes: 60", workflow)
+        self.assertIn(f"actions/cache/restore@{cache_action}", workflow)
+        self.assertIn(f"actions/cache/save@{cache_action}", workflow)
+        self.assertEqual(workflow.count("continue-on-error: true"), 2)
+        self.assertIn('SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"', workflow)
+        self.assertIn("Bound Linux package mirror operations", workflow)
+        self.assertIn(
+            "inputs.command == 'test-all' && runner.os == 'Linux'",
+            workflow,
+        )
+        self.assertIn('Acquire::Retries "3";', workflow)
+        self.assertIn('Acquire::http::Timeout "30";', workflow)
+        self.assertIn('Acquire::https::Timeout "30";', workflow)
+        self.assertEqual(workflow.count(cache_key), 2)
+        self.assertEqual(workflow.count("build/playwright-browsers\n"), 2)
+        self.assertEqual(
+            workflow.count("!build/playwright-browsers/.links"),
+            2,
+        )
+        self.assertNotIn("restore-keys:", workflow)
+        self.assertIn("inputs.command == 'test-all'", workflow)
+        self.assertIn("github.event_name == 'push'", workflow)
+        self.assertIn(
+            "github.ref == format('refs/heads/{0}', "
+            "github.event.repository.default_branch)",
+            workflow,
+        )
+        self.assertIn(
+            "steps.playwright-browser-cache.outputs.cache-hit != 'true'",
+            workflow,
+        )
+        self.assertLess(
+            workflow.index("Install locked Pixi"),
+            workflow.index("Restore the exact Playwright browser cache"),
+        )
+        self.assertLess(
+            workflow.index("Restore the exact Playwright browser cache"),
+            workflow.index("Bound Linux package mirror operations"),
+        )
+        self.assertLess(
+            workflow.index("Bound Linux package mirror operations"),
+            workflow.index("Run the consumer facade"),
+        )
+        self.assertLess(
+            workflow.index("Run the consumer facade"),
+            workflow.index("Save the exact Playwright browser cache"),
+        )
 
 
 if __name__ == "__main__":
