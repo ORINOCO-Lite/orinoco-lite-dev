@@ -7,15 +7,15 @@ Status: evolving architecture; two downstream examples under review
 A source adapter turns an external metadata source into a reviewable change in an Orinoco Lite site.
 The name describes the boundary without prescribing one implementation or one kind of change.
 
-Orinoco Lite adopts the vocabulary already used by the upstream Things tools:
+Orinoco Lite aligns with the concrete vocabulary used by the upstream Things tools:
 
 - a **scraper** acquires data from a remote source;
 - an **importer** translates source records into Things records;
 - an **enricher** adds or revises fields using another source;
-- an **extractor** or **reporter** emits information for review; and
 - a **projection** derives a website or another presentation from site metadata and is not a source adapter.
 
-Source adapter is the umbrella term for the first four roles.
+Source adapter is Orinoco Lite's local umbrella term for tools that acquire or propose changes to site records, including report-only modes.
+It is not an upstream-defined interface or role name.
 It replaces the earlier use of *plugin*, which upstream uses for unrelated CLI modularity.
 
 ## Review and provenance model
@@ -99,8 +99,10 @@ The engineering workspace may pin upstream source implementations as submodules 
 
 ## Alignment and reuse
 
-Prefer released upstream acquisition, import, enrichment, matching, and update helpers over local equivalents.
+Prefer released upstream acquisition, import, enrichment, matching, query, serialization, and update helpers over local equivalents.
+When a local service-free implementation is still required, retain executable parity tests against the upstream primitive or fixture it replaces.
 Where field-level provenance is appropriate, use upstream PAV semantics such as `pav:importedBy` and `pav:importedFrom` rather than inventing an Orinoco Lite ownership inventory.
+During the prototype phase those annotations inform adapter behavior without imposing a universal field-ownership gate: `report`, `basic`, and `aggressive` modes may deliberately propose wider diffs, and pull-request review remains authoritative.
 New source-adapter work should pay down local technical debt by contributing a generally useful primitive upstream when possible.
 The engineering workspace follows the reviewed `things-enrichment-tools` source through its gitlink; that commit is the version authority, without a second downstream checksum inventory.
 
@@ -120,6 +122,6 @@ Extract only behavior demonstrated by multiple adapters and continue to track up
 2. **Normalize the exploratory adapter.** Record a literal project-relative source path and exact revision in the DataLad command; document its precise read/write roots and defensible modes; prove deterministic, idempotent direct metadata diffs.
 3. **Develop Zotero as the reusable case.** Keep API snapshots in ordinary Git, separate reusable mechanics from site policy, and exercise report, basic, and aggressive behavior only where each mode has a clear meaning.
 4. **Extract demonstrated common behavior.** Standardize the smallest useful CLI surface after the examples agree; keep adapter-specific Pixi environments and avoid a speculative host API.
-5. **Converge with upstream.** Reuse or improve upstream helpers first, keep engineering pins reviewable, and decide between template-managed files and separately versioned packages only after more adapters establish the maintenance boundary.
+5. **Converge with upstream.** Reuse or improve upstream helpers first, maintain parity tests for local qri-like behavior, keep engineering pins reviewable, and decide between template-managed files and separately versioned packages only after more adapters establish the maintenance boundary.
 
 An adapter is ready for reuse when its recorded command has no absolute paths or hidden operative configuration, its pull request contains a focused source diff, its source evidence is ordinary Git, reruns are idempotent, and its local code exists only where no suitable upstream implementation is available.
