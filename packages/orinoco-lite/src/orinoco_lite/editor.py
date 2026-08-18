@@ -18,6 +18,7 @@ import yaml
 
 from .config import WorkspaceConfig, load_config_path
 from .errors import ConfigurationError, DriverError
+from .records import record_sources
 from .schema_conversion import build_format_converters
 
 
@@ -54,55 +55,22 @@ def _git_commit(root: Path) -> str:
     return value
 
 
-def _record_files(workspace: WorkspaceConfig, path_name: str) -> list[Path]:
-    root = workspace.path(path_name)
-    return sorted(
-        candidate
-        for candidate in root.rglob("*")
-        if candidate.is_file()
-        and not candidate.is_symlink()
-        and not any(part.startswith(".") for part in candidate.relative_to(root).parts)
-        and candidate.suffix in {".yaml", ".yml"}
-    )
-
-
-def _record_sources(
-    workspace: WorkspaceConfig,
-    path_name: str,
-) -> list[dict[str, str]]:
-    records: list[dict[str, str]] = []
-    pids: set[str] = set()
-    for path in _record_files(workspace, path_name):
-        content = path.read_text(encoding="utf-8")
-        value = yaml.safe_load(content)
-        if not isinstance(value, dict):
-            raise ConfigurationError(f"Metadata record must be a mapping: {path}")
-        pid = value.get("pid")
-        schema_type = value.get("schema_type")
-        if not isinstance(pid, str) or not isinstance(schema_type, str):
-            raise ConfigurationError(f"Metadata record identity is invalid: {path}")
-        if pid in pids:
-            raise ConfigurationError(f"Metadata record PID is duplicated: {pid}")
-        pids.add(pid)
-        records.append(
-            {
-                "content": content,
-                "path": path.relative_to(workspace.root).as_posix(),
-                "pid": pid,
-                "schema_type": schema_type,
-                "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-            }
-        )
-    records.sort(key=lambda item: (item["pid"], item["path"]))
-    return records
-
-
 def record_catalog(workspace: WorkspaceConfig) -> dict[str, Any]:
-    """Return immutable coordinates for editable, canonical records only."""
+    """Return coordinates for records editable under the projection plan."""
+
+    # Import here so projection and editor can share record loading without a
+    # module cycle. Editability is declarative, never inferred from a second
+    # filesystem category.
+    from .projection import load_contract
+
+    contract = load_contract(workspace)
+    editable_classes = set(contract.pages) | set(contract.graph_node_classes)
 
     records = [
         {key: source[key] for key in ("path", "pid", "schema_type", "sha256")}
-        for source in _record_sources(workspace, "canonical")
+        for source in record_sources(workspace)
+        if source["pid"] == contract.homepage_pid
+        or source["schema_type"] in editable_classes
     ]
     return {
         "format": CATALOG_FORMAT,
@@ -227,22 +195,11 @@ def bind_editor(
             raise DriverError(f"Runtime editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    canonical_sources = _record_sources(workspace, "canonical")
-    reference_sources = _record_sources(workspace, "reference")
-    duplicate_pids = {item["pid"] for item in canonical_sources} & {
-        item["pid"] for item in reference_sources
-    }
-    if duplicate_pids:
-        raise ConfigurationError(
-            "Canonical and reference metadata duplicate PIDs: "
-            + ", ".join(sorted(duplicate_pids))
-        )
+    sources = record_sources(workspace)
     json_to_rdf, _ = _converters(
         runtime_root / "schema/demo-research-information/unreleased.yaml"
     )
-    record_rdf, combined_rdf = _render_rdf_sources(
-        [*canonical_sources, *reference_sources], json_to_rdf
-    )
+    record_rdf, combined_rdf = _render_rdf_sources(sources, json_to_rdf)
     catalog = record_catalog(workspace)
     for entry in catalog["records"]:
         entry["rdf_turtle"] = record_rdf[entry["pid"]]
@@ -252,8 +209,8 @@ def bind_editor(
     (destination / "records.ttl").write_text(combined_rdf, encoding="utf-8")
     return {
         "catalog_format": CATALOG_FORMAT,
-        "editable_records": len(canonical_sources),
-        "loaded_records": len(canonical_sources) + len(reference_sources),
+        "editable_records": len(catalog["records"]),
+        "loaded_records": len(sources),
         "source_commit": catalog["source_commit"],
         "version": VERSION,
     }
@@ -366,7 +323,7 @@ def validate_bundle(
         seen.add(pid)
         source = by_pid.get(pid)
         if source is None:
-            raise DriverError(f"Review bundle PID is not canonical: {pid}")
+            raise DriverError(f"Review bundle PID is not in metadata/records: {pid}")
         source_path = item.get("source_path")
         relative = PurePosixPath(source_path) if isinstance(source_path, str) else None
         if (
@@ -379,7 +336,7 @@ def validate_bundle(
             raise DriverError(f"Review bundle source path does not match {pid}")
         path = workspace.root.joinpath(*relative.parts)
         if source_path in dirty:
-            raise DriverError(f"Canonical source has a conflicting local change: {source_path}")
+            raise DriverError(f"Metadata source has a conflicting local change: {source_path}")
         if item.get("source_sha256") != source["sha256"]:
             raise DriverError(f"Review bundle source digest is stale for {pid}")
         if hashlib.sha256(path.read_bytes()).hexdigest() != item.get("source_sha256"):

@@ -14,7 +14,7 @@ from orinoco_lite.integrity import sha256_file
 
 
 CONFIG = """\
-contract_version: 1
+contract_version: 2
 site:
   name: Hugo compatibility fixture
   base_url: https://example.invalid/orinoco/

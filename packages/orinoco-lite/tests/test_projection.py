@@ -98,8 +98,6 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             report,
             {
-                "canonical_records": 186,
-                "reference_records": 13,
                 "records": 199,
                 "pages": 185,
                 "graph_nodes": 186,
@@ -186,7 +184,6 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.runtime = Path(self.temporary.name) / "runtime"
         for relative in (
             "metadata/records/Person",
-            "metadata/reference",
             "site/projection-templates",
             "site/projection-tools",
             "generated",
@@ -262,8 +259,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             raw={},
         )
         self.semantic = {
-            "canonical_records": 2,
-            "reference_records": 0,
             "records": 2,
             "graph_nodes": 2,
             "graph_edges": 0,

@@ -11,7 +11,7 @@ from orinoco_lite.validation import validate_workspace
 
 
 CONFIG = """\
-contract_version: 1
+contract_version: 2
 site:
   name: Complete fixture
   base_url: https://example.invalid/complete/
@@ -25,12 +25,12 @@ class DownstreamValidationTests(unittest.TestCase):
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
         for relative in (
             "metadata/records/XYZPerson",
-            "metadata/reference/XYZAgentRole",
-            "metadata/provenance",
+            "metadata/records/XYZAgentRole",
+            ".orinoco-lite/provenance",
             "editorial",
             "assets/files",
             "site",
-            "integrations/zotero",
+            "source-adapters/zotero",
             "generated",
             "extensions",
             "build",
@@ -40,11 +40,11 @@ class DownstreamValidationTests(unittest.TestCase):
             "pid: xyzrins:persons/test\nschema_type: xyzri:XYZPerson\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/reference/XYZAgentRole/role.yaml").write_text(
+        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:roles/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/provenance/selection.yaml").write_text(
+        (self.root / ".orinoco-lite/provenance/selection.yaml").write_text(
             "version: 1\n", encoding="utf-8"
         )
         (self.root / "assets/manifest.yaml").write_text(
@@ -56,42 +56,77 @@ class DownstreamValidationTests(unittest.TestCase):
 
     def test_complete_flattened_layout_passes(self) -> None:
         report = validate_workspace(load_workspace(self.root))
-        self.assertEqual(report["canonical_records"], 1)
-        self.assertEqual(report["reference_records"], 1)
-        self.assertEqual(report["canonical_classes"], {"xyzri:XYZPerson": 1})
+        self.assertEqual(report["records"], 2)
+        self.assertEqual(
+            report["record_classes"],
+            {"xyzri:XYZAgentRole": 1, "xyzri:XYZPerson": 1},
+        )
 
     def test_record_source_control_markers_are_not_records(self) -> None:
-        for relative in (
-            "metadata/records/.dumpthings.yaml",
-            "metadata/reference/.dumpthings.yaml",
-        ):
-            (self.root / relative).write_text(
-                "type: records\nnamespace: fixture\n", encoding="utf-8"
-            )
+        (self.root / "metadata/records/.dumpthings.yaml").write_text(
+            "type: records\nnamespace: fixture\n", encoding="utf-8"
+        )
         report = validate_workspace(load_workspace(self.root))
-        self.assertEqual(report["canonical_records"], 1)
-        self.assertEqual(report["reference_records"], 1)
+        self.assertEqual(report["records"], 2)
 
     def test_other_yaml_at_or_below_record_source_remains_fail_closed(self) -> None:
         cases = (
-            "metadata/records/ordinary.yaml",
-            "metadata/records/.review.yaml",
-            "metadata/records/XYZPerson/.dumpthings.yaml",
+            ("metadata/records/ordinary.yaml", "pid and schema_type"),
+            (
+                "metadata/records/.review.yaml",
+                "Everything below paths.records must be a Thing YAML record",
+            ),
+            (
+                "metadata/records/XYZPerson/.dumpthings.yaml",
+                "Everything below paths.records must be a Thing YAML record",
+            ),
         )
-        for relative in cases:
+        for relative, message in cases:
             with self.subTest(relative=relative):
                 path = self.root / relative
                 path.write_text("type: records\n", encoding="utf-8")
-                with self.assertRaisesRegex(ConfigurationError, "pid and schema_type"):
+                with self.assertRaisesRegex(ConfigurationError, message):
                     validate_workspace(load_workspace(self.root))
                 path.unlink()
 
-    def test_duplicate_pid_across_reference_closure_fails(self) -> None:
-        (self.root / "metadata/reference/XYZAgentRole/role.yaml").write_text(
+    def test_non_record_content_below_record_source_fails_closed(self) -> None:
+        for relative in (
+            "metadata/records/README.md",
+            "metadata/records/.DS_Store",
+            "metadata/records/XYZPerson/notes.txt",
+        ):
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                path.write_text("not a Thing\n", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "Everything below paths.records must be a Thing YAML record",
+                ):
+                    validate_workspace(load_workspace(self.root))
+                path.unlink()
+
+    def test_yaml_suffix_matching_is_case_insensitive(self) -> None:
+        (self.root / "metadata/records/XYZPerson/second.YAML").write_text(
+            "pid: xyzrins:persons/second\nschema_type: xyzri:XYZPerson\n",
+            encoding="utf-8",
+        )
+        report = validate_workspace(load_workspace(self.root))
+        self.assertEqual(3, report["records"])
+
+    def test_duplicate_pid_in_record_inventory_fails(self) -> None:
+        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:persons/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "duplicated"):
+            validate_workspace(load_workspace(self.root))
+
+    def test_metadata_outside_record_root_fails(self) -> None:
+        legacy = self.root / "metadata/reference"
+        legacy.mkdir()
+        with self.assertRaisesRegex(
+            ConfigurationError, "Everything below metadata must be part of paths.records"
+        ):
             validate_workspace(load_workspace(self.root))
 
     def test_full_uri_discriminator_fails_closed(self) -> None:

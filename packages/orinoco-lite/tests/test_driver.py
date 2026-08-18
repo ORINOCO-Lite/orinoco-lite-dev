@@ -72,7 +72,7 @@ class DriverEnvironmentTests(unittest.TestCase):
                         "manifest_version": 1,
                         "release": "0.1.5",
                         "compatibility": {
-                            "config": [1],
+                            "config": [2],
                             "hugo": ">=0.154,<0.155",
                         },
                         "commands": {

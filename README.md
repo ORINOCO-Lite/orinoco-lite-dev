@@ -158,7 +158,7 @@ To advance upstream dependencies safely:
 
 This keeps checkout automation in the task without letting a validation command silently discard work in progress.
 The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
-The accepted post-Milestone goal in [`docs/metadata-source-adapters.md`](docs/metadata-source-adapters.md) defines how downstream-owned source adapters can produce semantic metadata-review evidence before any common host graduates into the template.
+The accepted post-Milestone architecture and work plan in [`docs/source-adapters.md`](docs/source-adapters.md) define how downstream-owned source adapters produce reviewable metadata changes through recorded DataLad commands while Orinoco Lite gathers evidence for a reusable Zotero adapter.
 
 The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
 They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
@@ -171,8 +171,8 @@ Do not reproduce that release boundary with an ad hoc local archive.
 
 - Original Orinoco Lite software is MIT licensed; original documentation is CC BY 4.0, factual metadata is CC0 1.0, and media remains item-specific.
 See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
-- Reviewed YAML is the canonical metadata source.
-Generated projection files remain committed so stale output, review, and rollback are explicit.
+- Every Thing under `metadata/records/` is a real validation and projection input; declarative site policy determines pages and editor exposure.
+Projection output is regenerated during validation and build, remains ignored, and never obscures a source-metadata review diff.
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 See [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md).

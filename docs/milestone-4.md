@@ -30,13 +30,12 @@ Graduation of the real site is a later, separately reviewed operation.
 
 The flattened consumer starts from all accepted Milestone 3 CON inputs:
 
-- 186 canonical records: 33 people, 24 projects, 126 publications, one instrument, one organization, and one topic;
-- 13 supporting reference records;
+- one `metadata/records/` tree containing all 199 Things: 33 people, 24 projects, 126 publications, one instrument, one organization, one topic, one instrument type, six bibliographic types, and six agent roles;
 - ten editorial sources and their declared routes;
 - 71 declared assets, including all 55 ordinary-Git and 16 annex-backed payload contracts;
-- seven provenance ledgers;
-- the complete 199-record committed projection, 185 rendered record pages, 186-node and 467-edge graph, and both reviewed digests;
-- the static editor catalog for all 186 canonical records; and
+- `.orinoco-lite/provenance/` reserved for framework provenance that is not already expressed by the Git/DataLad commit;
+- a deterministic generated projection of 199 records, 185 rendered record pages, and a 186-node, 467-edge graph;
+- a 186-record static editor catalog selected by the declarative projection plan, while all 199 records remain validation, RDF, relationship, and projection inputs; and
 - the complete Zotero source snapshot, mappings, review policy, and promotion evidence needed to explain and repeat the publication integration.
 
 The German upstream content tree is not CON content and is not copied into the consumer.
@@ -50,7 +49,7 @@ Milestone 4 has five explicit boundaries:
 2. A versioned Orinoco Lite engine provides validation, projection, static assembly, editor-patch handling, and artifact audits through a narrow CLI.
 3. A checksummed runtime release supplies schemas, reviewed website templates, graph support, the static editor, license material, and compatibility metadata without exposing component repositories.
 4. One Copier source produces the GitHub template snapshot and owns only the downstream framework surface.
-5. Each consumer directly owns metadata, editorial content, assets, provenance, presentation policy, integrations, and supported extensions.
+5. Each consumer directly owns records, editorial content, assets, presentation policy, site-specific source adapters, and supported extensions; template-managed provenance and generic adapters remain under `.orinoco-lite/`.
 
 The minimum downstream commands are:
 
@@ -73,16 +72,16 @@ Downstream paths have one declared owner:
 
 | Ownership | Examples | Update behavior |
 | --- | --- | --- |
-| Site-owned | `metadata/`, `editorial/`, `assets/`, `integrations/`, presentation policy | Never overwritten silently |
-| Template-owned | workflow launchers, Pixi command facade, update plumbing, test launchers | Updated through Copier; conflicts fail visibly |
+| Site-owned | `metadata/records/`, `custom/editorial/`, `custom/assets/`, `source-adapters/`, presentation policy | Never overwritten silently |
+| Template-owned | `.orinoco-lite/` support and provenance, workflow launchers, Pixi command facade, update plumbing, test launchers | Updated through Copier; conflicts fail visibly |
 | Structured | `orinoco.yaml` | Versioned field migrations with an explicit diff |
 | Engine-locked | `orinoco.lock` | Updated only by a reviewed framework update |
-| Generated | `generated/` | Replaced only after validation and recorded in a separate update section |
+| Generated | `generated/` | Ignored and regenerated during validation or build |
 | Extension | `extensions/` | Stable site-owned hook surface |
 | Local state | `build/`, tokens, stores, caches, browser output | Ignored and never published |
 
-The initial distribution retains the committed generated projection because stale-output detection, review, and editor source binding currently depend on it.
-A later milestone may reconsider this only after equivalent review and rollback behavior is proven.
+The initial distribution retained a committed projection as acceptance evidence.
+The minimum downstream interface now generates it during validation and build, keeps it ignored, and binds the editor to source records so metadata pull requests remain focused on source changes.
 
 ## Packaging contract
 
@@ -105,8 +104,9 @@ A checked-in traceability ledger maps every current test to one or more successo
 
 - engineering: upstream review, rebases, gitlinks, component resolution, preservation, release extraction, and German comparison;
 - engine/release: schemas, native relationships, projection, assembly, assets, editor security, deterministic builds, and release integrity;
-- consumer: complete content, presentation, routes, Pages, project paths, downloaded patches, update preservation, customization, and rollback; and
-- integrations: Zotero acquisition/transformation and SHACL Vue component behavior.
+- consumer: complete content, presentation, routes, Pages, project paths, downloaded patches, update preservation, customization, and rollback;
+- source adaptation: Zotero acquisition and transformation; and
+- component integration: SHACL Vue behavior.
 
 The baseline contains 106 parent Python methods, five Playwright definitions with nine Chromium/WebKit executions, 42 Zotero tests, and eight SHACL Vue tests.
 Topology-specific tests receive released-interface successors rather than being copied nonsensically into the no-submodule consumer.
@@ -145,7 +145,7 @@ Gate: the rendered template matches its recorded Copier version and contains no 
 
 Instantiate `test-orinoco-downstream-website` from the template and import the complete Milestone 3 CON bundle without a selection policy.
 
-Gate: exact PID, reference, editorial, asset, provenance, projection, route, graph, and editor-catalog parity; no German leakage; and complete test traceability.
+Gate: exact record, editorial, asset, provenance, projection, route, graph, and editor-catalog parity; no German leakage; and complete test traceability.
 
 ### 6. Creation, customization, update, and rollback proof
 
@@ -177,7 +177,10 @@ Every framework update pull request reports:
 - a deployable preview artifact.
 
 Update automation may create a branch and pull request.
-It may not merge one, change canonical content silently, deploy pull-request code to the shared Pages environment, or gain permissions beyond its declared update job.
+It may not merge one, change record metadata silently, deploy pull-request code to the shared Pages environment, or gain permissions beyond its declared update job.
+
+The original Milestone 4 acceptance runs described the same 199 Things as 186 canonical records plus 13 reference records.
+That filesystem distinction is historical evidence only: configuration contract 2 stores every Thing in `metadata/records/`, and editability or page generation comes from declarative site policy rather than record location.
 
 ## External authorization and real-site boundary
 

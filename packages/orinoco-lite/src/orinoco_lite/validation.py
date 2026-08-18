@@ -13,20 +13,17 @@ import yaml
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
 from .integrity import tree_sha256
+from .records import record_files
 
 
-RECORD_SUFFIXES = {".yaml", ".yml"}
-RECORD_SOURCE_CONTROL_NAME = ".dumpthings.yaml"
 MAX_RECORD_BYTES = 10 * 1024 * 1024
 REQUIRED_INPUT_PATHS = (
-    "canonical",
-    "reference",
+    "records",
     "provenance",
     "editorial",
     "assets",
     "site",
-    "integrations",
-    "generated",
+    "source_adapters",
 )
 
 
@@ -64,17 +61,6 @@ def _load_record(path: Path) -> dict[str, Any]:
     return value
 
 
-def _record_files(root: Path) -> Iterator[Path]:
-    """Yield records while excluding only the source root's control marker."""
-
-    control = root / RECORD_SOURCE_CONTROL_NAME
-    for path in _files(root):
-        if path == control:
-            continue
-        if path.suffix.lower() in RECORD_SUFFIXES:
-            yield path
-
-
 def _gitlinks(root: Path) -> list[str]:
     if not (root / ".git").exists():
         return []
@@ -94,8 +80,34 @@ def _gitlinks(root: Path) -> list[str]:
     return links
 
 
+def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
+    """Reject metadata content that is not part of the configured record tree."""
+
+    metadata_root = workspace.root / "metadata"
+    if not metadata_root.exists():
+        return
+    if metadata_root.is_symlink() or not metadata_root.is_dir():
+        raise ConfigurationError(
+            f"The metadata boundary must be a regular directory: {metadata_root}"
+        )
+    records_root = workspace.path("records")
+    for candidate in sorted(metadata_root.rglob("*")):
+        if candidate.is_symlink():
+            raise ConfigurationError(
+                f"Site-owned paths cannot contain symlinks: {candidate}"
+            )
+        if candidate == records_root or records_root in candidate.parents:
+            continue
+        if candidate in records_root.parents:
+            continue
+        raise ConfigurationError(
+            "Everything below metadata must be part of paths.records; "
+            f"found undeclared content: {candidate}"
+        )
+
+
 def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
-    """Validate path ownership and the basic canonical inventory.
+    """Validate path ownership and the basic record inventory.
 
     The released schema/projection driver performs semantic validation. This
     check deliberately runs before that driver so malformed or unsafe
@@ -115,29 +127,22 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         path = workspace.path(name)
         if not path.is_dir():
             raise ConfigurationError(f"Required site-owned directory is missing: {path}")
+    _validate_metadata_boundary(workspace)
 
-    categories: dict[str, list[tuple[Path, dict[str, Any]]]] = {}
-    for category in ("canonical", "reference"):
-        root = workspace.path(category)
-        records = [(path, _load_record(path)) for path in _record_files(root)]
-        categories[category] = records
-    if not categories["canonical"]:
-        raise ConfigurationError("Canonical metadata inventory is empty")
+    records = [(path, _load_record(path)) for path in record_files(workspace)]
+    if not records:
+        raise ConfigurationError("Metadata record inventory is empty")
 
-    pids: dict[str, tuple[str, Path]] = {}
+    pids: dict[str, Path] = {}
     classes: Counter[str] = Counter()
-    for category, records in categories.items():
-        for path, record in records:
-            pid = record["pid"]
-            if pid in pids:
-                previous_category, previous_path = pids[pid]
-                raise ConfigurationError(
-                    f"Metadata PID {pid!r} is duplicated in {previous_category} "
-                    f"{previous_path} and {category} {path}"
-                )
-            pids[pid] = (category, path)
-            if category == "canonical":
-                classes[record["schema_type"]] += 1
+    for path, record in records:
+        pid = record["pid"]
+        if pid in pids:
+            raise ConfigurationError(
+                f"Metadata PID {pid!r} is duplicated in {pids[pid]} and {path}"
+            )
+        pids[pid] = path
+        classes[record["schema_type"]] += 1
 
     asset_manifest = workspace.path("assets") / "manifest.yaml"
     if not asset_manifest.is_file() or asset_manifest.is_symlink():
@@ -153,15 +158,14 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         for name in REQUIRED_INPUT_PATHS
     }
     return {
-        "canonical_records": len(categories["canonical"]),
-        "reference_records": len(categories["reference"]),
-        "canonical_classes": dict(sorted(classes.items())),
+        "records": len(records),
+        "record_classes": dict(sorted(classes.items())),
         "files": file_counts,
         "site": workspace.site_name,
         "site_owned_tree_sha256": {
             name: tree_sha256(workspace.path(name)) for name in REQUIRED_INPUT_PATHS
         },
-        "version": 1,
+        "version": 2,
     }
 
 

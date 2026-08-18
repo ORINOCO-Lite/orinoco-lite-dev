@@ -147,11 +147,7 @@ def _validate(args: argparse.Namespace) -> int:
     if args.json:
         sys.stdout.write(report_json(report))
     else:
-        print(
-            f"Validated {report['canonical_records']} canonical and "
-            f"{report['reference_records']} reference records for "
-            f"{workspace.site_name}"
-        )
+        print(f"Validated {report['records']} records for {workspace.site_name}")
     return 0
 
 

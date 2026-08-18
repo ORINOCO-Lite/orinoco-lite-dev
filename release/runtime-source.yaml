@@ -2,7 +2,7 @@ format: orinoco-lite-runtime-source
 spec_version: 1
 release: 0.1.0
 compatibility:
-  config: [1]
+  config: [2]
   minimum_python: "3.12"
   hugo: ">=0.154,<0.155"
   schema_profile: things-schemas/demo-research-information@d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
