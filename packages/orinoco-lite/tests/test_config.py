@@ -13,7 +13,7 @@ from orinoco_lite.config import (
 
 
 CONFIG = """\
-contract_version: 1
+contract_version: 2
 site:
   name: Test Orinoco downstream
   base_url: https://example.invalid/test-site/
@@ -49,13 +49,28 @@ class WorkspaceConfigTests(unittest.TestCase):
         workspace = load_workspace(self.root)
         self.assertEqual(workspace.site_name, "Test Orinoco downstream")
         self.assertEqual(
-            workspace.path("canonical").resolve(),
+            workspace.path("records").resolve(),
             (self.root / "metadata/records").resolve(),
         )
         self.assertEqual(workspace.path("site").resolve(), (self.root / "site").resolve())
         self.assertEqual(
-            workspace.environment()["ORINOCO_CANONICAL_ROOT"],
+            workspace.path("source_adapters").resolve(),
+            (self.root / "source-adapters").resolve(),
+        )
+        self.assertEqual(
+            workspace.environment()["ORINOCO_RECORDS_ROOT"],
             str((self.root / "metadata/records").resolve()),
+        )
+        self.assertEqual(
+            workspace.environment()["ORINOCO_SOURCE_ADAPTERS_ROOT"],
+            str((self.root / "source-adapters").resolve()),
+        )
+        self.assertNotIn("ORINOCO_CANONICAL_ROOT", workspace.environment())
+        self.assertNotIn("ORINOCO_REFERENCE_ROOT", workspace.environment())
+        self.assertNotIn("ORINOCO_INTEGRATIONS_ROOT", workspace.environment())
+        self.assertEqual(
+            workspace.path("provenance").resolve(),
+            (self.root / ".orinoco-lite/provenance").resolve(),
         )
 
     def test_nearest_ancestor_discovers_workspace(self) -> None:
@@ -65,18 +80,35 @@ class WorkspaceConfigTests(unittest.TestCase):
 
     def test_paths_cannot_escape_or_collide(self) -> None:
         (self.root / "orinoco.yaml").write_text(
-            CONFIG + "paths:\n  canonical: ../outside\n", encoding="utf-8"
+            CONFIG + "paths:\n  records: ../outside\n", encoding="utf-8"
         )
         with self.assertRaisesRegex(ConfigurationError, "normalized relative"):
             load_workspace(self.root)
         (self.root / "orinoco.yaml").write_text(
             CONFIG
             + "paths:\n"
-            + "  canonical: metadata\n"
-            + "  reference: metadata\n",
+            + "  records: metadata\n"
+            + "  provenance: metadata\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "distinct"):
+            load_workspace(self.root)
+
+    def test_removed_path_names_are_not_accepted_as_aliases(self) -> None:
+        for name in ("canonical", "reference", "integrations"):
+            with self.subTest(name=name):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG + f"paths:\n  {name}: legacy\n", encoding="utf-8"
+                )
+                with self.assertRaisesRegex(ConfigurationError, "unknown path keys"):
+                    load_workspace(self.root)
+
+    def test_version_one_contract_is_rejected(self) -> None:
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG.replace("contract_version: 2", "contract_version: 1"),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ConfigurationError, "contract_version must be 2"):
             load_workspace(self.root)
 
     def test_lock_requires_one_immutable_runtime_location(self) -> None:

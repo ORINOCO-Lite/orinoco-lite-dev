@@ -7,7 +7,7 @@ This package is one layer of the larger system:
 
 - the [engineering repository](https://github.com/con/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
 - the [template repository](https://github.com/con/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
-- each downstream repository owns its metadata, editorial content, assets, policy, extensions, and committed generated projection.
+- each downstream repository owns its metadata, editorial content, assets, policy, and extensions; projection output is ignored and regenerated.
 
 The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.
 
@@ -37,8 +37,8 @@ The stable commands are:
 | `orinoco validate` | Validate structure and run the verified runtime's semantic contract. |
 | `orinoco assets hydrate` | Retrieve only manifest-declared payloads and verify their sizes and digests. |
 | `orinoco assets verify` | Verify declared local payloads without silently fetching them. |
-| `orinoco projection update` | Regenerate and atomically install the committed projection. |
-| `orinoco projection verify` | Prove the committed projection is current and deterministic. |
+| `orinoco projection update` | Regenerate and atomically install projection output. |
+| `orinoco projection verify` | Prove existing projection output is current and deterministic. |
 | `orinoco build` | Validate and build a static site below the configured build root. |
 | `orinoco serve` | Serve existing static bytes; it never changes the artifact's URL base. |
 | `orinoco editor apply` | Validate a review bundle; add `--write` only after review. |
@@ -53,6 +53,11 @@ The template can compose prerequisites and platform compatibility checks that a 
 ## Configuration and release locks
 
 `orinoco.yaml` names the site, public base URL, normalized site-owned roots, and optional released-driver aliases.
+The current configuration contract is version 2; version 1 is intentionally rejected rather than translated implicitly.
+The metadata interface is deliberately singular: `paths.records` defaults to `metadata/records`, and every Thing below that root participates in validation and projection.
+Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
+Site-owned source adapters use `paths.source_adapters` (default `source-adapters`), while framework provenance defaults to `.orinoco-lite/provenance`.
+There are no legacy `canonical`, `reference`, or `integrations` path aliases.
 `orinoco.lock` binds:
 
 - the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest;

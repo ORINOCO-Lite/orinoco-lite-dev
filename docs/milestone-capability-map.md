@@ -16,7 +16,7 @@ This closes the engineering execution gap without making a metadata service a do
 
 | Earlier result | Milestone 4 successor |
 | --- | --- |
-| Repository-owned canonical YAML and reference closure | Complete consumer inputs: 186 canonical and 13 reference records |
+| Repository-owned Things metadata and relationship closure | One `metadata/records/` inventory containing all 199 Things; declarative policy selects 186 editor records and 185 pages |
 | Schema validation and native relationship closure | Locked engine validation against the pinned source Things Schema and exact `dlthings:*` contract |
 | Deterministic qri/Hugo projection | Generic declarative projection: 199 records, 185 record pages, 186 graph nodes, and 467 native edges |
 | Static output after ephemeral validation | Root-relative local builds and absolute project-path Pages builds, with no persistent service |
@@ -24,11 +24,12 @@ This closes the engineering execution gap without making a metadata service a do
 | Static credential-free editing | Public catalog, browser review-bundle export, commit/path/digest-bound application, validation, projection, and rollback |
 | Project-path browser behavior | Chromium and WebKit graph, route, editor, download, and credential-scrub contracts |
 | Read-only Zotero integration | Captured source evidence, 23 active consumer successors, and exact publication-transform parity |
-| Reviewable generated output | Committed projection ledger, stale-output rejection, deterministic double builds, and exact ordinary revert proof |
+| Reviewable generated output | Ignored projection regeneration, stale-output rejection, deterministic double builds, and source-only metadata diffs |
 | Local/offline operation | Digest-addressed asset hydration followed by OS-level denied-network validation, projection, build, and editor checks |
 
 The M4 traceability baseline maps 106 parent Python methods, five Playwright definitions with nine browser executions, 42 Zotero methods, and eight editor methods with no unmapped source assertion.
 The complete details and immutable coordinates remain in [`milestone-4-acceptance.md`](milestone-4-acceptance.md).
+Counts in that historical evidence use the former 186-canonical/13-reference filesystem vocabulary; configuration contract 2 supersedes it with one 199-record input tree without changing the accepted content.
 
 ## Retained as engineering capability
 
@@ -84,5 +85,5 @@ Under that rule the old CON-coupled root environment can remain historical, whil
 
 ## Next engineering goal
 
-The accepted [`metadata source-adapter goal`](metadata-source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
-Its first downstream proof uses Zotero; a common plugin host becomes a template candidate only after at least two independent adapters and a real metadata review pull request establish a stable contract.
+The accepted [`source-adapter architecture`](source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
+Its first reusable candidate is Zotero; the CON-specific `dump-research-info` experiment supplies design evidence but does not define a common host or a generic adapter.

@@ -1,11 +1,11 @@
 format: orinoco-lite-runtime-source
 spec_version: 1
-release: 0.1.0
+release: 0.1.12
 compatibility:
   config: [2]
   minimum_python: "3.12"
   hugo: ">=0.154,<0.155"
-  schema_profile: things-schemas/demo-research-information@d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
+  schema_profile: things-schemas/demo-research-information@cb6c791aec4c5309775437df4bd58e94e1bfcc3c
 
 commands:
   validate:
@@ -73,6 +73,7 @@ commands:
 
 licenses:
   - licenses/README.md
+  - licenses/orinoco-lite-MIT.txt
   - licenses/pool-ui-MIT.txt
   - licenses/things-schemas-MIT.txt
   - licenses/editor-dependencies/inventory.json
@@ -84,6 +85,8 @@ resources:
     destination: drivers/adapt_pages.py
   - source: release/runtime-licenses/README.md
     destination: licenses/README.md
+  - source: packages/orinoco-lite/LICENSE
+    destination: licenses/orinoco-lite-MIT.txt
   - source: submodules/pool.psychoinformatics.de-ui/LICENSE
     destination: licenses/pool-ui-MIT.txt
   - source: submodules/things-schemas/LICENSE
@@ -105,26 +108,31 @@ provenance:
   source_repository: https://github.com/con/orinoco-lite-dev
   component_commits:
     pool_ui: 93961ace8d4ceaea088ccc04526a9bc5428139a6
-    things_schemas: d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
-  notes:
-    - Runtime contents are assembled only from the exact pinned source tree.
-    - The runtime is content and presentation neutral; downstream sites own presentation.
-    - Component license texts are bundled; the parent project remains license-neutral.
+    things_schemas: cb6c791aec4c5309775437df4bd58e94e1bfcc3c
+  compatibility_change: >-
+    This release establishes configuration contract 2: one metadata/records
+    pool, source-adapters as the public acquisition boundary, and hidden
+    framework provenance. Every Thing validates and participates in projection,
+    while page, graph, and editor exposure remain declarative view policy. It
+    also advances the source Things Schema to the exact upstream commit that
+    declares the PAV prefix without changing model classes or projection
+    semantics. Contract 1 aliases and the canonical/reference split are
+    intentionally unsupported during the prototype phase.
   source_inventory:
     engine:
       commit: release-source
-      license: not-declared
-    page_adapter:
-      commit: release-source
-      license: not-declared
+      license: MIT
+      license_path: licenses/orinoco-lite-MIT.txt
     editor_shell:
       commit: 93961ace8d4ceaea088ccc04526a9bc5428139a6
       shacl_vue_commit: 3be33196f0eb7a65817df78b88ea40ecbb5eca11
       license: MIT
       license_path: licenses/pool-ui-MIT.txt
-      overlay: release/editor-v2/review-bundle.js
+      overlays:
+        - release/editor-v2/review-bundle.js
+        - release/editor-v2/SubmitComp.vue.patch
     schema:
-      commit: d26ea4135e28c25b134c64de1cdc15d15cd2f9f0
+      commit: cb6c791aec4c5309775437df4bd58e94e1bfcc3c
       profile: demo-research-information/unreleased
       license: MIT
       license_path: licenses/things-schemas-MIT.txt

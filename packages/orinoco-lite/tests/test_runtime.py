@@ -44,7 +44,7 @@ spec_version: 1
 release: 0.1.0
 source_root: source
 compatibility:
-  config: [1]
+  config: [2]
   hugo: ">=0.154,<0.155"
 commands:
   validate: ["{python}", "{runtime}/drivers/validate.py"]
@@ -90,7 +90,7 @@ provenance:
         consumer = self.root / "consumer"
         consumer.mkdir()
         (consumer / "orinoco.yaml").write_text(
-            "contract_version: 1\n"
+            "contract_version: 2\n"
             "site:\n"
             "  name: Runtime cache fixture\n"
             "  base_url: https://example.invalid/runtime-cache/\n",

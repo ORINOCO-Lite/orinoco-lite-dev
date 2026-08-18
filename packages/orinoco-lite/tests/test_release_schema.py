@@ -10,8 +10,8 @@ from linkml_runtime import SchemaView
 from orinoco_lite.release_schema import localize_schema
 
 
-CON_ROOT = Path(__file__).resolve().parents[4]
-SCHEMA_SOURCE = CON_ROOT / "orinoco-milestone-4-dev/submodules/things-schemas/src"
+ENGINE_ROOT = Path(__file__).resolve().parents[3]
+SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
 
 
 @unittest.skipUnless(SCHEMA_SOURCE.is_dir(), "pinned schema fixture is unavailable")

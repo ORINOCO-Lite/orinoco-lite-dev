@@ -14,32 +14,30 @@ import yaml
 from .errors import ConfigurationError
 
 
-CONFIG_CONTRACT_VERSION = 1
+CONFIG_CONTRACT_VERSION = 2
 LOCK_CONTRACT_VERSION = 1
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DRIVER_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$")
 
 DEFAULT_PATHS: dict[str, str] = {
-    "canonical": "metadata/records",
-    "reference": "metadata/reference",
-    "provenance": "metadata/provenance",
+    "records": "metadata/records",
+    "provenance": ".orinoco-lite/provenance",
     "editorial": "editorial",
     "assets": "assets",
     "site": "site",
-    "integrations": "integrations",
+    "source_adapters": "source-adapters",
     "generated": "generated",
     "extensions": "extensions",
     "build": "build",
 }
 
 DIRECTORY_PATHS = {
-    "canonical",
-    "reference",
+    "records",
     "provenance",
     "editorial",
     "assets",
     "site",
-    "integrations",
+    "source_adapters",
     "generated",
     "extensions",
     "build",
@@ -187,7 +185,7 @@ def load_workspace(
     config_name: str = "orinoco.yaml",
     lock_name: str = "orinoco.lock",
 ) -> WorkspaceConfig:
-    """Load and resolve a version-1 downstream workspace."""
+    """Load and resolve a version-2 downstream workspace."""
 
     resolved_root = find_workspace_root(root) if root is None else root.resolve()
     if not resolved_root.is_dir():

@@ -8,7 +8,8 @@ Date: 2026-08-11
 
 The clean migration does not need the LinkML discriminator trial or the later Things Schemas identity candidate.
 
-The verified path uses the checked-out source schema at commit `d26ea413`, the released LinkML stack pinned below, and explicit `dlthings:*` CURIEs in record type designators.
+The verified path uses the checked-out source schema at commit `cb6c791`, the released LinkML stack pinned below, and explicit `dlthings:*` CURIEs in record type designators.
+That schema commit differs from the original `d26ea413` acceptance fixture only by declaring the `pav:` prefix; its classes and recursive structure are unchanged.
 With that combination, native `Association`, `Attribution`, `Generation`, `DOI`, and `ISSN` values pass JSON to RDF to JSON conversion and live Dump Things validation.
 
 Equivalent full-URI spellings are not supported by this contract.
@@ -20,7 +21,7 @@ The verified environment is:
 
 | Component | Exact selection |
 | --- | --- |
-| Things Schemas | `d26ea4135e28c25b134c64de1cdc15d15cd2f9f0` |
+| Things Schemas | `cb6c791aec4c5309775437df4bd58e94e1bfcc3c` |
 | Root schema | `src/demo-research-information/unreleased.yaml` |
 | Dump Things | `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf` |
 | Dump Things release | `6.3.6` |
@@ -163,8 +164,9 @@ The clean migration does not use proposed LinkML changes for:
 Do not adopt the later Things Schemas candidate that adds explicit `class_uri` declarations for the five classes.
 In particular, commit `33604b1a` and its prerequisite candidate commits are outside the clean-migration dependency set.
 
-The source schema remains pinned at `d26ea413`.
-The clean migration must not advance that pin indirectly while updating another submodule or regenerating a resolved schema.
+The original clean-migration evidence used `d26ea413`.
+Contract 2 deliberately advances to `cb6c791`, whose only change is the reviewed `pav:` prefix declaration required for upstream-aligned provenance.
+The release must not advance that pin indirectly while updating another submodule or regenerating a resolved schema.
 
 ## Build and test rules
 
@@ -193,7 +195,8 @@ LinkML expands the inlined, type-designated `Thing.relations` range into a union
 That wide recursive union is repeated on the descendant models.
 Serialization and Python compilation succeed, but Pydantic 2.13.4 exhausts the default stack while `Thing.model_rebuild()` constructs the recursive core schema.
 The same failure occurs with LinkML directly, before loading Dump Things patches.
-Dump Things 6.3.6 catches it, raises the process-wide recursion limit from 1,000 to 2,000, and retries.
+Authoritative upstream Dump Things has carried its own workaround since commit `b748d8a`: it catches the failure, raises the process-wide recursion limit in increments of 1,000, and retries.
+Dump Things 6.3.6 therefore succeeds at 2,000 for this schema but leaves the higher process-wide limit in place.
 
 Orinoco contains that existing fallback at the integration boundary.
 It builds the paired JSON/RDF converters under a lock with a temporary limit of 2,000, then restores the caller's exact prior limit on success or failure.

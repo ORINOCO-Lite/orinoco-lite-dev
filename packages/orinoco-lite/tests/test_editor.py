@@ -20,7 +20,7 @@ from orinoco_lite.errors import DriverError
 
 
 CONFIG = """\
-contract_version: 1
+contract_version: 2
 site:
   name: Editor fixture
   base_url: https://example.invalid/editor/
@@ -34,12 +34,13 @@ class EditorBundleTests(unittest.TestCase):
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
         for relative in (
             "metadata/records/XYZPerson",
-            "metadata/reference",
-            "metadata/provenance",
+            "metadata/records/XYZAgentRole",
+            ".orinoco-lite/provenance",
             "editorial",
             "assets",
-            "site",
-            "integrations",
+            "site/projection-templates",
+            "site/projection-tools",
+            "source-adapters",
             "generated",
             "extensions",
             "build",
@@ -47,6 +48,27 @@ class EditorBundleTests(unittest.TestCase):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
         (self.root / "assets/manifest.yaml").write_text(
             "version: 1\nassets: {}\n", encoding="utf-8"
+        )
+        (self.root / "site/projection-templates/person.md.j2").write_text(
+            "{{ display_label }}\n", encoding="utf-8"
+        )
+        (self.root / "site/projection-tools/graph.py").write_text(
+            "import json, sys\njson.dump({'nodes': [], 'edges': []}, sys.stdout)\n",
+            encoding="utf-8",
+        )
+        (self.root / "site/projection.yaml").write_text(
+            "version: 2\n"
+            "routing:\n  strip_prefix: 'xyzrins:'\n"
+            "homepage:\n  pid: xyzrins:persons/first\n"
+            "  template: site/projection-templates/person.md.j2\n"
+            "pages:\n  xyzri:XYZPerson:\n"
+            "    template: site/projection-templates/person.md.j2\n"
+            "unrendered_classes: [xyzri:XYZAgentRole]\n"
+            "graph:\n  producer: site/projection-tools/graph.py\n"
+            "  node_classes: [xyzri:XYZPerson]\n"
+            "  relationship_fields: []\n"
+            "  missing_external_targets: reject\n",
+            encoding="utf-8",
         )
         self.first = self.root / "metadata/records/XYZPerson/first.yaml"
         self.second = self.root / "metadata/records/XYZPerson/second.yaml"
@@ -60,6 +82,12 @@ class EditorBundleTests(unittest.TestCase):
             "pid: xyzrins:persons/second\n"
             "schema_type: xyzri:XYZPerson\n"
             "display_label: Second\n",
+            encoding="utf-8",
+        )
+        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
+            "pid: xyzrins:roles/member\n"
+            "schema_type: xyzri:XYZAgentRole\n"
+            "display_label: Member\n",
             encoding="utf-8",
         )
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
@@ -138,7 +166,7 @@ class EditorBundleTests(unittest.TestCase):
         )
         return bundle
 
-    def test_catalog_binds_all_canonical_sources(self) -> None:
+    def test_catalog_uses_projection_editability_policy(self) -> None:
         catalog = record_catalog(self.workspace)
         self.assertEqual(catalog["version"], 2)
         self.assertEqual(len(catalog["records"]), 2)

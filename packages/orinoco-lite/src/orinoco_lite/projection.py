@@ -20,9 +20,9 @@ from linkml_runtime import SchemaView
 import yaml
 
 from .config import WorkspaceConfig
-from .editor import _record_sources
 from .errors import ConfigurationError, DriverError
 from .integrity import sha256_file
+from .records import record_sources
 from .schema_conversion import build_format_converters
 
 
@@ -285,13 +285,10 @@ def _native_fingerprint(value: Any) -> Counter[tuple[str, str]]:
     return result
 
 
-def _records(workspace: WorkspaceConfig) -> tuple[list[dict[str, Any]], set[str], set[str]]:
-    canonical_sources = _record_sources(workspace, "canonical")
-    reference_sources = _record_sources(workspace, "reference")
-    records = [yaml.safe_load(item["content"]) for item in [*canonical_sources, *reference_sources]]
-    canonical = {item["pid"] for item in canonical_sources}
-    reference = {item["pid"] for item in reference_sources}
-    return records, canonical, reference
+def _records(workspace: WorkspaceConfig) -> tuple[list[dict[str, Any]], set[str]]:
+    sources = record_sources(workspace)
+    records = [yaml.safe_load(item["content"]) for item in sources]
+    return records, {item["pid"] for item in sources}
 
 
 def validate_semantics(
@@ -299,13 +296,13 @@ def validate_semantics(
     runtime_root: Path,
 ) -> dict[str, Any]:
     contract = load_contract(workspace)
-    records, canonical, reference = _records(workspace)
+    records, record_pids = _records(workspace)
     by_pid = {record["pid"]: record for record in records}
-    if len(by_pid) != len(records) or not canonical:
+    if len(by_pid) != len(records) or not record_pids:
         raise DriverError("Projection metadata PIDs must be unique and non-empty")
     homepage = by_pid.get(contract.homepage_pid)
-    if homepage is None or contract.homepage_pid not in canonical:
-        raise DriverError("Projection homepage is not a canonical record")
+    if homepage is None:
+        raise DriverError("Projection homepage is not a metadata record")
     declared_classes = set(contract.pages) | set(contract.unrendered_classes)
     record_classes = {record["schema_type"] for record in records}
     if not record_classes <= declared_classes:
@@ -323,7 +320,6 @@ def validate_semantics(
         to_ttl, to_json = build_format_converters(schema)
     except Exception as error:
         raise DriverError("Could not initialize semantic schema conversion") from error
-    adjacency: dict[str, set[str]] = {pid: set() for pid in by_pid}
     for record in records:
         pid = record["pid"]
         for schema_type in _nested_schema_types(record):
@@ -335,7 +331,6 @@ def validate_semantics(
         for field, target in _all_links(record, contract.relationship_fields):
             if target not in by_pid:
                 raise DriverError(f"{pid}: dangling {field} target {target}")
-            adjacency[pid].add(target)
         try:
             class_name = record["schema_type"].rsplit(":", 1)[-1]
             restored = to_json.convert(to_ttl.convert(record, class_name), class_name)
@@ -345,22 +340,9 @@ def validate_semantics(
         after = Counter(_nested_schema_types(restored))
         if any(after[item] < count for item, count in before.items()) or _native_fingerprint(restored) != _native_fingerprint(record):
             raise DriverError(f"{pid}: schema round trip changed native semantics")
-    reachable = set(canonical)
-    pending = list(canonical)
-    while pending:
-        source = pending.pop()
-        for target in adjacency[source]:
-            if target not in reachable:
-                reachable.add(target)
-                pending.append(target)
-    if reference - reachable:
-        raise DriverError(
-            "Reference records are outside the canonical relationship closure: "
-            + ", ".join(sorted(reference - reachable))
-        )
     graph_nodes = {
         pid
-        for pid in canonical
+        for pid in record_pids
         if by_pid[pid]["schema_type"] in contract.graph_node_classes
     }
     graph_edges: set[tuple[str, str]] = set()
@@ -371,11 +353,9 @@ def validate_semantics(
                     raise DriverError(f"{pid}: graph target does not materialize: {target}")
                 graph_edges.add((pid, target))
     return {
-        "canonical_records": len(canonical),
-        "reference_records": len(reference),
+        "records": len(records),
         "graph_nodes": len(graph_nodes),
         "graph_edges": len(graph_edges),
-        "records": len(records),
     }
 
 
@@ -501,8 +481,7 @@ def _matches_policy(
 
 def _projection_inputs(workspace: WorkspaceConfig, contract: ProjectionContract) -> list[Path]:
     roots = [
-        workspace.path("canonical"),
-        workspace.path("reference"),
+        workspace.path("records"),
         contract.path,
         workspace.path("site") / "projection-templates",
         workspace.path("site") / "projection-tools",
@@ -613,7 +592,7 @@ def render_projection(
 ) -> dict[str, Any]:
     semantic = validate_semantics(workspace, runtime_root)
     contract = load_contract(workspace)
-    records, canonical, _ = _records(workspace)
+    records, record_pids = _records(workspace)
     by_pid = {record["pid"]: record for record in records}
     if output.exists():
         shutil.rmtree(output)
@@ -623,7 +602,7 @@ def render_projection(
         "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in sorted(records, key=lambda item: (item["schema_type"], item["pid"]))),
         encoding="utf-8",
     )
-    for pid in sorted(canonical):
+    for pid in sorted(record_pids):
         record = by_pid[pid]
         schema_type = record["schema_type"]
         if pid == contract.homepage_pid:
@@ -660,7 +639,7 @@ def render_projection(
         raise DriverError("Projection graph must contain node and edge arrays")
     expected_nodes = {
         pid
-        for pid in canonical
+        for pid in record_pids
         if by_pid[pid]["schema_type"] in contract.graph_node_classes
     }
     expected_edges = {
@@ -696,12 +675,12 @@ def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
     ledger = output / "SHA256SUMS"
     if not ledger.is_file():
         raise DriverError(
-            "Committed projection ledger is missing; run `orinoco projection update`"
+            "Projection ledger is missing; run `orinoco projection update`"
         )
     expected = projection_manifest(workspace, runtime_root, output)
     if ledger.read_text(encoding="utf-8") != expected:
         raise DriverError(
-            "Committed projection is stale; run `orinoco projection update` after review"
+            "Projection output is stale; run `orinoco projection update`"
         )
     with tempfile.TemporaryDirectory(prefix="orinoco-projection-") as temporary:
         candidate = Path(temporary) / "projection"
@@ -727,7 +706,7 @@ def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
         ]
         if changed:
             raise DriverError(
-                "Committed projection does not match deterministic regeneration: "
+                "Projection output does not match deterministic regeneration: "
                 + ", ".join(changed[:10])
             )
     return {**rendered, "deterministic": True}

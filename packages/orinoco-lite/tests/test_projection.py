@@ -19,18 +19,18 @@ from orinoco_lite.projection import (
     update_projection,
     verify_projection,
 )
+from orinoco_lite.release_schema import localize_schema
 
 
 CON_ROOT = Path(__file__).resolve().parents[4]
+ENGINE_ROOT = Path(__file__).resolve().parents[3]
 ACCEPTED_CONSUMER = CON_ROOT / "test-orinoco-downstream-website"
-ACCEPTED_SCHEMA = (
-    CON_ROOT / "orinoco-milestone-4-dev/build/runtime-schema"
-)
+SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
 
 
 @unittest.skipUnless(
     (ACCEPTED_CONSUMER / "site/projection.yaml").is_file()
-    and (ACCEPTED_SCHEMA / "source-inventory.json").is_file(),
+    and (SCHEMA_SOURCE / "demo-research-information/unreleased.yaml").is_file(),
     "full-fidelity sibling fixture is not available",
 )
 class FullProjectionAcceptanceTests(unittest.TestCase):
@@ -56,8 +56,13 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
                 shutil.copytree(source, destination)
             else:
                 shutil.copyfile(source, destination)
+        localize_schema(
+            SCHEMA_SOURCE,
+            SCHEMA_SOURCE / "demo-research-information/unreleased.yaml",
+            self.runtime_010 / "schema",
+        )
+        shutil.copytree(self.runtime_010 / "schema", self.runtime_011 / "schema")
         for runtime, release in ((self.runtime_010, "0.1.0"), (self.runtime_011, "0.1.1")):
-            shutil.copytree(ACCEPTED_SCHEMA, runtime / "schema")
             (runtime / "runtime-manifest.json").write_text(
                 json.dumps({"release": release}) + "\n", encoding="utf-8"
             )
@@ -98,8 +103,6 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             report,
             {
-                "canonical_records": 186,
-                "reference_records": 13,
                 "records": 199,
                 "pages": 185,
                 "graph_nodes": 186,
@@ -186,7 +189,6 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.runtime = Path(self.temporary.name) / "runtime"
         for relative in (
             "metadata/records/Person",
-            "metadata/reference",
             "site/projection-templates",
             "site/projection-tools",
             "generated",
@@ -262,8 +264,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             raw={},
         )
         self.semantic = {
-            "canonical_records": 2,
-            "reference_records": 0,
             "records": 2,
             "graph_nodes": 2,
             "graph_edges": 0,

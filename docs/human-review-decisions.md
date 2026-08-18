@@ -58,7 +58,6 @@ Priorities mean:
 | HR-201 | P2 | Hosted editing | Keep bundle handoff or add authenticated branch/PR creation |
 | HR-202a | P2 | Packaging | Decide whether to ship an optional full-stack image |
 | HR-202b | P2 | Services | Decide whether to operate a persistent public service |
-| HR-203 | P2 | Generated data | Reconsider committed projections after an equivalent review model exists |
 | HR-204a | P2 | Updates | Choose manual coordinates or reviewed release discovery |
 | HR-204b | P2 | Automation | Choose a future update credential model |
 | HR-204c | P2 | Hosting | Decide whether per-PR deployed previews are worthwhile |
@@ -500,10 +499,6 @@ Decide whether the optional Dump Things and SHACL Vue service stack merits a dig
 Separately decide whether CON should operate any persistent public metadata or editing service.
 Static build, Pages, and bundle editing need none today.
 
-### HR-203 — Lifecycle of committed projections
-
-Reconsider committed `generated/projection` only after another design proves equivalent stale-output rejection, reviewability, source binding, and rollback.
-
 ### HR-204a — Release discovery
 
 Choose among manual immutable coordinates, a scheduled workflow, dependency automation, or another reviewed discovery mechanism.
@@ -548,7 +543,7 @@ Create separate IDs only when a milestone proposes a concrete scope.
 - The consumer contains **all** accepted Milestone 3 content and tests, not a representative subset.
 - The template is content-neutral; a downstream is one ordinary Git repository without submodules or gitlinks.
 - A locked engine, immutable runtime, versioned Copier source, and full-SHA reusable workflow form the release boundary.
-- Generated projections remain committed initially.
+- Projection output is ignored and regenerated during validation/build; metadata review uses source-only diffs.
 - Static validate/build/preview/Pages/editor operations require no persistent service.
 - Framework updates create pull requests and never auto-merge.
 - Pages deploys only reviewed default-branch code, not PR code.
