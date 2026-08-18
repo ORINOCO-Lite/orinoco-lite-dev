@@ -25,6 +25,8 @@ diff-upstream-pool = "python tools/upstream_pool_diff.py"
 format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
 install-hooks = { cmd = "git config core.hooksPath .githooks" }
 check-format = { cmd = "pre-commit run --all-files" }
+skills-install = '"$PIXI_EXE" run --frozen --manifest-path tools/skills/pixi.toml install'
+skills-audit = '"$PIXI_EXE" run --frozen --manifest-path tools/skills/pixi.toml audit'
 
 [pypi-dependencies]
 orinoco-lite = { path = "packages/orinoco-lite", editable = true }

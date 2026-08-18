@@ -2,6 +2,7 @@
 /build/
 /dist/
 /node_modules/
+apm_modules/
 *.env
 !.env.example
 __pycache__/

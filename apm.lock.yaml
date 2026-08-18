@@ -1,0 +1,82 @@
+lockfile_version: '1'
+generated_at: '2026-08-18T20:29:31.242049+00:00'
+apm_version: 0.28.0
+dependencies:
+- repo_url: leej3/skills-workshop
+  name: skills-workshop
+  host: github.com
+  resolved_commit: a8c43e090cb69ffeae63785f1a621975a04baf6b
+  resolved_ref: a8c43e090cb69ffeae63785f1a621975a04baf6b
+  version: 0.1.0
+  package_type: apm_package
+  deployed_files:
+  - .agents/skills/develop-orinoco-lite
+  - .agents/skills/develop-orinoco-lite/SKILL.md
+  - .agents/skills/develop-orinoco-lite/agents/openai.yaml
+  - .agents/skills/develop-orinoco-lite/references/adapter-static-curation.md
+  - .agents/skills/develop-orinoco-lite/references/repository-boundaries.md
+  - .agents/skills/develop-orinoco-lite/references/version-and-authority.md
+  deployed_file_hashes:
+    .agents/skills/develop-orinoco-lite/SKILL.md: sha256:9c5ccb9b8a0409740356cb828b917637bdc6be3fbe2d204246da90cdbb81dfa9
+    .agents/skills/develop-orinoco-lite/agents/openai.yaml: sha256:5aa3e7163c719c23cb8d88cf25b8e39d535e8da4fa6fbde60eb1953d0704bbab
+    .agents/skills/develop-orinoco-lite/references/adapter-static-curation.md: sha256:cbe00b0ece978ecc12dcf8156835abcced252d62c38c5a3e969dcc13f8cbe507
+    .agents/skills/develop-orinoco-lite/references/repository-boundaries.md: sha256:7fc3c121be9e89acc6fdaaa0ccffd3cc18dfb3423ef6bdb59def2cf78e71411e
+    .agents/skills/develop-orinoco-lite/references/version-and-authority.md: sha256:ae0cba5b68bf4458d85e31c525f267f2649090b358e6cbc5dcabe3ffc86d323e
+  content_hash: sha256:72c6251fa6b21822cf8b02f8b027c042e48393fcd2da9a158055bfd94891519e
+  skill_subset:
+  - develop-orinoco-lite
+deployments:
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: sha256:9c5ccb9b8a0409740356cb828b917637bdc6be3fbe2d204246da90cdbb81dfa9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite/agents/openai.yaml
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: sha256:5aa3e7163c719c23cb8d88cf25b8e39d535e8da4fa6fbde60eb1953d0704bbab
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite/references/adapter-static-curation.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: sha256:cbe00b0ece978ecc12dcf8156835abcced252d62c38c5a3e969dcc13f8cbe507
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite/references/repository-boundaries.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: sha256:7fc3c121be9e89acc6fdaaa0ccffd3cc18dfb3423ef6bdb59def2cf78e71411e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/develop-orinoco-lite/references/version-and-authority.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills-workshop
+  active_owner: leej3/skills-workshop
+  content_hash: sha256:ae0cba5b68bf4458d85e31c525f267f2649090b358e6cbc5dcabe3ffc86d323e

@@ -39,8 +39,14 @@ jobs:
       - name: Verify the root environment and standalone script locks
         run: |
           pixi lock --check
+          pixi lock --manifest-path tools/skills/pixi.toml --check
           pixi lock --script tools/upstream_static.py --check
           pixi lock --script tools/upstream_full.py --check
+
+      - name: Install and audit the pinned project skill
+        run: |
+          pixi run skills-install
+          pixi run skills-audit
 
       - name: Run submodule-independent tests
         run: pixi run test

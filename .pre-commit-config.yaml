@@ -6,3 +6,4 @@ repos:
         entry: snapper --in-place
         language: system
         files: '\.(md|markdown|rst|txt)$'
+        exclude: '^\.agents/skills/'

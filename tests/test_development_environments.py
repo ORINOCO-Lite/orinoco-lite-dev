@@ -13,6 +13,8 @@ MANIFEST = ROOT / "pixi.toml"
 SCRIPT = ROOT / "tools" / "upstream_static.py"
 SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
+SKILLS_MANIFEST = ROOT / "tools" / "skills" / "pixi.toml"
+SKILLS_LOCK = ROOT / "tools" / "skills" / "pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 
@@ -65,6 +67,41 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(set(lock["environments"]), {"default"})
         self.assertTrue(FULL_SCRIPT_LOCK.is_file())
 
+    def test_skill_install_is_pinned_and_isolated(self) -> None:
+        root = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        skills = tomllib.loads(SKILLS_MANIFEST.read_text(encoding="utf-8"))
+        apm = yaml.safe_load((ROOT / "apm.yml").read_text(encoding="utf-8"))
+        lock_text = (ROOT / "apm.lock.yaml").read_text(encoding="utf-8")
+        lock = yaml.safe_load(lock_text)
+
+        self.assertEqual(
+            root["tasks"]["skills-install"],
+            '"$PIXI_EXE" run --frozen --manifest-path '
+            "tools/skills/pixi.toml install",
+        )
+        self.assertEqual(
+            root["tasks"]["skills-audit"],
+            '"$PIXI_EXE" run --frozen --manifest-path '
+            "tools/skills/pixi.toml audit",
+        )
+        self.assertEqual(skills["pypi-dependencies"]["apm-cli"], "==0.28.0")
+        self.assertEqual(skills["tasks"]["install"]["cwd"], "../..")
+        self.assertEqual(skills["tasks"]["audit"]["cwd"], "../..")
+
+        dependency = apm["dependencies"]["apm"][0]
+        resolved = lock["dependencies"][0]
+        self.assertEqual(dependency["skills"], ["develop-orinoco-lite"])
+        self.assertEqual(resolved["skill_subset"], dependency["skills"])
+        self.assertEqual(resolved["resolved_commit"], dependency["ref"])
+        self.assertNotIn("/Users/", lock_text)
+        self.assertTrue(
+            (ROOT / ".agents" / "skills" / "develop-orinoco-lite" / "SKILL.md")
+            .is_file()
+        )
+
+        skills_lock = yaml.safe_load(SKILLS_LOCK.read_text(encoding="utf-8"))
+        self.assertEqual(set(skills_lock["environments"]), {"default"})
+
     def test_script_metadata_is_exact_and_platform_complete(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         match = re.search(r"^# /// script\n(?P<body>.*?)^# ///$", source, re.M | re.S)
@@ -110,10 +147,16 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("submodules: false", workflow)
         self.assertIn("pixi-version: v0.76.2", workflow)
         install = workflow.index("frozen: true")
+        skill_install = workflow.index("run: |\n          pixi run skills-install")
         tests = workflow.index("run: pixi run test")
         build = workflow.index("run: pixi run build-upstream-static")
-        self.assertLess(install, tests)
+        self.assertLess(install, skill_install)
+        self.assertLess(skill_install, tests)
         self.assertLess(tests, build)
+        self.assertIn(
+            "pixi lock --manifest-path tools/skills/pixi.toml --check", workflow
+        )
+        self.assertIn("pixi run skills-audit", workflow)
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("run: pixi run build-upstream-static-worktree", workflow)
         self.assertIn("run: pixi run test-upstream-full", workflow)

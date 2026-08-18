@@ -1,0 +1,16 @@
+name: orinoco-lite-engineering
+version: 0.1.0
+description: Engineering workspace for the Orinoco Lite static metadata stack
+targets:
+  - agent-skills
+
+dependencies:
+  apm:
+    - git: leej3/skills-workshop
+      ref: a8c43e090cb69ffeae63785f1a621975a04baf6b
+      skills:
+        - develop-orinoco-lite
+  mcp: []
+
+includes: auto
+scripts: {}
