@@ -59,9 +59,12 @@ The production `centerforopenneuroscience.org` repository and all of its local a
 - Runtime archive: 0.1.12, SHA-256 `0d43cf6b3db4c324777a373c7d2178ab8dcdaf224795f19b4ce2c16e8f114a5a`.
 - Runtime manifest: SHA-256 `4751bab7bfe5fa65bdc95499aff05a77b48de2f7f194270293865d6f25ab200f`.
 - Reusable workflow: `fe01e297d3d22d1690bf891b40eaab36595cea9e`.
-- Baseline command at the planning snapshot: `pixi run test`.
+- Template source release: `v0.1.15`, source commit `bea66d916da3791fe3820498aca676c8b64a585d`, tag object `ca8c78070e7a9fed291db662c43026d2cac65ac4`.
+- Published `github-template` remains `92ce600d2a0428169d94d9ad71bd438230d48558`, generated from `v0.1.14`.
+- Baseline command at the activated consumer base: `pixi run test`.
 - Result: all 46 site-owned Python tests passed.
-The current activated base is rechecked before the first consumer implementation commit.
+- Hosted validation run `32191740068` passed at the activated base on both macOS 14 ARM64 and Linux x86-64.
+- Hosted Pages run `32191739405` passed at the activated base.
 
 ### Source fixtures
 
@@ -76,6 +79,18 @@ The current activated base is rechecked before the first consumer implementation
 - Both source fixtures were clean at activation.
 Normal acceptance must remain independent of live Zotero, credentials, git-annex, and a persistent service.
 
+### Classified drift and negative evidence
+
+- A read-only Zotero API check on 2026-08-18 reported library version `668` and 190 top-level items.
+That is advisory live-source drift only.
+The implementation continues to propose from the exact reviewed version `451` fixture and does not refresh or combine it with live state.
+- The existing consumer proposal branch at `9cbed0b` is not an implementation base.
+It contains 218 records rather than the accepted 199-record corpus, combines unresolved person, grant, and venue changes, and its two platform checks fail.
+It is retained only as evidence that unconditional materialization is unsafe.
+- The consumer currently permits merge commits, squash merges, and rebase merges.
+Its `main` branch requires linear history, one approval, approval of the latest push, and dismissal of stale approvals.
+Milestone 5 therefore retains the complete inventory, decisions, and reconciliation report in the final tracked tree instead of relying on intermediate proposal commits to survive a squash or rebase.
+
 ## Design and decision ledger
 
 The implementation will record evidence for M5-Q001 through M5-Q007 here, but will label every outcome either `proposed`, `not activated`, or `human accepted`.
@@ -85,6 +100,9 @@ Source candidate decisions likewise require explicit human input; tests may use 
 No W3C PROV or SSSOM representation is activated at baseline.
 Git/DataLad, PAV assertion annotations, and tracked human disposition state remain the minimum provenance split to test.
 
+The implementation currently treats all candidate, decision, and command surfaces as explicitly versioned, site-owned prototypes.
+Proposal paths are relative to `metadata/records/`, and reconciliation must reject absolute paths, parent traversal, stale fingerprints, incomplete transaction coverage, and ambiguous links before replacing the canonical tree.
+
 ## Progress log
 
 ### 2026-08-18 — activation and baseline freeze
@@ -93,3 +111,12 @@ Git/DataLad, PAV assertion annotations, and tracked human disposition state rema
 - Reconciled the plan's consumer snapshot with the subsequently merged template `v0.1.15` update.
 - Reproduced the engineering and consumer unit-level baselines.
 - Confirmed that no original planning or acceptance document was modified.
+
+### 2026-08-18 — source-adapter preparation
+
+- Consumer commit `c3e689d` makes literal relative `dump-research-info` checkout paths resolve from the downstream repository root.
+The focused adapter suite passed all 10 tests, and a review against `../dump-research-info` at the frozen revision completed without copying the source into the consumer.
+- Consumer commit `da8568b` exposes the existing dump adapter's deterministic materialization plan separately from its legacy write step.
+The same 10 focused tests pass, and the proposal layer can now reuse the transform without mutating canonical metadata.
+- The frozen dump source currently produces 82 transformed records: 19 are source-only and 63 overlap existing canonical records.
+These counts describe review candidates, not accepted content changes.
