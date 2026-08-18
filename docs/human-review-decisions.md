@@ -2,7 +2,7 @@
 
 Status: Milestone 4 accepted; production-graduation review remains open
 
-Review snapshot: 2026-08-13
+Review snapshot: 2026-08-18
 
 This is the single working list of unresolved **human choices** accumulated through the clean migration, full migration, complete-content migration, and single-repository distribution work.
 It separates policy from facts with an objectively testable answer.
@@ -63,6 +63,7 @@ Priorities mean:
 | HR-204c | P2 | Hosting | Decide whether per-PR deployed previews are worthwhile |
 | HR-205 | P2 | Support | Add platforms beyond macOS ARM64 and Linux x86-64 |
 | HR-206 | P2 | Upstream | Prioritize a LinkML named-recursive-alias contribution |
+| HR-207 | P2 | Source adapters | Define Lite defaults and adapter-configurable decision behavior |
 | HR-210 | P2 | Test fixture | Choose the long-term role of the full-content test consumer |
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
 
@@ -482,6 +483,29 @@ Accept intentional modernization rather than requiring pixel parity, but record 
 
 **Resolution:** standard; reviewed surfaces/assistive technologies; exceptions; required changes; approver/date.
 
+## Accepted strategic decisions
+
+### HR-207 — Define source-adapter decision defaults
+
+**Status:** accepted
+
+**Question:** Should candidate identity, fingerprints, dispositions, deferral, and re-review behavior be fixed globally or owned entirely by each source adapter?
+
+**Outcome:** Orinoco Lite provides safe defaults.
+A rejection suppresses the same materially unchanged claim; a material source change or relevant matching-policy change reopens review; a deferral declares when the candidate returns; and permanent exclusion requires explicit human scope.
+
+Adapters may configure stable source-identity components, normalized material fields included in a versioned fingerprint, deferral conditions, and additional re-review triggers when their source semantics require it.
+Configuration must be deterministic and versioned, must preserve explicit durable human dispositions, and cannot infer a decision from absence or pull-request closure, treat deferral as permanent rejection, or suppress a materially changed candidate without an explicit broader human decision.
+
+The exact serialized disposition schema and common adapter interface remain exploratory until at least two adapters demonstrate the contract.
+This decision does not settle identity, publication, venue, topic, or eligibility policy.
+
+**Rationale:** Lite needs predictable safe behavior, while adapters need bounded control over what constitutes stable identity and material change for their source.
+
+**Decided by/date:** John Lee, 2026-08-18.
+
+**Follow-up:** Prototype the representation and transaction with the Zotero and `dump-research-info` adapters, including unchanged rejection, changed-source re-review, explicit deferral return, and all-rejected decision-only review cases.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.
@@ -596,6 +620,8 @@ This table makes completeness auditable.
 | M4-I011 | HR-206 for upstream resourcing; removal test is objective |
 | M4-I012 | Settled host-neutral local and explicit Pages bases |
 | M4-I013 | HR-001 engineering PR 5 disposition |
+| M4-I014 | Settled generated-projection boundary |
+| M4-I015 | HR-207 accepted source-adapter default and configuration boundary |
 
 Milestone 1's native type-discriminator deferral was superseded by the accepted native relationship records and typed identifiers under the exact `dlthings:*` CURIE contract; alternative full-URI designators remain outside the supported contract rather than an open decision.
 The accepted graph-only organization behavior maps to deferred HR-211, and the test fixture's long-term role maps to deferred HR-210.
