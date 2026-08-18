@@ -5,12 +5,20 @@ Status: contract 2 release candidate; public projection and source-adapter inter
 ## Goal
 
 Orinoco Lite keeps reviewed lab metadata in an ordinary Git repository and derives disposable outputs for websites, data exchange, and optional use by the full Orinoco service stack.
-It changes the curation transport, not the Things data model:
+It changes the curation transport, not the Things data model.
+The target source-adapter flow under exploration is:
 
 ```mermaid
 flowchart LR
     sources["External sources"] --> adapters["Source adapters\nscrapers, importers, enrichers"]
-    adapters -->|"DataLad-recorded command and Git diff"| records["metadata/records\nreviewed Things YAML"]
+    records["metadata/records\nreviewed Things YAML"] --> adapters
+    decisions["Prototype curation state\nadapter-scoped decisions"] --> adapters
+    adapters --> proposals["Reviewable proposal\nmetadata diff + candidate inventory"]
+    proposals --> review["Human review"]
+    review -->|"durable decision"| decisions
+    proposals --> reconcile["Recorded reconciliation"]
+    decisions --> reconcile
+    reconcile -->|"metadata with assertion provenance"| records
     records --> validate["Pinned Things Schema\nvalidation"]
     validate --> policy["Projection policy"]
     policy --> site["Static website and editor"]
@@ -21,6 +29,7 @@ flowchart LR
 Every Thing under `metadata/records/` is a real semantic input.
 Page creation, graph membership, editor exposure, and future exports are view policy rather than separate categories of source metadata.
 Generated output is ignored and regenerated so a metadata pull request presents the source change itself.
+In this target, durable human dispositions are tracked site policy and adapter input, not generated output, a disposable cache, or automatically a public Thing.
 
 The service-backed Dump Things, pool UI, and SHACL Vue stack remains an engineering capability and an optional advanced deployment.
 A normal downstream validates, reviews, builds, and deploys without running a persistent service.
@@ -43,15 +52,15 @@ Orinoco Lite uses *source adapter* only as a local umbrella for tools that propo
 
 ## Provenance and adapter policy
 
-The Git commit produced by `datalad run` records the literal project-relative command and the resulting ordinary-Git changes.
-The pull request is the acceptance boundary.
-Adapters do not maintain a second ownership inventory or digest copy of the same record diff.
+The source-adapter exploration is evaluating a static workflow that distinguishes execution provenance, assertion provenance, and durable curation state.
+Git and preserved DataLad run evidence are intended to record execution; Provenance, Authoring and Versioning (PAV) annotations identify the tool and source responsible for imported assertions; tracked site-owned decisions prevent a materially unchanged rejected claim from being proposed again.
+A content diff does not record why an absent candidate was rejected or deferred, so this decision state is not a duplicate ownership or digest inventory.
+M4-I015 and HR-207 settle the safe default and adapter-configuration boundary; the serialized decision format, transaction transport, and common adapter interface remain exploratory.
 
-Upstream enrichment helpers use PAV terms such as `pav:importedBy` and `pav:importedFrom` to protect and explain field-level changes.
-Orinoco Lite targets those semantics where they add useful source attribution, but does not make field ownership a universal precondition during the current prototype phase.
-An adapter may offer `report`, `basic`, and `aggressive` modes with documented, adapter-specific behavior.
-Each mode may propose arbitrary additions, modifications, or removals; the reviewer accepts or revises the resulting Git diff.
-As multiple pool iterations establish stable semantics, reusable adapters should increasingly delegate provenance-aware updates to upstream helpers.
+The target uses proposal and reconciliation as separate phases on one pull-request branch.
+The human decision occurs between them, and the eventual default-branch merge would make the resulting metadata and decisions one reviewed transition.
+This target requires neither a persistent service nor a follow-up bot; transaction and failure behavior remain to be proven.
+The detailed exploratory contract, technology boundaries, and completion criteria are maintained in [`source-adapters.md`](source-adapters.md).
 
 ## Known compatibility seams
 
@@ -64,7 +73,7 @@ Until LinkML emits a named recursive alias, Lite constructs the converters under
 Other deliberate seams are:
 
 - exact reviewed `dlthings:*` CURIE type designators rather than unreviewed full-URI alternatives;
-- a credential-free static review-bundle editor overlay instead of the upstream authenticated service workflow;
+- a credential-free static review-bundle editor overlay, with a tracked-decision extension under exploration, instead of the upstream authenticated service workflow;
 - project-path and host-neutral static artifacts adapted from upstream's root-absolute presentation; and
 - ordinary-Git runtime assets instead of requiring git-annex in a downstream.
 
@@ -91,10 +100,10 @@ Until that choice is implemented, creation documentation must place the profile 
 
 ### 3. Exercise reusable upstream enrichment
 
-- Develop Zotero as the first reusable source adapter.
-- Use the newly available upstream PAV prefix and enrichment/update helpers where their behavior matches a demonstrated mode.
-- Keep the CON-specific `dump-research-info` importer as an exploratory example, not a generic Git-checkout adapter.
-- Extract a common CLI contract only after at least two adapters demonstrate it.
+- Complete the identity, disposition, review-transaction, mapping, and verification exploration defined in [`source-adapters.md`](source-adapters.md).
+- Demonstrate the complete workflow with Zotero and the CON-specific `dump-research-info` importer, including decision-only rejection and material-change re-review.
+- Use upstream PAV and enrichment/update helpers where their behavior matches a demonstrated mode, and test A Simple Standard for Sharing Ontological Mappings (SSSOM) only as a mapping interchange format.
+- Decide whether a common CLI or decision contract is justified only after both adapters satisfy the documented exit criteria.
 
 ### 4. Prove a non-website projection
 
