@@ -134,6 +134,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("timeout-minutes: 60", workflow)
         self.assertIn(f"actions/cache/restore@{cache_action}", workflow)
         self.assertIn(f"actions/cache/save@{cache_action}", workflow)
+        self.assertEqual(workflow.count("continue-on-error: true"), 2)
+        self.assertIn('SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"', workflow)
         self.assertEqual(workflow.count(cache_key), 2)
         self.assertEqual(workflow.count("build/playwright-browsers\n"), 2)
         self.assertEqual(
