@@ -83,6 +83,16 @@ jobs:
             !build/playwright-browsers/.links
           key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
 
+      - name: Bound Linux package mirror operations
+        if: ${{ inputs.command == 'test-all' && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'Acquire::Retries "3";' \
+            'Acquire::http::Timeout "30";' \
+            'Acquire::https::Timeout "30";' \
+            | sudo tee /etc/apt/apt.conf.d/99orinoco-network-bounds >/dev/null
+
       - name: Run the consumer facade
         shell: bash
         env:

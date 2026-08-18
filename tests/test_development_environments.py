@@ -136,6 +136,14 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn(f"actions/cache/save@{cache_action}", workflow)
         self.assertEqual(workflow.count("continue-on-error: true"), 2)
         self.assertIn('SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"', workflow)
+        self.assertIn("Bound Linux package mirror operations", workflow)
+        self.assertIn(
+            "inputs.command == 'test-all' && runner.os == 'Linux'",
+            workflow,
+        )
+        self.assertIn('Acquire::Retries "3";', workflow)
+        self.assertIn('Acquire::http::Timeout "30";', workflow)
+        self.assertIn('Acquire::https::Timeout "30";', workflow)
         self.assertEqual(workflow.count(cache_key), 2)
         self.assertEqual(workflow.count("build/playwright-browsers\n"), 2)
         self.assertEqual(
@@ -160,6 +168,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         self.assertLess(
             workflow.index("Restore the exact Playwright browser cache"),
+            workflow.index("Bound Linux package mirror operations"),
+        )
+        self.assertLess(
+            workflow.index("Bound Linux package mirror operations"),
             workflow.index("Run the consumer facade"),
         )
         self.assertLess(
