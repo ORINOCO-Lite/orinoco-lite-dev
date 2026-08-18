@@ -69,8 +69,9 @@ Supporting records are:
 
 - [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) for exact releases, test results, hosted runs, parity counts, and remaining gates;
 - [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for accepted Milestone 4 architecture decisions;
+- [`docs/milestone-5.md`](docs/milestone-5.md) and its [decision register](docs/milestone-5-decisions.md) for the proposed next source-adapter exploration, not accepted Milestone 4 evidence;
 - [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
-- [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the implementation diff under review.
+- [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the accepted implementation-review history.
 
 ## Stable downstream interface
 
@@ -158,7 +159,8 @@ To advance upstream dependencies safely:
 
 This keeps checkout automation in the task without letting a validation command silently discard work in progress.
 The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
-The accepted post-Milestone source-adapter plan in [`docs/source-adapters.md`](docs/source-adapters.md) defines how downstream-owned tools produce reviewable metadata changes through recorded DataLad commands.
+The proposed [`Milestone 5 plan`](docs/milestone-5.md) bounds the next source-adapter exploration, with future evidence separated into its [acceptance record](docs/milestone-5-acceptance.md).
+The detailed exploration in [`docs/source-adapters.md`](docs/source-adapters.md) records the target model for reviewable metadata changes, DataLad execution evidence, and durable human dispositions.
 The broader [`lightweight architecture roadmap`](docs/lightweight-architecture-roadmap.md) records the upstream-reuse and parity policy, the gradual PAV convergence, the contract 2 release sequence, and the evidence required before a general projection interface is designed.
 
 The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
