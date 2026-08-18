@@ -103,6 +103,22 @@ Git/DataLad, PAV assertion annotations, and tracked human disposition state rema
 The implementation currently treats all candidate, decision, and command surfaces as explicitly versioned, site-owned prototypes.
 Proposal paths are relative to `metadata/records/`, and reconciliation must reject absolute paths, parent traversal, stale fingerprints, incomplete transaction coverage, and ambiguous links before replacing the canonical tree.
 
+The following outcomes are implementation proposals, not accepted decisions:
+
+| Gate | Proposed implementation outcome |
+| --- | --- |
+| M5-Q001 | A deterministic, content-addressed YAML inventory transports one complete adapter proposal. Exact source and policy inputs participate in its identifier. Inventories remain noncanonical review envelopes and are not retained on the integration branch until a human accepts their public-repository privacy and retention policy. |
+| M5-Q002 | A site-owned, prototype-versioned YAML ledger records immutable decision events and the exact inventory transactions that anchor them. Generation cannot write the ledger. No predecessor or compatibility promise is activated. |
+| M5-Q003 | Reconciliation requires a complete active decision event for every inventory candidate, a current-baseline compare-and-swap, locked-schema staged validation, an exclusive local transaction, and rollback or explicit interrupted-run recovery before a whole-tree activation. Tracked inventory, ledger, reconciliation report, and DataLad sidecar evidence are intended to survive the consumer's squash/rebase-capable merge policy. |
+| M5-Q004 | Every decision event requires reviewer identity, decision date, rationale, and nonempty evidence. The prototype validates presence and retention but deliberately does not decide who is authorized to approve. |
+| M5-Q005 | Not activated. The demonstrated audit questions are answered by tracked transaction state, Git/DataLad execution evidence, and PAV assertion provenance. |
+| M5-Q006 | Not activated. No genuine ontology-mapping case was found; entity linkage and rejection remain decision semantics rather than SSSOM mappings. |
+| M5-Q007 | Keep the common semantics, tests, and command facade as a site-owned prototype. Do not release an engine API or template-managed adapter. The template receives only a generic proof that normal updates preserve site-owned decision and crosswalk bytes. |
+
+The candidate and decision formats contain complete proposed/baseline records and human audit prose.
+The underlying test corpus and frozen source fixtures are already public, but that fact does not settle future-source privacy, reviewer privacy, or long-term retention.
+For that reason, real inventories and reviewer decisions are generated only as ignored local evidence during this implementation; they are not committed as durable policy before M5-Q001, M5-Q002, and M5-Q004 receive human review.
+
 ## Progress log
 
 ### 2026-08-18 — activation and baseline freeze
@@ -120,3 +136,27 @@ The focused adapter suite passed all 10 tests, and a review against `../dump-res
 The same 10 focused tests pass, and the proposal layer can now reuse the transform without mutating canonical metadata.
 - The frozen dump source currently produces 82 transformed records: 19 are source-only and 63 overlap existing canonical records.
 These counts describe review candidates, not accepted content changes.
+
+### 2026-08-18 — provenance and update-preservation evidence
+
+- Consumer commit `6fc345f` adds locked Orinoco Lite 0.1.12 acceptance for expanded keyed PAV annotations.
+PAV round-trips on a whole record and on `dlthings:Attribution`, `dlthings:AttributeSpecification`, `dlthings:Identifier`, and `dlthings:Generation` assertions.
+Compact nested input normalizes to the expanded form and fails the native semantic fingerprint check rather than publishing changed semantics silently.
+- The same test proves a top-level imported-record PAV annotation survives reconciliation semantics and the exact `records.jsonl` machine projection while the public page and graph bytes remain unchanged.
+Counts remain 199 records, 185 pages, 186 graph nodes, and 467 graph edges.
+- Template commits `baee9a3` and `d7edba7` add only an updater preservation test.
+A normal framework update retains a syntactically representative prototype decision ledger and a site-owned crosswalk byte-for-byte, with no site-owned path reported as changed.
+- The template does not receive the curation implementation, a managed adapter, or a new released interface.
+
+### 2026-08-18 — two-adapter proposal evidence
+
+- The frozen Zotero fixture deterministically produces 126 whole-publication candidates without changing canonical metadata.
+Stable source identity uses the transformed publication PID; a publication merged from multiple Zotero items retains every item key in the source material and one deterministic API query URI for assertion provenance.
+- The exact clean `dump-research-info` checkout deterministically produces 82 candidates from the literal `../dump-research-info` path.
+Seventy-six candidates carry one or more unresolved-relation blockers, representing eight unique unresolved target PIDs; blocked candidates cannot be accepted automatically.
+- Checkout relocation, a run-identifier change, and an unrelated source-repository commit leave dump candidate identities, fingerprints, and proposed records unchanged.
+A material source-record change preserves candidate identity and changes the material fingerprint.
+- The adapters propose the same six canonical publication paths.
+Their candidate identities remain source-specific, both proposals remain visible, and reconciling either proposal makes the other's captured baseline stale until it is reproposed and explicitly reviewed.
+- PAV uses stable source-record and software-agent URIs.
+Exact snapshot digests, Git commit/tree coordinates, and provider/transformer hashes remain separate inventory inputs so execution provenance is exact without turning an unrelated commit or implementation comment into a material source change.
