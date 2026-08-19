@@ -8,6 +8,8 @@ Engineering branch: `codex/milestone-5`
 
 Consumer branch: `codex/milestone-5`
 
+Template branch: `codex/milestone-5`
+
 ## Purpose and documentation boundary
 
 This report records Milestone 5 implementation choices, deviations, commands, test evidence, and proposed decision outcomes while preserving the planning documents supplied by the reviewer.
@@ -28,12 +30,13 @@ Formal milestone acceptance will still require a human to review the final evide
 
 ## Scope and ownership
 
-The implementation is expected to change:
+The implementation changes:
 
 - the test consumer for the two site-owned adapter vertical slices, durable decision state, transaction tests, and complete downstream regression; and
-- this engineering repository for cross-layer fixtures, acceptance automation, and this report.
+- this engineering repository for activation evidence and this report.
 
-The template will change only if evidence from both adapters requires a generic framework surface.
+The template changes only by adding update-preservation acceptance for site-owned adapter policy.
+It does not receive the prototype or a new managed surface.
 `dump-research-info` remains an exact, read-only source checkout unless a source-specific defect is demonstrated.
 The production `centerforopenneuroscience.org` repository and all of its local and remote state remain read-only.
 
@@ -142,16 +145,19 @@ These counts describe review candidates, not accepted content changes.
 - Consumer commit `6fc345f` adds locked Orinoco Lite 0.1.12 acceptance for expanded keyed PAV annotations.
 PAV round-trips on a whole record and on `dlthings:Attribution`, `dlthings:AttributeSpecification`, `dlthings:Identifier`, and `dlthings:Generation` assertions.
 Compact nested input normalizes to the expanded form and fails the native semantic fingerprint check rather than publishing changed semantics silently.
-- The same test proves a top-level imported-record PAV annotation survives reconciliation semantics and the exact `records.jsonl` machine projection while the public page and graph bytes remain unchanged.
+- Consumer commit `14a42b9` composes the guarded reconciliation transaction, the exact locked 0.1.12 validator, JSON/RDF round-trip, and projection in one acceptance test.
+A top-level imported-record PAV annotation survives the reconciled YAML and exact `records.jsonl` machine projection while the public page and graph bytes remain unchanged.
 Counts remain 199 records, 185 pages, 186 graph nodes, and 467 graph edges.
-- Template commits `baee9a3` and `d7edba7` add only an updater preservation test.
+- Template commits `baee9a3`, `d7edba7`, and `d635658` add only an updater preservation test and align its fixture with the final immutable decision-event format.
 A normal framework update retains a syntactically representative prototype decision ledger and a site-owned crosswalk byte-for-byte, with no site-owned path reported as changed.
 - The template does not receive the curation implementation, a managed adapter, or a new released interface.
 
 ### 2026-08-18 — two-adapter proposal evidence
 
 - The frozen Zotero fixture deterministically produces 126 whole-publication candidates without changing canonical metadata.
-Stable source identity uses the transformed publication PID; a publication merged from multiple Zotero items retains every item key in the source material and one deterministic API query URI for assertion provenance.
+Stable source identity uses `item:<key>` for one source item and a sorted `items:<keys>` identity for a merged group.
+The DOI, transformed PID, path, and output remain material, so correcting a DOI reopens the same claim rather than creating a new identity.
+A publication merged from multiple Zotero items retains every item key in the source material and one deterministic API query URI for assertion provenance.
 - The exact clean `dump-research-info` checkout deterministically produces 82 candidates from the literal `../dump-research-info` path.
 Seventy-six candidates carry one or more unresolved-relation blockers, representing eight unique unresolved target PIDs; blocked candidates cannot be accepted automatically.
 - Checkout relocation, a run-identifier change, and an unrelated source-repository commit leave dump candidate identities, fingerprints, and proposed records unchanged.
@@ -160,3 +166,48 @@ A material source-record change preserves candidate identity and changes the mat
 Their candidate identities remain source-specific, both proposals remain visible, and reconciling either proposal makes the other's captured baseline stale until it is reproposed and explicitly reviewed.
 - PAV uses stable source-record and software-agent URIs.
 Exact snapshot digests, Git commit/tree coordinates, and provider/transformer hashes remain separate inventory inputs so execution provenance is exact without turning an unrelated commit or implementation comment into a material source change.
+
+### 2026-08-18 — durable prototype and transaction safety
+
+- Consumer commit `8cea625` adds the adapter-neutral, explicitly versioned `curation-*-prototype-v1` core and behavior vectors for both adapter identifiers.
+Candidate identity excludes run identifiers while the material fingerprint binds the source material, relevant policy, destination path, complete proposed record, and captured baseline.
+- Durable decisions are immutable events with a stable claim-revision identity, a unique decision-event identity, explicit supersession, and exact inventory-transaction anchoring.
+Only the active nonbranching chain tip can affect evaluation or reconciliation; historical events remain retained but cannot be replayed.
+The model supports accept, reject, link, defer, permanent exclusion, and supersede, including material/policy return, explicit dates, resolved-policy-question context, wildcard permanent scope, and `v1 -> v2 -> v1` source reversion without deleting history.
+- Consumer commits `d40d251` and `4fa38ee` bind the dump and Zotero providers to those shared safety semantics while retaining their source-specific identity and material rules.
+Consumer commit `3821656` makes transaction inventory coordinates strict full SHA-256 identities.
+- Consumer commit `49a4ebc` adds the guarded command facade for proposal, decision rendering, reconciliation, interrupted-tree recovery, stale-lock recovery, and report-reservation recovery.
+Proposal cannot write canonical metadata or the decision ledger.
+Reconciliation requires complete transaction-local decisions and invokes the exact locked 0.1.12 semantic validator on the staged full corpus before activation.
+- The canonical transaction uses an exclusive sibling lock, exact baseline compare-and-swap, symlink and duplicate-PID rejection, pre-validation and pre-activation tree-digest checks, staged and installed digest checks, atomic whole-tree rename, rollback authority, and explicit crash recovery.
+Append-only report journals are prepared before mutation, finalized under the same lock, and recoverable only when exact canonical digests and artifact sets match.
+Recovery evidence uses logical repository-relative paths rather than host paths.
+- Consumer commit `0c81c90` creates and revalidates fresh ignored provider-output directories, so the documented first-run Zotero command needs no manual setup.
+Consumer commits `773557a` and `9b5cd66` add the prototype operator guide and make its first-run commands independent of a nonexistent future decision ledger.
+
+### 2026-08-18 — exact local proposal evidence
+
+The following real inventories were generated twice with explicit `--as-of 2026-08-18`, no decision ledger, and no resolved policy questions.
+Both reruns reproduced the same inventory identifier and exact file SHA-256.
+They were summarized and moved to Trash after the comparison rather than retained in public history before the privacy and retention gates are reviewed.
+Canonical `metadata/records/` remained unchanged and the consumer worktree returned clean.
+
+| Adapter | Candidates | Blocked | Inventory ID | File SHA-256 | Bytes |
+| --- | ---: | ---: | --- | --- | ---: |
+| Zotero v451 | 126 | 0 | `curation-inventory-v1:d7230a3523277dad2b975226ab091bd95c8a1d7e607fcd286ce5d1f1f272012e` | `34a5a5c8c1494d39aa7dd43561c8719862503fe81737108bef197bac8c51a461` | 467153 |
+| `dump-research-info` `062da59` | 82 | 76 | `curation-inventory-v1:d2edc26f13ecd586ba18a1ff53680e6f55c1d03b75eac97989fc2e9b2e635a46` | `8c0fceecefe3544af6d3a670cd873196518800de37f4d5728df62f9c1ce2766a` | 195071 |
+
+The Zotero set contains 120 single-item and 6 deterministic multi-item source identities.
+The dump set retains 8 unique unresolved target blockers across its 76 blocked candidates.
+The two proposals overlap on exactly 6 canonical paths; neither provider suppresses the other, and the captured baseline makes an out-of-order second reconciliation stale.
+
+### 2026-08-18 — DataLad and squash-retention evidence
+
+- Consumer commit `612c304` adds a synthetic all-rejected transaction that runs in a nested ordinary Git repository through the project-local DataLad 1.6.2 and git-annex 10.20260420 environment.
+It records one content-addressed inventory, one explicit synthetic reject event ledger, one no-change reconciliation report, and one compressed DataLad run sidecar.
+- The test squashes the run branch locally, deletes the branch, expires all reflogs, prunes the original run commit, and then reparses every retained curation artifact and the sidecar.
+The squash tree equals the run tree at `c19df5d2fd6b3ad34d994ce5e3ffd2c54e1f30dc`; the four retained evidence files have aggregate SHA-256 `adfcc7351b24c409109da0a7d5808bd1a298e6eeef9769d83dde80b2abcb2e27`, and the sidecar SHA-256 is `29aeb2f49bbd3490c1f4f4c1c3f3fc18dd3f6801236dce774859381a5c54b1d6`.
+The canonical change count is zero.
+- Consumer commit `1572678` moves the nested test repository under ignored build scratch and asserts the ignore rule, preventing transient execution evidence from contaminating concurrent validation, build, or browser tasks.
+- This proves the local Git tree semantics of the repository's enabled squash mode and that sufficient evidence can survive without the intermediate run commit.
+It does not prove a server-generated GitHub squash, human final-head review, branch-protection enforcement, or a reviewed default-branch transition; those remain external acceptance gates.
