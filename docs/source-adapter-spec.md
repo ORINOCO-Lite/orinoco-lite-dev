@@ -62,10 +62,23 @@ Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch
 
 Source acquisition MUST be read-only.
 Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
-Each source claim MUST bind a stable source-record identifier to a content hash of the material source facts.
+Each source claim MUST bind a stable source-record identifier to a content hash of all and only the normalized source facts that can affect its proposed metadata.
+Transport metadata and unused source fields MUST NOT affect that hash or reopen review.
 A source-level version such as a Git commit or Zotero library version SHOULD also be recorded when available.
 Historical source payloads MAY be retained, but the specification never requires a full source snapshot.
 Historical reacquisition is not a conformance requirement: the identifier, source version, content hash, proposal diff, and review history are sufficient evidence of what was reviewed.
+
+### Canonical ordering
+
+One shared schema-aware canonicalizer MUST order and serialize every Thing written by an adapter.
+Adapters MUST NOT implement private YAML-ordering rules.
+The same canonicalizer MUST be applied once to the existing canonical record set so that later diffs compare like with like.
+That initial normalization SHOULD be a dedicated commit containing no semantic metadata changes.
+
+The canonicalizer MUST recursively order mappings by schema slot order with a lexical fallback for extension keys, sort set-like lists by their recursively canonicalized values, and preserve lists whose order carries meaning.
+The ordered-list policy is part of the shared schema contract, not adapter policy.
+Hashing and YAML serialization MUST consume the same canonicalized representation.
+This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
 ### Candidate plan
 
@@ -76,7 +89,7 @@ Each candidate contains at least:
 - the target canonical PID and record path;
 - a human-readable label;
 - the baseline and proposed Thing, or an explicit deletion;
-- a versioned digest of material source facts and relevant adapter policy; and
+- a versioned digest of the canonical source-mapped proposal facts and relevant adapter policy; and
 - any condition that blocks acceptance.
 
 The plan drives proposal generation, form rendering, and submission validation.
@@ -121,10 +134,11 @@ It MUST NOT contain baseline or proposed records, rendered diffs, candidate or d
 Re-review replaces the current entry; the prior entry remains available through Git.
 
 An unchanged rejection remains suppressed.
-A material source change or change to relevant policy MUST reopen review.
-An accepted record with no resulting metadata change is not proposed again.
+A change to the canonical source-mapped claim or relevant policy MUST reopen review.
+An unused source change does not reopen review because it cannot alter the proposal.
+An accepted claim whose source-mapped proposal is unchanged is not proposed again, even when the reviewed metadata contains a human correction.
 Deferral always returns on the next proposal.
-There is no separate permanent-exclusion disposition: rejection persists until the material claim or relevant policy changes.
+There is no separate permanent-exclusion disposition: rejection persists until the canonical source-mapped claim or relevant policy changes.
 Identity linkage is adapter policy or a reviewed crosswalk, not a disposition.
 
 ### Human modification and finalization
@@ -170,7 +184,7 @@ Automation MUST NOT choose a disposition, mark a review ready, approve, merge, d
 Before merge, corrections remain on the same review branch and add attributable commits; finalization is rerun against the new head.
 After merge, a correction starts a new adapter run and pull request from the reviewed default branch.
 
-### Update and ownership behavior
+### Update and adapter interaction
 
 Adapters MUST apply the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
 When a whole-record proposal would replace such content, the complete loss or change MUST remain visible in the Git diff and require explicit acceptance.
@@ -178,7 +192,13 @@ When a whole-record proposal would replace such content, the complete loss or ch
 An adapter MAY propose deletion for any record.
 The Git diff and form MUST make the deletion explicit, and acceptance or rejection is a human decision like any other proposed change.
 The final metadata tree MUST still pass schema and relationship validation; the adapter does not need a separate lifecycle-ownership or source-completeness protocol.
-Two adapters may target the same Thing, but each works from the current reviewed base and maintains its own source identity and decisions.
+
+Two adapters may target the same Thing.
+Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
+Each proposal MUST start from the current reviewed base.
+If another adapter merges first, an open proposal MUST be regenerated and reviewed against the new base before finalization.
+Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV.
+Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
 
 ## Semantic provenance
@@ -193,6 +213,8 @@ Adapters MUST use that representation and prove JSON-to-RDF-to-JSON and projecti
 
 Semantic machine provenance belongs in the canonical Thing because the upstream Things model includes this PAV annotation pattern.
 It is not moved into an Orinoco-specific provenance file.
+PAV records the origin of a machine-provided assertion, not authority to merge it.
+Every merged adapter change is associated with a human decision through the review and Git history.
 
 Every machine-provided assertion MUST carry assertion-level PAV.
 Imported objects such as `attributed_to`, `identifiers`, and `generated_by` carry annotations directly.
@@ -202,10 +224,9 @@ A record-level annotation MAY supplement but MUST NOT replace assertion-level pr
 An assertion created by a human or downstream policy rather than present in the external source is not imported source data and MUST NOT receive the adapter's PAV annotation.
 Examples include a manually resolved identity, an eligibility decision, or a locally chosen relationship.
 When a human changes a machine-provided assertion, the resulting human assertion MUST lose the adapter's PAV annotation unless it still states exactly the imported source fact.
-That change transfers the assertion out of machine ownership.
 The reviewed source claim remains cached even when the final human assertion differs from the source proposal, so an unchanged source claim MUST NOT produce a later reversion diff.
-If the source later changes, candidate generation MUST preserve the human-owned assertion.
-The adapter MAY report the source disagreement as a review diagnostic, but it MUST NOT express that disagreement as a proposed replacement unless a human explicitly returns the assertion to machine ownership.
+If the canonical source claim later changes, the adapter MAY propose a new visible diff against the human-edited baseline.
+Accepting that proposal associates the resulting source-provided assertion with the new human decision and restores its source PAV; rejecting or deferring it preserves the human edit.
 
 `pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice.
 Changing the adapter incompatibly requires a new versioned agent Thing.
@@ -305,6 +326,7 @@ The concrete upstream reference points are the Dump Things [inbox/curation model
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
 | Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
+| No site-wide canonical YAML serializer | Shared schema-aware record canonicalizer | Required to keep review diffs stable across service-free adapters. |
 | Compact scalar PAV annotations | Expanded annotation objects | Required by the pinned converter for lossless round trips. |
 | Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
 
@@ -315,7 +337,8 @@ These are gaps to close, not permitted variants of the specification:
 - current adapters use stable URNs rather than versioned adapter Things for `pav:importedBy`;
 - direct scalar imports rely on record-level PAV instead of upstream-style annotated attributes;
 - Zotero has record-level rather than assertion-level PAV;
-- the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or deletion proposals; and
+- existing canonical YAML has not been normalized by a shared schema-aware ordering function;
+- the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or deletion proposals;
 - Pixi review-application tasks do not yet run through DataLad; and
 - the pull-request opening text does not yet warn reviewers that adapter pull requests require rebase merge rather than squash.
 
@@ -323,7 +346,8 @@ These are gaps to close, not permitted variants of the specification:
 
 The following details are deliberately not settled by this draft:
 
-1. Does the source content hash cover the complete canonicalized source record or an adapter-selected subset, and how does canonicalization treat ordered and set-like lists?
-2. When a human changes a machine-imported assertion, is removing its PAV annotation sufficient, or should the schema also record explicit human authorship on that assertion?
+1. Which multivalued Things slots are semantically ordered?
+The shared canonicalizer needs an explicit list; publication author order is the clearest case that should not be sorted.
+2. When two adapters independently support the same assertion, should the existing assertion and its original PAV remain unchanged, or does that use case justify an upstream representation for multiple machine sources on one assertion?
 
 Until these questions are resolved, implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
