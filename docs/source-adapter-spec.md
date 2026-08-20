@@ -72,12 +72,13 @@ Historical reacquisition is not a conformance requirement: the identifier, sourc
 
 One shared schema-aware canonicalizer MUST order and serialize every Thing written by an adapter.
 Adapters MUST NOT implement private YAML-ordering rules.
-The same canonicalizer MUST be applied once to the existing canonical record set so that later diffs compare like with like.
+The same canonicalizer MUST be applied once to the existing canonical record set so that later diffs compare like with like; an adapter run does not reserialize untouched records.
 That initial normalization SHOULD be a dedicated commit containing no semantic metadata changes.
 
-The canonicalizer MUST recursively order mappings by schema slot order with a lexical fallback for extension keys, sort set-like lists by their recursively canonicalized values, and preserve lists whose order carries meaning.
-The ordered-list policy is part of the shared schema contract, not adapter policy.
-Hashing and YAML serialization MUST consume the same canonicalized representation.
+The canonicalizer MUST recursively order mappings by schema slot order with a lexical fallback for extension keys.
+Lists preserve their input order by default.
+A central schema-slot rule MAY identify a list as unordered and sort it by recursively canonicalized values; adapters MUST NOT make that choice independently.
+Record comparison operates on the canonical parsed Thing, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on its deterministic YAML serialization.
 This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
 ### Candidate plan
@@ -109,6 +110,7 @@ The recorded command MUST name the adapter, exact source coordinate, relevant in
 The proposal's DataLad commit and every later review commit MUST survive as distinct commits in default-branch history.
 A rebase may rewrite its commit ID while preserving its message and diff.
 Squashing it into another commit is not conformant.
+An obsolete proposal replaced during a conflicting rebase and adapter rerun is not part of the final reviewed lineage and need not be retained.
 
 ### Decisions and cache
 
@@ -196,7 +198,8 @@ The final metadata tree MUST still pass schema and relationship validation; the 
 Two adapters may target the same Thing.
 Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
 Each proposal MUST start from the current reviewed base.
-If another adapter merges first, an open proposal MUST be regenerated and reviewed against the new base before finalization.
+Semantically non-overlapping proposals may be rebased and merged in either order without rerunning either adapter, provided their reviewed diffs remain unchanged and the final tree validates.
+If another merge overlaps a proposal, the proposal branch MUST be rebased onto the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
 Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV.
 Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
@@ -220,6 +223,9 @@ Every machine-provided assertion MUST carry assertion-level PAV.
 Imported objects such as `attributed_to`, `identifiers`, and `generated_by` carry annotations directly.
 Imported scalar data is represented by annotated `AttributeSpecification` objects in `attributes`, using the upstream enrichment pattern; a topical scalar slot MAY remain when required by the schema or presentation.
 A record-level annotation MAY supplement but MUST NOT replace assertion-level provenance.
+When a later accepted adapter supplies an existing assertion, its PAV replaces the prior source PAV even if the assertion value is unchanged.
+That provenance replacement is part of the proposal diff and requires the normal human decision.
+The current Thing therefore names the most recent accepted machine source; Git history retains earlier sources and decisions.
 
 An assertion created by a human or downstream policy rather than present in the external source is not imported source data and MUST NOT receive the adapter's PAV annotation.
 Examples include a manually resolved identity, an eligibility decision, or a locally chosen relationship.
@@ -342,12 +348,4 @@ These are gaps to close, not permitted variants of the specification:
 - Pixi review-application tasks do not yet run through DataLad; and
 - the pull-request opening text does not yet warn reviewers that adapter pull requests require rebase merge rather than squash.
 
-## Remaining review questions
-
-The following details are deliberately not settled by this draft:
-
-1. Which multivalued Things slots are semantically ordered?
-The shared canonicalizer needs an explicit list; publication author order is the clearest case that should not be sorted.
-2. When two adapters independently support the same assertion, should the existing assertion and its original PAV remain unchanged, or does that use case justify an upstream representation for multiple machine sources on one assertion?
-
-Until these questions are resolved, implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
+Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
