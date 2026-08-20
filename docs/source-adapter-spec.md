@@ -110,7 +110,7 @@ The recorded command MUST name the adapter, exact source coordinate, relevant in
 The proposal's DataLad commit and every later review commit MUST survive unchanged as distinct commits in default-branch history.
 A merge commit or true fast-forward preserves those commits.
 Rebasing or squashing the final reviewed lineage is not conformant because it rewrites the execution record.
-An obsolete proposal replaced during a conflicting rebase and adapter rerun is not part of the final reviewed lineage and need not be retained.
+An obsolete proposal replaced during conflict regeneration is not part of the final reviewed lineage and need not be retained.
 
 ### Decisions and cache
 
@@ -198,8 +198,8 @@ The final metadata tree MUST still pass schema and relationship validation; the 
 Two adapters may target the same Thing.
 Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
 Each proposal MUST start from the current reviewed base.
-Semantically non-overlapping proposal branches may be merged in either order without rebasing or rerunning either adapter, provided their reviewed diffs remain unchanged and the final tree validates.
-If another merge overlaps a proposal, the proposal branch MUST be recreated on the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
+Proposal branches that Git can merge cleanly may be merged in either order without rebasing or rerunning either adapter, provided the resulting tree validates.
+If Git reports a conflict, the proposal branch MUST be recreated on the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
 Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV.
 Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
