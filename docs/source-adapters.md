@@ -35,7 +35,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Concern | Authority | Rule |
 | --- | --- | --- |
 | Metadata records | `metadata/records/` | Store reviewable, user-facing Things without inline machine-source annotations. |
-| Machine assertion provenance | `metadata/provenance/` | Store PAV companions; joining both metadata trees produces the complete semantic Things graph. |
+| Machine assertion provenance | `metadata/overlays/annotations/` | Store PAV annotation companions; joining the record and annotation-overlay trees produces the complete semantic Things graph. |
 | Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
 | Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
 | Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
@@ -43,7 +43,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
-The two metadata trees are canonical site-owned state.
+The record and annotation-overlay trees are canonical site-owned state.
 Generated projections, candidate plans, caches, diagnostics, and hosted form renderings are not canonical metadata.
 
 ## Core adapter contract
@@ -64,7 +64,7 @@ Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch
 Source acquisition MUST be read-only.
 Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
 The adapter MUST apply every validation rule exposed by its declared source model before transformation.
-Before the proposal commit, every stored record and every Thing produced by joining its provenance companion MUST pass the complete automated validation supported by the locked Things Schema and runtime.
+Before the proposal commit, every stored record and every Thing produced by joining its annotation companion MUST pass the complete automated validation supported by the locked Things Schema and runtime.
 Validation failures are diagnostics to correct, not review dispositions or durable candidate state.
 Each source claim MUST bind a stable source-record identifier to a content hash of all and only the normalized source facts that can affect its proposed metadata.
 Transport metadata and unused source fields MUST NOT affect that hash or reopen review.
@@ -74,14 +74,14 @@ Historical reacquisition is not a conformance requirement: the identifier, sourc
 
 ### Canonical ordering
 
-One shared canonicalizer MUST order and serialize every record and provenance companion written by an adapter.
+One shared canonicalizer MUST order and serialize every record and annotation companion written by an adapter.
 Adapters MUST NOT implement private YAML-ordering rules.
 The canonicalizer MUST match the upstream Dump Things `order_dict()` and `json2yaml()` behavior: recursively sort mapping keys lexically and preserve list order.
 It MUST be an idempotent shared library operation with focused upstream-parity tests, not a service or plugin framework.
 Every record in the canonical corpus MUST already conform to that serialization.
 An adapter run serializes only records it writes and does not reserialize untouched records.
 
-Record comparison operates on canonical metadata without machine-source annotations, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on deterministic record and companion serialization.
+Record comparison operates on canonical metadata without machine-source annotations, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on deterministic record and annotation-companion serialization.
 This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
 ### Candidate plan
@@ -93,7 +93,7 @@ Each candidate contains at least:
 - the target canonical PID and record path;
 - a human-readable label;
 - the baseline and proposed Thing, or an explicit deletion;
-- the corresponding assertion-provenance changes; and
+- the corresponding annotation-overlay changes; and
 - the claim content hash defined above.
 
 The plan drives proposal generation, form rendering, and submission validation.
@@ -104,7 +104,7 @@ Internal digests MUST NOT be the primary human identifier.
 ### Proposal
 
 Given identical source, base, policy, and active decisions, proposal output MUST be deterministic and idempotent.
-It MUST change only proposed Things under `metadata/records/` and their matching PAV companions under `metadata/provenance/`.
+It MUST change only proposed Things under `metadata/records/` and their matching PAV annotation companions under `metadata/overlays/annotations/`.
 
 The proposal MUST be created by one project-locked `datalad run --explicit` invocation.
 The run record MUST remain inline in a distinct commit; a DataLad sidecar is not used.
@@ -157,7 +157,7 @@ Supported inputs include:
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
-Unrelated human edits do not acquire a PAV companion entry or a source-candidate cache entry merely because they share the branch.
+Unrelated human edits do not acquire a machine-annotation entry or a source-candidate cache entry merely because they share the branch.
 
 A direct human commit is already its own execution and attribution record.
 When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
@@ -173,7 +173,7 @@ Finalizing review MUST:
 4. apply the reviewed record and provenance changes for accepted candidates;
 5. restore rejected and deferred record and provenance changes;
 6. update no durable review artifact other than the compact decision cache; and
-7. validate both metadata trees and the complete joined Things graph.
+7. validate the record tree, annotation-overlay tree, and complete joined Things graph.
 
 If finalization changes metadata programmatically, its Pixi task MUST run through DataLad.
 For each bot commit, the most recent authenticated human whose action triggered the operation is the Git author and automation is the committer.
@@ -191,15 +191,15 @@ After merge, a correction starts a new adapter run and pull request from the rev
 
 Adapters MUST apply the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
 When a whole-record proposal would replace such content, the complete loss or change MUST remain visible in the Git diff and require explicit acceptance.
-Candidate derivation MUST compare assertion content independently of its provenance companion.
+Candidate derivation MUST compare assertion content independently of its annotation companion.
 When an incoming assertion is semantically identical to an existing assertion, the adapter MUST preserve both and MUST NOT produce a provenance-only diff.
 When an incoming assertion differs substantively, the proposal MAY replace it; an accepted replacement records the proposing adapter and source in the companion.
 This rule applies assertion by assertion, so an unrelated change elsewhere in a record does not change the provenance of unchanged assertions.
 
 An adapter MAY propose deletion for any record.
 The Git diff and form MUST make the deletion explicit, and acceptance or rejection is a human decision like any other proposed change.
-Deleting a record also deletes its provenance companion.
-Both metadata trees and the joined graph MUST still pass schema and relationship validation; the adapter does not need a separate lifecycle-ownership or source-completeness protocol.
+Deleting a record also deletes its annotation companion.
+The record tree, annotation-overlay tree, and joined graph MUST still pass schema and relationship validation; the adapter does not need a separate lifecycle-ownership or source-completeness protocol.
 
 Two adapters may target the same Thing.
 Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
@@ -210,17 +210,20 @@ Assertions from different adapters may coexist in one Thing and retain their own
 Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
 
-## Semantic provenance companions
+## Semantic annotation overlay
 
 Upstream stores PAV annotations inline in a Thing and therefore in the same RDF graph.
 Orinoco Lite stores the user-facing record and its machine assertion provenance separately to keep record diffs readable, then joins them into the same semantic Thing before validation or RDF export.
 This is a storage-layout deviation, not a different provenance model.
 
-Adapter-generated PAV MUST be stored under `metadata/provenance/`, in a YAML companion that mirrors the record's relative path under `metadata/records/`.
+Adapter-generated PAV MUST be stored under `metadata/overlays/annotations/`, in a YAML companion that mirrors the record's relative path under `metadata/records/`.
 One companion covers one record and contains its PID plus only its current machine assertion provenance.
 It MUST NOT copy the record, retain prior states, or contain review decisions.
 The top-level mapping contains exactly `record` and `assertions`.
 `record` is the canonical PID and MUST match the mirrored record.
+
+Only the `annotations` overlay is defined by this specification.
+A new `metadata/overlays/<name>/` directory requires a focused specification change, a deterministic join rule, and validation of the resulting Thing.
 
 Each item in `assertions` contains exactly:
 
@@ -277,7 +280,7 @@ No second host implementation is required until the GitHub profile is complete, 
 The initial supported profile MUST:
 
 - start from a default-branch `workflow_dispatch` and open one draft pull request;
-- show user-facing record changes under `metadata/records/` in **Files changed**, with machine provenance confined to the mirrored companion tree;
+- show user-facing record changes under `metadata/records/` in **Files changed**, with machine provenance confined to the mirrored annotation-overlay tree;
 - render one task-list group per record in the pull-request body, headed by a friendly label, canonical PID, and useful source-native identifier;
 - support attributed comment suggestions, direct metadata commits, and SHACL Vue bundle application on the same branch;
 - accept a complete form through an exact `/curation submit` comment;
@@ -315,15 +318,15 @@ Beyond that boundary:
 - No custom distributed transaction, journal, lock service, or crash-recovery protocol is introduced.
 - No tracked inventory, review document, exhaustive manifest, DataLad sidecar, reconciliation report, or custom attestation graph is introduced.
 - No artifact is added merely to authenticate another artifact produced by the same trusted workflow.
-- No provenance store beyond the single companion tree is introduced without a source or human state that Git, PAV, and the compact decision cache cannot represent.
+- No semantic overlay beyond `annotations` is introduced without a focused specification change and a source or human state that Git, PAV, and the compact decision cache cannot represent.
 - A stronger attacker or availability model requires a separate reviewed design rather than incremental workflow machinery.
 
 ## Repository and dependency boundaries
 
 Concrete adapters and their policy are site-owned under `source-adapters/<adapter>/`.
 Scratch state belongs under ignored `build/`.
-The record and provenance trees are site-owned semantic metadata.
-The companion format and join operation are an engine contract; framework updates MUST NOT overwrite companion content.
+The record and annotation-overlay trees are site-owned semantic metadata.
+The annotation-companion format and join operation are an engine contract; framework updates MUST NOT overwrite companion content.
 Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter state beneath `.orinoco-lite/`.
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
@@ -352,7 +355,7 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Persistent schema-validating service | Locked local/CI validation of Git-backed YAML | Intentional; static operation must not require a service. |
 | Scraper/importer/enricher are distinct roles | `source adapter` is a local umbrella | Naming convenience only; specific upstream terms remain preferred. |
 | Positive proposals move through an inbox | Git diff contains proposed Things directly | Required for native pull-request metadata review. |
-| PAV annotations are stored inline in each Thing | Records and PAV companions are stored in parallel trees and joined before validation or RDF export | Keeps record diffs focused on user-facing metadata while preserving the same semantic graph. |
+| PAV annotations are stored inline in each Thing | Records and PAV annotation companions are stored under parallel record and overlay trees and joined before validation or RDF export | Keeps record diffs focused on user-facing metadata while preserving the same semantic graph. |
 | Rejected inbox proposals do not enter curated GitAudit history | The proposal DataLad commit remains in default-branch history after rejection | Required to preserve the single-PR execution and decision record; public retention is disclosed. |
 | No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
@@ -366,4 +369,4 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 
 Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).
 
-Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing provenance stores beyond the companion tree.
+Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing semantic overlays beyond the defined annotation overlay.

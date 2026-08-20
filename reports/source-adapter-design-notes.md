@@ -28,5 +28,5 @@ These observations describe the prototypes, not permanent adapter categories.
 ## Superseded directions
 
 The exploration considered tracked candidate inventories, append-only decision events, reconciliation reports, custom transaction recovery, and additional dispositions such as `link`, `supersede`, permanent exclusion, and conditional deferral.
-The specification deliberately replaces them with the Git diff, three dispositions, a compact current-state decision cache, ordinary Git recovery, and one semantic provenance companion tree.
+The specification deliberately replaces them with the Git diff, three dispositions, a compact current-state decision cache, ordinary Git recovery, and one annotation-overlay tree.
 Git history retains the discarded exploration; implementations should not revive it without a separate reviewed need.
