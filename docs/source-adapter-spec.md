@@ -143,7 +143,7 @@ Unrelated human edits do not acquire source PAV or a source-candidate cache entr
 
 A direct human commit is already its own execution and attribution record.
 When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
-The user MAY select ordinary Git instead.
+DataLad recording is opt-in; ordinary Git remains the default unless the user selects it.
 The command SHOULD record an input identifier and content hash when available, but the input payload need not remain in the final tree or Git history.
 DataLad is not useful for a decision-cache-only commit.
 
@@ -320,8 +320,7 @@ These are gaps to close, not permitted variants of the specification:
 
 The following details are deliberately not settled by this draft:
 
-1. Should optional DataLad recording of review edits be enabled by default in the hosted GitHub workflow, or only exposed as an explicit reviewer choice?
-2. Should squash merging be disabled repository-wide, or enforced only for adapter pull requests through the strongest host rule available?
-3. When a human changes a machine-imported assertion, is removing its PAV annotation sufficient, or should the schema also record explicit human authorship on that assertion?
+1. Should squash merging be disabled repository-wide, or enforced only for adapter pull requests through the strongest host rule available?
+2. When a human changes a machine-imported assertion, is removing its PAV annotation sufficient, or should the schema also record explicit human authorship on that assertion?
 
 Until these questions are resolved, implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
