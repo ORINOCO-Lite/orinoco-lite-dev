@@ -1,6 +1,6 @@
 # Milestone 5 acceptance record
 
-Status: active; implementation evidence pending
+Status: active; shared-foundation implementation is complete locally and review evidence is pending
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
@@ -19,13 +19,13 @@ Record these coordinates when each implementation workstream begins:
 
 | Surface | Required evidence | Status |
 | --- | --- | --- |
-| Specification | reviewed pull request head and merge commit establishing the normative contract and accepted M5 decisions | pending |
-| Engineering | exact base, released engine/runtime inputs, upstream pins, clean worktree, and baseline tests | pending |
+| Specification | reviewed pull request head and merge commit establishing the normative contract and accepted M5 decisions | `829ee92acbc2c872e89b4a68f7b260ac5ed990a3` (`main`, pull request 15); current refinement pending review |
+| Engineering | exact base, released engine/runtime inputs, upstream pins, clean worktree, and baseline tests | base `829ee92acbc2c872e89b4a68f7b260ac5ed990a3`; Dump Things `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`; Things Schema `cb6c791aec4c5309775437df4bd58e94e1bfcc3c`; enrichment-tools `2e6a5ddc92928a6165b81fdae24a52c447967c7d`; local implementation heads below |
 | Zotero | exact library version, adapter revision, policy revision, and baseline behavior | pending |
 | `dump-research-info` | exact source revision, adapter revision, policy revision, and baseline behavior | pending |
-| Consumer | exact base, lock, template release, corpus counts, branch policy, and baseline CI | pending |
+| Consumer | exact base, lock, template release, corpus counts, branch policy, and baseline CI | reviewed base `7e66d156a677435e838e9495094288d42fb26c29`; remaining evidence pending |
 | Template | exact source release and generated-template commit if generic support changes | pending |
-| Platforms | macOS ARM64 and Linux x86-64 clean-clone commands and results | pending |
+| Platforms | macOS ARM64 and Linux x86-64 clean-clone commands and results | local macOS 26.5.2 ARM64 foundation pass; clean-clone and Linux evidence pending |
 
 Live-source or authoritative-head drift is advisory and must not silently replace a reviewed input.
 
@@ -33,13 +33,15 @@ Live-source or authoritative-head drift is advisory and must not silently replac
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | pending |
+| Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | local pass `f413278a4ad8c6da0eb1f1d6412d42b06f5a759c`; review pending |
 | Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | pending |
-| Annotation selectors | Exact path/hash matching rejects missing or ambiguous assertions | pending |
-| Joined validation | Record plus annotation overlay validates as one Thing with the locked schema | pending |
-| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON without semantic loss | pending |
-| Projection | Joined annotations reach the machine projection while configured public views remain unaffected | pending |
-| Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | pending |
+| Annotation selectors | Exact path/hash matching rejects missing or ambiguous assertions | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| Joined validation | Record plus annotation overlay validates as one Thing with the locked schema | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| Projection | Joined annotations reach the machine projection while configured public views remain unaffected | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+
+Foundation verification command: `pixi run test` at `e8cb3917dbc6d62a34ed3a07ede860322d26a317` on macOS 26.5.2 ARM64; 83 engine tests passed with 2 fixture skips and all 40 development tests passed.
 
 ## Adapter behavior matrix
 
@@ -66,11 +68,13 @@ Each row requires focused tests for both adapters and at least one reviewed GitH
 | Requirement | Required evidence | Status |
 | --- | --- | --- |
 | Proposal | Default-branch dispatch opens one draft pull request whose first commit is an inline `datalad run --explicit` metadata proposal. | pending |
-| Review interface | Pull-request body shows friendly per-record controls without opaque hashes as the primary identifier. | pending |
-| Complete decision state | Exact `/curation submit` rejects missing, duplicate, unknown, or stale record decisions. | pending |
+| Pull-request summary | Trusted workflow provides a friendly accessible summary, public-retention disclosure, secondary source/path/blocker/hash details, and link to the supported review application. | pending |
+| Review application | Deployed application shows responsive before-and-after record diffs, friendly primary identifiers, secondary source/path/hash details, mutually exclusive controls, filters, changed-only views, keyboard navigation, and completion status. | pending |
+| Stateless service | GitHub App uses only metadata read, contents read, and pull-requests write access; OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | pending |
+| Complete decision state | Exact structured `/curation submit` binds repository, pull request, proposal commit, head, source, and the complete diff-derived candidate set; the trusted Action regenerates source IDs and claim digests and rejects missing, duplicate, unknown, or stale decisions. | pending |
 | Human modifications | Comments, direct commits, and a SHACL Vue bundle can produce attributed, validated metadata changes on the same branch. | pending |
 | DataLad boundary | Programmatic metadata changes use the project Pixi/DataLad task; decision-cache-only commits use ordinary Git. | pending |
-| Attribution | Each bot commit uses the most recent triggering human as author and automation as committer. | pending |
+| Attribution | The GitHub App posts on the user's behalf; the Action derives the reviewer from authenticated comment context, and each bot commit uses the most recent triggering human as author and automation as committer. | pending |
 | Trusted execution | Write credentials are not exposed to pull-request executable code or source data. | pending |
 | Exact-head update | Automated writes use the observed pull-request head and fail on a concurrent change. | pending |
 | Correction | A pre-merge correction remains on the same pull request and finalization reruns against the new head. | pending |
@@ -78,7 +82,7 @@ Each row requires focused tests for both adapters and at least one reviewed GitH
 | Conflict handling | A conflicting proposal is regenerated from the new base; a clean non-overlapping proposal is not. | pending |
 | Human authority | Automation never chooses a disposition, marks review ready, approves, merges, deploys, or writes to the source. | pending |
 | Public retention | The proposal discloses that rejected public metadata remains in Git history and requires acknowledgment before publication. | pending |
-| No local requirement | An authorized reviewer completes the normal workflow entirely in GitHub. | pending |
+| No local requirement | An authorized reviewer completes the normal workflow through the linked web application and GitHub without a checkout. | pending |
 | Complexity boundary | No tracked inventory, review document, manifest, sidecar, reconciliation report, custom journal, or attestation graph is introduced. | pending |
 
 ## Cross-layer acceptance

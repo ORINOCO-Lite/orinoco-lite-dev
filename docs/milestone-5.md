@@ -15,7 +15,8 @@ Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
 ## Outcome
 
 Milestone 5 completes the Orinoco Lite source-adapter system defined by the normative source-adapter specification.
-It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent service or required local checkout.
+It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent metadata service or required local checkout.
+The hosted decision path uses a small stateless GitHub authentication and comment service; GitHub remains the metadata, decision, and provenance authority.
 
 Zotero is the reusable-looking case.
 `dump-research-info` is the deliberately CON-specific case.
@@ -31,7 +32,7 @@ Milestone 5 preserves the accepted Milestone 4 distribution unless this mileston
 
 - a downstream is one ordinary Git repository without submodules or gitlinks;
 - concrete adapters and their policy are site-owned under `source-adapters/`;
-- static validation, build, review, and deployment require no persistent metadata service;
+- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review uses only the normative stateless GitHub authentication and comment service;
 - human review is authoritative, and automation never chooses a disposition, approves, merges, deploys, or writes to an external source;
 - the real `centerforopenneuroscience.org` repository remains read-only; and
 - open identity, publication, venue, topic, eligibility, governance, and production decisions remain open.
@@ -52,6 +53,7 @@ Exact implementation bases, releases, source versions, and reviewed heads are re
 - Prove parity and idempotence with focused tests.
 - After that implementation is reviewed, normalize the existing metadata corpus once in a separate pull request.
 - Implement the annotation-overlay format, selector validation, deterministic join, schema validation, JSON/RDF round trip, and projection behavior.
+- Match pinned enrichment behavior for imported objects, string attributes, and class-range `Statement` qualification; preserve non-string topical types with schema-derived typed attribute values.
 
 Gate: the canonical corpus produces stable review diffs, and joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML.
 
@@ -69,7 +71,10 @@ Gate: Zotero and `dump-research-info` independently satisfy the same observable 
 ### 3. Complete the GitHub profile
 
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
-- Create the proposal with one inline `datalad run --explicit` commit and render friendly per-record task-list controls in the pull-request body.
+- Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible summary and review-application link in the pull-request body.
+- Provide responsive before-and-after record diffs, mutually exclusive per-record controls, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
+- Have the trusted workflow generate the actual diff and accessible summary; the application reads those GitHub objects without running adapter or source logic.
+- Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
 - Support attributed comment suggestions, direct human commits, and SHACL Vue bundles applied through the project Pixi/DataLad task.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
 - Keep trusted workflow code separate from pull-request data, use exact-head compare-and-swap for automated commits, and require no local checkout from reviewers.
@@ -114,7 +119,7 @@ Milestone 5 does not:
 - modify or graduate the production site;
 - write to Zotero or another external source;
 - resolve identity, publication, venue, topic, eligibility, approver, hosting, or production policy;
-- require a persistent service, custom credential service, automatic approval, automatic merge, or pull-request deployment;
+- require a persistent metadata or credential service, durable hosted curation state, automatic approval, automatic merge, or pull-request deployment;
 - add another semantic overlay, generic plugin ABI, persistent adapter service, or second hosted implementation;
 - use SSSOM without a genuine ontology-mapping set or add W3C PROV without a demonstrated lineage question;
 - retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, or custom attestation graphs; or

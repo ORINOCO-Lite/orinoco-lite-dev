@@ -3,7 +3,9 @@
 Status: normative specification
 
 This document defines a host-neutral source-adapter contract and the GitHub profile that Orinoco Lite will implement first.
-It does not define a Python ABI, plugin protocol, or persistent service.
+The GitHub profile includes a small stateless authentication and comment service for its hosted review application.
+That service is not a metadata service or durable curation store.
+This document does not define a Python ABI, plugin protocol, or persistent metadata service.
 Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
@@ -41,6 +43,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
 | Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
+| Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
@@ -96,7 +99,7 @@ Each candidate contains at least:
 - the corresponding annotation-overlay changes; and
 - the claim content hash defined above.
 
-The plan drives proposal generation, form rendering, and submission validation.
+The plan drives proposal generation, hosted review rendering, and submission validation.
 It MUST be reproducible and MUST NOT be tracked.
 Full records, opaque candidate IDs, transaction IDs, or copies of Git diffs MUST NOT be stored as review provenance.
 Internal digests MUST NOT be the primary human identifier.
@@ -233,6 +236,7 @@ Each item in `assertions` contains exactly:
 - `pav:importedFrom`, identifying the logical source record.
 
 `path` uses an RFC 6901 JSON Pointer.
+It MUST terminate at a scalar slot or collection and MUST NOT traverse a collection by array index; collection membership is selected only by the assertion fingerprint.
 `assertion_sha256` is `sha256:` followed by the lowercase SHA-256 digest of the UTF-8, whitespace-free JSON serialization produced with lexically sorted mapping keys, preserved list order, and recursively omitted `annotations` keys.
 For a scalar slot, the fingerprint MUST match its value; for a collection, it MUST match exactly one item.
 Zero or multiple matches are invalid.
@@ -241,12 +245,16 @@ Entries MUST be ordered lexically by `path` and then `assertion_sha256`.
 
 The join operation is a shared engine function.
 It attaches annotations directly to imported objects such as `attributed_to`, `identifiers`, and `generated_by`.
-For imported scalar data, it produces the annotated `AttributeSpecification` required by the upstream enrichment pattern while leaving the topical scalar in the stored record.
+For imported string data, it produces the annotated `AttributeSpecification` required by the upstream enrichment pattern while leaving the topical scalar in the stored record.
+For non-string scalar data, the topical value retains its native type, while the `AttributeSpecification` contains its canonical JSON lexical form plus the locked LinkML datatype in `range`; values MUST NOT be indiscriminately coerced in the topical record.
+For a scalar URI whose induced LinkML range is a class, the join instead appends the pinned upstream annotated `Statement` form under `characterized_by`, using the induced slot URI as `predicate` and the topical URI as `object`.
+The derived `Statement` has no `schema_type`, as required by the locked schema.
 The joined representation uses the expanded `annotation_tag` and `annotation_value` objects required by the pinned runtime and MUST pass JSON-to-RDF-to-JSON and projection round trips with the locked Things Schema.
 
 Every machine-provided assertion MUST have a companion entry.
 Assertions created by a human or downstream policy do not.
 Structural `pid` and `schema_type` slots are not imported assertions.
+The stored record tree MUST NOT contain either CURIE or expanded-URI `pav:importedBy` or `pav:importedFrom` annotations; those machine annotations belong only in companions and the derived joined graph.
 A provenance entry changes only when the metadata assertion it describes changes: an unchanged adapter result produces no diff, while a human replacement removes the old machine-source entry in the same change.
 Git retains the earlier assertion and provenance.
 The accepted source claim remains cached, so the unchanged source MUST NOT later propose reverting the human replacement.
@@ -281,9 +289,10 @@ The initial supported profile MUST:
 
 - start from a default-branch `workflow_dispatch` and open one draft pull request;
 - show user-facing record changes under `metadata/records/` in **Files changed**, with machine provenance confined to the mirrored annotation-overlay tree;
-- render one task-list group per record in the pull-request body, headed by a friendly label, canonical PID, and useful source-native identifier;
+- have the trusted workflow render an accessible pull-request summary and fallback headed by friendly labels and canonical PIDs, with source-native identifiers, paths, blockers, and hashes as secondary details and a link to the supported review application;
+- provide the supported decision controls in the hosted review application defined below;
 - support attributed comment suggestions, direct metadata commits, and SHACL Vue bundle application on the same branch;
-- accept a complete form through an exact `/curation submit` comment;
+- accept a complete structured form through an exact `/curation submit` comment posted on behalf of the authenticated reviewer;
 - treat the authenticated submitter as the reviewer attesting the whole form;
 - accept submissions only from collaborators with `write` or `admin` access;
 - load executable workflow and adapter code from the trusted default branch;
@@ -292,6 +301,51 @@ The initial supported profile MUST:
 - restrict changes to both declared metadata trees and the decision-cache path;
 - push against the exact observed head with a lease; and
 - dispatch normal validation without approving, merging, or deploying.
+
+#### Hosted review application
+
+The supported decision interface is a deployed web application backed by a minimal stateless GitHub App user-authorization service.
+Native pull-request Markdown is an accessible summary and fallback, not a substitute for mutually exclusive form controls or complete-submission validation.
+
+The application MUST:
+
+- accept or link directly to a repository and pull-request number;
+- use the authenticated GitHub API to load the current pull request, trusted-workflow summary, proposal commit, and metadata changes rather than accepting client-supplied metadata as authoritative;
+- display responsive before-and-after record diffs and identify records primarily by friendly IDs and labels;
+- expose source identifiers, paths, blockers, and hashes as secondary details;
+- provide exactly one mutually exclusive `accept`, `reject`, or `defer` control for every current candidate;
+- support filtering, a changed-only view, keyboard navigation, and complete-submission validation;
+- bind the submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete ordered candidate set; and
+- post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
+
+The trusted proposal workflow performs adapter and source execution and produces the actual Git diff plus the accessible pull-request summary.
+The application reads those GitHub objects and MUST NOT run an adapter or reacquire the source.
+The summary is a human-facing rendering of the ephemeral plan, not a second tracked proposal or a hidden candidate descriptor.
+
+The structured comment MUST begin with the exact line `/curation submit` and contain one JSON object with the format value `orinoco-lite-curation-submission-v1`.
+That object contains exactly `format`, `repository`, `pull_request`, `proposal_sha`, `head_sha`, `adapter`, `source_coordinate`, and `decisions`.
+Each decision contains exactly the initial proposal's canonical `pid`, `record_path`, `operation`, and the human's `disposition`.
+Candidate decisions MUST use deterministic candidate-plan order.
+The browser MUST NOT supply reviewer identity; the workflow derives it from the authenticated GitHub comment event.
+
+The GitHub App requests only repository metadata read, contents read, and pull-requests write access for selected repositories.
+It uses a short-lived user access token so the posted comment is attributed jointly to the authenticated user and app.
+The service MAY retain signed or encrypted OAuth state and a short-lived authentication session as operational state.
+It MUST NOT retain the proposal, candidate plan, decision payload, metadata, source data, user access token, or refresh token after the submission or session expires.
+
+The application and service MUST NOT:
+
+- become a metadata, decision, candidate, provenance, or credential store;
+- commit metadata or decision-cache changes;
+- execute code from the pull request or external source;
+- choose or infer a disposition;
+- approve, merge, deploy, or write to an external source; or
+- introduce a custom manifest, attestation, transaction log, or recovery protocol.
+
+The default-branch GitHub Action remains the trusted commit boundary.
+For each submitted comment it MUST re-read the pull request and source coordinates, regenerate the candidate plan with trusted code, verify the proposal commit and observed head, require exact ordered candidate-set equality, and verify the source-native identifiers and claim digests that were shown as secondary review details.
+It then rejects stale or incomplete submissions or applies the decisions, validates the joined graph, and commits the resulting metadata and compact decision cache.
+No second copy of the proposal or decisions is retained by the service.
 
 In a public repository, proposed metadata remains visible in Git history even when review later rejects it.
 The workflow MUST disclose that retention and require an explicit acknowledgment before proposing public data.
@@ -334,7 +388,8 @@ The annotation-companion format and join operation are an engine contract; frame
 Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter state beneath `.orinoco-lite/`.
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
-A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things service for validation, review, build, or publication.
+A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things or metadata service for validation, review, build, or publication.
+The stateless GitHub authentication and comment service is the hosted decision transport, not a metadata runtime dependency.
 
 Prefer released upstream acquisition, matching, serialization, and update helpers.
 In particular, reuse `things-enrichment-tools` ownership-aware update helpers when their data model and pinned runtime are compatible.
@@ -369,7 +424,7 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | The joined Thing uses expanded annotation objects | Required by the pinned converter for lossless round trips. |
-| Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
+| Service curation API and authorization model | Hosted stateless review application and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
 
 Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).
 

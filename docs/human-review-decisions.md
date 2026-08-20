@@ -491,15 +491,18 @@ Accept intentional modernization rather than requiring pixel parity, but record 
 
 **Question:** Should normal source-adapter review require a local bundle handoff, or provide a least-privilege authenticated branch and pull-request workflow?
 
-**Outcome:** The GitHub profile opens one draft pull request containing the actual metadata proposal and friendly per-record controls.
-An authorized collaborator can review, modify, and submit the complete decision state without a local checkout.
-Automation applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
-The workflow uses the repository's normal GitHub Actions credential and does not introduce a persistent service or custom credential system.
+**Outcome:** The trusted GitHub workflow opens one draft pull request containing the actual metadata proposal, an accessible summary, and a link to the supported decision application.
+A deployed web application backed by a minimal stateless GitHub App user-authorization service provides friendly before-and-after record diffs and mutually exclusive accept, reject, or defer controls.
+It posts the complete head- and source-bound decision payload on the authorized collaborator's behalf and retains no second copy of metadata or curation state.
+It reads the workflow-generated GitHub proposal objects and does not execute adapter or source logic.
+GitHub Actions applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
+The service retains only OAuth state and short-lived authentication sessions as operational state; it is not a persistent metadata or credential service.
 
-**Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review.
+**Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review, but native Markdown cannot provide dynamic mutually exclusive controls, typed complete submission, or useful compact review for a large candidate set.
+The custom page is only the decision transport; GitHub remains authoritative for the proposal, authenticated comment, commit boundary, compact cache, and review history.
 Local execution remains available for development and reproduction but is not a condition of normal curation.
 
-**Decided by/date:** John Lee, 2026-08-20.
+**Decided and refined by/date:** John Lee, 2026-08-20.
 
 **Follow-up:** Implement and accept the GitHub profile under the normative [`source-adapters.md`](source-adapters.md) contract.
 
@@ -526,6 +529,23 @@ This decision does not settle identity, publication, venue, topic, or eligibilit
 **Decided by/date:** John Lee, 2026-08-20.
 
 **Follow-up:** Complete Zotero and `dump-research-info` conformance and the hosted review workflow under Milestone 5.
+
+### HR-208 — Preserve source-adapter assertion types during annotation join
+
+**Status:** accepted
+
+**Question:** How should the annotation overlay qualify machine-provided class-range URIs and non-string data without changing their RDF meaning or coercing stored topical metadata?
+
+**Outcome:** Follow the pinned upstream enrichment pattern for class-range URI assertions by deriving an annotated `Statement` under `characterized_by`, with the schema-induced predicate and topical URI object.
+For non-string data, retain the native topical value and derive an `AttributeSpecification` whose string-valued `value` is the canonical lexical form and whose `range` is the locked LinkML datatype.
+Do not add `schema_type` to the derived `Statement`, and do not coerce topical values to strings.
+
+**Rationale:** Encoding a class-range URI as an attribute value changes an RDF resource into a literal, while putting a raw integer or boolean into `AttributeSpecification.value` violates the locked schema.
+The accepted forms preserve native topical semantics and round trip through the pinned JSON/RDF converters.
+
+**Decided by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Add focused parity and locked-schema round-trip evidence to Milestone 5 acceptance.
 
 ## P2 — strategic decisions
 
