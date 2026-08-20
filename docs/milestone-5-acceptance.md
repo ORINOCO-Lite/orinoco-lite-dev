@@ -48,6 +48,17 @@ This remains valid evidence for canonicalization, object attachment, qualified-o
 Replacement HR-212 evidence must reject scalar companion targets and cover an absent topical slot, an equal topical value without a qualifier, an identical richer qualifier, a changed same-owner qualifier, human- and differently owned qualifiers, multivalue order, compact-to-expanded PAV conversion, typed reverse normalization, class-range `Statement` storage, candidate/cache reopening, and the actual public projection effect.
 The rare absent-topical plus equivalent unowned-qualifier case must exercise the reviewed outcome rather than infer ownership.
 
+## Shared review core
+
+| Requirement | Evidence | Status |
+| --- | --- | --- |
+| Ephemeral candidates | Deterministic immutable add/modify/delete plans, canonical record/companion bytes, source-claim hashes independent of curated baselines, fixed PIDs/paths, no provenance-only candidates, and adapter-agent checks | local pass `8ebd7122a0167e1c300a2c1eff94dc74ec162a19`; 20 focused tests |
+| Compact decisions | Exact v1 canonical YAML, complete current-candidate decisions, authenticated GitHub review coordinates, accept/reject suppression, defer and material-change reopening, human-correction suppression, source remap, and referenced-review pruning | local pass `f7b14d45f86040edbdab7b061a7b4c1ef3dbb4a3`; 21 focused tests |
+| Git finalization | Exact base/proposal/head verification; add, modify, delete, all-rejected, accepted correction, cache-only accept, clean three-way reversal, overlap failure, hostile Git environment, and path-escape prevention | local pass `961f2961488cb6185fe1a5985c82be591bfab300`; 18 focused temporary-repository tests |
+
+Shared-core verification command: `pixi run test` at `961f2961488cb6185fe1a5985c82be591bfab300` on macOS 26.5.2 ARM64; 142 engine tests passed with 2 expected fixture skips and all 40 development tests passed.
+The scalar-path tests in that count remain provisional as described above; candidate, decision, and Git-finalization evidence is independent of the reopened storage choice.
+
 ## Adapter behavior matrix
 
 Each row requires focused tests for both adapters and at least one reviewed GitHub execution across the combined evidence.
