@@ -72,8 +72,8 @@ Historical reacquisition is not a conformance requirement: the identifier, sourc
 
 One shared schema-aware canonicalizer MUST order and serialize every Thing written by an adapter.
 Adapters MUST NOT implement private YAML-ordering rules.
-The same canonicalizer MUST be applied once to the existing canonical record set so that later diffs compare like with like; an adapter run does not reserialize untouched records.
-That initial normalization SHOULD be a dedicated commit containing no semantic metadata changes.
+Every record in the canonical corpus MUST already conform to that serialization.
+An adapter run serializes only records it writes and does not reserialize untouched records.
 
 The canonicalizer MUST recursively order mappings by schema slot order with a lexical fallback for extension keys.
 Lists preserve their input order by default.
@@ -107,9 +107,9 @@ The proposal MUST be created by one project-locked `datalad run --explicit` invo
 The run record MUST remain inline in a distinct commit; a DataLad sidecar is not used.
 The recorded command MUST name the adapter, exact source coordinate, relevant inputs, base, and `metadata/records/` output.
 
-The proposal's DataLad commit and every later review commit MUST survive as distinct commits in default-branch history.
-A rebase may rewrite its commit ID while preserving its message and diff.
-Squashing it into another commit is not conformant.
+The proposal's DataLad commit and every later review commit MUST survive unchanged as distinct commits in default-branch history.
+A merge commit or true fast-forward preserves those commits.
+Rebasing or squashing the final reviewed lineage is not conformant because it rewrites the execution record.
 An obsolete proposal replaced during a conflicting rebase and adapter rerun is not part of the final reviewed lineage and need not be retained.
 
 ### Decisions and cache
@@ -198,8 +198,8 @@ The final metadata tree MUST still pass schema and relationship validation; the 
 Two adapters may target the same Thing.
 Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
 Each proposal MUST start from the current reviewed base.
-Semantically non-overlapping proposals may be rebased and merged in either order without rerunning either adapter, provided their reviewed diffs remain unchanged and the final tree validates.
-If another merge overlaps a proposal, the proposal branch MUST be rebased onto the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
+Semantically non-overlapping proposal branches may be merged in either order without rebasing or rerunning either adapter, provided their reviewed diffs remain unchanged and the final tree validates.
+If another merge overlaps a proposal, the proposal branch MUST be recreated on the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
 Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV.
 Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
@@ -253,7 +253,7 @@ A conforming host MUST provide:
 - attributable human modification inputs and commit history;
 - exact-head compare-and-swap for each automated commit;
 - normal metadata validation on the reviewed head; and
-- a merge method that preserves every proposal, review, and finalization commit.
+- a merge method that preserves the exact proposal, review, and finalization commit objects.
 
 The adapter core is host-neutral.
 No second host implementation is required until the GitHub profile is complete, but another host may implement the same contract without adopting GitHub-specific files or APIs.
@@ -283,9 +283,9 @@ Secrets and data that are not approved for repository history MUST be excluded b
 Reviewers MUST NOT need a local checkout.
 Local execution MAY expose the same deterministic operations for development and reproduction.
 
-Adapter review pull requests MUST use a commit-preserving merge method.
-Under a linear-history policy, use rebase merge; do not squash.
-The pull-request opening text MUST prominently explain that squash merging destroys required provenance and instruct the reviewer to use rebase merge.
+Adapter review pull requests MUST use a merge commit or true fast-forward.
+Rebase merge and squash merge both rewrite required DataLad or human-review commits and MUST NOT be used.
+The pull-request opening text MUST prominently state that requirement, and the host MUST permit an exact-commit-preserving merge method.
 
 ## Security and complexity guardrails
 
@@ -343,9 +343,8 @@ These are gaps to close, not permitted variants of the specification:
 - current adapters use stable URNs rather than versioned adapter Things for `pav:importedBy`;
 - direct scalar imports rely on record-level PAV instead of upstream-style annotated attributes;
 - Zotero has record-level rather than assertion-level PAV;
-- existing canonical YAML has not been normalized by a shared schema-aware ordering function;
 - the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or deletion proposals;
 - Pixi review-application tasks do not yet run through DataLad; and
-- the pull-request opening text does not yet warn reviewers that adapter pull requests require rebase merge rather than squash.
+- the pull-request opening text and hosted merge configuration do not yet require an exact-commit-preserving merge.
 
 Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
