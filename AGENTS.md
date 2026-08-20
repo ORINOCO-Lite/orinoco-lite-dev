@@ -2,13 +2,15 @@
 
 ## Current work
 
-- The active effort is Milestone 4 on `codex/milestone-4`.
-- Read `README.md`, `docs/milestone-4.md`, `docs/milestone-4-decisions.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
-- Read Milestone 1–3 plans and acceptance records only when their derivation or preserved evidence is relevant.
+- The active effort is Milestone 5 source-adapter implementation.
+- Read `README.md`, `docs/source-adapters.md`, `docs/milestone-5.md`, `docs/milestone-5-decisions.md`, `docs/milestone-5-acceptance.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
+- Read Milestone 1–4 plans and acceptance records only when their derivation or preserved evidence is relevant.
 Their old operating commands and branch descriptions are not the downstream interface.
 - Do not silently infer an answer to an open human decision.
 Record resolutions in `docs/human-review-decisions.md` and the corresponding source decision register in the same reviewed change.
-- Do not begin work explicitly deferred from Milestone 4 unless the user expands scope.
+- Stop and request clarification when ambiguity would change metadata semantics, provenance, review behavior, repository history, authority, or durable state.
+Do not resolve ambiguity by broadening the threat model or inventing another artifact or authority.
+- Do not begin a Milestone 5 non-goal or deferred human decision unless the user expands scope.
 
 ## Repository boundaries
 
@@ -35,7 +37,7 @@ Do not apply it to unrelated branches.
 
 ## Content and runtime contracts
 
-- Reviewed YAML is the sole canonical metadata source.
+- Reviewed YAML under `metadata/records/` and `metadata/overlays/annotations/` is the canonical semantic metadata source; the joined Things graph is the validation and RDF boundary.
 Zotero ingestion remains repeatable, read-only source evidence and never a normal production runtime dependency.
 - Keep source capture, transformation, human review, and site promotion distinct.
 Do not write to Zotero or invent identities, publication semantics, venues, topics, licensing, asset custody, or cutover policy.
@@ -50,7 +52,7 @@ Do not substitute the vendored resolved schema, an unreviewed LinkML trial, or a
 Do not use the real site as a worktree target.
 - Framework updates may create a branch and pull request but never approve or merge themselves or deploy pull-request code to the shared Pages environment.
 - Preserve exact immutable release coordinates, ownership classifications, site-owned before/after hashes, and rollback evidence.
-- Update the engineering acceptance record and pull-request summary when hosted state changes materially; do not leave superseded review coordinates as the current entry point.
+- Update the Milestone 5 acceptance record and pull-request summary when hosted state changes materially; do not leave superseded review coordinates as the current entry point.
 
 ## User preferences
 

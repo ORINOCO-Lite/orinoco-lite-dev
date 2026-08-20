@@ -1,46 +1,42 @@
 # Milestone 5 decision register
 
-Status: proposed; no Milestone 5 decisions accepted
+Status: architecture accepted; implementation evidence pending
 
-Planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
+Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
-This file will become the authoritative source register for reviewed Milestone 5 engineering decisions.
-It does not make a prototype path, representation, or command a supported contract merely by listing it as an evidence question.
+Normative contract: [`source-adapters.md`](source-adapters.md)
 
 Human policy choices remain in [`human-review-decisions.md`](human-review-decisions.md).
-When Milestone 5 activates such a choice, its resolution and the corresponding source-register entry must land in the same reviewed change.
-Objective runs, hashes, and pull-request evidence belong in [`milestone-5-acceptance.md`](milestone-5-acceptance.md).
+Commands, hashes, releases, and pull-request evidence belong in [`milestone-5-acceptance.md`](milestone-5-acceptance.md).
+This register summarizes reviewed engineering outcomes without duplicating the normative specification.
 
-## Inherited accepted constraints
+## Accepted decisions
 
-| Source | Milestone 5 consequence |
-| --- | --- |
-| M4-D001 and M4-I014 | Reviewed Things remain in one `metadata/records/` tree; generated projection remains ignored. |
-| M4-D004 | A supported downstream remains one ordinary Git repository without submodules or gitlinks. |
-| M4-D008 | Static validation, build, preview, and review require no persistent service. |
-| M4-D010 and M4-I004 | Human pull-request review is authoritative; automation does not approve or merge. |
-| M4-I003 | Concrete adapters and site policy use the existing site-owned `source-adapters/` root; no new configured root is implied. |
-| M4-I015 and HR-207 | Lite supplies fixed safety defaults while adapters configure bounded source-specific identity, fingerprint, defer, and re-review inputs. |
-| M4-D011 | The real site remains read-only unless a later reviewed milestone explicitly changes that boundary. |
-
-These constraints are not reopened by Milestone 5 without new evidence and an explicit reviewed decision.
-
-## Open engineering decision gates
-
-| ID | Question | Evidence required before acceptance |
+| ID | Outcome | Consequence |
 | --- | --- | --- |
-| M5-Q001 | What represents and transports a candidate inventory, and how long is it retained? | Deterministic Zotero and `dump-research-info` proposals, all-rejected review, stale-candidate detection, public-repository privacy and history review, and no second canonical metadata pool |
-| M5-Q002 | What serializes adapter decisions, and where is their long-term authority? | Both adapters, version migration, cache independence, public-repository privacy/retention review, and framework-update preservation |
-| M5-Q003 | What is the supported reconciliation and merge transaction? | Complete-decision checks, interrupted-run recovery, final-head review, and evidence preserved by the actual consumer merge mode |
-| M5-Q004 | How are reviewer identity, rationale, and evidence recorded without deciding who may approve? | Explicit decision evidence from both adapters and escalation of any privacy, authorization, or governance choice to the human-review queue |
-| M5-Q005 | Is additional PROV activity lineage useful beyond Git/DataLad and PAV? | A demonstrated query or audit need plus schema and round-trip evidence |
-| M5-Q006 | For a genuine semantic-mapping case, which representation, if any, is authoritative and should SSSOM be retained? | One real mapping set, one tracked authority, deterministic derivation, and lossless round-trip for required semantics |
-| M5-Q007 | Which behavior, if any, should become a shared CLI, schema, engine helper, template adapter, or upstream primitive? | Independent evidence from both adapters and clean-clone cross-layer acceptance |
+| M5-D001 | The Git metadata diff is the proposal and the candidate plan is ephemeral. | No tracked candidate inventory, duplicate review document, or retained source snapshot is required. |
+| M5-D002 | Each adapter owns one compact current-state decision cache under `source-adapters/<adapter>/policy/curation-decisions.yaml`; Git stores its history. | The cache records accepted, rejected, and deferred claims without baseline/proposed records or an event graph. |
+| M5-D003 | Git commits are the review transaction. DataLad records the proposal and programmatic metadata changes; a merge commit preserves the reviewed lineage. | Custom journals, transaction-recovery machinery, sidecars, reports, and attestations are prohibited. Linear-history-only downstreams are not supported. This supersedes M4-I008 for a conforming source-adapter consumer. |
+| M5-D004 | The authenticated reviewer confirms the complete decision state. The most recent triggering human is the Git author of a bot-applied change; automation is the committer. | The compact cache and Git/host history retain reviewer, time, source coordinate, and review URL without deciding who may approve production content. |
+| M5-D005 | Git and DataLad record execution and review history; PAV records machine assertion provenance. | Additional W3C PROV is not activated without a demonstrated unanswered lineage query. |
+| M5-D006 | No ontology-mapping representation is activated by Milestone 5. | SSSOM is used only if a genuine mapping set later requires it; rejection, identity linkage, and deduplication are not mappings. |
+| M5-D007 | The host-neutral contract, shared canonicalizer, annotation-overlay join, and GitHub profile are common Orinoco Lite behavior. Concrete adapters and policy remain site-owned. | No generic Python ABI, plugin framework, persistent adapter service, or second host implementation is required. |
+| M5-D008 | Canonical semantic metadata is stored in `metadata/records/` plus `metadata/overlays/annotations/` and joined before validation or RDF export. | Human-facing record diffs remain readable while the resulting graph preserves upstream PAV semantics. Another overlay requires a focused specification change. |
 
-Until a gate is accepted, implementations must remain replaceable prototypes and avoid compatibility promises.
-M5-Q002 does not authorize a new public configuration root, and M5-Q003 does not claim that multi-record editor transactionality is already solved.
+## Refined inherited defaults
 
-## Decisions not authorized by this register
+M5-D001 through M5-D008 refine M4-I003, M4-I008, M4-I014, and M4-I015 and implement HR-201 and HR-207 for source-adapter operation.
+All other accepted Milestone 4 boundaries remain in force, including the ordinary-repository topology, no-persistent-service requirement, human review authority, site-owned adapter policy, and read-only real-site boundary.
 
-Milestone 5 does not infer answers about identities, publication versions, venues, topics, eligibility, approvers, hosted editing, persistent service operation, automation credentials, deployed pull-request previews, production graduation, or real-site operation.
-Those remain governed by the existing human-review queue and accepted milestone decisions.
+## Superseded exploration
+
+The following are not dormant requirements and must not be restored without a focused specification change:
+
+- tracked candidate inventories or full-record review bundles;
+- append-only decision events or transaction graphs;
+- `link`, `supersede`, permanent-exclusion, or conditional-deferral dispositions;
+- custom reconciliation journals, locks, crash recovery, reports, or artifact attestations;
+- squash- or rebase-compatible substitutes for preserving the original DataLad commit; and
+- speculative template distribution, plugin APIs, or additional semantic overlays.
+
+Implementation ambiguity is handled by stopping for clarification, not by adding another authority, artifact, or threat model.
