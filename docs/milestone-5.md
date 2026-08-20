@@ -62,7 +62,8 @@ Gate: the canonical corpus produces stable review diffs, and joined records pres
 - Derive an ephemeral candidate plan from stable source identifiers, normalized metadata-affecting source facts, current canonical metadata, adapter policy, and the compact decision cache.
 - Produce deterministic additions, modifications, and deletions in the record and annotation-overlay trees.
 - Implement only `accept`, `reject`, and `defer` with the behavior defined by the specification.
-- Store current decisions in the adapter-owned compact cache and rely on Git for history.
+- Store PID-keyed current decisions and only their referenced authenticated-comment review blocks in the adapter-owned compact v1 cache; rely on Git for history.
+- Coalesce same-adapter source rows per PID, keep candidate PID/path fixed during review, and use correction-safe three-way reversal for rejection and deferral.
 - Preserve semantically unchanged assertions and their existing PAV; do not produce provenance-only changes.
 - Reuse pinned upstream validation, serialization, PAV, and ownership-aware update primitives where compatible, with focused parity tests for local replacements.
 

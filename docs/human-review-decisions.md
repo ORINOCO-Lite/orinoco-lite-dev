@@ -547,6 +547,24 @@ The accepted forms preserve native topical semantics and round trip through the 
 
 **Follow-up:** Add focused parity and locked-schema round-trip evidence to Milestone 5 acceptance.
 
+### HR-209 — Keep review finalization compact and correction-safe
+
+**Status:** accepted
+
+**Question:** What exact durable cache and patch behavior preserve human corrections without reintroducing transaction artifacts or silently discarding work?
+
+**Outcome:** Use the normative compact v1 canonical-YAML cache with PID-keyed current decisions and only their referenced authenticated GitHub-comment review blocks.
+Reject and defer reverse each candidate's proposal patch using Git three-way semantics, preserve clean non-overlapping human edits, and fail on overlap.
+For accepted human corrections, remove only untouched proposal-added PAV entries made stale by the correction and fail on human-edited or ambiguous companion state.
+Delete empty companions, coalesce same-adapter rows into one claim per PID, and keep the candidate PID and path fixed during one review.
+
+**Rationale:** Git already supplies patch merging, conflicts, correction, retry, and history.
+These rules keep the durable cache small, avoid whole-record restoration that can discard unrelated edits, and make ambiguous ownership or identity changes visible to the reviewer.
+
+**Decided by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Add focused cache, correction, overlap, all-rejected, and rerun evidence to Milestone 5 acceptance.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.

@@ -51,11 +51,11 @@ Each row requires focused tests for both adapters and at least one reviewed GitH
 | --- | --- | --- | --- |
 | New claim | A friendly record entry and actual metadata diff are presented for explicit review. | pending | pending |
 | Accept | The reviewed proposal remains, the compact cache records acceptance, and an identical rerun is a no-op. | pending | pending |
-| Reject | The baseline is restored, the compact cache records rejection, and the unchanged claim stays suppressed. | pending | pending |
-| Defer | The baseline is restored and the claim returns on the next adapter proposal. | pending | pending |
+| Reject | The candidate patch is reversed with three-way semantics, non-overlapping human edits survive, the compact cache records rejection, and the unchanged claim stays suppressed. | pending | pending |
+| Defer | The candidate patch is reversed with three-way semantics, non-overlapping human edits survive, and the claim returns on the next adapter proposal. | pending | pending |
 | Material source change | A changed metadata-affecting source claim returns for review. | pending | pending |
 | Unused source change | A source change that cannot affect generated metadata produces no candidate or metadata diff. | pending | pending |
-| Human correction | An accepted human edit is attributed, removes replaced machine PAV, and is not reverted by an unchanged source claim. | pending | pending |
+| Human correction | An accepted human edit is attributed, removes only untouched stale proposal PAV, deletes an emptied companion, and is not reverted by an unchanged source claim; overlap or ambiguous companion state fails. | pending | pending |
 | Deletion | The record and matching annotation companion are visibly proposed for deletion and accept/reject behave normally. | pending | pending |
 | All rejected | Final metadata matches the base while the compact decisions and reviewed proposal lineage survive the merge. | pending | pending |
 | Existing PAV | A semantically identical assertion retains its current PAV and produces no provenance-only diff. | pending | pending |

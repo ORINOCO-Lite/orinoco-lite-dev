@@ -137,6 +137,20 @@ The compact representation MUST store:
 - once per review: the exact source coordinate, reviewer, review time, and review URL; and
 - once per current record decision: canonical PID, source-native record ID, claim digest, disposition, and review reference.
 
+The cache is canonical YAML with exactly these top-level fields:
+
+- `format`, whose value is `orinoco-lite-curation-decisions-v1`;
+- `adapter`, whose value is the literal adapter name;
+- `reviews`, a mapping whose keys are `github-comment:<decimal comment id>` references; and
+- `decisions`, a mapping whose keys are canonical PIDs.
+
+Each review contains exactly `source_coordinate`, `reviewer`, `reviewed_at`, and `review_url`.
+The reviewer and canonical UTC-second review time come from the authenticated GitHub comment event, and `review_url` is the exact comment URL.
+Each decision contains exactly `source_record_id`, `claim_sha256`, `disposition`, and `review`.
+The claim digest uses the normative `sha256:` form and `review` names one extant review mapping.
+Every source record identity and PID occurs at most once, and every retained review is referenced by a current decision.
+Re-review replaces current decisions for the same source identities and prunes review mappings that are no longer referenced.
+
 It MUST NOT contain baseline or proposed records, rendered diffs, candidate or decision event graphs, run manifests, or duplicated batch metadata.
 Re-review replaces the current entry; the prior entry remains available through Git.
 
@@ -161,6 +175,8 @@ Supported inputs include:
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
 Unrelated human edits do not acquire a machine-annotation entry or a source-candidate cache entry merely because they share the branch.
+The PID and record path identifying an initial candidate remain fixed for that review.
+A human identity retarget is expressed as rejection or deferral of the source candidate plus a separately attributed human deletion or addition; the cache never silently moves a source decision to another Thing.
 
 A direct human commit is already its own execution and attribution record.
 When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
@@ -177,6 +193,15 @@ Finalizing review MUST:
 5. restore rejected and deferred record and provenance changes;
 6. update no durable review artifact other than the compact decision cache; and
 7. validate the record tree, annotation-overlay tree, and complete joined Things graph.
+
+For each rejected or deferred candidate, finalization MUST reverse that candidate's metadata-base-to-proposal patch against the submitted head using Git three-way semantics.
+A clean non-overlapping human edit survives.
+An overlapping hunk is a focused conflict: finalization stops without committing and requires correction and resubmission rather than choosing which metadata to retain.
+
+For an accepted candidate, attributed human record bytes remain authoritative.
+If such a correction makes an untouched proposal-added annotation selector stale, finalization removes only that stale proposal-added entry.
+It MUST fail rather than overwrite a human-edited companion or resolve an ambiguous selector.
+After reconciliation, a companion with no assertions is deleted rather than retained with an empty assertion list.
 
 If finalization changes metadata programmatically, its Pixi task MUST run through DataLad.
 For each bot commit, the most recent authenticated human whose action triggered the operation is the Git author and automation is the committer.
@@ -212,6 +237,9 @@ If Git reports a conflict, the proposal branch MUST be recreated on the new defa
 Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV in the joined graph.
 Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
 No global field-ownership registry is implied.
+
+Within one adapter, multiple source rows that intentionally target the same PID MUST be coalesced into one candidate and one adapter-defined stable composite source identity before the shared plan is built.
+The compact PID-keyed cache does not represent multiple independent same-adapter decisions for one Thing.
 
 ## Semantic annotation overlay
 
