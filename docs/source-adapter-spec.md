@@ -202,7 +202,10 @@ A record-level annotation MAY supplement but MUST NOT replace assertion-level pr
 An assertion created by a human or downstream policy rather than present in the external source is not imported source data and MUST NOT receive the adapter's PAV annotation.
 Examples include a manually resolved identity, an eligibility decision, or a locally chosen relationship.
 When a human changes a machine-provided assertion, the resulting human assertion MUST lose the adapter's PAV annotation unless it still states exactly the imported source fact.
-The adapter may report a later upstream conflict but MUST NOT silently reclaim ownership.
+That change transfers the assertion out of machine ownership.
+The reviewed source claim remains cached even when the final human assertion differs from the source proposal, so an unchanged source claim MUST NOT produce a later reversion diff.
+If the source later changes, candidate generation MUST preserve the human-owned assertion.
+The adapter MAY report the source disagreement as a review diagnostic, but it MUST NOT express that disagreement as a proposed replacement unless a human explicitly returns the assertion to machine ownership.
 
 `pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice.
 Changing the adapter incompatibly requires a new versioned agent Thing.
