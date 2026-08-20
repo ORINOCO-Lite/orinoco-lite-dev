@@ -53,9 +53,11 @@ Exact implementation bases, releases, source versions, and reviewed heads are re
 - Prove parity and idempotence with focused tests.
 - After that implementation is reviewed, normalize the existing metadata corpus once in a separate pull request.
 - Implement the annotation-overlay format, selector validation, deterministic join, schema validation, JSON/RDF round trip, and projection behavior.
-- Match pinned enrichment behavior for imported objects, string attributes, and class-range `Statement` qualification; preserve non-string topical types with schema-derived typed attribute values.
+- Match pinned enrichment behavior for imported objects and qualified data and class-range assertions.
+- Resolve M5-Q001 before adapter work continues: canonical records should store the real `AttributeSpecification` and `Statement` objects, companions should retain only their PAV, and the join should attach annotations rather than derive semantic objects from scalar selectors.
+- Preserve non-string topical types with schema-derived typed attribute values, and use a reversible ephemeral compact-PAV view rather than forking the pinned ownership helper.
 
-Gate: the canonical corpus produces stable review diffs, and joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML.
+Gate: the canonical corpus produces stable review diffs, joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML, and the reviewed HR-212 outcome has focused helper-parity, RDF, and projection evidence.
 
 ### 2. Conform both adapters
 
@@ -64,7 +66,7 @@ Gate: the canonical corpus produces stable review diffs, and joined records pres
 - Implement only `accept`, `reject`, and `defer` with the behavior defined by the specification.
 - Store PID-keyed current decisions and only their referenced authenticated-comment review blocks in the adapter-owned compact v1 cache; rely on Git for history.
 - Coalesce same-adapter source rows per PID, keep candidate PID/path fixed during review, and use correction-safe three-way reversal for rejection and deferral.
-- Preserve semantically unchanged assertions and their existing PAV; do not produce provenance-only changes.
+- Preserve semantically unchanged qualified assertions and their existing PAV; do not produce provenance-only changes or infer ownership from a topical scalar.
 - Reuse pinned upstream validation, serialization, PAV, and ownership-aware update primitives where compatible, with focused parity tests for local replacements.
 
 Gate: Zotero and `dump-research-info` independently satisfy the same observable contract without sharing source-specific policy.

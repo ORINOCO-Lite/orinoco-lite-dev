@@ -542,6 +542,7 @@ Do not add `schema_type` to the derived `Statement`, and do not coerce topical v
 
 **Rationale:** Encoding a class-range URI as an attribute value changes an RDF resource into a literal, while putting a raw integer or boolean into `AttributeSpecification.value` violates the locked schema.
 The accepted forms preserve native topical semantics and round trip through the pinned JSON/RDF converters.
+This decision fixes the qualified-object shapes, not whether those objects are stored in canonical records or synthesized from scalar companion selectors; HR-212 reopens that placement after the pinned update behavior exposed a representational incompatibility.
 
 **Decided by/date:** John Lee, 2026-08-20.
 
@@ -564,6 +565,42 @@ These rules keep the durable cache small, avoid whole-record restoration that ca
 **Decided by/date:** John Lee, 2026-08-20.
 
 **Follow-up:** Add focused cache, correction, overlap, all-rejected, and rerun evidence to Milestone 5 acceptance.
+
+### HR-212 — Preserve upstream qualified scalar updates
+
+**Status:** in review
+
+**Question:** When a source data or class-range value differs from an already populated topical slot, should Orinoco Lite preserve the pinned enrichment helper's qualified-assertion behavior or adopt a local scalar replacement model?
+
+**Evidence:** Pinned `update_data_property()` populates a topical slot only when it is absent.
+It independently maintains machine-owned `AttributeSpecification` or `Statement` objects, preserves differently owned qualified values, and leaves an existing topical value unchanged.
+The current scalar-path companion can derive only the current topical value, so it cannot represent a different machine source value.
+An unannotated qualified object stored in the record and selected by the existing companion rejoins to the same RDF assertion as upstream inline PAV.
+
+**Options:**
+
+1. Store every qualified assertion object as canonical record content, retain only its PAV in the companion, and use an ephemeral compact-PAV view to run the pinned helper.
+This preserves upstream semantics and confines local behavior to reversible PAV splitting and locked-schema typed normalization.
+It also means an initial source run can add substantive qualified objects even when a topical value already matches, and public projections must tolerate those real semantic objects.
+2. Derive the qualified object from a scalar companion and visibly replace conflicting topical values.
+This keeps records shorter and top-level fields current, but permanently forks upstream ownership and coexistence semantics and requires a locally maintained merge algorithm.
+3. Replace only a scalar inferred to be same-owner.
+Upstream does not encode ownership on the topical scalar, so this requires new state or inference and is not sustainable under the accepted authority boundary.
+4. Put the alternate source value in the companion.
+This keeps records compact but turns the PAV companion into a second semantic metadata store and changes its schema, hashing, review, and migration contract.
+5. Ignore a conflicting source scalar.
+This avoids overwriting curated data but drops the upstream qualified source claim from the canonical graph and review diff.
+
+**Preferred direction:** John prefers updating canonical data to remain compatible with upstream rather than pinning a storage-driven semantic divergence.
+The proposed contract is option 1, with direct scalar companion selectors removed and the join reduced to attaching PAV to an existing assertion object.
+This preference is not yet approval of the detailed storage and projection contract.
+
+**Open edge:** If a topical slot is absent but an equivalent human- or unowned qualified assertion exists, upstream fills the topical slot without adding machine PAV.
+The proposed default is to fail closed for review rather than infer ownership or weaken the requirement that every machine assertion object has companion PAV.
+
+**Raised by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Review M5-Q001 in the normative source-adapter specification, then either accept HR-212 and replace the provisional scalar-join implementation or select another option before either concrete adapter writes metadata.
 
 ## P2 — strategic decisions
 

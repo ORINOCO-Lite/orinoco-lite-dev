@@ -36,8 +36,8 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 
 | Concern | Authority | Rule |
 | --- | --- | --- |
-| Metadata records | `metadata/records/` | Store reviewable, user-facing Things without inline machine-source annotations. |
-| Machine assertion provenance | `metadata/overlays/annotations/` | Store PAV annotation companions; joining the record and annotation-overlay trees produces the complete semantic Things graph. |
+| Metadata records | `metadata/records/` | Store every reviewable semantic assertion object, including qualified `AttributeSpecification` and `Statement` objects, without inline machine-source annotations. |
+| Machine assertion provenance | `metadata/overlays/annotations/` | Store only PAV annotation companions for assertion objects already present in records; joining the two trees reattaches PAV without supplying assertion content. |
 | Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
 | Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
 | Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
@@ -223,6 +223,7 @@ Candidate derivation MUST compare assertion content independently of its annotat
 When an incoming assertion is semantically identical to an existing assertion, the adapter MUST preserve both and MUST NOT produce a provenance-only diff.
 When an incoming assertion differs substantively, the proposal MAY replace it; an accepted replacement records the proposing adapter and source in the companion.
 This rule applies assertion by assertion, so an unrelated change elsewhere in a record does not change the provenance of unchanged assertions.
+The scalar compatibility gate below is more specific: this general replacement permission does not authorize an adapter to replace an already populated topical data or class-range slot when the pinned enrichment helper would preserve it and represent the source value as a qualified assertion.
 
 An adapter MAY propose deletion for any record.
 The Git diff and form MUST make the deletion explicit, and acceptance or rejection is a human decision like any other proposed change.
@@ -244,8 +245,8 @@ The compact PID-keyed cache does not represent multiple independent same-adapter
 ## Semantic annotation overlay
 
 Upstream stores PAV annotations inline in a Thing and therefore in the same RDF graph.
-Orinoco Lite stores the user-facing record and its machine assertion provenance separately to keep record diffs readable, then joins them into the same semantic Thing before validation or RDF export.
-This is a storage-layout deviation, not a different provenance model.
+Orinoco Lite stores the assertion content in the user-facing record and its machine assertion provenance separately to keep record diffs readable, then joins them into the same semantic Thing before validation or RDF export.
+The intended difference is only the location of PAV: the unannotated assertion content in `metadata/records/` plus its companion entry MUST produce the same joined assertion that the pinned enrichment helper produces inline.
 
 Adapter-generated PAV MUST be stored under `metadata/overlays/annotations/`, in a YAML companion that mirrors the record's relative path under `metadata/records/`.
 One companion covers one record and contains its PID plus only its current machine assertion provenance.
@@ -264,22 +265,71 @@ Each item in `assertions` contains exactly:
 - `pav:importedFrom`, identifying the logical source record.
 
 `path` uses an RFC 6901 JSON Pointer.
-It MUST terminate at a scalar slot or collection and MUST NOT traverse a collection by array index; collection membership is selected only by the assertion fingerprint.
+It MUST terminate at an inlined mapping assertion or a collection of mapping assertions and MUST NOT traverse a collection by array index; collection membership is selected only by the assertion fingerprint.
 `assertion_sha256` is `sha256:` followed by the lowercase SHA-256 digest of the UTF-8, whitespace-free JSON serialization produced with lexically sorted mapping keys, preserved list order, and recursively omitted `annotations` keys.
-For a scalar slot, the fingerprint MUST match its value; for a collection, it MUST match exactly one item.
+For a direct mapping, the fingerprint MUST match that mapping; for a collection, it MUST match exactly one mapping item.
 Zero or multiple matches are invalid.
 This is the complete selector model: adapters MUST NOT add private identifiers or matching rules.
 Entries MUST be ordered lexically by `path` and then `assertion_sha256`.
 
 The join operation is a shared engine function.
-It attaches annotations directly to imported objects such as `attributed_to`, `identifiers`, and `generated_by`.
-For imported string data, it produces the annotated `AttributeSpecification` required by the upstream enrichment pattern while leaving the topical scalar in the stored record.
-For non-string scalar data, the topical value retains its native type, while the `AttributeSpecification` contains its canonical JSON lexical form plus the locked LinkML datatype in `range`; values MUST NOT be indiscriminately coerced in the topical record.
-For a scalar URI whose induced LinkML range is a class, the join instead appends the pinned upstream annotated `Statement` form under `characterized_by`, using the induced slot URI as `predicate` and the topical URI as `object`.
-The derived `Statement` has no `schema_type`, as required by the locked schema.
+It attaches annotations directly to the selected stored object, including imported objects such as `attributed_to` and `identifiers`, qualified data assertions under `attributes`, and qualified class-range assertions under `characterized_by`.
+It MUST NOT manufacture an `AttributeSpecification`, `Statement`, or other semantic assertion from a scalar companion selector.
 The joined representation uses the expanded `annotation_tag` and `annotation_value` objects required by the pinned runtime and MUST pass JSON-to-RDF-to-JSON and projection round trips with the locked Things Schema.
 
-Every machine-provided assertion MUST have a companion entry.
+### Upstream scalar-update compatibility gate
+
+Status: specification review required before adapter implementation continues.
+
+The pinned `update_data_property()` behavior separates a topical slot from its qualified source assertion.
+It fills the topical slot only when that slot is absent.
+Whether the topical slot was absent or already populated, it manages the machine-owned qualified assertion in `attributes`, or in `characterized_by` when configured for a class-range relation.
+If the source later differs from an existing topical value, upstream leaves that topical value untouched, removes obsolete qualified assertions owned by the same updater, preserves human- and differently owned assertions, and appends the new qualified source assertion.
+
+A scalar companion selector cannot preserve that behavior.
+It contains no assertion value of its own, so a join can only derive a qualified assertion from the current topical value.
+When the source and topical values differ, deriving from the topical value loses the source claim, while replacing the topical value creates a local ownership behavior that the pinned helper does not have.
+Putting the differing source value in the companion would turn the provenance companion into a second metadata store, contrary to its exact schema and authority boundary.
+
+The proposed upstream-compatible resolution is to store the qualified assertion content as canonical metadata and separate only its PAV:
+
+- a data value is a schema-valid `dlthings:AttributeSpecification` under `attributes`, with the schema-induced predicate and source value;
+- a class-range URI is the pinned `Statement` under `characterized_by`, with the schema-induced predicate and source URI object and no `schema_type`;
+- a missing topical slot is populated exactly as upstream does, while an existing topical slot is preserved;
+- non-string topical data retains its native type, while its stored `AttributeSpecification` uses the canonical JSON lexical value and locked LinkML datatype in `range`, as required by the locked schema;
+- the companion selects that stored qualified object and contains only its PAV; and
+- the join reattaches expanded PAV to the selected object without creating another semantic assertion.
+
+Under this resolution, adding a missing qualified assertion is a substantive metadata proposal even when the topical value already matches.
+It records the source's qualified claim in the canonical graph; it is not a provenance-only rewrite.
+If an equivalent qualified assertion already exists, the upstream subset match preserves the richer existing object and its current ownership and produces no PAV-only diff.
+Same-owner obsolete qualified assertions are removed, human- or differently owned assertions survive, existing order is preserved, and missing desired assertions are appended in deterministic source order.
+The claim digest remains over normalized source-mapped facts with native source value types, not over PAV or the storage bridge.
+A changed source value therefore reopens review and updates only the adapter-owned qualified assertion, while the populated topical slot remains unchanged.
+If a reviewer later edits or removes the qualified assertion, the accepted unchanged claim stays suppressed under the ordinary human-correction rule.
+
+The alternatives and their compatibility costs are:
+
+| Option | Benefit | Cost |
+| --- | --- | --- |
+| Store the upstream qualified assertion and split only PAV | Preserves the upstream semantic graph, topical-slot behavior, ownership rules, and existing companion authority without another artifact. | Canonical records and public projections contain the real qualified assertions; the first source run may therefore have a material metadata diff even where topical values already match. A small wrapper must split inline upstream PAV and normalize the already approved typed-value edge case. |
+| Derive a qualified assertion from a scalar companion selector | Keeps stored records shorter and is simple when source and topical values are equal. | Cannot represent a differing source value without replacing or losing the topical value, so it permanently forks update semantics and requires local ownership rules and parity maintenance. |
+| Replace only a topical value inferred to have the same owner | Propagates source changes while attempting to preserve human and foreign values. | Upstream does not record ownership on the topical scalar, so qualifier ownership cannot prove who owns that scalar. The inference needs new state or a local rule and is not sustainable under the accepted authority boundary. |
+| Store the source value in the companion | Keeps the qualified assertion out of the record. | Makes the companion a second metadata and candidate store, changes its schema and authority, duplicates source facts, and requires a new migration and hashing contract. |
+| Preserve the topical value and emit no qualified source assertion | Avoids overwriting curated data. | Drops a material source claim from the canonical graph and Git diff, so it cannot be reviewed or reproduced as upstream represents it. |
+| Restore inline PAV | Uses upstream storage bytes directly. | Reintroduces machine-only provenance noise into human-facing records and abandons the accepted companion boundary even though storing the unannotated qualified assertion is sufficient. |
+
+One rare upstream edge remains part of the review.
+If the topical slot is absent but an equivalent human- or unowned qualified assertion already exists, the pinned helper fills the topical slot and does not add machine PAV because its subset match ignores ownership.
+Failing closed preserves the rule that every machine-provided assertion object has PAV; allowing the topical convenience copy would match the helper but leave only Git/DataLad proposal attribution for that copied scalar.
+The proposed default is to fail closed until a reviewer explicitly resolves that record rather than infer ownership or add provenance-only PAV.
+
+Until this proposed resolution is reviewed, adapters MUST fail before candidate generation if any source-mapped machine claim has a data or class range, whether its topical slot is absent, equal, or different.
+They MUST NOT emit a scalar-path companion, omit the qualified object, classify the source field as unused, use the general visible-replacement rule to overwrite a populated topical scalar, or extend the companion schema.
+Implementation evidence MUST compare the local split/join result with the pinned enrichment helper for missing, equal, differing, same-owner, human-owned, and differently owned values; cover string, typed non-string, class-range, and multivalued cases; and prove locked-schema RDF and projection round trips.
+Any accepted qualified-assertion additions to the existing corpus are source-adapter metadata changes reviewed through the normal proposal workflow, not part of the separate canonical-serialization normalization pull request.
+
+Every machine-provided assertion object MUST have a companion entry.
 Assertions created by a human or downstream policy do not.
 Structural `pid` and `schema_type` slots are not imported assertions.
 The stored record tree MUST NOT contain either CURIE or expanded-URI `pav:importedBy` or `pav:importedFrom` annotations; those machine annotations belong only in companions and the derived joined graph.
@@ -424,6 +474,13 @@ In particular, reuse `things-enrichment-tools` ownership-aware update helpers wh
 A local replacement MUST have focused parity tests and a documented reason it remains local.
 The pinned source Things Schema and exact `dlthings:*` CURIE spellings remain authoritative.
 
+The proposed scalar resolution keeps the ownership algorithm upstream rather than forking it.
+An adapter would build an ephemeral enrichment view in which companion PAV is attached to its selected assertion objects in the compact string form understood by the pinned helper, run that helper unchanged, and then split machine PAV back into companions while retaining every semantic assertion object in the record.
+The RDF-validation join's expanded annotation objects MUST NOT be passed directly to the current helper because its owner matching does not recognize that representation.
+The split and join MUST be inverse for supported machine PAV.
+The only local semantic normalization is the locked-schema shape already required by HR-208: explicit `AttributeSpecification` type, string lexical value, datatype `range` for native non-string data, and no `schema_type` on `Statement`.
+Typed normalization must also be reversible in the ephemeral helper view so an unchanged typed assertion remains idempotent.
+
 The pinned upstream reference points map directly onto this contract:
 
 - Dump Things [validation and curated storage](../submodules/dump-things-service/dump_things_service/curated.py) supply the schema-gated curated-state model;
@@ -442,16 +499,16 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Persistent schema-validating service | Locked local/CI validation of Git-backed YAML | Intentional; static operation must not require a service. |
 | Scraper/importer/enricher are distinct roles | `source adapter` is a local umbrella | Naming convenience only; specific upstream terms remain preferred. |
 | Positive proposals move through an inbox | Git diff contains proposed Things directly | Required for native pull-request metadata review. |
-| PAV annotations are stored inline in each Thing | Records and PAV annotation companions are stored under parallel record and overlay trees and joined before validation or RDF export | Keeps record diffs focused on user-facing metadata while preserving the same semantic graph. |
+| PAV annotations are stored inline in each Thing | Records retain every semantic assertion object, while only PAV is stored in a parallel annotation companion and reattached before validation or RDF export | Keeps provenance out of record diffs while preserving the same semantic graph and avoiding a second metadata store. |
 | Rejected inbox proposals do not enter curated GitAudit history | The proposal DataLad commit remains in default-branch history after rejection | Required to preserve the single-PR execution and decision record; public retention is disclosed. |
 | No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
 | Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
-| Ownership-aware helpers do not overwrite another owner | A conflicting value may be proposed but only a human can accept the replacement | Pull-request curation is the explicit ownership-migration boundary. |
+| Ownership-aware helpers preserve populated topical data and allow differently owned qualified values to coexist | M5-Q001 proposes retaining that behavior by storing qualified assertions and limiting visible replacement to cases not governed by the scalar helper | Avoids inferring ownership for a direct scalar or making pull-request acceptance a permanent scalar-update fork. Review is still required before this becomes active. |
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
-| Compact scalar PAV annotations | The joined Thing uses expanded annotation objects | Required by the pinned converter for lossless round trips. |
+| Compact scalar PAV annotations | The ephemeral update view uses compact PAV, while the joined validation/RDF view uses expanded annotation objects | The pinned helper recognizes compact ownership and the pinned converter requires expanded annotations for lossless round trips. The conversion is transient and parity-tested. |
 | Service curation API and authorization model | Hosted stateless review application and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
 
 Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).

@@ -1,6 +1,6 @@
 # Milestone 5 acceptance record
 
-Status: active; shared-foundation implementation is complete locally and review evidence is pending
+Status: active; shared-foundation scalar compatibility is under specification review
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
@@ -35,13 +35,18 @@ Live-source or authoritative-head drift is advisory and must not silently replac
 | --- | --- | --- |
 | Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | local pass `f413278a4ad8c6da0eb1f1d6412d42b06f5a759c`; review pending |
 | Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | pending |
-| Annotation selectors | Exact path/hash matching rejects missing or ambiguous assertions | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
-| Joined validation | Record plus annotation overlay validates as one Thing with the locked schema | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
-| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
-| Projection | Joined annotations reach the machine projection while configured public views remain unaffected | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| Annotation selectors | Exact path/hash matching rejects missing or ambiguous mapping assertions; scalar targets are rejected | object-selector behavior passes at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; its scalar-selector evidence is provisional and must be replaced under M5-Q001 |
+| Joined validation | Stored semantic assertion objects plus annotation companions validate as one Thing with the locked schema | object attachment passes at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; stored qualified data and class-range coverage pending HR-212 |
+| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | the qualified shapes pass at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; direct-scalar synthesis is superseded evidence and stored-object parity is pending |
+| Projection | Stored qualified assertions reach normal semantic projections, joined PAV reaches the machine projection, and actual public rendering behavior is explicit | pending HR-212 implementation and consumer evidence |
 | Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
+| Upstream scalar updates | Missing, equal, differing, same-owner, human-owned, and differently owned values match pinned `update_data_property()` after reversible compact-PAV split/join and typed normalization | blocked on review of M5-Q001/HR-212 |
 
 Foundation verification command: `pixi run test` at `e8cb3917dbc6d62a34ed3a07ede860322d26a317` on macOS 26.5.2 ARM64; 83 engine tests passed with 2 fixture skips and all 40 development tests passed.
+This remains valid evidence for canonicalization, object attachment, qualified-object shapes, and locked round trips, but not for the scalar storage/update behavior reopened by M5-Q001.
+
+Replacement HR-212 evidence must reject scalar companion targets and cover an absent topical slot, an equal topical value without a qualifier, an identical richer qualifier, a changed same-owner qualifier, human- and differently owned qualifiers, multivalue order, compact-to-expanded PAV conversion, typed reverse normalization, class-range `Statement` storage, candidate/cache reopening, and the actual public projection effect.
+The rare absent-topical plus equivalent unowned-qualifier case must exercise the reviewed outcome rather than infer ownership.
 
 ## Adapter behavior matrix
 
