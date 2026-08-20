@@ -62,6 +62,8 @@ Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch
 
 Source acquisition MUST be read-only.
 Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
+The adapter MUST validate acquired records against its declared input types before transformation.
+Validation failures are diagnostics to correct, not review dispositions or durable candidate state.
 Each source claim MUST bind a stable source-record identifier to a content hash of all and only the normalized source facts that can affect its proposed metadata.
 Transport metadata and unused source fields MUST NOT affect that hash or reopen review.
 A source-level version such as a Git commit or Zotero library version SHOULD also be recorded when available.
@@ -72,6 +74,7 @@ Historical reacquisition is not a conformance requirement: the identifier, sourc
 
 One shared schema-aware canonicalizer MUST order and serialize every Thing written by an adapter.
 Adapters MUST NOT implement private YAML-ordering rules.
+The canonicalizer MUST be an idempotent shared library operation with focused conformance tests, not a service or plugin framework.
 Every record in the canonical corpus MUST already conform to that serialization.
 An adapter run serializes only records it writes and does not reserialize untouched records.
 
@@ -90,8 +93,7 @@ Each candidate contains at least:
 - the target canonical PID and record path;
 - a human-readable label;
 - the baseline and proposed Thing, or an explicit deletion;
-- a versioned digest of the canonical source-mapped proposal facts and relevant adapter policy; and
-- any condition that blocks acceptance.
+- the claim content hash defined above.
 
 The plan drives proposal generation, form rendering, and submission validation.
 It MUST be reproducible and MUST NOT be tracked.
@@ -108,7 +110,7 @@ The run record MUST remain inline in a distinct commit; a DataLad sidecar is not
 The recorded command MUST name the adapter, exact source coordinate, relevant inputs, base, and `metadata/records/` output.
 
 The proposal's DataLad commit and every later review commit MUST survive unchanged as distinct commits in default-branch history.
-A merge commit or true fast-forward preserves those commits.
+A merge commit preserves those commits.
 Rebasing or squashing the final reviewed lineage is not conformant because it rewrites the execution record.
 An obsolete proposal replaced during conflict regeneration is not part of the final reviewed lineage and need not be retained.
 
@@ -121,7 +123,6 @@ The system supports three dispositions for any proposed addition, modification, 
 - `defer`: restore the baseline and ask again on the next proposal.
 
 Absence, an unchecked form, pull-request closure, workflow failure, or a missing cache entry is never a decision.
-A blocked candidate MUST NOT be accepted.
 
 The cache is current state, not an append-only event log.
 It MUST be owned by the adapter under `source-adapters/<adapter>/policy/curation-decisions.yaml`.
@@ -136,11 +137,11 @@ It MUST NOT contain baseline or proposed records, rendered diffs, candidate or d
 Re-review replaces the current entry; the prior entry remains available through Git.
 
 An unchanged rejection remains suppressed.
-A change to the canonical source-mapped claim or relevant policy MUST reopen review.
+A change to the canonical source-mapped claim MUST reopen review.
 An unused source change does not reopen review because it cannot alter the proposal.
 An accepted claim whose source-mapped proposal is unchanged is not proposed again, even when the reviewed metadata contains a human correction.
 Deferral always returns on the next proposal.
-There is no separate permanent-exclusion disposition: rejection persists until the canonical source-mapped claim or relevant policy changes.
+There is no separate permanent-exclusion disposition: rejection persists until the canonical source-mapped claim changes.
 Identity linkage is adapter policy or a reviewed crosswalk, not a disposition.
 
 ### Human modification and finalization
@@ -175,7 +176,6 @@ Finalizing review MUST:
 
 If finalization changes metadata programmatically, its Pixi task MUST run through DataLad.
 For each bot commit, the most recent authenticated human whose action triggered the operation is the Git author and automation is the committer.
-Compact commit trailers MUST identify the adapter, exact source coordinate, review URL, and review time.
 
 Accepted record bytes may exist only in the earlier proposal commit.
 The record's Git history, its PID-keyed cache entry, and the review commit together form the per-record human audit.
@@ -255,6 +255,9 @@ A conforming host MUST provide:
 - normal metadata validation on the reviewed head; and
 - a merge method that preserves the exact proposal, review, and finalization commit objects.
 
+A conforming downstream MUST permit merge commits on its curated branch.
+A linear-history-only branch policy is not supported.
+
 The adapter core is host-neutral.
 No second host implementation is required until the GitHub profile is complete, but another host may implement the same contract without adopting GitHub-specific files or APIs.
 
@@ -283,7 +286,7 @@ Secrets and data that are not approved for repository history MUST be excluded b
 Reviewers MUST NOT need a local checkout.
 Local execution MAY expose the same deterministic operations for development and reproduction.
 
-Adapter review pull requests MUST use a merge commit or true fast-forward.
+Adapter review pull requests MUST use a merge commit.
 Rebase merge and squash merge both rewrite required DataLad or human-review commits and MUST NOT be used.
 The pull-request opening text MUST prominently state that requirement, and the host MUST permit an exact-commit-preserving merge method.
 
@@ -336,15 +339,6 @@ The concrete upstream reference points are the Dump Things [inbox/curation model
 | Compact scalar PAV annotations | Expanded annotation objects | Required by the pinned converter for lossless round trips. |
 | Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
 
-## Current implementation gaps
-
-These are gaps to close, not permitted variants of the specification:
-
-- current adapters use stable URNs rather than versioned adapter Things for `pav:importedBy`;
-- direct scalar imports rely on record-level PAV instead of upstream-style annotated attributes;
-- Zotero has record-level rather than assertion-level PAV;
-- the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or deletion proposals;
-- Pixi review-application tasks do not yet run through DataLad; and
-- the pull-request opening text and hosted merge configuration do not yet require an exact-commit-preserving merge.
+Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).
 
 Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
