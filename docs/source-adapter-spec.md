@@ -22,10 +22,9 @@ Implementations SHOULD use the more specific upstream role when applicable:
 A projection derives a presentation from canonical metadata and is not a source adapter.
 A report-only diagnostic is useful adapter tooling but does not, by itself, implement this contract.
 
-The supported workflow has two durable commits in one review branch:
-
-1. a DataLad commit containing the proposed metadata changes; and
-2. an ordinary Git commit applying the complete human review and updating the compact decision cache.
+The supported workflow has one proposal commit, zero or more human-review modification commits, and a final complete decision state on one review branch.
+Programmatic metadata changes are DataLad run commits.
+Direct human changes are ordinary Git commits.
 
 The reviewed default branch is the curated state.
 A proposal branch is the service-free equivalent of an upstream inbox.
@@ -37,8 +36,9 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Canonical metadata | `metadata/records/` | Every file except the source-control marker is a schema-valid Thing. |
 | Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
 | Machine assertion provenance | PAV annotations in the Thing | Identify the importing adapter and source record. |
-| Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
-| Execution provenance | Initial DataLad proposal commit | Record the metadata-producing command and exact inputs. |
+| Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, deferred, and deletion decisions. |
+| Human modification | Attributed Git commit, host comment, or review bundle | Preserve the exact human input and resulting metadata change. |
+| Execution provenance | DataLad run commit | Record every bot-performed metadata-changing command and its inputs. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
@@ -61,7 +61,9 @@ Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch
 
 Source acquisition MUST be read-only.
 Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
-A redistributable snapshot MAY be tracked when it is the clearest immutable source evidence.
+When a source exposes an immutable revision, the run MUST record that coordinate.
+When an old revision cannot be reacquired, the adapter MUST retain the exact normalized source snapshot in Git or another immutable, review-accessible store for as long as the resulting metadata and decisions are supported.
+The snapshot MUST be content-addressed and its rights and privacy boundary MUST be explicit.
 
 ### Candidate plan
 
@@ -71,7 +73,7 @@ Each candidate contains at least:
 - a stable source namespace and source-native record identifier;
 - the target canonical PID and record path;
 - a human-readable label;
-- the baseline and proposed Thing;
+- the baseline and proposed Thing, or an explicit deletion;
 - a versioned digest of material source facts and relevant adapter policy; and
 - any condition that blocks acceptance.
 
@@ -83,23 +85,24 @@ Internal digests MUST NOT be the primary human identifier.
 ### Proposal
 
 Given identical source, base, policy, and active decisions, proposal output MUST be deterministic and idempotent.
-It MUST write only proposed Things under `metadata/records/`.
+It MUST change only proposed Things under `metadata/records/`.
 
 The proposal MUST be created by one project-locked `datalad run --explicit` invocation.
 The run record MUST remain inline in a distinct commit; a DataLad sidecar is not used.
 The recorded command MUST name the adapter, exact source coordinate, relevant inputs, base, and `metadata/records/` output.
 
-The proposal's DataLad commit MUST survive as a distinct commit in default-branch history.
+The proposal's DataLad commit and every later metadata-changing run commit MUST survive as distinct commits in default-branch history.
 A rebase may rewrite its commit ID while preserving its message and diff.
 Squashing it into another commit is not conformant.
 
 ### Decisions and cache
 
-Version 1 supports exactly three dispositions:
+The system supports four dispositions:
 
-- `accept`: retain the proposed Thing;
-- `reject`: restore the baseline and suppress the same unchanged claim; and
-- `defer`: restore the baseline and ask again on the next proposal.
+- `accept`: retain the reviewed Thing, including any attributed human edits;
+- `reject`: restore the baseline and suppress the same unchanged claim;
+- `defer`: restore the baseline and ask again on the next proposal; and
+- `delete`: remove an existing canonical Thing and suppress the same unchanged deletion claim.
 
 Absence, an unchecked form, pull-request closure, workflow failure, or a missing cache entry is never a decision.
 A blocked candidate MUST NOT be accepted.
@@ -119,21 +122,38 @@ Re-review replaces the current entry; the prior entry remains available through 
 An unchanged rejection remains suppressed.
 A material source change or change to relevant policy MUST reopen review.
 An accepted record with no resulting metadata change is not proposed again.
-Version 1 deferral always returns on the next proposal.
+Deferral always returns on the next proposal.
+There is no separate permanent-exclusion disposition: rejection persists until the material claim or relevant policy changes.
+Identity linkage is adapter policy or a reviewed crosswalk, not a disposition.
 
-### Applying review
+### Human modification and finalization
 
-Applying review MUST:
+Review may revise proposed metadata before finalization.
+Supported inputs include:
+
+- attributed suggestions in review comments that automation applies;
+- one or more metadata commits pushed by authorized humans;
+- a SHACL Vue review bundle applied by an authenticated workflow; and
+- the same bundle operation invoked directly by a future SHACL Vue integration.
+
+A direct human commit is already its own execution and attribution record.
+When automation applies a comment, patch, or bundle that changes metadata, it MUST use a project-locked `datalad run --explicit` commit identifying the human input, tool, declared inputs, and outputs.
+The input MUST remain recoverable from Git history or an immutable host URL and digest.
+DataLad is not used for a decision-cache-only commit.
+
+Finalizing review MUST:
 
 1. require exactly one valid disposition for every current candidate;
-2. regenerate the candidate plan from the recorded source and base;
-3. retain accepted proposal bytes;
-4. restore or remove rejected and deferred proposal bytes;
-5. update only the compact decision cache; and
-6. validate the complete resulting metadata tree.
+2. regenerate and verify the initial candidate plan from the recorded source and base;
+3. verify that subsequent metadata edits have an allowed, attributed review input;
+4. retain the reviewed bytes for accepted candidates;
+5. restore rejected and deferred candidates and remove deleted candidates;
+6. update no durable review artifact other than the compact decision cache; and
+7. validate the complete resulting metadata tree.
 
-The result is one ordinary Git commit, not another DataLad run.
-The authenticated reviewer is the Git author and automation is the committer.
+If finalization changes metadata, it is a DataLad run commit.
+If it changes only the decision cache, it is an ordinary Git commit.
+For a bot-applied human instruction, the authenticated human is the Git author and automation is the committer.
 Compact commit trailers MUST identify the adapter, exact source coordinate, review URL, and review time.
 
 Accepted record bytes may exist only in the earlier proposal commit.
@@ -142,13 +162,19 @@ A record MUST NOT be rewritten solely to make it appear in the review commit.
 
 Automation MUST NOT choose a disposition, mark a review ready, approve, merge, deploy, or write to the external source.
 
+Before merge, corrections remain on the same review branch and add attributable commits; finalization is rerun against the new head.
+After merge, a correction starts a new adapter run and pull request from the reviewed default branch.
+
 ### Update and ownership behavior
 
-Adapters MUST prefer the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
+Adapters MUST apply the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
 When a whole-record proposal would replace such content, the complete loss or change MUST remain visible in the Git diff and require explicit acceptance.
 
-Source absence MUST NOT imply record deletion.
-An adapter that proposes deletion needs a separately specified source-completeness and ownership rule.
+An adapter may propose deletion only when the proposal identifies the prior canonical Thing, stable source identity, exact source revision, and a declared source-completeness scope showing that absence is meaningful.
+The adapter MUST demonstrate lifecycle authority through prior adapter provenance or policy.
+The review MUST show the full deletion diff and inbound-reference impact.
+Deletion MUST NOT cascade implicitly, and unresolved required references block it.
+Without completeness and ownership evidence, source absence is only a diagnostic; a human may still request deletion as an explicit metadata edit.
 Two adapters may target the same Thing, but each works from the current reviewed base and maintains its own source identity and decisions.
 No global field-ownership registry is implied.
 
@@ -162,12 +188,21 @@ Accepted imported records MUST use upstream PAV terms:
 The pinned runtime requires expanded annotation objects containing `annotation_tag` and `annotation_value`.
 Adapters MUST use that representation and prove JSON-to-RDF-to-JSON and projection round trips with the locked Things Schema.
 
-Record-level PAV covers a wholly imported record and direct scalar slots.
-Where source and site assertions can be distinguished safely, PAV SHOULD also annotate imported `attributed_to`, `attributes`, `identifiers`, and `generated_by` objects.
-An adapter MUST NOT label a pre-existing human or site-policy assertion as an upstream import.
+Semantic machine provenance belongs in the canonical Thing because the upstream Things model includes this PAV annotation pattern.
+It is not moved into an Orinoco-specific provenance file.
 
-Version 1 uses a stable adapter URN for `pav:importedBy`.
-Upstream prefers a versioned pool Thing identifying the enricher; this is a documented temporary deviation until adapter-agent metadata needs to be published or queried.
+Every machine-provided assertion MUST carry assertion-level PAV.
+Imported objects such as `attributed_to`, `identifiers`, and `generated_by` carry annotations directly.
+Imported scalar data is represented by annotated `AttributeSpecification` objects in `attributes`, using the upstream enrichment pattern; a topical scalar slot MAY remain when required by the schema or presentation.
+A record-level annotation MAY supplement but MUST NOT replace assertion-level provenance.
+
+An assertion created by a human or downstream policy rather than present in the external source is not imported source data and MUST NOT receive the adapter's PAV annotation.
+Examples include a manually resolved identity, an eligibility decision, or a locally chosen relationship.
+When a human changes a machine-provided assertion, the resulting human assertion MUST lose the adapter's PAV annotation unless it still states exactly the imported source fact.
+The adapter may report a later upstream conflict but MUST NOT silently reclaim ownership.
+
+`pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice.
+Changing the adapter incompatibly requires a new versioned agent Thing.
 
 The exact source revision belongs in Git/DataLad review provenance.
 The PAV source may remain the stable logical record URI.
@@ -182,9 +217,10 @@ A conforming host MUST provide:
 - authenticated reviewer identity and authorization;
 - complete-decision validation;
 - trusted regeneration from immutable source and base coordinates;
-- one atomic review commit with an exact-head compare-and-swap;
+- attributable human modification inputs and commit history;
+- exact-head compare-and-swap for each automated commit;
 - normal metadata validation on the reviewed head; and
-- a merge method that preserves the distinct DataLad and review commits.
+- a merge method that preserves every proposal, review, and finalization commit.
 
 The adapter core is host-neutral.
 No second host implementation is required until the GitHub profile is complete, but another host may implement the same contract without adopting GitHub-specific files or APIs.
@@ -196,12 +232,13 @@ The initial supported profile MUST:
 - start from a default-branch `workflow_dispatch` and open one draft pull request;
 - show proposed Things in **Files changed**;
 - render one task-list group per record in the pull-request body, headed by a friendly label, canonical PID, and useful source-native identifier;
+- support attributed comment suggestions, direct metadata commits, and SHACL Vue bundle application on the same branch;
 - accept a complete form through an exact `/curation submit` comment;
 - treat the authenticated submitter as the reviewer attesting the whole form;
 - accept submissions only from collaborators with `write` or `admin` access;
 - load executable workflow and adapter code from the trusted default branch;
 - treat the pull-request branch and source checkout only as data while a write token is available;
-- regenerate and compare the proposal before applying decisions;
+- regenerate the initial proposal and validate every later human modification before applying decisions;
 - restrict changes to declared metadata and decision-cache paths;
 - push against the exact observed head with a lease; and
 - dispatch normal validation without approving, merging, or deploying.
@@ -260,22 +297,28 @@ The concrete upstream reference points are the Dump Things [inbox/curation model
 | No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
-| Enrichment tools do not use DataLad as semantic provenance | One DataLad metadata-proposal commit | Orinoco execution provenance only; not claimed as upstream alignment. |
+| Enrichment tools do not use DataLad as semantic provenance | DataLad records bot-performed metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
 | Compact scalar PAV annotations | Expanded annotation objects | Required by the pinned converter for lossless round trips. |
-| Machine scalar values may be duplicated as annotated attributes | Direct scalar slots use record-level PAV | Intentional V1 economy; avoid duplicate assertions solely for provenance. |
-| `pav:importedBy` points to a versioned enricher Thing | Stable adapter URN | Temporary documented deviation; converge when adapter metadata is published or queried. |
-| Assertion-level PAV for machine information | Zotero currently has record-level PAV only | Deferred until source assertions can be separated from site policy and round-trip proven. |
 | Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
+
+## Current implementation gaps
+
+These are gaps to close, not permitted variants of the specification:
+
+- current adapters use stable URNs rather than versioned adapter Things for `pav:importedBy`;
+- direct scalar imports rely on record-level PAV instead of upstream-style annotated attributes;
+- Zotero has record-level rather than assertion-level PAV;
+- the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or explicit deletion; and
+- current automation uses DataLad only for the proposal rather than every bot-performed metadata modification; and
+- the hosted merge path does not yet enforce preservation of every DataLad and human-review commit.
 
 ## Remaining review questions
 
 The following details are deliberately not settled by this draft:
 
-1. What source-completeness evidence and review control are required before an adapter may propose record deletion?
-2. Should post-submission corrections amend the same review branch or always begin a new proposal from the reviewed default branch?
-3. What concrete need triggers replacing adapter URNs with versioned adapter Things?
-4. Which Zotero assertions can receive assertion-level PAV without labeling site policy as imported source data?
-5. Which demonstrated use case, if any, justifies adding `link`, permanent exclusion, conditional deferral, or another disposition after Version 1?
-6. When a source cannot be reacquired immutably, what adapter-specific source snapshot and retention policy is required?
+1. Must every explicit deletion require prior adapter lifecycle ownership, or may a human reviewer authorize deletion of a record that originated elsewhere within the same adapter pull request?
+2. Where should an uploaded SHACL Vue bundle be retained so its exact bytes remain recoverable without adding a permanent duplicate artifact to the final tree?
+3. When several humans contribute review edits, should each automated commit use the originating contributor as author while the final submitter attests the complete result?
+4. May human review add a related Thing that was not in the source candidate plan, or must such an addition be reviewed in a separate non-adapter change?
 
-Until these questions are resolved, adapters MUST use the conservative Version 1 behavior above rather than infer a broader capability.
+Until these questions are resolved, implementations MUST use the narrower behavior that does not infer extra deletion authority, discard review inputs, misattribute edits, or add unrelated records.
