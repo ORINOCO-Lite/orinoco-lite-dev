@@ -85,5 +85,5 @@ Under that rule the old CON-coupled root environment can remain historical, whil
 
 ## Next engineering goal
 
-The accepted [`source-adapter architecture`](source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
+The draft [`source-adapter specification`](source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
 Its first reusable candidate is Zotero; the CON-specific `dump-research-info` experiment supplies design evidence but does not define a common host or a generic adapter.

@@ -1,186 +1,369 @@
-# Source adapters
+# Orinoco Lite source-adapter specification
 
-Status: evolving architecture; two downstream examples under review
+Status: draft reference for review
 
-## Purpose and vocabulary
+This document defines a host-neutral source-adapter contract and the GitHub profile that Orinoco Lite will implement first.
+It does not define a Python ABI, plugin protocol, or persistent service.
+Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
 
-A source adapter turns an external metadata source into a reviewable change in an Orinoco Lite site.
-The name describes the boundary without prescribing one implementation or one kind of change.
+The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
-Orinoco Lite aligns with the concrete vocabulary used by the upstream Things tools:
+## Scope and vocabulary
 
-- a **scraper** acquires data from a remote source;
-- an **importer** translates source records into Things records;
-- an **enricher** adds or revises fields using another source;
-- a **projection** derives a website or another presentation from site metadata and is not a source adapter.
+A source adapter turns an identified external metadata source into a reviewable change to an Orinoco Lite site's canonical Things.
 
-Source adapter is Orinoco Lite's local umbrella term for tools that acquire or propose changes to site records, including report-only modes.
-It is not an upstream-defined interface or role name.
-It replaces the earlier use of *plugin*, which upstream uses for unrelated CLI modularity.
+`source adapter` is an Orinoco Lite umbrella term.
+Implementations SHOULD use the more specific upstream role when applicable:
 
-## Review and provenance model
+- a **scraper** acquires source data;
+- an **importer** translates source records into Things; and
+- an **enricher** adds or updates assertions using another source.
 
-The site repository is the staging and review surface.
-The current exploration distinguishes four kinds of state rather than treating all of them as provenance:
+A projection derives a presentation from canonical metadata and is not a source adapter.
+A report-only diagnostic is useful adapter tooling but does not, by itself, implement this contract.
 
-| State | Tracked authority | Purpose |
+The supported workflow has one proposal commit, zero or more human-review modification commits, and a final complete decision state on one review branch.
+The proposal is a DataLad run commit.
+Pixi tasks that programmatically apply metadata changes also use DataLad.
+Direct human changes are ordinary Git commits.
+
+The reviewed default branch is the curated state.
+A proposal branch is the service-free equivalent of an upstream inbox.
+
+## Authorities and state
+
+| Concern | Authority | Rule |
 | --- | --- | --- |
-| Execution provenance | Git and preserved DataLad run evidence | Records the literal command, declared inputs, source version, and resulting changes. |
-| Assertion provenance | The proposed or accepted Thing in `metadata/records/` | Uses Provenance, Authoring and Versioning (PAV) annotations to identify the tool and source responsible for an imported field, object, or statement. |
-| Human disposition | Site-owned adapter policy | Records an explicit candidate disposition, such as accept, reject, link, defer, or supersede, that later adapter runs can consume. |
-| Cache and diagnostics | Ignored adapter/build state | Improves acquisition or reporting but never determines what a human already decided. |
+| Metadata records | `metadata/records/` | Store reviewable, user-facing Things without inline machine-source annotations. |
+| Machine assertion provenance | `metadata/provenance/` | Store PAV companions; joining both metadata trees produces the complete semantic Things graph. |
+| Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
+| Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
+| Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
+| Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
+| Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
+| Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
-An adapter can write only provenance known when it runs.
-Human-review provenance and disposition arise later and must be recorded by the review action, not inferred by the generator.
-The target static workflow is therefore one pull request with a proposal phase and a reconciliation phase, rather than one command that both proposes and decides.
+The two metadata trees are canonical site-owned state.
+Generated projections, candidate plans, caches, diagnostics, and hosted form renderings are not canonical metadata.
 
-Run the proposal phase through the downstream project's locked DataLad environment:
+## Core adapter contract
 
-```console
-pixi run datalad run \
-  -m "Propose Zotero source adapter changes (basic)" \
-  "source-adapters/zotero/update \
-    --source source-adapters/zotero/source/items.json \
-    --source-version {literal-source-version} \
-    --mode basic \
-    --config source-adapters/zotero/config.toml \
-    --records metadata/records"
-```
+### Inputs and boundaries
 
-The proposal command may write intermediate proposed Things directly to `metadata/records/` on the pull-request branch.
-They are not accepted metadata until the final reviewed state is merged.
-Reconciliation retains or revises accepted proposals and removes rejected or linked-away proposed Things.
-The proposal phase must also expose, or deterministically reproduce, a machine-readable candidate inventory bound to the source snapshot and claim fingerprints.
-Choosing its representation, transport, and retention is part of the current exploration; it must not become a second canonical metadata pool.
+An adapter run MUST identify:
 
-The braces mark documentation placeholders only.
-The command actually passed to `datalad run` must contain resolved literal values.
-In particular, a source checkout is passed as a path relative to the downstream project root, such as `../dump-research-info`, together with its exact revision.
-Do not record a developer-specific absolute path or hide the operative value in an environment variable.
-A `.env` file may help prepare an invocation, but the expanded value belongs in the recorded command so the commit says exactly what ran.
+- the adapter and implementation version;
+- a source coordinate or version;
+- the exact canonical-metadata base;
+- the adapter policy relevant to the proposed change; and
+- its declared read and write roots.
 
-The adapter executable does not commit, merge, or deploy.
-`datalad run` records the command and resulting ordinary-Git changes; a pull request supplies human review.
-The diff precisely records the materialized content delta—additions, modifications, and removals—so adapters must not add a second SHA inventory or a custom copy of the same diff.
-Absence from a diff cannot distinguish rejection, deferral, abandonment, or a failed run, so a durable disposition is not a duplicate diff inventory.
-Detailed digests are retained only when they establish an external fact, such as the identity of a fetched payload.
-API snapshots and other redistributable source evidence are ordinary Git files.
-Downstream source-adapter operation does not use git-annex.
+Operative values MUST be literal and reproducible.
+Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch locations MUST NOT affect candidate identity or output.
 
-The workflow under exploration is:
+Source acquisition MUST be read-only.
+Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
+The adapter MUST apply every validation rule exposed by its declared source model before transformation.
+Before the proposal commit, every stored record and every Thing produced by joining its provenance companion MUST pass the complete automated validation supported by the locked Things Schema and runtime.
+Validation failures are diagnostics to correct, not review dispositions or durable candidate state.
+Each source claim MUST bind a stable source-record identifier to a content hash of all and only the normalized source facts that can affect its proposed metadata.
+Transport metadata and unused source fields MUST NOT affect that hash or reopen review.
+A source-level version such as a Git commit or Zotero library version SHOULD also be recorded when available.
+Historical source payloads MAY be retained, but the specification never requires a full source snapshot.
+Historical reacquisition is not a conformance requirement: the identifier, source version, content hash, proposal diff, and review history are sufficient evidence of what was reviewed.
 
-1. Propose changes and a candidate inventory from an exact source snapshot, current metadata, adapter policy, and previously merged decisions.
-2. Have a human explicitly record a candidate disposition, such as accept, reject, link, defer, or supersede, on the same branch.
-3. Run a recorded reconciliation command that consumes the exact proposal and decisions and produces the final metadata state.
-4. Verify in CI that every proposal has an explicit valid disposition, every decision still matches its source claim, and the reconciled result is deterministic and idempotent.
-5. Review the final pull-request head and merge the metadata and decisions as one reviewed default-branch transition.
+### Canonical ordering
 
-If every proposal is rejected, the final metadata diff may be empty.
-The decision-only pull request must still be merged; closing the proposal does not create state that a future adapter can consume.
-A bot is not required.
-Automation may help materialize an explicit human decision on the same branch, but it must not infer a disposition, approve, merge, or make a follow-up pull request the normal path.
-The exploration must also prove that the repository's actual merge mode preserves enough run evidence to reproduce the final state; a proposal-branch commit is not assumed to remain authoritative after a squash or rebase.
+One shared canonicalizer MUST order and serialize every record and provenance companion written by an adapter.
+Adapters MUST NOT implement private YAML-ordering rules.
+The canonicalizer MUST match the upstream Dump Things `order_dict()` and `json2yaml()` behavior: recursively sort mapping keys lexically and preserve list order.
+It MUST be an idempotent shared library operation with focused upstream-parity tests, not a service or plugin framework.
+Every record in the canonical corpus MUST already conform to that serialization.
+An adapter run serializes only records it writes and does not reserialize untouched records.
 
-## Modes and adapter-specific policy
+Record comparison operates on canonical metadata without machine-source annotations, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on deterministic record and companion serialization.
+This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
-Adapters may expose three consistent mode names when those distinctions are useful:
+### Candidate plan
 
-- `report` inspects the source and site without changing site metadata;
-- `basic` proposes narrow, high-confidence changes; and
-- `aggressive` permits broader inference or a wider class of proposed changes.
+The adapter MUST deterministically derive an ephemeral candidate plan before writing metadata.
+Each candidate contains at least:
 
-These names describe review risk, not universal semantics.
-Each adapter documents its inputs, matching rules, exact read and write roots, and what additions, replacements, field removals, or record deletions each mode may perform.
-Whether a source record's absence should remove a record from the site metadata depends on that adapter, mode, source completeness, and review context.
-There is no cross-adapter ownership map or default deletion rule.
+- a stable source namespace and source-native record identifier;
+- the target canonical PID and record path;
+- a human-readable label;
+- the baseline and proposed Thing, or an explicit deletion;
+- the corresponding assertion-provenance changes; and
+- the claim content hash defined above.
 
-Likewise, two adapters may propose changes to the same record.
-Each writes its own change; the reviewer sees the overlap in Git and can adjust the invocation, order, or result before merging.
-An adapter should be deterministic and idempotent so rerunning it from the same base with the same declared inputs and decisions produces no further diff.
+The plan drives proposal generation, form rendering, and submission validation.
+It MUST be reproducible and MUST NOT be tracked.
+Full records, opaque candidate IDs, transaction IDs, or copies of Git diffs MUST NOT be stored as review provenance.
+Internal digests MUST NOT be the primary human identifier.
 
-A decision key must survive individual run identifiers.
-The exploration must define a stable source namespace and record identifier, the kind of claim under review, a versioned semantic fingerprint, and the relevant matching-policy version.
-Orinoco Lite's default is that rejection suppresses the same materially unchanged claim.
-A material source change or a change to relevant matching policy reopens review, and permanent exclusion requires explicit human scope.
-A deferral is not a rejection: it must declare when the candidate returns, such as a date, a material source change, or resolution of a named policy question.
+### Proposal
 
-An adapter may configure the stable source-identity components, normalized material fields included in the versioned fingerprint, deferral conditions, and additional re-review triggers needed for that source.
-It may not make decisions implicit, use run-local identity, treat deferral as permanent rejection, or suppress materially changed claims without an explicit broader human decision.
-These semantics are accepted defaults; the serialized disposition schema and common adapter interface remain exploratory.
+Given identical source, base, policy, and active decisions, proposal output MUST be deterministic and idempotent.
+It MUST change only proposed Things under `metadata/records/` and their matching PAV companions under `metadata/provenance/`.
 
-Every Thing that participates in validation or projection lives under `metadata/records/`.
-There is no separate reference-record class or lookup-only metadata root.
-Implementation-private caches, indexes, and heuristics used only by one adapter belong with that adapter, not under `metadata/`.
-Reviewed entity crosswalks, ontology mappings, and human dispositions are durable site knowledge rather than disposable matching internals and must have one declared tracked authority.
-Apart from the root `metadata/records/.dumpthings.yaml` source-control marker, every file below `metadata/` must be a Thing and is a real projection input.
-Putting a disposition there would make it a canonical, potentially public Thing; do that only when publication is intentional and supported by the schema.
+The proposal MUST be created by one project-locked `datalad run --explicit` invocation.
+The run record MUST remain inline in a distinct commit; a DataLad sidecar is not used.
+The recorded command MUST name the adapter, exact source coordinate, relevant inputs, base, and both metadata outputs.
 
-For the current exploration, adapter-scoped decisions and reviewed crosswalks may be prototyped under `source-adapters/<name>/policy/`.
-This uses the existing site-owned adapter root and does not establish a new public configuration path or freeze a common decision schema.
-Evidence from multiple adapters is required before choosing a shared curation or mapping authority.
+The proposal's DataLad commit and every later review commit MUST survive unchanged as distinct commits in default-branch history.
+A merge commit preserves those commits.
+Rebasing or squashing the final reviewed lineage is not conformant because it rewrites the execution record.
+An obsolete proposal replaced during conflict regeneration is not part of the final reviewed lineage and need not be retained.
 
-## Repository layout and environments
+### Decisions and cache
 
-Concrete, site-owned adapters are visible at the downstream root:
+The system supports three dispositions for any proposed addition, modification, or deletion:
 
-```text
-metadata/records/
-source-adapters/<name>/        # site-owned adapter
-.orinoco-lite/source-adapters/ # selected generic adapters and support
-.orinoco-lite/provenance/
-build/source-adapters/         # ignored diagnostic output
-```
+- `accept`: apply the reviewed change, including any attributed human edits;
+- `reject`: restore the baseline and suppress the same unchanged claim;
+- `defer`: restore the baseline and ask again on the next proposal.
 
-The public configuration names these roots `paths.records`, `paths.source_adapters`, and `paths.provenance` respectively.
-Configuration contract 2 exposes only this single-record-pool interface; there are no compatibility aliases.
-The exploratory decision state stays within the site-owned source-adapter root; `.orinoco-lite/provenance/` remains reserved for framework provenance that is not already expressed by the Git/DataLad commit.
+Absence, an unchecked form, pull-request closure, workflow failure, or a missing cache entry is never a decision.
 
-An adapter may keep its own Pixi manifest and lock when its source client or transformation dependencies differ from the root project.
-That independent dependency boundary is intentional.
-The root Pixi environment supplies DataLad and the site-level orchestration; the recorded command still identifies the adapter, inputs, configuration, mode, and outputs explicitly.
+The cache is current state, not an append-only event log.
+It MUST be owned by the adapter under `source-adapters/<adapter>/policy/curation-decisions.yaml`.
+Git history is the history of prior cache states.
 
-Shared implementations may eventually live in template-managed `.orinoco-lite/source-adapters/` or in separately versioned packages.
-If a packaged adapter needs generic, implementation-private matching aids, it keeps them with its implementation under `.orinoco-lite/`.
-During the prototype, site-specific source captures and candidate decision state remain under the site-owned adapter root and must not be overwritten by a framework update.
-The long-term authority for reviewed crosswalks and decisions remains an exploration outcome.
-That distribution choice remains evidence-driven.
-The engineering workspace may pin upstream source implementations as submodules while evaluating them, but a generated downstream remains one ordinary Git repository with no submodules or gitlinks.
+The compact representation MUST store:
 
-## Alignment and reuse
+- once per review: the exact source coordinate, reviewer, review time, and review URL; and
+- once per current record decision: canonical PID, source-native record ID, claim digest, disposition, and review reference.
 
-Prefer released upstream acquisition, import, enrichment, matching, query, serialization, and update helpers over local equivalents.
-When a local service-free implementation is still required, retain executable parity tests against the upstream primitive or fixture it replaces.
-Where field-level provenance is appropriate, use upstream PAV semantics such as `pav:importedBy` and `pav:importedFrom` rather than inventing an Orinoco Lite ownership inventory.
-During the prototype phase those annotations inform adapter behavior without imposing a universal field-ownership gate: `report`, `basic`, and `aggressive` modes may deliberately propose wider diffs, and pull-request review remains authoritative.
-Use W3C PROV for run or review-activity lineage only when that additional semantic model is useful beyond the Git/DataLad record.
-A Simple Standard for Sharing Ontological Mappings (SSSOM) is a candidate interchange format for reviewed ontology or concept mappings, not a generic record-deduplication key or rejection ledger.
-Record linkage remains a separate identity problem whose evidence, confidence, and invalidation policy this exploration must define.
-When Things mappings and an SSSOM mapping set both exist, choose one tracked authority and derive the other representation instead of maintaining two independent assertions.
-At the reviewed upstream pins, the enrichment helpers provide positive-state deduplication and PAV-aware updates but no durable record of a rejected inbox proposal.
-The adapter-policy prototype addresses that missing curation state without presenting it as an existing upstream interface.
-New source-adapter work should pay down local technical debt by contributing a generally useful primitive upstream when possible.
-The engineering workspace follows the reviewed `things-enrichment-tools` source through its gitlink; that commit is the version authority, without a second downstream checksum inventory.
+It MUST NOT contain baseline or proposed records, rendered diffs, candidate or decision event graphs, run manifests, or duplicated batch metadata.
+Re-review replaces the current entry; the prior entry remains available through Git.
 
-The current examples have different roles:
+An unchanged rejection remains suppressed.
+A change to the canonical source-mapped claim MUST reopen review.
+An unused source change does not reopen review because it cannot alter the proposal.
+An accepted claim whose source-mapped proposal is unchanged is not proposed again, even when the reviewed metadata contains a human correction.
+Deferral always returns on the next proposal.
+There is no separate permanent-exclusion disposition: rejection persists until the canonical source-mapped claim changes.
+Identity linkage is adapter policy or a reviewed crosswalk, not a disposition.
 
-- Zotero is the only present candidate for a reusable adapter selected by a downstream or generated by the template.
-Its source mapping and publication policy remain site-owned.
-- The `dump-research-info` adapter is a deliberately messy, CON-specific exploration.
-It helps test modes and review behavior, but it is not a candidate generic adapter for an arbitrary Git checkout containing Things JSON.
+### Human modification and finalization
 
-Do not freeze a common Python ABI, manifest schema, or host protocol from these two examples alone.
-Extract only behavior demonstrated by multiple adapters and continue to track upstream's organization and vocabulary.
+Review may revise proposed metadata before finalization.
+Supported inputs include:
 
-## Work plan
+- attributed suggestions in review comments that automation applies;
+- one or more metadata commits pushed by authorized humans;
+- a SHACL Vue review bundle applied by an authenticated workflow; and
+- the same bundle operation invoked directly by a future SHACL Vue integration.
 
-1. **Completed: align names and dependencies.** Establish the `source-adapters/` interface, advance reviewed upstream pins, and verify both static and service-backed engineering stacks.
-2. **Encode the accepted decision defaults.** Define a prototype versioned representation for stable source identity, claim kinds, material fingerprints, explicit dispositions, adapter-configurable defer and re-review rules, and minimum reviewer/rationale evidence without weakening the fixed safety boundaries or silently resolving content policy.
-3. **Select prototype authorities.** Define how the proposal inventory is represented and transported and how adapter-scoped decisions are tracked under the existing site-owned adapter root, including retention and public-repository privacy, while leaving a shared root and common schema unfrozen.
-4. **Prove the two-phase transaction.** Exercise propose, explicit human decision, recorded reconciliation, and final-head review with Zotero and `dump-research-info`; include an all-rejected decision-only pull request, stale decisions, overlapping adapters, and the repository's actual merge mode.
-5. **Prove the invariants.** Verify complete decision coverage, suppression of unchanged rejections, re-review after material changes, deterministic and idempotent reconciliation, schema-valid metadata, preserved PAV annotations, and recoverable failure behavior.
-6. **Resolve mapping representation and extraction.** Where a genuine semantic-mapping case exists, test Things and SSSOM with one tracked authority; then decide whether evidence from both adapters justifies any common CLI or decision contract.
-7. **Converge with upstream.** Reuse or improve upstream helpers first, maintain parity tests for local qri-like behavior, keep engineering pins reviewable, and contribute a generally useful decision or mapping primitive when its semantics are established.
+Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
+That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
+Unrelated human edits do not acquire a PAV companion entry or a source-candidate cache entry merely because they share the branch.
 
-The current exploration is complete when both adapters provide reviewed evidence for the identity, disposition, transaction, and invariant questions; mapping choices additionally require a genuine mapping case.
-Any human policy resolutions activated by that evidence must update `human-review-decisions.md` and the corresponding originating decision register in the same reviewed change; objective engineering outcomes belong in the acceptance evidence.
-An adapter is ready for reuse when its recorded commands have no absolute paths or hidden operative configuration, its pull request contains focused policy and metadata diffs, its source evidence is ordinary Git, reruns are idempotent, and its local code exists only where no suitable upstream implementation is available.
+A direct human commit is already its own execution and attribution record.
+When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
+The Pixi task MUST run through that DataLad recording path.
+The command SHOULD record an input identifier and content hash when available, but the input payload need not remain in the final tree or Git history.
+DataLad is not useful for a decision-cache-only commit.
+
+Finalizing review MUST:
+
+1. require exactly one valid disposition for every current candidate;
+2. verify the form's stable source identifiers and content hashes against the initial proposal commit;
+3. retain all attributed human metadata edits on the review branch;
+4. apply the reviewed record and provenance changes for accepted candidates;
+5. restore rejected and deferred record and provenance changes;
+6. update no durable review artifact other than the compact decision cache; and
+7. validate both metadata trees and the complete joined Things graph.
+
+If finalization changes metadata programmatically, its Pixi task MUST run through DataLad.
+For each bot commit, the most recent authenticated human whose action triggered the operation is the Git author and automation is the committer.
+
+Accepted record or provenance bytes may exist only in the earlier proposal commit.
+Their Git history, the PID-keyed cache entry, and the review commit together form the per-record human audit.
+A record MUST NOT be rewritten solely to make it appear in the review commit.
+
+Automation MUST NOT choose a disposition, mark a review ready, approve, merge, deploy, or write to the external source.
+
+Before merge, corrections remain on the same review branch and add attributable commits; finalization is rerun against the new head.
+After merge, a correction starts a new adapter run and pull request from the reviewed default branch.
+
+### Update and adapter interaction
+
+Adapters MUST apply the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
+When a whole-record proposal would replace such content, the complete loss or change MUST remain visible in the Git diff and require explicit acceptance.
+Candidate derivation MUST compare assertion content independently of its provenance companion.
+When an incoming assertion is semantically identical to an existing assertion, the adapter MUST preserve both and MUST NOT produce a provenance-only diff.
+When an incoming assertion differs substantively, the proposal MAY replace it; an accepted replacement records the proposing adapter and source in the companion.
+This rule applies assertion by assertion, so an unrelated change elsewhere in a record does not change the provenance of unchanged assertions.
+
+An adapter MAY propose deletion for any record.
+The Git diff and form MUST make the deletion explicit, and acceptance or rejection is a human decision like any other proposed change.
+Deleting a record also deletes its provenance companion.
+Both metadata trees and the joined graph MUST still pass schema and relationship validation; the adapter does not need a separate lifecycle-ownership or source-completeness protocol.
+
+Two adapters may target the same Thing.
+Each maintains its own source identities and decision cache, so one adapter's decision never suppresses another adapter's claim.
+Each proposal MUST start from the current reviewed base.
+Proposal branches that Git can merge cleanly may be merged in either order without rebasing or rerunning either adapter, provided the resulting tree validates.
+If Git reports a conflict, the proposal branch MUST be recreated on the new default branch and the adapter rerun; the obsolete proposal commit is replaced rather than retained.
+Assertions from different adapters may coexist in one Thing and retain their own assertion-level PAV in the joined graph.
+Conflicting proposals remain ordinary visible diffs for a human to accept, reject, defer, or edit.
+No global field-ownership registry is implied.
+
+## Semantic provenance companions
+
+Upstream stores PAV annotations inline in a Thing and therefore in the same RDF graph.
+Orinoco Lite stores the user-facing record and its machine assertion provenance separately to keep record diffs readable, then joins them into the same semantic Thing before validation or RDF export.
+This is a storage-layout deviation, not a different provenance model.
+
+Adapter-generated PAV MUST be stored under `metadata/provenance/`, in a YAML companion that mirrors the record's relative path under `metadata/records/`.
+One companion covers one record and contains its PID plus only its current machine assertion provenance.
+It MUST NOT copy the record, retain prior states, or contain review decisions.
+The top-level mapping contains exactly `record` and `assertions`.
+`record` is the canonical PID and MUST match the mirrored record.
+
+Each item in `assertions` contains exactly:
+
+- `path`, identifying a scalar slot or collection;
+- `assertion_sha256`, identifying the canonical assertion with annotations excluded;
+- `pav:importedBy`, identifying the adapter; and
+- `pav:importedFrom`, identifying the logical source record.
+
+`path` uses an RFC 6901 JSON Pointer.
+`assertion_sha256` is `sha256:` followed by the lowercase SHA-256 digest of the UTF-8, whitespace-free JSON serialization produced with lexically sorted mapping keys, preserved list order, and recursively omitted `annotations` keys.
+For a scalar slot, the fingerprint MUST match its value; for a collection, it MUST match exactly one item.
+Zero or multiple matches are invalid.
+This is the complete selector model: adapters MUST NOT add private identifiers or matching rules.
+Entries MUST be ordered lexically by `path` and then `assertion_sha256`.
+
+The join operation is a shared engine function.
+It attaches annotations directly to imported objects such as `attributed_to`, `identifiers`, and `generated_by`.
+For imported scalar data, it produces the annotated `AttributeSpecification` required by the upstream enrichment pattern while leaving the topical scalar in the stored record.
+The joined representation uses the expanded `annotation_tag` and `annotation_value` objects required by the pinned runtime and MUST pass JSON-to-RDF-to-JSON and projection round trips with the locked Things Schema.
+
+Every machine-provided assertion MUST have a companion entry.
+Assertions created by a human or downstream policy do not.
+Structural `pid` and `schema_type` slots are not imported assertions.
+A provenance entry changes only when the metadata assertion it describes changes: an unchanged adapter result produces no diff, while a human replacement removes the old machine-source entry in the same change.
+Git retains the earlier assertion and provenance.
+The accepted source claim remains cached, so the unchanged source MUST NOT later propose reverting the human replacement.
+
+`pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice. Changing the adapter incompatibly requires a new versioned agent Thing. The exact source revision belongs in Git/DataLad review provenance; `pav:importedFrom` may remain the stable logical record URI.
+
+W3C PROV is added only when a specific lineage query cannot be answered by Git, DataLad, and PAV.
+SSSOM is used only for a genuine ontology mapping set and never as a decision cache or generic identity ledger.
+
+## Host profile
+
+A conforming host MUST provide:
+
+- a visible metadata diff and friendly per-record decision controls;
+- authenticated reviewer identity and authorization;
+- complete-decision validation;
+- proposal-time validation bound to the source version, record identifiers, content hashes, and metadata base;
+- attributable human modification inputs and commit history;
+- exact-head compare-and-swap for each automated commit;
+- normal metadata validation on the reviewed head; and
+- a merge method that preserves the exact proposal, review, and finalization commit objects.
+
+A conforming downstream MUST permit merge commits on its curated branch.
+A linear-history-only branch policy is not supported.
+
+The adapter core is host-neutral.
+No second host implementation is required until the GitHub profile is complete, but another host may implement the same contract without adopting GitHub-specific files or APIs.
+
+### GitHub profile
+
+The initial supported profile MUST:
+
+- start from a default-branch `workflow_dispatch` and open one draft pull request;
+- show user-facing record changes under `metadata/records/` in **Files changed**, with machine provenance confined to the mirrored companion tree;
+- render one task-list group per record in the pull-request body, headed by a friendly label, canonical PID, and useful source-native identifier;
+- support attributed comment suggestions, direct metadata commits, and SHACL Vue bundle application on the same branch;
+- accept a complete form through an exact `/curation submit` comment;
+- treat the authenticated submitter as the reviewer attesting the whole form;
+- accept submissions only from collaborators with `write` or `admin` access;
+- load executable workflow and adapter code from the trusted default branch;
+- treat the pull-request branch and source checkout only as data while a write token is available;
+- verify the form against the initial proposal, preserve later attributed human metadata changes, and validate the resulting tree before applying decisions;
+- restrict changes to both declared metadata trees and the decision-cache path;
+- push against the exact observed head with a lease; and
+- dispatch normal validation without approving, merging, or deploying.
+
+In a public repository, proposed metadata remains visible in Git history even when review later rejects it.
+The workflow MUST disclose that retention and require an explicit acknowledgment before proposing public data.
+Secrets and data that are not approved for repository history MUST be excluded before the proposal commit.
+
+Reviewers MUST NOT need a local checkout.
+Local execution MAY expose the same deterministic operations for development and reproduction.
+
+Adapter review pull requests MUST use a merge commit.
+Rebase merge and squash merge both rewrite required DataLad or human-review commits and MUST NOT be used.
+The pull-request opening text MUST prominently state that requirement, and the host MUST permit an exact-commit-preserving merge method.
+
+## Security and complexity guardrails
+
+The supported threat model trusts collaborators who already have repository `write` or `admin` permission as authorized curators.
+Branch protection, review, and GitHub's audit history govern misuse of that authority.
+The workflow does not construct a cryptographic protocol against a malicious authorized collaborator.
+
+The implementation MUST protect write credentials from untrusted source data and pull-request executable code.
+Beyond that boundary:
+
+- Git commits are the transaction and recovery mechanism.
+- A failed operation is retried, corrected, or reverted.
+- No custom distributed transaction, journal, lock service, or crash-recovery protocol is introduced.
+- No tracked inventory, review document, exhaustive manifest, DataLad sidecar, reconciliation report, or custom attestation graph is introduced.
+- No artifact is added merely to authenticate another artifact produced by the same trusted workflow.
+- No provenance store beyond the single companion tree is introduced without a source or human state that Git, PAV, and the compact decision cache cannot represent.
+- A stronger attacker or availability model requires a separate reviewed design rather than incremental workflow machinery.
+
+## Repository and dependency boundaries
+
+Concrete adapters and their policy are site-owned under `source-adapters/<adapter>/`.
+Scratch state belongs under ignored `build/`.
+The record and provenance trees are site-owned semantic metadata.
+The companion format and join operation are an engine contract; framework updates MUST NOT overwrite companion content.
+Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter state beneath `.orinoco-lite/`.
+
+An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
+A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things service for validation, review, build, or publication.
+
+Prefer released upstream acquisition, matching, serialization, and update helpers.
+In particular, reuse `things-enrichment-tools` ownership-aware update helpers when their data model and pinned runtime are compatible.
+A local replacement MUST have focused parity tests and a documented reason it remains local.
+The pinned source Things Schema and exact `dlthings:*` CURIE spellings remain authoritative.
+
+The pinned upstream reference points map directly onto this contract:
+
+- Dump Things [validation and curated storage](../submodules/dump-things-service/dump_things_service/curated.py) supply the schema-gated curated-state model;
+- Dump Things [`order_dict()` and `json2yaml()`](../submodules/dump-things-service/dump_things_service/utils.py) define canonical mapping and list ordering;
+- the [inbox/curation model](../submodules/dump-things-service/WHAT_IS_IT.md) supplies the proposal-versus-curated-state separation;
+- the [GitAudit backend](../submodules/dump-things-service/dump_things_service/audit/gitaudit.py) supplies record diff plus author/curator/time audit semantics; and
+- enrichment-tools [machine annotation rules](../submodules/things-enrichment-tools/docs/machine_annotations.md) and [ownership-aware updates](../submodules/things-enrichment-tools/things_enrichment_tools/__init__.py) supply PAV, idempotence, human priority, and multi-enricher behavior.
+
+The local runtime remains pinned to the exact [Things Schema contract](explaining-schema-issues.md).
+
+## Required deviations from German upstream
+
+| Upstream pattern | Orinoco Lite deviation | Reason and status |
+| --- | --- | --- |
+| Dump Things inbox and curated collection | Pull-request branch and reviewed default branch | Required for a static ordinary-repository deployment. |
+| Persistent schema-validating service | Locked local/CI validation of Git-backed YAML | Intentional; static operation must not require a service. |
+| Scraper/importer/enricher are distinct roles | `source adapter` is a local umbrella | Naming convenience only; specific upstream terms remain preferred. |
+| Positive proposals move through an inbox | Git diff contains proposed Things directly | Required for native pull-request metadata review. |
+| PAV annotations are stored inline in each Thing | Records and PAV companions are stored in parallel trees and joined before validation or RDF export | Keeps record diffs focused on user-facing metadata while preserving the same semantic graph. |
+| Rejected inbox proposals do not enter curated GitAudit history | The proposal DataLad commit remains in default-branch history after rejection | Required to preserve the single-PR execution and decision record; public retention is disclosed. |
+| No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
+| Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
+| Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
+| Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
+| Ownership-aware helpers do not overwrite another owner | A conflicting value may be proposed but only a human can accept the replacement | Pull-request curation is the explicit ownership-migration boundary. |
+| Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
+| `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
+| Compact scalar PAV annotations | The joined Thing uses expanded annotation objects | Required by the pinned converter for lossless round trips. |
+| Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
+
+Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).
+
+Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing provenance stores beyond the companion tree.

@@ -52,15 +52,14 @@ Orinoco Lite uses *source adapter* only as a local umbrella for tools that propo
 
 ## Provenance and adapter policy
 
-The source-adapter exploration is evaluating a static workflow that distinguishes execution provenance, assertion provenance, and durable curation state.
-Git and preserved DataLad run evidence are intended to record execution; Provenance, Authoring and Versioning (PAV) annotations identify the tool and source responsible for imported assertions; tracked site-owned decisions prevent a materially unchanged rejected claim from being proposed again.
-A content diff does not record why an absent candidate was rejected or deferred, so this decision state is not a duplicate ownership or digest inventory.
-M4-I015 and HR-207 settle the safe default and adapter-configuration boundary; the serialized decision format, transaction transport, and common adapter interface remain exploratory.
+The source-adapter specification distinguishes execution provenance, machine assertion provenance, and durable curation state.
+Git and preserved DataLad run commits record execution.
+Site-owned PAV companions join with user-facing records to form the complete semantic Things graph, while compact adapter-owned decisions prevent a materially unchanged rejection from being proposed again.
+A content diff cannot explain why an absent candidate was rejected or deferred, so the decision cache is not a duplicate metadata inventory.
 
-The target uses proposal and reconciliation as separate phases on one pull-request branch.
-The human decision occurs between them, and the eventual default-branch merge would make the resulting metadata and decisions one reviewed transition.
-This target requires neither a persistent service nor a follow-up bot; transaction and failure behavior remain to be proven.
-The detailed exploratory contract, technology boundaries, and completion criteria are maintained in [`source-adapters.md`](source-adapters.md).
+Proposal, human modification, and complete decisions remain on one pull-request branch and enter the curated branch through an exact-commit-preserving merge.
+The workflow requires neither a persistent service nor a follow-up pull request.
+The normative contract and its complexity guardrails are maintained in [`source-adapters.md`](source-adapters.md).
 
 ## Known compatibility seams
 
@@ -100,10 +99,10 @@ Until that choice is implemented, creation documentation must place the profile 
 
 ### 3. Exercise reusable upstream enrichment
 
-- Complete the identity, disposition, review-transaction, mapping, and verification exploration defined in [`source-adapters.md`](source-adapters.md).
-- Demonstrate the complete workflow with Zotero and the CON-specific `dump-research-info` importer, including decision-only rejection and material-change re-review.
+- Implement the identity, disposition, provenance-companion, hosted-review, and verification contract defined in [`source-adapters.md`](source-adapters.md).
+- Demonstrate the complete workflow with Zotero and the CON-specific `dump-research-info` importer, including all-rejected review and material-change re-review.
 - Use upstream PAV and enrichment/update helpers where their behavior matches a demonstrated mode, and test A Simple Standard for Sharing Ontological Mappings (SSSOM) only as a mapping interchange format.
-- Decide whether a common CLI or decision contract is justified only after both adapters satisfy the documented exit criteria.
+- Keep the core host-neutral without freezing a Python ABI or plugin protocol from two implementations.
 
 ### 4. Prove a non-website projection
 
