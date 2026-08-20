@@ -62,7 +62,8 @@ Developer-specific absolute paths, credentials, run IDs, timestamps, and scratch
 
 Source acquisition MUST be read-only.
 Credentials, non-redistributable source payloads, and caches MUST remain outside tracked repository state.
-The adapter MUST validate acquired records against its declared input types before transformation.
+The adapter MUST apply every validation rule exposed by its declared source model before transformation.
+Before the proposal commit, every generated Thing MUST pass the complete automated validation supported by the locked Things Schema and runtime.
 Validation failures are diagnostics to correct, not review dispositions or durable candidate state.
 Each source claim MUST bind a stable source-record identifier to a content hash of all and only the normalized source facts that can affect its proposed metadata.
 Transport metadata and unused source fields MUST NOT affect that hash or reopen review.
@@ -72,15 +73,13 @@ Historical reacquisition is not a conformance requirement: the identifier, sourc
 
 ### Canonical ordering
 
-One shared schema-aware canonicalizer MUST order and serialize every Thing written by an adapter.
+One shared canonicalizer MUST order and serialize every Thing written by an adapter.
 Adapters MUST NOT implement private YAML-ordering rules.
-The canonicalizer MUST be an idempotent shared library operation with focused conformance tests, not a service or plugin framework.
+The canonicalizer MUST match the upstream Dump Things `order_dict()` and `json2yaml()` behavior: recursively sort mapping keys lexically and preserve list order.
+It MUST be an idempotent shared library operation with focused upstream-parity tests, not a service or plugin framework.
 Every record in the canonical corpus MUST already conform to that serialization.
 An adapter run serializes only records it writes and does not reserialize untouched records.
 
-The canonicalizer MUST recursively order mappings by schema slot order with a lexical fallback for extension keys.
-Lists preserve their input order by default.
-A central schema-slot rule MAY identify a list as unordered and sort it by recursively canonicalized values; adapters MUST NOT make that choice independently.
 Record comparison operates on the canonical parsed Thing, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on its deterministic YAML serialization.
 This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
@@ -321,7 +320,15 @@ In particular, reuse `things-enrichment-tools` ownership-aware update helpers wh
 A local replacement MUST have focused parity tests and a documented reason it remains local.
 The pinned source Things Schema and exact `dlthings:*` CURIE spellings remain authoritative.
 
-The concrete upstream reference points are the Dump Things [inbox/curation model](../submodules/dump-things-service/WHAT_IS_IT.md), its [GitAudit backend](../submodules/dump-things-service/dump_things_service/audit/gitaudit.py), the enrichment-tools [machine annotation rules](../submodules/things-enrichment-tools/docs/machine_annotations.md), and the pinned [schema contract](explaining-schema-issues.md).
+The pinned upstream reference points map directly onto this contract:
+
+- Dump Things [validation and curated storage](../submodules/dump-things-service/dump_things_service/curated.py) supply the schema-gated curated-state model;
+- Dump Things [`order_dict()` and `json2yaml()`](../submodules/dump-things-service/dump_things_service/utils.py) define canonical mapping and list ordering;
+- the [inbox/curation model](../submodules/dump-things-service/WHAT_IS_IT.md) supplies the proposal-versus-curated-state separation;
+- the [GitAudit backend](../submodules/dump-things-service/dump_things_service/audit/gitaudit.py) supplies record diff plus author/curator/time audit semantics; and
+- enrichment-tools [machine annotation rules](../submodules/things-enrichment-tools/docs/machine_annotations.md) and [ownership-aware updates](../submodules/things-enrichment-tools/things_enrichment_tools/__init__.py) supply PAV, idempotence, human priority, and multi-enricher behavior.
+
+The local runtime remains pinned to the exact [Things Schema contract](explaining-schema-issues.md).
 
 ## Required deviations from German upstream
 
@@ -331,11 +338,15 @@ The concrete upstream reference points are the Dump Things [inbox/curation model
 | Persistent schema-validating service | Locked local/CI validation of Git-backed YAML | Intentional; static operation must not require a service. |
 | Scraper/importer/enricher are distinct roles | `source adapter` is a local umbrella | Naming convenience only; specific upstream terms remain preferred. |
 | Positive proposals move through an inbox | Git diff contains proposed Things directly | Required for native pull-request metadata review. |
+| Rejected inbox proposals do not enter curated GitAudit history | The proposal DataLad commit remains in default-branch history after rejection | Required to preserve the single-PR execution and decision record; public retention is disclosed. |
 | No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
 | Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
-| No site-wide canonical YAML serializer | Shared schema-aware record canonicalizer | Required to keep review diffs stable across service-free adapters. |
+| Ownership-only changes do not trigger an enrichment update | A later accepted source replaces PAV even when the assertion value is unchanged | The current Thing names the latest accepted source; Git preserves prior sources. |
+| Ownership-aware helpers do not overwrite another owner | A conflicting value may be proposed but only a human can accept the replacement | Pull-request curation is the explicit ownership-migration boundary. |
+| Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
+| `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | Expanded annotation objects | Required by the pinned converter for lossless round trips. |
 | Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
 
