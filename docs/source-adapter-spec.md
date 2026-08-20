@@ -24,7 +24,7 @@ A report-only diagnostic is useful adapter tooling but does not, by itself, impl
 
 The supported workflow has one proposal commit, zero or more human-review modification commits, and a final complete decision state on one review branch.
 The proposal is a DataLad run commit.
-Later programmatic metadata changes MAY also use DataLad through the project's Pixi tasks.
+Pixi tasks that programmatically apply metadata changes also use DataLad.
 Direct human changes are ordinary Git commits.
 
 The reviewed default branch is the curated state.
@@ -39,7 +39,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Machine assertion provenance | PAV annotations in the Thing | Identify the importing adapter and source record. |
 | Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
 | Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
-| Execution provenance | Git commit, optionally recorded by DataLad | Record a programmatic metadata-changing command when requested. |
+| Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
@@ -143,7 +143,7 @@ Unrelated human edits do not acquire source PAV or a source-candidate cache entr
 
 A direct human commit is already its own execution and attribution record.
 When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
-DataLad recording is opt-in; ordinary Git remains the default unless the user selects it.
+The Pixi task MUST run through that DataLad recording path.
 The command SHOULD record an input identifier and content hash when available, but the input payload need not remain in the final tree or Git history.
 DataLad is not useful for a decision-cache-only commit.
 
@@ -157,7 +157,7 @@ Finalizing review MUST:
 6. update no durable review artifact other than the compact decision cache; and
 7. validate the complete resulting metadata tree.
 
-If finalization changes metadata, the same Pixi task MUST support optional DataLad recording.
+If finalization changes metadata programmatically, its Pixi task MUST run through DataLad.
 For each bot commit, the most recent authenticated human whose action triggered the operation is the Git author and automation is the committer.
 Compact commit trailers MUST identify the adapter, exact source coordinate, review URL, and review time.
 
@@ -255,7 +255,7 @@ Local execution MAY expose the same deterministic operations for development and
 
 Adapter review pull requests MUST use a commit-preserving merge method.
 Under a linear-history policy, use rebase merge; do not squash.
-When the host supports merge-method controls, it MUST disable or forbid squash merging for adapter pull requests.
+The pull-request opening text MUST prominently explain that squash merging destroys required provenance and instruct the reviewer to use rebase merge.
 
 ## Security and complexity guardrails
 
@@ -301,7 +301,7 @@ The concrete upstream reference points are the Dump Things [inbox/curation model
 | No durable negative-decision state | Compact reject/defer cache | Required Orinoco feature to avoid repeated human review. |
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
-| Enrichment tools do not use DataLad as semantic provenance | DataLad records the proposal and optionally later programmatic edits | Orinoco execution provenance only; not claimed as upstream alignment. |
+| Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
 | Compact scalar PAV annotations | Expanded annotation objects | Required by the pinned converter for lossless round trips. |
 | Service curation API and authorization model | Hosted task-list review and mechanical bot application | Required GitHub profile; the human remains the decision authority. |
 
@@ -313,14 +313,14 @@ These are gaps to close, not permitted variants of the specification:
 - direct scalar imports rely on record-level PAV instead of upstream-style annotated attributes;
 - Zotero has record-level rather than assertion-level PAV;
 - the GitHub workflow does not yet support comment-applied edits, direct SHACL Vue bundle application, or deletion proposals; and
-- Pixi review-application tasks do not yet expose optional DataLad recording; and
-- the hosted merge path does not yet enforce preservation of every DataLad and human-review commit.
+- Pixi review-application tasks do not yet run through DataLad; and
+- the pull-request opening text does not yet warn reviewers that adapter pull requests require rebase merge rather than squash.
 
 ## Remaining review questions
 
 The following details are deliberately not settled by this draft:
 
-1. Should squash merging be disabled repository-wide, or enforced only for adapter pull requests through the strongest host rule available?
+1. Does the source content hash cover the complete canonicalized source record or an adapter-selected subset, and how does canonicalization treat ordered and set-like lists?
 2. When a human changes a machine-imported assertion, is removing its PAV annotation sufficient, or should the schema also record explicit human authorship on that assertion?
 
 Until these questions are resolved, implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing additional provenance stores.
