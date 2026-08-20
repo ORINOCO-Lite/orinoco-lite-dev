@@ -1,35 +1,38 @@
 # Lightweight architecture roadmap
 
-Status: contract 2 release candidate; public projection and source-adapter interfaces remain evidence-driven
+Status: contract 2 release candidate; source-adapter contract normative; implementation and public projection pending
 
 ## Goal
 
 Orinoco Lite keeps reviewed lab metadata in an ordinary Git repository and derives disposable outputs for websites, data exchange, and optional use by the full Orinoco service stack.
 It changes the curation transport, not the Things data model.
-The target source-adapter flow under exploration is:
+The normative source-adapter flow is:
 
 ```mermaid
 flowchart LR
     sources["External sources"] --> adapters["Source adapters\nscrapers, importers, enrichers"]
     records["metadata/records\nreviewed Things YAML"] --> adapters
-    decisions["Prototype curation state\nadapter-scoped decisions"] --> adapters
-    adapters --> proposals["Reviewable proposal\nmetadata diff + candidate inventory"]
-    proposals --> review["Human review"]
-    review -->|"durable decision"| decisions
-    proposals --> reconcile["Recorded reconciliation"]
-    decisions --> reconcile
-    reconcile -->|"metadata with assertion provenance"| records
-    records --> validate["Pinned Things Schema\nvalidation"]
+    annotations["metadata/overlays/annotations\nmachine PAV"] --> adapters
+    decisions["Compact curation state\nadapter decision cache"] --> adapters
+    adapters --> proposal["DataLad proposal commit\nmetadata diff"]
+    proposal --> review["Human review\nfriendly controls + edits"]
+    review --> finalize["Mechanical finalization"]
+    finalize -->|"reviewed metadata"| records
+    finalize -->|"assertion provenance"| annotations
+    finalize -->|"durable decision"| decisions
+    records --> join["Joined Things graph"]
+    annotations --> join
+    join --> validate["Pinned Things Schema\nvalidation"]
     validate --> policy["Projection policy"]
     policy --> site["Static website and editor"]
     policy --> exchange["RDF or other exchange artifact"]
     policy --> service["Optional full Orinoco stack"]
 ```
 
-Every Thing under `metadata/records/` is a real semantic input.
+Every record and annotation companion is canonical semantic input, and their joined Thing is the schema and RDF boundary.
 Page creation, graph membership, editor exposure, and future exports are view policy rather than separate categories of source metadata.
 Generated output is ignored and regenerated so a metadata pull request presents the source change itself.
-In this target, durable human dispositions are tracked site policy and adapter input, not generated output, a disposable cache, or automatically a public Thing.
+Durable human dispositions are tracked site policy and adapter input, not generated output, a disposable cache, or automatically a public Thing.
 
 The service-backed Dump Things, pool UI, and SHACL Vue stack remains an engineering capability and an optional advanced deployment.
 A normal downstream validates, reviews, builds, and deploys without running a persistent service.
@@ -72,7 +75,7 @@ Until LinkML emits a named recursive alias, Lite constructs the converters under
 Other deliberate seams are:
 
 - exact reviewed `dlthings:*` CURIE type designators rather than unreviewed full-URI alternatives;
-- a credential-free static review-bundle editor overlay, with a tracked-decision extension under exploration, instead of the upstream authenticated service workflow;
+- a credential-free static review-bundle editor plus the GitHub source-adapter review profile, instead of the upstream authenticated service workflow;
 - project-path and host-neutral static artifacts adapted from upstream's root-absolute presentation; and
 - ordinary-Git runtime assets instead of requiring git-annex in a downstream.
 

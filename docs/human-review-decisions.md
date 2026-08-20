@@ -1,12 +1,12 @@
 # Orinoco Lite human-review decision queue
 
-Status: Milestone 4 accepted; production-graduation review remains open
+Status: Milestone 4 accepted; Milestone 5 active; production-graduation review remains open
 
-Review snapshot: 2026-08-18
+Review snapshot: 2026-08-20
 
 This is the single working list of unresolved **human choices** accumulated through the clean migration, full migration, complete-content migration, and single-repository distribution work.
 It separates policy from facts with an objectively testable answer.
-Release-coordinate repairs, documentation drift, CI results, and other engineering tasks belong in [`milestone-4-acceptance.md`](milestone-4-acceptance.md) or an implementation issue, not in this queue.
+Release-coordinate repairs, documentation drift, CI results, and other engineering tasks belong in the applicable milestone acceptance record or an implementation issue, not in this queue.
 
 ## Review rules
 
@@ -55,7 +55,7 @@ Priorities mean:
 | HR-114 | P1 | Releases | Define release stewardship, compatibility, and support lifetime |
 | HR-115a | P1 | Presentation | Accept or revise production branding, information architecture, responsive design, and legacy parity |
 | HR-115b | P1 | Accessibility | Define and accept the production accessibility standard |
-| HR-201 | P2 | Hosted editing | Keep bundle handoff or add authenticated branch/PR creation |
+| HR-201 | P2 | Hosted editing | Use authenticated one-pull-request source-adapter review without requiring a local checkout |
 | HR-202a | P2 | Packaging | Decide whether to ship an optional full-stack image |
 | HR-202b | P2 | Services | Decide whether to operate a persistent public service |
 | HR-204a | P2 | Updates | Choose manual coordinates or reviewed release discovery |
@@ -63,7 +63,7 @@ Priorities mean:
 | HR-204c | P2 | Hosting | Decide whether per-PR deployed previews are worthwhile |
 | HR-205 | P2 | Support | Add platforms beyond macOS ARM64 and Linux x86-64 |
 | HR-206 | P2 | Upstream | Prioritize a LinkML named-recursive-alias contribution |
-| HR-207 | P2 | Source adapters | Define Lite defaults and adapter-configurable decision behavior |
+| HR-207 | P2 | Source adapters | Use shared accept/reject/defer behavior with adapter-owned source semantics |
 | HR-210 | P2 | Test fixture | Choose the long-term role of the full-content test consumer |
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
 
@@ -485,34 +485,51 @@ Accept intentional modernization rather than requiring pixel parity, but record 
 
 ## Accepted strategic decisions
 
+### HR-201 — Hosted authenticated source-adapter review
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** Should normal source-adapter review require a local bundle handoff, or provide a least-privilege authenticated branch and pull-request workflow?
+
+**Outcome:** The GitHub profile opens one draft pull request containing the actual metadata proposal and friendly per-record controls.
+An authorized collaborator can review, modify, and submit the complete decision state without a local checkout.
+Automation applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
+The workflow uses the repository's normal GitHub Actions credential and does not introduce a persistent service or custom credential system.
+
+**Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review.
+Local execution remains available for development and reproduction but is not a condition of normal curation.
+
+**Decided by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Implement and accept the GitHub profile under the normative [`source-adapters.md`](source-adapters.md) contract.
+
 ### HR-207 — Define source-adapter decision defaults
 
 **Status:** accepted
 
 **Question:** Should candidate identity, fingerprints, dispositions, deferral, and re-review behavior be fixed globally or owned entirely by each source adapter?
 
-**Outcome:** Orinoco Lite provides safe defaults.
-A rejection suppresses the same materially unchanged claim; a material source change or relevant matching-policy change reopens review; a deferral declares when the candidate returns; and permanent exclusion requires explicit human scope.
+**Outcome:** Orinoco Lite supports exactly `accept`, `reject`, and `defer` for a proposed addition, modification, or deletion.
+A rejection suppresses the same unchanged source-mapped claim until its normalized metadata-affecting source facts change.
+A deferral returns on the next proposal.
+Acceptance retains the reviewed metadata and prevents an unchanged source claim from reverting a later human correction.
+Absence, pull-request closure, and workflow failure are never decisions.
 
-Adapters may configure stable source-identity components, normalized material fields included in a versioned fingerprint, deferral conditions, and additional re-review triggers when their source semantics require it.
-Configuration must be deterministic and versioned, must preserve explicit durable human dispositions, and cannot infer a decision from absence or pull-request closure, treat deferral as permanent rejection, or suppress a materially changed candidate without an explicit broader human decision.
-
-The exact serialized disposition schema and common adapter interface remain exploratory until at least two adapters demonstrate the contract.
+Adapters configure stable source identity and the normalized source facts that can affect generated metadata.
+Unused source fields and transport metadata do not enter the claim hash.
+The compact current-state cache and shared behavior are defined by the normative [`source-adapters.md`](source-adapters.md) contract; source acquisition, transformation, and site policy remain adapter-owned.
+There is no separate permanent-exclusion, conditional-deferral, link, or supersede disposition.
 This decision does not settle identity, publication, venue, topic, or eligibility policy.
 
 **Rationale:** Lite needs predictable safe behavior, while adapters need bounded control over what constitutes stable identity and material change for their source.
 
-**Decided by/date:** John Lee, 2026-08-18.
+**Decided by/date:** John Lee, 2026-08-20.
 
-**Follow-up:** Prototype the representation and transaction with the Zotero and `dump-research-info` adapters, including unchanged rejection, changed-source re-review, explicit deferral return, and all-rejected decision-only review cases.
+**Follow-up:** Complete Zotero and `dump-research-info` conformance and the hosted review workflow under Milestone 5.
 
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.
-
-### HR-201 — Hosted authenticated editing
-
-Keep credential-free bundle download and local review, or introduce a least-privilege authenticated branch/PR flow after a concrete user need and threat model exist.
 
 ### HR-202a — Optional full-stack packaging
 
@@ -576,7 +593,7 @@ Create separate IDs only when a milestone proposes a concrete scope.
 - The 13 inherited framework pointers are verified ordinary Git bytes.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 - The LinkML recursion workaround has an objective removal test.
-- Test/template branch controls, including M4-I008's administrator setting, are accepted fixture defaults unless explicitly superseded.
+- Test/template branch controls remain accepted fixture defaults except that M5-D003 supersedes the consumer's linear-history requirement for conforming source-adapter review; merge commits must be permitted.
 - Milestone 4 authorizes no real-site operation or production cutover.
 
 ## Source-ID crosswalk
@@ -614,19 +631,19 @@ This table makes completeness auditable.
 | M4-I005 | HR-204c if per-PR deployments are proposed |
 | M4-I006 | Settled: local and hosted updates use the same updater |
 | M4-I007 | HR-114 for compatibility/deprecation; bundle v1 remains meanwhile |
-| M4-I008 | Settled for test/template; production policy is HR-103b |
+| M4-I008 | M5-D003 supersedes consumer linear history for source-adapter review; other test/template controls remain settled; production policy is HR-103b |
 | M4-I009 | Objective compatibility removal gate, not a policy choice |
 | M4-I010 | PR exclusion settled; broader preview lifecycle is HR-004 |
 | M4-I011 | HR-206 for upstream resourcing; removal test is objective |
 | M4-I012 | Settled host-neutral local and explicit Pages bases |
 | M4-I013 | HR-001 engineering PR 5 disposition |
 | M4-I014 | Settled generated-projection boundary |
-| M4-I015 | HR-207 accepted source-adapter default and configuration boundary |
+| M4-I015 | HR-207 and the normative source-adapter specification supersede the exploratory disposition and representation details |
 
 Milestone 1's native type-discriminator deferral was superseded by the accepted native relationship records and typed identifiers under the exact `dlthings:*` CURIE contract; alternative full-URI designators remain outside the supported contract rather than an open decision.
 The accepted graph-only organization behavior maps to deferred HR-211, and the test fixture's long-term role maps to deferred HR-210.
 
 ## Source registers and operational evidence
 
-Authoritative derivation remains in [`milestone-3-decisions.md`](milestone-3-decisions.md), [`milestone-3-acceptance.md`](milestone-3-acceptance.md), [`milestone-4-decisions.md`](milestone-4-decisions.md), [`milestone-4-acceptance.md`](milestone-4-acceptance.md), and [`full-con-migration.md`](full-con-migration.md).
+Authoritative derivation remains in [`milestone-3-decisions.md`](milestone-3-decisions.md), [`milestone-3-acceptance.md`](milestone-3-acceptance.md), [`milestone-4-decisions.md`](milestone-4-decisions.md), [`milestone-4-acceptance.md`](milestone-4-acceptance.md), [`milestone-5-decisions.md`](milestone-5-decisions.md), [`milestone-5-acceptance.md`](milestone-5-acceptance.md), and [`full-con-migration.md`](full-con-migration.md).
 Objective implementation follow-ups and hosted evidence belong in the acceptance record or dedicated issues so this queue stays focused on human judgment.

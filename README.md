@@ -53,7 +53,7 @@ The engineering workspace may remain multi-repository; the template and every su
 
 | Layer | Repository | Owns | Start here |
 | --- | --- | --- | --- |
-| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-4.md`](docs/milestone-4.md) and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-5.md`](docs/milestone-5.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
 | Distribution | [`con/orinoco-lite-template`](https://github.com/con/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/con/orinoco-lite-template#readme) |
 | Integration consumer | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and end-to-end tests | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
 
@@ -67,9 +67,9 @@ It prioritizes every open human choice, separates those choices from mechanical 
 
 Supporting records are:
 
-- [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) for exact releases, test results, hosted runs, parity counts, and remaining gates;
-- [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for accepted Milestone 4 architecture decisions;
-- [`docs/milestone-5.md`](docs/milestone-5.md) and its [decision register](docs/milestone-5-decisions.md) for the proposed next source-adapter exploration, not accepted Milestone 4 evidence;
+- [`docs/milestone-5.md`](docs/milestone-5.md), its [decision register](docs/milestone-5-decisions.md), and its [acceptance record](docs/milestone-5-acceptance.md) for the active source-adapter implementation;
+- [`docs/source-adapters.md`](docs/source-adapters.md) for the normative source-adapter contract;
+- [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) and [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for the accepted distribution baseline;
 - [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
 - [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the accepted implementation-review history.
 
@@ -159,7 +159,7 @@ To advance upstream dependencies safely:
 
 This keeps checkout automation in the task without letting a validation command silently discard work in progress.
 The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
-The proposed [`Milestone 5 plan`](docs/milestone-5.md) bounds the next source-adapter exploration, with future evidence separated into its [acceptance record](docs/milestone-5-acceptance.md).
+The active [`Milestone 5 plan`](docs/milestone-5.md) sequences source-adapter implementation, with exact evidence separated into its [acceptance record](docs/milestone-5-acceptance.md).
 The [`source-adapter specification`](docs/source-adapters.md) defines reviewable metadata changes, DataLad execution evidence, PAV annotation overlays, and durable human dispositions.
 The broader [`lightweight architecture roadmap`](docs/lightweight-architecture-roadmap.md) records the upstream-reuse and parity policy, the gradual PAV convergence, the contract 2 release sequence, and the evidence required before a general projection interface is designed.
 
@@ -174,7 +174,8 @@ Do not reproduce that release boundary with an ad hoc local archive.
 
 - Original Orinoco Lite software is MIT licensed; original documentation is CC BY 4.0, factual metadata is CC0 1.0, and media remains item-specific.
 See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
-- Every Thing under `metadata/records/` is a real validation and projection input; declarative site policy determines pages and editor exposure.
+- Every record under `metadata/records/` and companion under `metadata/overlays/annotations/` is canonical semantic input; their joined Thing is the validation, RDF, and projection boundary.
+Declarative site policy determines pages and editor exposure.
 Projection output is regenerated during validation and build, remains ignored, and never obscures a source-metadata review diff.
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
@@ -196,4 +197,4 @@ They are preserved as evidence, not as current operating instructions:
 - [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md)
 
 Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
-Current work follows Milestone 4 and the versioned template.
+The supported distribution follows accepted Milestone 4 releases and the versioned template; active engineering work follows Milestone 5 and the normative source-adapter specification.
