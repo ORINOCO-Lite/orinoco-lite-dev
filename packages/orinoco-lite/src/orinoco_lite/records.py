@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Any
 
+from linkml_runtime import SchemaView
 import yaml
 
+from .annotations import (
+    SlotSemantics,
+    companion_sources,
+    join_annotations,
+    validate_stored_record,
+)
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
 
@@ -57,6 +65,7 @@ def record_sources(workspace: WorkspaceConfig) -> list[dict[str, str]]:
         value = yaml.safe_load(content)
         if not isinstance(value, dict):
             raise ConfigurationError(f"Metadata record must be a mapping: {path}")
+        validate_stored_record(value)
         pid = value.get("pid")
         schema_type = value.get("schema_type")
         if not isinstance(pid, str) or not isinstance(schema_type, str):
@@ -75,3 +84,64 @@ def record_sources(workspace: WorkspaceConfig) -> list[dict[str, str]]:
         )
     records.sort(key=lambda item: (item["pid"], item["path"]))
     return records
+
+
+def stored_records(workspace: WorkspaceConfig) -> list[dict[str, Any]]:
+    """Load the human-facing record tree without machine annotations."""
+
+    return [yaml.safe_load(source["content"]) for source in record_sources(workspace)]
+
+
+def joined_records(
+    workspace: WorkspaceConfig,
+    schema: Path,
+) -> list[dict[str, Any]]:
+    """Load records joined with their mirrored machine PAV companions."""
+
+    sources = record_sources(workspace)
+    companions = {
+        source.record_path.resolve(): source.value
+        for source in companion_sources(workspace)
+    }
+    if not companions:
+        return [yaml.safe_load(source["content"]) for source in sources]
+
+    schema_view = SchemaView(str(schema))
+
+    def semantics_for_slot(slot: str) -> SlotSemantics:
+        try:
+            slot_definition = schema_view.get_slot(slot)
+            slot_range = slot_definition.range if slot_definition is not None else None
+            predicate = str(schema_view.get_uri(slot, expand=False))
+            range_type = schema_view.get_type(slot_range) if slot_range else None
+        except ConfigurationError:
+            raise
+        except Exception as error:
+            raise ConfigurationError(
+                f"Could not resolve the predicate for scalar assertion slot {slot}"
+            ) from error
+        if not predicate or ":" not in predicate:
+            raise ConfigurationError(
+                f"Schema has no CURIE predicate for scalar assertion slot {slot}"
+            )
+        return SlotSemantics(
+            predicate=predicate,
+            class_range=(
+                slot_range is not None
+                and schema_view.get_class(slot_range) is not None
+            ),
+            datatype=(
+                str(range_type.uri)
+                if range_type is not None and range_type.uri is not None
+                else None
+            ),
+        )
+
+    joined: list[dict[str, Any]] = []
+    for source in sources:
+        path = workspace.root / source["path"]
+        record = yaml.safe_load(source["content"])
+        joined.append(
+            join_annotations(record, companions.get(path.resolve()), semantics_for_slot)
+        )
+    return joined

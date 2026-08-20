@@ -16,6 +16,12 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from .annotations import (
+    companion_sources,
+    reconcile_annotation_companion,
+    validate_stored_record,
+)
+from .canonical import canonical_yaml
 from .config import WorkspaceConfig, load_config_path
 from .errors import ConfigurationError, DriverError
 from .records import record_sources
@@ -275,28 +281,6 @@ def _git_status(root: Path) -> set[str]:
     return changed
 
 
-def _preserve_order(value: Any, template: Any) -> Any:
-    if isinstance(value, dict):
-        original = template if isinstance(template, dict) else {}
-        ordered = {
-            key: _preserve_order(value[key], original[key])
-            for key in original
-            if key in value
-        }
-        ordered.update(
-            (key, _preserve_order(value[key], None))
-            for key in sorted(set(value) - set(ordered))
-        )
-        return ordered
-    if isinstance(value, list):
-        original = template if isinstance(template, list) else []
-        return [
-            _preserve_order(item, original[index] if index < len(original) else None)
-            for index, item in enumerate(value)
-        ]
-    return value
-
-
 def validate_bundle(
     workspace: WorkspaceConfig,
     runtime_root: Path,
@@ -307,6 +291,10 @@ def validate_bundle(
         raise DriverError("Review bundle is stale for the current consumer commit")
     by_pid = {entry["pid"]: entry for entry in catalog["records"]}
     dirty = _git_status(workspace.root)
+    companions = {
+        source.record_path.resolve(): source
+        for source in companion_sources(workspace)
+    }
     _, rdf_to_json = _converters(
         runtime_root / "schema/demo-research-information/unreleased.yaml"
     )
@@ -358,15 +346,21 @@ def validate_bundle(
             raise DriverError(f"Review bundle conversion failed for {pid}")
         if record.get("pid") != pid or record.get("schema_type") != source["schema_type"]:
             raise DriverError(f"Review bundle changed record identity: {pid}")
-        original = yaml.safe_load(path.read_text(encoding="utf-8"))
-        rendered = yaml.safe_dump(
-            _preserve_order(record, original),
-            allow_unicode=True,
-            default_flow_style=False,
-            sort_keys=False,
-            width=80,
-        )
-        updates[path] = rendered
+        validate_stored_record(record)
+        updates[path] = canonical_yaml(record)
+
+        companion = companions.get(path.resolve())
+        if companion is not None:
+            companion_relative = companion.path.relative_to(workspace.root).as_posix()
+            if companion_relative in dirty:
+                raise DriverError(
+                    "Annotation companion has a conflicting local change: "
+                    f"{companion_relative}"
+                )
+            reconciled = reconcile_annotation_companion(record, companion.value)
+            rendered_companion = canonical_yaml(reconciled)
+            if companion.path.read_text(encoding="utf-8") != rendered_companion:
+                updates[companion.path] = rendered_companion
     return updates
 
 
@@ -461,7 +455,12 @@ def apply_bundle_report(
         "changed_paths": changed_paths,
         "diff": difference,
         "format": APPLY_REPORT_FORMAT,
-        "validated_records": len(updates),
+        "validated_records": sum(
+            1
+            for source in updates
+            if source == workspace.path("records")
+            or workspace.path("records") in source.parents
+        ),
         "version": APPLY_REPORT_VERSION,
     }
 

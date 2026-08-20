@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
+from copy import deepcopy
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -10,10 +11,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from orinoco_lite.annotations import annotation_companion, assertion_sha256
+from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
 from orinoco_lite.errors import DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
+    _machine_pav_fingerprint,
     projection_manifest,
     render_projection,
     update_projection,
@@ -30,6 +34,7 @@ SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
 
 @unittest.skipUnless(
     (ACCEPTED_CONSUMER / "site/projection.yaml").is_file()
+    and (ACCEPTED_CONSUMER / "generated/projection").is_dir()
     and (SCHEMA_SOURCE / "demo-research-information/unreleased.yaml").is_file(),
     "full-fidelity sibling fixture is not available",
 )
@@ -291,6 +296,115 @@ class GenericProjectionContractTests(unittest.TestCase):
         imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
             verify_projection(self.workspace, self.runtime)
+
+    def test_joined_annotations_reach_machine_projection_only(self) -> None:
+        companion = self.root / (
+            "metadata/overlays/annotations/Person/one.yaml"
+        )
+        companion.parent.mkdir(parents=True)
+        companion.write_text(
+            canonical_yaml(
+                annotation_companion(
+                    "acme:people/one",
+                    [
+                        {
+                            "path": "/display_label",
+                            "assertion_sha256": assertion_sha256("One"),
+                            "pav:importedBy": "acme:source-adapters/example/v1",
+                            "pav:importedFrom": "https://source.example/people/one",
+                        }
+                    ],
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        class Slot:
+            range = "string"
+
+        class Type:
+            uri = "xsd:string"
+
+        class Schema:
+            def __init__(self, _path):
+                pass
+
+            def get_slot(self, name):
+                return Slot() if name == "display_label" else None
+
+            def get_class(self, _name):
+                return None
+
+            def get_type(self, _name):
+                return Type()
+
+            def get_uri(self, name, *, expand):
+                self.assert_false = expand
+                return {"display_label": "skos:prefLabel"}[name]
+
+        output = Path(self.temporary.name) / "annotated-projection"
+        with patch(
+            "orinoco_lite.projection.validate_semantics", return_value=self.semantic
+        ), patch("orinoco_lite.records.SchemaView", Schema):
+            render_projection(self.workspace, self.runtime, output)
+
+        public_page = output / "content/people/one/_index.md"
+        self.assertEqual(
+            public_page.read_text(encoding="utf-8"),
+            "---\npid: acme:people/one\n---\nOne\n",
+        )
+        records = [
+            json.loads(line)
+            for line in (output / "records.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        joined = next(item for item in records if item["pid"] == "acme:people/one")
+        self.assertNotIn("annotations", joined)
+        self.assertEqual(
+            joined["attributes"][0]["annotations"]["pav:importedBy"]
+            ["annotation_value"],
+            "acme:source-adapters/example/v1",
+        )
+        stored = (
+            self.root / "metadata/records/Person/one.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("pav:imported", stored)
+        manifest = (output / "SHA256SUMS").read_text(encoding="utf-8")
+        self.assertIn(
+            "input:metadata/overlays/annotations/Person/one.yaml",
+            manifest,
+        )
+
+    def test_machine_pav_fingerprint_binds_provenance_to_assertion(self) -> None:
+        annotation = {
+            "pav:importedBy": {
+                "annotation_tag": "pav:importedBy",
+                "annotation_value": "acme:source-adapters/example/v1",
+            },
+            "pav:importedFrom": {
+                "annotation_tag": "pav:importedFrom",
+                "annotation_value": "https://source.example/people/one",
+            },
+        }
+        original = {
+            "notation": "source-one",
+            "schema_type": "dlthings:Identifier",
+            "annotations": annotation,
+        }
+        changed_assertion = deepcopy(original)
+        changed_assertion["notation"] = "source-two"
+        changed_source = deepcopy(original)
+        changed_source["annotations"]["pav:importedFrom"][
+            "annotation_value"
+        ] = "https://source.example/people/two"
+
+        self.assertNotEqual(
+            _machine_pav_fingerprint(original),
+            _machine_pav_fingerprint(changed_assertion),
+        )
+        self.assertNotEqual(
+            _machine_pav_fingerprint(original),
+            _machine_pav_fingerprint(changed_source),
+        )
 
     def test_update_preserves_projection_control_sidecar_and_active_ledger(self) -> None:
         projection = self.root / "generated/projection"

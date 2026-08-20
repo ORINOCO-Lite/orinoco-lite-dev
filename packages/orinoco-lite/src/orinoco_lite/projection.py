@@ -19,15 +19,21 @@ from jinja2 import Environment, FileSystemLoader
 from linkml_runtime import SchemaView
 import yaml
 
+from .annotations import (
+    PAV_IMPORTED_BY,
+    PAV_IMPORTED_FROM,
+    annotation_root,
+    assertion_sha256,
+)
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
 from .integrity import sha256_file
-from .records import record_sources
+from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
 
 
-MANIFEST_HEADER = "# orinoco-lite projection manifest v2"
-PROJECTION_ALGORITHM = "orinoco-projection-v2"
+MANIFEST_HEADER = "# orinoco-lite projection manifest v3"
+PROJECTION_ALGORITHM = "orinoco-projection-v3"
 PROJECTION_CONTROL_SIDECAR = ".gitattributes"
 FORBIDDEN_BRIDGE_PREDICATES = {
     "dcterms:contributor",
@@ -285,10 +291,44 @@ def _native_fingerprint(value: Any) -> Counter[tuple[str, str]]:
     return result
 
 
-def _records(workspace: WorkspaceConfig) -> tuple[list[dict[str, Any]], set[str]]:
-    sources = record_sources(workspace)
-    records = [yaml.safe_load(item["content"]) for item in sources]
-    return records, {item["pid"] for item in sources}
+def _machine_pav_fingerprint(value: Any) -> Counter[tuple[str, str]]:
+    """Bind every joined machine PAV pair to its annotation-free assertion."""
+
+    result: Counter[tuple[str, str]] = Counter()
+    if isinstance(value, dict):
+        annotations = value.get("annotations")
+        if isinstance(annotations, dict) and {
+            PAV_IMPORTED_BY,
+            PAV_IMPORTED_FROM,
+        } <= set(annotations):
+            machine = {
+                tag: annotations[tag]
+                for tag in (PAV_IMPORTED_BY, PAV_IMPORTED_FROM)
+            }
+            result[
+                (
+                    assertion_sha256(value),
+                    json.dumps(machine, sort_keys=True, separators=(",", ":")),
+                )
+            ] += 1
+        for child in value.values():
+            result.update(_machine_pav_fingerprint(child))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_machine_pav_fingerprint(child))
+    return result
+
+
+def _records(
+    workspace: WorkspaceConfig,
+    schema: Path | None = None,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    records = (
+        stored_records(workspace)
+        if schema is None
+        else joined_records(workspace, schema)
+    )
+    return records, {item["pid"] for item in records}
 
 
 def validate_semantics(
@@ -296,7 +336,8 @@ def validate_semantics(
     runtime_root: Path,
 ) -> dict[str, Any]:
     contract = load_contract(workspace)
-    records, record_pids = _records(workspace)
+    schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
+    records, record_pids = _records(workspace, schema)
     by_pid = {record["pid"]: record for record in records}
     if len(by_pid) != len(records) or not record_pids:
         raise DriverError("Projection metadata PIDs must be unique and non-empty")
@@ -310,7 +351,6 @@ def validate_semantics(
             "Projection class policy differs from the metadata inventory: "
             f"declared={sorted(declared_classes)}, actual={sorted(record_classes)}"
         )
-    schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
     schema_view = SchemaView(str(schema))
     accepted = {
         str(schema_view.get_uri(name, expand=False))
@@ -338,7 +378,12 @@ def validate_semantics(
             raise DriverError(f"{pid}: JSON/RDF/JSON schema validation failed: {error}") from error
         before = Counter(_nested_schema_types(record))
         after = Counter(_nested_schema_types(restored))
-        if any(after[item] < count for item, count in before.items()) or _native_fingerprint(restored) != _native_fingerprint(record):
+        if (
+            any(after[item] < count for item, count in before.items())
+            or _native_fingerprint(restored) != _native_fingerprint(record)
+            or _machine_pav_fingerprint(restored)
+            != _machine_pav_fingerprint(record)
+        ):
             raise DriverError(f"{pid}: schema round trip changed native semantics")
     graph_nodes = {
         pid
@@ -486,6 +531,9 @@ def _projection_inputs(workspace: WorkspaceConfig, contract: ProjectionContract)
         workspace.path("site") / "projection-templates",
         workspace.path("site") / "projection-tools",
     ]
+    annotations = annotation_root(workspace)
+    if annotations.exists():
+        roots.append(annotations)
     paths: list[Path] = []
     for root in roots:
         if root.is_file():
@@ -593,15 +641,28 @@ def render_projection(
     semantic = validate_semantics(workspace, runtime_root)
     contract = load_contract(workspace)
     records, record_pids = _records(workspace)
+    schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
+    machine_records, machine_pids = _records(workspace, schema)
+    if machine_pids != record_pids:
+        raise DriverError("Joined projection changed the metadata record inventory")
     by_pid = {record["pid"]: record for record in records}
     if output.exists():
         shutil.rmtree(output)
     (output / "content").mkdir(parents=True)
     (output / "static").mkdir()
-    (output / "records.jsonl").write_text(
-        "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in sorted(records, key=lambda item: (item["schema_type"], item["pid"]))),
-        encoding="utf-8",
+    public_jsonl = "".join(
+        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+        for record in sorted(
+            records, key=lambda item: (item["schema_type"], item["pid"])
+        )
     )
+    machine_jsonl = "".join(
+        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+        for record in sorted(
+            machine_records, key=lambda item: (item["schema_type"], item["pid"])
+        )
+    )
+    (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
     for pid in sorted(record_pids):
         record = by_pid[pid]
         schema_type = record["schema_type"]
@@ -622,7 +683,7 @@ def render_projection(
         )
     graph_result = subprocess.run(
         [sys.executable, str(contract.graph_producer)],
-        input=(output / "records.jsonl").read_text(encoding="utf-8"),
+        input=public_jsonl,
         capture_output=True,
         text=True,
         check=False,
