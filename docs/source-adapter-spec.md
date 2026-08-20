@@ -189,6 +189,10 @@ After merge, a correction starts a new adapter run and pull request from the rev
 
 Adapters MUST apply the upstream machine-ownership rules: a machine update does not silently overwrite a human- or differently owned assertion.
 When a whole-record proposal would replace such content, the complete loss or change MUST remain visible in the Git diff and require explicit acceptance.
+Candidate derivation MUST compare assertion content independently of PAV.
+When an incoming assertion is semantically identical to an existing assertion, the adapter MUST preserve the existing assertion and its PAV and MUST NOT produce a provenance-only diff.
+When an incoming assertion differs substantively, the proposal MAY replace it; an accepted replacement carries the proposing adapter and source PAV.
+This rule applies assertion by assertion, so an unrelated change elsewhere in a record does not transfer ownership of unchanged assertions.
 
 An adapter MAY propose deletion for any record.
 The Git diff and form MUST make the deletion explicit, and acceptance or rejection is a human decision like any other proposed change.
@@ -222,9 +226,8 @@ Every machine-provided assertion MUST carry assertion-level PAV.
 Imported objects such as `attributed_to`, `identifiers`, and `generated_by` carry annotations directly.
 Imported scalar data is represented by annotated `AttributeSpecification` objects in `attributes`, using the upstream enrichment pattern; a topical scalar slot MAY remain when required by the schema or presentation.
 A record-level annotation MAY supplement but MUST NOT replace assertion-level provenance.
-When a later accepted adapter supplies an existing assertion, its PAV replaces the prior source PAV even if the assertion value is unchanged.
-That provenance replacement is part of the proposal diff and requires the normal human decision.
-The current Thing therefore names the most recent accepted machine source; Git history retains earlier sources and decisions.
+PAV changes only with a substantive accepted change to its assertion.
+Ownership-only differences are ignored, matching upstream enrichment behavior.
 
 An assertion created by a human or downstream policy rather than present in the external source is not imported source data and MUST NOT receive the adapter's PAV annotation.
 Examples include a manually resolved identity, an eligibility decision, or a locally chosen relationship.
@@ -343,7 +346,6 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
 | Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
-| Ownership-only changes do not trigger an enrichment update | A later accepted source replaces PAV even when the assertion value is unchanged | The current Thing names the latest accepted source; Git preserves prior sources. |
 | Ownership-aware helpers do not overwrite another owner | A conflicting value may be proposed but only a human can accept the replacement | Pull-request curation is the explicit ownership-migration boundary. |
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
