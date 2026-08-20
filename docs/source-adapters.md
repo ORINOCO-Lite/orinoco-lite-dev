@@ -1,6 +1,6 @@
 # Orinoco Lite source-adapter specification
 
-Status: draft reference for review
+Status: normative specification
 
 This document defines a host-neutral source-adapter contract and the GitHub profile that Orinoco Lite will implement first.
 It does not define a Python ABI, plugin protocol, or persistent service.
@@ -309,6 +309,10 @@ The pull-request opening text MUST prominently state that requirement, and the h
 The supported threat model trusts collaborators who already have repository `write` or `admin` permission as authorized curators.
 Branch protection, review, and GitHub's audit history govern misuse of that authority.
 The workflow does not construct a cryptographic protocol against a malicious authorized collaborator.
+
+An implementation MUST stop and request human clarification when an ambiguity would change metadata semantics, provenance, review behavior, repository history, authority, or durable state.
+It MUST NOT resolve that ambiguity by broadening the threat model, inventing another authority or artifact, or generalizing the architecture.
+A new requirement at one of those boundaries requires a focused specification change before implementation continues.
 
 The implementation MUST protect write credentials from untrusted source data and pull-request executable code.
 Beyond that boundary:
