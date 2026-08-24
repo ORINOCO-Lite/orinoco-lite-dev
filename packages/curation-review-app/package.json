@@ -1,0 +1,42 @@
+{
+  "name": "@orinoco-lite/curation-review-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.2 <25"
+  },
+  "packageManager": "npm@11.6.0",
+  "scripts": {
+    "build": "npm run typecheck && vite build",
+    "check": "npm run format && npm run test && npm run build && npm run pages:functions:build",
+    "dev": "vite --host 127.0.0.1 --port 4173",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "pages:dev": "wrangler pages dev dist --local --port 8788",
+    "pages:functions:build": "wrangler pages functions build functions --project-directory . --build-output-directory dist --outdir .wrangler/pages-functions",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.5",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.1.0",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.125.0"
+  }
+}
