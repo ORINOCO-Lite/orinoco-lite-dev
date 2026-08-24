@@ -3,4 +3,8 @@
   "name": "orinoco-curation-review",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-08-20",
+  "vars": {
+    "GITHUB_CLIENT_ID": "Iv23limCfUnRPCFcXx3H",
+    "PUBLIC_ORIGIN": "https://orinoco-curation-review.pages.dev",
+  },
 }

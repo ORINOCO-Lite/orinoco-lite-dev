@@ -52,6 +52,8 @@ Refresh tokens are discarded.
 
 The Pages build command is `npm run build` and the output directory is `dist`.
 Pages Functions are under `functions/`; `npm run pages:functions:build` verifies their Worker bundle without publishing it.
+The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
+Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
 
 A review link has this form:
 
