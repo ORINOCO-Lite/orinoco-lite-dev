@@ -20,6 +20,13 @@ site:
 """
 
 
+DISPLAY_LABEL_ASSERTION = {
+    "predicate": "skos:prefLabel",
+    "schema_type": "dlthings:AttributeSpecification",
+    "value": "Test person",
+}
+
+
 class DownstreamValidationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -41,7 +48,11 @@ class DownstreamValidationTests(unittest.TestCase):
         (self.root / "metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: xyzri:XYZPerson\n"
-            "display_label: Test person\n",
+            "display_label: Test person\n"
+            "attributes:\n"
+            "- predicate: skos:prefLabel\n"
+            "  schema_type: dlthings:AttributeSpecification\n"
+            "  value: Test person\n",
             encoding="utf-8",
         )
         (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
@@ -143,8 +154,8 @@ class DownstreamValidationTests(unittest.TestCase):
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
-            "path": "/display_label",
-            "assertion_sha256": assertion_sha256("Test person"),
+            "path": "/attributes",
+            "assertion_sha256": assertion_sha256(DISPLAY_LABEL_ASSERTION),
             "pav:importedBy": "xyzrins:source-adapters/example/v1",
             "pav:importedFrom": "https://source.example/people/test",
         }
@@ -187,8 +198,8 @@ class DownstreamValidationTests(unittest.TestCase):
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
-            "path": "/display_label",
-            "assertion_sha256": assertion_sha256("wrong"),
+            "path": "/attributes",
+            "assertion_sha256": assertion_sha256({"value": "wrong"}),
             "pav:importedBy": "xyzrins:source-adapters/example/v1",
             "pav:importedFrom": "https://source.example/people/test",
         }

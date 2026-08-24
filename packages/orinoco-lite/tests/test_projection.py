@@ -204,7 +204,13 @@ class GenericProjectionContractTests(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / "metadata/records/Person/one.yaml").write_text(
-            "pid: acme:people/one\nschema_type: acme:Person\ndisplay_label: One\n",
+            "pid: acme:people/one\n"
+            "schema_type: acme:Person\n"
+            "display_label: One\n"
+            "attributes:\n"
+            "- predicate: skos:prefLabel\n"
+            "  schema_type: dlthings:AttributeSpecification\n"
+            "  value: One\n",
             encoding="utf-8",
         )
         (self.root / "site/projection-templates/page.md.j2").write_text(
@@ -308,8 +314,16 @@ class GenericProjectionContractTests(unittest.TestCase):
                     "acme:people/one",
                     [
                         {
-                            "path": "/display_label",
-                            "assertion_sha256": assertion_sha256("One"),
+                            "path": "/attributes",
+                            "assertion_sha256": assertion_sha256(
+                                {
+                                    "predicate": "skos:prefLabel",
+                                    "schema_type": (
+                                        "dlthings:AttributeSpecification"
+                                    ),
+                                    "value": "One",
+                                }
+                            ),
                             "pav:importedBy": "acme:source-adapters/example/v1",
                             "pav:importedFrom": "https://source.example/people/one",
                         }
@@ -319,33 +333,10 @@ class GenericProjectionContractTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        class Slot:
-            range = "string"
-
-        class Type:
-            uri = "xsd:string"
-
-        class Schema:
-            def __init__(self, _path):
-                pass
-
-            def get_slot(self, name):
-                return Slot() if name == "display_label" else None
-
-            def get_class(self, _name):
-                return None
-
-            def get_type(self, _name):
-                return Type()
-
-            def get_uri(self, name, *, expand):
-                self.assert_false = expand
-                return {"display_label": "skos:prefLabel"}[name]
-
         output = Path(self.temporary.name) / "annotated-projection"
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
-        ), patch("orinoco_lite.records.SchemaView", Schema):
+        ):
             render_projection(self.workspace, self.runtime, output)
 
         public_page = output / "content/people/one/_index.md"

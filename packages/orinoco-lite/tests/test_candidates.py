@@ -29,6 +29,13 @@ def record(pid: str, name: str, **values: object) -> dict[str, object]:
         "schema_type": "xyzri:XYZOrganization",
         "pid": pid,
         "name": name,
+        "attributes": [
+            {
+                "predicate": "schema:name",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": name,
+            }
+        ],
         **values,
     }
 
@@ -43,8 +50,8 @@ def companion(
         pid,
         [
             {
-                "path": "/name",
-                "assertion_sha256": assertion_sha256(source["name"]),
+                "path": "/attributes",
+                "assertion_sha256": assertion_sha256(source["attributes"][0]),
                 "pav:importedBy": imported_by,
                 "pav:importedFrom": f"{NAMESPACE}/one",
             }
@@ -375,18 +382,25 @@ class CandidateTests(unittest.TestCase):
         pid = "xyzrins:records/one"
         old = record(pid, "old", display_label="Old")
         new = record(pid, "new", display_label="New")
+        new["attributes"].append(
+            {
+                "predicate": "skos:prefLabel",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": new["display_label"],
+            }
+        )
         annotations = annotation_companion(
             pid,
             [
                 {
-                    "path": "/name",
-                    "assertion_sha256": assertion_sha256(new["name"]),
+                    "path": "/attributes",
+                    "assertion_sha256": assertion_sha256(new["attributes"][0]),
                     "pav:importedBy": "xyzrins:source-adapters/example/v1",
                     "pav:importedFrom": f"{NAMESPACE}/one",
                 },
                 {
-                    "path": "/display_label",
-                    "assertion_sha256": assertion_sha256(new["display_label"]),
+                    "path": "/attributes",
+                    "assertion_sha256": assertion_sha256(new["attributes"][1]),
                     "pav:importedBy": "xyzrins:source-adapters/example/v1",
                     "pav:importedFrom": f"{NAMESPACE}/one",
                 },
@@ -417,7 +431,9 @@ class CandidateTests(unittest.TestCase):
             )
 
         stale = deepcopy(annotations)
-        stale["assertions"][1]["assertion_sha256"] = assertion_sha256("stale")
+        stale["assertions"][1]["assertion_sha256"] = assertion_sha256(
+            {"value": "stale"}
+        )
         with self.assertRaisesRegex(ConfigurationError, "matched zero assertions"):
             candidate(
                 "one",

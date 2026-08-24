@@ -31,6 +31,14 @@ site:
 """
 
 
+def display_label_assertion(value: str) -> dict[str, str]:
+    return {
+        "predicate": "skos:prefLabel",
+        "schema_type": "dlthings:AttributeSpecification",
+        "value": value,
+    }
+
+
 class EditorBundleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -79,7 +87,11 @@ class EditorBundleTests(unittest.TestCase):
         self.first.write_text(
             "pid: xyzrins:persons/first\n"
             "schema_type: xyzri:XYZPerson\n"
-            "display_label: First\n",
+            "display_label: First\n"
+            "attributes:\n"
+            "- predicate: skos:prefLabel\n"
+            "  schema_type: dlthings:AttributeSpecification\n"
+            "  value: First\n",
             encoding="utf-8",
         )
         self.second.write_text(
@@ -251,8 +263,10 @@ class EditorBundleTests(unittest.TestCase):
                     "xyzrins:persons/first",
                     [
                         {
-                            "path": "/display_label",
-                            "assertion_sha256": assertion_sha256("First"),
+                            "path": "/attributes",
+                            "assertion_sha256": assertion_sha256(
+                                display_label_assertion("First")
+                            ),
                             "pav:importedBy": "xyzrins:source-adapters/example/v1",
                             "pav:importedFrom": "https://source.example/people/first",
                         }
@@ -308,8 +322,10 @@ class EditorBundleTests(unittest.TestCase):
                     "xyzrins:persons/first",
                     [
                         {
-                            "path": "/display_label",
-                            "assertion_sha256": assertion_sha256("First"),
+                            "path": "/attributes",
+                            "assertion_sha256": assertion_sha256(
+                                display_label_assertion("First")
+                            ),
                             "pav:importedBy": "xyzrins:source-adapters/example/v1",
                             "pav:importedFrom": "https://source.example/people/first",
                         }

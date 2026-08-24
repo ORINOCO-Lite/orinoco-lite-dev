@@ -2,18 +2,15 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-import runpy
-from types import SimpleNamespace
 import unittest
 
-from linkml_runtime import SchemaView
-
 from orinoco_lite.annotations import (
-    SlotSemantics,
     annotation_companion,
     assertion_sha256,
+    compact_enrichment_view,
     join_annotations,
     reconcile_annotation_companion,
+    split_enrichment_view,
 )
 from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.errors import ConfigurationError
@@ -26,10 +23,6 @@ SCHEMA = (
     Path(__file__).resolve().parents[3]
     / "submodules/things-schemas/src/demo-research-information/unreleased.yaml"
 )
-ENRICHMENT_TOOLS = (
-    Path(__file__).resolve().parents[3]
-    / "submodules/things-enrichment-tools/things_enrichment_tools/__init__.py"
-)
 
 
 def assertion(path: str, value: object, **changes: str) -> dict[str, str]:
@@ -41,17 +34,6 @@ def assertion(path: str, value: object, **changes: str) -> dict[str, str]:
     }
     result.update(changes)
     return result
-
-
-def predicate(slot: str) -> SlotSemantics:
-    return SlotSemantics(
-        predicate={
-            "display_label": "skos:prefLabel",
-            "literal/items": "ex:escaped",
-            "title": "dlthings:title",
-        }[slot],
-        class_range=False,
-    )
 
 
 def record() -> dict[str, object]:
@@ -127,103 +109,69 @@ class CompanionTests(unittest.TestCase):
 
 
 class JoinTests(unittest.TestCase):
-    def test_object_and_scalar_assertions_join_as_expanded_pav(self):
+    def test_stored_object_and_qualified_assertions_join_as_expanded_pav(self):
         stored = record()
+        stored["attributes"] = [
+            {
+                "predicate": "dlthings:title",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": "A title",
+            }
+        ]
+        stored["characterized_by"] = [
+            {"object": "bibo:AcademicArticle", "predicate": "dcterms:type"}
+        ]
         original = deepcopy(stored)
         companion = annotation_companion(
             stored["pid"],
             [
+                assertion("/attributes", stored["attributes"][0]),
+                assertion("/characterized_by", stored["characterized_by"][0]),
                 assertion("/identifiers", stored["identifiers"][0]),
-                assertion("/title", stored["title"]),
             ],
         )
 
-        joined = join_annotations(stored, companion, predicate)
+        joined = join_annotations(stored, companion)
 
         self.assertEqual(stored, original)
-        machine = {
-            "pav:importedBy": {
-                "annotation_tag": "pav:importedBy",
-                "annotation_value": AGENT,
-            },
-            "pav:importedFrom": {
-                "annotation_tag": "pav:importedFrom",
-                "annotation_value": SOURCE,
-            },
-        }
-        self.assertEqual(joined["identifiers"][0]["annotations"], machine)
-        self.assertEqual(
-            joined["attributes"],
-            [
-                {
-                    "annotations": machine,
-                    "predicate": "dlthings:title",
-                    "schema_type": "dlthings:AttributeSpecification",
-                    "value": "A title",
-                }
-            ],
-        )
-        self.assertEqual(joined["title"], "A title")
+        for selected in (
+            joined["attributes"][0],
+            joined["characterized_by"][0],
+            joined["identifiers"][0],
+        ):
+            self.assertEqual(
+                selected["annotations"]["pav:importedBy"]["annotation_value"],
+                AGENT,
+            )
 
-    def test_class_range_assertion_joins_as_an_annotated_statement(self):
+    def test_scalar_selectors_are_rejected_instead_of_synthesizing_objects(self):
         stored = record()
-        stored["kind"] = "xyzrins:publication-types/article"
         companion = annotation_companion(
-            stored["pid"], [assertion("/kind", stored["kind"])]
+            stored["pid"], [assertion("/title", stored["title"])]
         )
 
-        joined = join_annotations(
-            stored,
-            companion,
-            lambda slot: SlotSemantics("dcterms:type", class_range=True),
-        )
+        with self.assertRaisesRegex(ConfigurationError, "scalar selectors"):
+            join_annotations(stored, companion)
 
-        self.assertEqual(joined["kind"], stored["kind"])
-        statement = joined["characterized_by"][0]
-        self.assertNotIn("schema_type", statement)
-        self.assertEqual(statement["predicate"], "dcterms:type")
-        self.assertEqual(statement["object"], stored["kind"])
-        self.assertEqual(
-            statement["annotations"]["pav:importedBy"]["annotation_value"],
-            AGENT,
-        )
-
-    def test_typed_data_keeps_topical_value_and_uses_schema_range(self):
+    def test_typed_attribute_is_selected_without_changing_topical_type(self):
         stored = record()
         stored["byte_size"] = 123
+        stored["attributes"] = [
+            {
+                "predicate": "dlthings:byte_size",
+                "range": "xsd:nonNegativeInteger",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": "123",
+            }
+        ]
         companion = annotation_companion(
-            stored["pid"], [assertion("/byte_size", stored["byte_size"])]
+            stored["pid"], [assertion("/attributes", stored["attributes"][0])]
         )
 
-        joined = join_annotations(
-            stored,
-            companion,
-            lambda slot: SlotSemantics(
-                "dcat:byteSize",
-                class_range=False,
-                datatype="xsd:nonNegativeInteger",
-            ),
-        )
+        joined = join_annotations(stored, companion)
 
         self.assertEqual(joined["byte_size"], 123)
         self.assertEqual(joined["attributes"][0]["value"], "123")
-        self.assertEqual(
-            joined["attributes"][0]["range"], "xsd:nonNegativeInteger"
-        )
-
-    def test_non_string_data_without_a_schema_datatype_fails_closed(self):
-        stored = record()
-        stored["byte_size"] = 123
-        companion = annotation_companion(
-            stored["pid"], [assertion("/byte_size", stored["byte_size"])]
-        )
-
-        with self.assertRaisesRegex(ConfigurationError, "no CURIE datatype"):
-            join_annotations(
-                stored,
-                companion,
-                lambda slot: SlotSemantics("dcat:byteSize", class_range=False),
-            )
 
     def test_existing_human_annotations_expand_and_survive(self):
         stored = record()
@@ -233,23 +181,29 @@ class JoinTests(unittest.TestCase):
             stored["pid"], [assertion("/identifiers", item)]
         )
 
-        joined = join_annotations(stored, companion, predicate)
+        joined = join_annotations(stored, companion)
 
         self.assertEqual(
             joined["identifiers"][0]["annotations"]["ex:reviewed"],
             {"annotation_tag": "ex:reviewed", "annotation_value": "yes"},
         )
 
-    def test_rfc6901_escaping_is_resolved(self):
+    def test_rfc6901_escaping_is_resolved_for_mapping_assertions(self):
         stored = record()
-        stored["literal/items"] = "escaped"
+        stored["literal/items"] = {"schema_type": "dlthings:Identifier"}
         companion = annotation_companion(
-            stored["pid"], [assertion("/literal~1items", "escaped")]
+            stored["pid"],
+            [assertion("/literal~1items", stored["literal/items"])],
         )
 
-        joined = join_annotations(stored, companion, predicate)
+        joined = join_annotations(stored, companion)
 
-        self.assertEqual(joined["attributes"][0]["predicate"], "ex:escaped")
+        self.assertEqual(
+            joined["literal/items"]["annotations"]["pav:importedFrom"][
+                "annotation_value"
+            ],
+            SOURCE,
+        )
 
     def test_array_index_pointer_cannot_bypass_collection_uniqueness(self):
         stored = record()
@@ -260,36 +214,24 @@ class JoinTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ConfigurationError, "identify a collection"):
-            join_annotations(stored, companion, predicate)
+            join_annotations(stored, companion)
 
     def test_missing_mismatched_and_ambiguous_selectors_fail(self):
         stored = record()
         duplicate = deepcopy(stored["identifiers"][0])
         stored["identifiers"].append(duplicate)
         cases = (
-            (
-                annotation_companion(
-                    stored["pid"], [assertion("/missing", "value")]
-                ),
-                "zero assertions",
-            ),
-            (
-                annotation_companion(
-                    stored["pid"], [assertion("/title", "different")]
-                ),
-                "zero assertions",
-            ),
-            (
-                annotation_companion(
-                    stored["pid"], [assertion("/identifiers", duplicate)]
-                ),
-                "2 assertions",
-            ),
+            (assertion("/missing", {"value": "missing"}), "zero assertions"),
+            (assertion("/identifiers", {"value": "different"}), "zero assertions"),
+            (assertion("/identifiers", duplicate), "2 assertions"),
         )
-        for companion, message in cases:
-            with self.subTest(message=message):
-                with self.assertRaisesRegex(ConfigurationError, message):
-                    join_annotations(stored, companion, predicate)
+        for item, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(
+                ConfigurationError, message
+            ):
+                join_annotations(
+                    stored, annotation_companion(stored["pid"], [item])
+                )
 
     def test_reconciliation_drops_missing_but_rejects_ambiguous_selector(self):
         stored = record()
@@ -300,8 +242,7 @@ class JoinTests(unittest.TestCase):
         changed = deepcopy(stored)
         changed["identifiers"] = []
         self.assertEqual(
-            reconcile_annotation_companion(changed, companion)["assertions"],
-            [],
+            reconcile_annotation_companion(changed, companion)["assertions"], []
         )
 
         duplicated = deepcopy(stored)
@@ -311,12 +252,13 @@ class JoinTests(unittest.TestCase):
 
     def test_companion_identity_order_and_shape_fail_closed(self):
         stored = record()
-        first = assertion("/title", stored["title"])
-        second = assertion("/identifiers", stored["identifiers"][0])
+        first = assertion("/identifiers", stored["identifiers"][0])
+        stored["other"] = {"schema_type": "dlthings:Identifier"}
+        second = assertion("/other", stored["other"])
         cases = (
             ({"record": "wrong", "assertions": []}, "does not match"),
             (
-                {"record": stored["pid"], "assertions": [first, second]},
+                {"record": stored["pid"], "assertions": [second, first]},
                 "must be ordered",
             ),
             (
@@ -325,9 +267,27 @@ class JoinTests(unittest.TestCase):
             ),
         )
         for companion, message in cases:
-            with self.subTest(message=message):
-                with self.assertRaisesRegex(ConfigurationError, message):
-                    join_annotations(stored, companion, predicate)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                ConfigurationError, message
+            ):
+                join_annotations(stored, companion)
+
+    def test_compact_split_is_an_inverse_for_supported_machine_pav(self):
+        stored = record()
+        stored["identifiers"][0]["annotations"] = {"ex:reviewed": "yes"}
+        companion = annotation_companion(
+            stored["pid"],
+            [assertion("/identifiers", stored["identifiers"][0])],
+        )
+
+        working = compact_enrichment_view(stored, companion)
+        split_record, split_companion = split_enrichment_view(working)
+
+        self.assertEqual(split_record, stored)
+        self.assertEqual(split_companion, companion)
+        self.assertEqual(
+            working["identifiers"][0]["annotations"]["pav:importedBy"], AGENT
+        )
 
     def test_existing_machine_annotation_is_never_overwritten(self):
         stored = record()
@@ -340,7 +300,7 @@ class JoinTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ConfigurationError, "overlays/annotations"):
-            join_annotations(stored, companion, predicate)
+            join_annotations(stored, companion)
 
     def test_inline_machine_pav_curie_or_uri_is_rejected(self):
         for tag in (
@@ -355,29 +315,28 @@ class JoinTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     ConfigurationError, "metadata/overlays/annotations"
                 ):
-                    join_annotations(stored, None, predicate)
+                    join_annotations(stored, None)
 
 
 @unittest.skipUnless(SCHEMA.is_file(), "pinned Things Schema fixture is unavailable")
 class RdfRoundTripTests(unittest.TestCase):
-    def test_object_and_scalar_pav_survive_locked_rdf_round_trip(self):
+    def test_object_and_qualified_data_pav_survive_locked_rdf_round_trip(self):
         stored = record()
+        stored["attributes"] = [
+            {
+                "predicate": "dlthings:title",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": "A title",
+            }
+        ]
         companion = annotation_companion(
             stored["pid"],
             [
+                assertion("/attributes", stored["attributes"][0]),
                 assertion("/identifiers", stored["identifiers"][0]),
-                assertion("/title", stored["title"]),
             ],
         )
-        schema_view = SchemaView(str(SCHEMA))
-        joined = join_annotations(
-            stored,
-            companion,
-            lambda slot: SlotSemantics(
-                str(schema_view.get_uri(slot, expand=False)),
-                class_range=False,
-            ),
-        )
+        joined = join_annotations(stored, companion)
         to_rdf, to_json = build_format_converters(SCHEMA)
 
         turtle = to_rdf.convert(joined, "XYZPublication")
@@ -398,18 +357,14 @@ class RdfRoundTripTests(unittest.TestCase):
     def test_class_range_statement_survives_locked_rdf_round_trip(self):
         stored = record()
         stored["kind"] = "bibo:AcademicArticle"
+        stored["characterized_by"] = [
+            {"object": stored["kind"], "predicate": "dcterms:type"}
+        ]
         companion = annotation_companion(
-            stored["pid"], [assertion("/kind", stored["kind"])]
+            stored["pid"],
+            [assertion("/characterized_by", stored["characterized_by"][0])],
         )
-        schema_view = SchemaView(str(SCHEMA))
-        joined = join_annotations(
-            stored,
-            companion,
-            lambda slot: SlotSemantics(
-                str(schema_view.get_uri(slot, expand=False)),
-                class_range=True,
-            ),
-        )
+        joined = join_annotations(stored, companion)
         to_rdf, to_json = build_format_converters(SCHEMA)
 
         turtle = to_rdf.convert(joined, "XYZPublication")
@@ -423,164 +378,26 @@ class RdfRoundTripTests(unittest.TestCase):
             "pid": "xyzrins:files/one",
             "schema_type": "xyzri:XYZFile",
             "byte_size": 123,
+            "attributes": [
+                {
+                    "predicate": "dlthings:byte_size",
+                    "range": "xsd:nonNegativeInteger",
+                    "schema_type": "dlthings:AttributeSpecification",
+                    "value": "123",
+                }
+            ],
         }
         companion = annotation_companion(
-            stored["pid"], [assertion("/byte_size", stored["byte_size"])]
+            stored["pid"],
+            [assertion("/attributes", stored["attributes"][0])],
         )
-        schema_view = SchemaView(str(SCHEMA))
-        slot = schema_view.get_slot("byte_size")
-        datatype = schema_view.get_type(slot.range)
-        joined = join_annotations(
-            stored,
-            companion,
-            lambda name: SlotSemantics(
-                str(schema_view.get_uri(name, expand=False)),
-                class_range=False,
-                datatype=str(datatype.uri),
-            ),
-        )
+        joined = join_annotations(stored, companion)
         to_rdf, to_json = build_format_converters(SCHEMA)
 
         turtle = to_rdf.convert(joined, "XYZFile")
         round_trip = to_json.convert(turtle, "XYZFile")
 
         self.assertEqual(round_trip, joined)
-
-
-@unittest.skipUnless(
-    SCHEMA.is_file() and ENRICHMENT_TOOLS.is_file(),
-    "pinned enrichment-tools parity fixtures are unavailable",
-)
-class UpstreamParityTests(unittest.TestCase):
-    @staticmethod
-    def _upstream():
-        return SimpleNamespace(**runpy.run_path(str(ENRICHMENT_TOOLS)))
-
-    @staticmethod
-    def _rdf_graph(record_value):
-        from rdflib import Graph
-        from rdflib.compare import to_isomorphic
-
-        to_rdf, _ = build_format_converters(SCHEMA)
-        class_name = record_value["schema_type"].rsplit(":", 1)[-1]
-        turtle = to_rdf.convert(record_value, class_name)
-        return to_isomorphic(Graph().parse(data=turtle, format="turtle"))
-
-    def test_join_matches_pinned_object_scalar_and_statement_rdf(self):
-        upstream = self._upstream()
-        schema_view = SchemaView(str(SCHEMA))
-
-        cases = []
-
-        identifier = {
-            "notation": "doi:10.1/example",
-            "schema_type": "dlthings:Identifier",
-        }
-        inline_object = {
-            "pid": "xyzrins:records/object",
-            "schema_type": "xyzri:XYZPublication",
-        }
-        self.assertTrue(
-            upstream.update_multivalued_object_property(
-                inline_object,
-                slot="identifiers",
-                values=[deepcopy(identifier)],
-                owner_id=AGENT,
-                source_id=SOURCE,
-            )
-        )
-        stored_object = {
-            "pid": inline_object["pid"],
-            "schema_type": inline_object["schema_type"],
-            "identifiers": [identifier],
-        }
-        cases.append(
-            (
-                inline_object,
-                stored_object,
-                annotation_companion(
-                    stored_object["pid"],
-                    [assertion("/identifiers", identifier)],
-                ),
-            )
-        )
-
-        inline_scalar = {
-            "pid": "xyzrins:records/scalar",
-            "schema_type": "xyzri:XYZPublication",
-        }
-        self.assertTrue(
-            upstream.update_data_property(
-                inline_scalar,
-                predicate="dlthings:title",
-                value="A title",
-                topical_slot="title",
-                owner_id=AGENT,
-                source_id=SOURCE,
-            )
-        )
-        stored_scalar = {
-            "pid": inline_scalar["pid"],
-            "schema_type": inline_scalar["schema_type"],
-            "title": "A title",
-        }
-        cases.append(
-            (
-                inline_scalar,
-                stored_scalar,
-                annotation_companion(
-                    stored_scalar["pid"],
-                    [assertion("/title", stored_scalar["title"])],
-                ),
-            )
-        )
-
-        inline_statement = {
-            "pid": "xyzrins:records/statement",
-            "schema_type": "xyzri:XYZPublication",
-        }
-        self.assertTrue(
-            upstream.update_data_property(
-                inline_statement,
-                predicate="dcterms:type",
-                value="bibo:AcademicArticle",
-                collection_slot="characterized_by",
-                value_key="object",
-                topical_slot="kind",
-                owner_id=AGENT,
-                source_id=SOURCE,
-            )
-        )
-        stored_statement = {
-            "pid": inline_statement["pid"],
-            "schema_type": inline_statement["schema_type"],
-            "kind": "bibo:AcademicArticle",
-        }
-        cases.append(
-            (
-                inline_statement,
-                stored_statement,
-                annotation_companion(
-                    stored_statement["pid"],
-                    [assertion("/kind", stored_statement["kind"])],
-                ),
-            )
-        )
-
-        for inline, stored, companion in cases:
-            with self.subTest(pid=stored["pid"]):
-                def semantics(slot):
-                    definition = schema_view.get_slot(slot)
-                    slot_range = definition.range
-                    datatype = schema_view.get_type(slot_range)
-                    return SlotSemantics(
-                        str(schema_view.get_uri(slot, expand=False)),
-                        class_range=schema_view.get_class(slot_range) is not None,
-                        datatype=(str(datatype.uri) if datatype is not None else None),
-                    )
-
-                joined = join_annotations(stored, companion, semantics)
-                self.assertEqual(self._rdf_graph(joined), self._rdf_graph(inline))
 
 
 if __name__ == "__main__":

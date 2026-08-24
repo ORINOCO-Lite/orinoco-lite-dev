@@ -6,11 +6,9 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from linkml_runtime import SchemaView
 import yaml
 
 from .annotations import (
-    SlotSemantics,
     companion_sources,
     join_annotations,
     validate_stored_record,
@@ -98,6 +96,11 @@ def joined_records(
 ) -> list[dict[str, Any]]:
     """Load records joined with their mirrored machine PAV companions."""
 
+    # Retain the schema argument as part of the established record-loading
+    # surface.  Annotation joining no longer derives assertions from scalar
+    # slots and therefore does not need schema slot semantics.
+    del schema
+
     sources = record_sources(workspace)
     companions = {
         source.record_path.resolve(): source.value
@@ -106,42 +109,11 @@ def joined_records(
     if not companions:
         return [yaml.safe_load(source["content"]) for source in sources]
 
-    schema_view = SchemaView(str(schema))
-
-    def semantics_for_slot(slot: str) -> SlotSemantics:
-        try:
-            slot_definition = schema_view.get_slot(slot)
-            slot_range = slot_definition.range if slot_definition is not None else None
-            predicate = str(schema_view.get_uri(slot, expand=False))
-            range_type = schema_view.get_type(slot_range) if slot_range else None
-        except ConfigurationError:
-            raise
-        except Exception as error:
-            raise ConfigurationError(
-                f"Could not resolve the predicate for scalar assertion slot {slot}"
-            ) from error
-        if not predicate or ":" not in predicate:
-            raise ConfigurationError(
-                f"Schema has no CURIE predicate for scalar assertion slot {slot}"
-            )
-        return SlotSemantics(
-            predicate=predicate,
-            class_range=(
-                slot_range is not None
-                and schema_view.get_class(slot_range) is not None
-            ),
-            datatype=(
-                str(range_type.uri)
-                if range_type is not None and range_type.uri is not None
-                else None
-            ),
-        )
-
     joined: list[dict[str, Any]] = []
     for source in sources:
         path = workspace.root / source["path"]
         record = yaml.safe_load(source["content"])
         joined.append(
-            join_annotations(record, companions.get(path.resolve()), semantics_for_slot)
+            join_annotations(record, companions.get(path.resolve()))
         )
     return joined

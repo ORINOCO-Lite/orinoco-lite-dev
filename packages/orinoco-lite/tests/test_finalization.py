@@ -24,6 +24,13 @@ def record(pid: str, name: str, **values: object) -> dict[str, object]:
         "schema_type": "xyzri:XYZOrganization",
         "pid": pid,
         "name": name,
+        "attributes": [
+            {
+                "predicate": "schema:name",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": name,
+            }
+        ],
         **values,
     }
 
@@ -32,15 +39,24 @@ def provenance(
     pid: str,
     value: object,
     *,
-    path: str = "/name",
+    path: str = "/attributes",
     imported_from: str = f"{NAMESPACE}/one",
 ) -> dict[str, object]:
+    assertion = (
+        {
+            "predicate": "schema:name",
+            "schema_type": "dlthings:AttributeSpecification",
+            "value": value,
+        }
+        if path == "/attributes" and not isinstance(value, Mapping)
+        else value
+    )
     return annotation_companion(
         pid,
         [
             {
                 "path": path,
-                "assertion_sha256": assertion_sha256(value),
+                "assertion_sha256": assertion_sha256(assertion),
                 "pav:importedBy": AGENT,
                 "pav:importedFrom": imported_from,
             }
@@ -418,9 +434,16 @@ class FinalizationTests(unittest.TestCase):
         plan = self.plan(base, (item,))
         proposal = self.apply_plan(plan)
         human_record = record(pid, "human correction", description="curated")
+        human_record["attributes"].append(
+            {
+                "predicate": "schema:description",
+                "schema_type": "dlthings:AttributeSpecification",
+                "value": "curated",
+            }
+        )
         human_assertion = {
-            "path": "/description",
-            "assertion_sha256": assertion_sha256("curated"),
+            "path": "/attributes",
+            "assertion_sha256": assertion_sha256(human_record["attributes"][1]),
             "pav:importedBy": "xyzrins:curators/human",
             "pav:importedFrom": "https://human.example/review",
         }
@@ -676,10 +699,16 @@ class FinalizationTests(unittest.TestCase):
         pid = "xyzrins:records/base"
         baseline = record(pid, "old")
         base_path = "metadata/records/XYZOrganization/base.yaml"
-        self.repo.write_bytes(
-            base_path,
-            b"schema_type: xyzri:XYZOrganization\npid: xyzrins:records/base\nname: old\n",
+        formatted_base = (
+            b"schema_type: xyzri:XYZOrganization\n"
+            b"pid: xyzrins:records/base\n"
+            b"name: old\n"
+            b"attributes:\n"
+            b"  - value: old\n"
+            b"    schema_type: dlthings:AttributeSpecification\n"
+            b"    predicate: schema:name\n"
         )
+        self.repo.write_bytes(base_path, formatted_base)
         base = self.repo.commit("noncanonical but semantic base")
         item = candidate(
             "base",
@@ -695,7 +724,7 @@ class FinalizationTests(unittest.TestCase):
         self.assertTrue(result.metadata_changed)
         self.assertEqual(
             (self.repo.path / base_path).read_bytes(),
-            b"schema_type: xyzri:XYZOrganization\npid: xyzrins:records/base\nname: old\n",
+            formatted_base,
         )
 
         drift_root = Path(self.temporary.name) / "drift-repository"

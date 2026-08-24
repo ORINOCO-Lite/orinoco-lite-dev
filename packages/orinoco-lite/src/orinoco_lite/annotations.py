@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
@@ -22,7 +22,6 @@ ANNOTATION_FIELDS = frozenset(
     {"path", "assertion_sha256", "pav:importedBy", "pav:importedFrom"}
 )
 COMPANION_FIELDS = frozenset({"record", "assertions"})
-ATTRIBUTE_SPECIFICATION = "dlthings:AttributeSpecification"
 PAV_IMPORTED_BY = "pav:importedBy"
 PAV_IMPORTED_FROM = "pav:importedFrom"
 PAV_IMPORTED_BY_URI = "http://purl.org/pav/importedBy"
@@ -47,15 +46,6 @@ class CompanionSource:
     record_path: Path
     value: Mapping[str, object]
     assertion_count: int
-
-
-@dataclass(frozen=True)
-class SlotSemantics:
-    """Schema-derived representation for one direct metadata slot."""
-
-    predicate: str
-    class_range: bool
-    datatype: str | None = None
 
 
 class _SelectorNoMatch(ConfigurationError):
@@ -326,90 +316,29 @@ def _attach_to_object(target: dict[str, Any], entry: Mapping[str, str]) -> None:
     target["annotations"] = annotations
 
 
-def _attach_scalar(
-    parent: object,
-    slot: object,
-    value: Any,
-    entry: Mapping[str, str],
-    semantics_for_slot: Callable[[str], SlotSemantics],
+def _attach_compact_to_object(
+    target: dict[str, Any], entry: Mapping[str, str]
 ) -> None:
-    if not isinstance(parent, dict) or not isinstance(slot, str):
-        raise ConfigurationError(
-            "A scalar assertion path must name a slot on a mapping"
-        )
-    semantics = semantics_for_slot(slot)
-    if not isinstance(semantics, SlotSemantics):
-        raise ConfigurationError(f"Schema semantics are invalid for slot {slot}")
-    predicate = _line(semantics.predicate, f"Predicate for slot {slot}")
-    if ":" not in predicate:
-        raise ConfigurationError(
-            f"Predicate for scalar assertion slot {slot} must be a CURIE"
-        )
-    if semantics.class_range:
-        if not isinstance(value, str):
-            raise ConfigurationError(
-                f"Class-range assertion slot {slot} requires a URI string"
-            )
-        statements = parent.setdefault("characterized_by", [])
-        if not isinstance(statements, list):
-            raise ConfigurationError(
-                "Class-range assertion parent has a non-list characterized_by "
-                f"slot at {entry['path']}"
-            )
-        statements.append(
-            {
-                "annotations": _machine_annotations(entry),
-                "object": value,
-                "predicate": predicate,
-            }
-        )
-        return
-
-    range_value: str | None = None
-    if isinstance(value, str):
-        lexical_value = value
-    elif value is None or isinstance(value, (dict, list)):
-        raise ConfigurationError(
-            f"Data assertion slot {slot} is not a supported JSON scalar"
-        )
+    raw_annotations = target.get("annotations")
+    if raw_annotations is None:
+        annotations: dict[str, Any] = {}
+    elif isinstance(raw_annotations, Mapping):
+        annotations = deepcopy(dict(raw_annotations))
     else:
-        datatype = semantics.datatype
-        if not isinstance(datatype, str) or ":" not in datatype:
+        raise ConfigurationError("Enrichment-view annotations must be a mapping")
+    for tag in (PAV_IMPORTED_BY, PAV_IMPORTED_FROM):
+        if tag in annotations:
             raise ConfigurationError(
-                f"Schema has no CURIE datatype for non-string assertion slot {slot}"
+                f"Enrichment-view assertion already contains machine annotation {tag}"
             )
-        try:
-            lexical_value = json.dumps(
-                value,
-                allow_nan=False,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
-        except (TypeError, ValueError) as error:
-            raise ConfigurationError(
-                f"Data assertion slot {slot} has no canonical lexical form"
-            ) from error
-        range_value = datatype
-    attributes = parent.setdefault("attributes", [])
-    if not isinstance(attributes, list):
-        raise ConfigurationError(
-            f"Scalar assertion parent has a non-list attributes slot at {entry['path']}"
-        )
-    attribute = {
-        "annotations": _machine_annotations(entry),
-        "predicate": predicate,
-        "schema_type": ATTRIBUTE_SPECIFICATION,
-        "value": lexical_value,
-    }
-    if range_value is not None:
-        attribute["range"] = range_value
-    attributes.append(attribute)
+        annotations[tag] = entry[tag]
+    target["annotations"] = annotations
 
 
 def _matched_assertion(
     record: dict[str, Any], entry: Mapping[str, str]
-) -> tuple[dict[str, Any] | list[Any], str | int, Any]:
-    parent, slot, target = _resolve_pointer(record, entry["path"])
+) -> dict[str, Any]:
+    _, _, target = _resolve_pointer(record, entry["path"])
     digest = entry["assertion_sha256"]
     if isinstance(target, list):
         matches = [item for item in target if assertion_sha256(item) == digest]
@@ -421,24 +350,36 @@ def _matched_assertion(
             raise ConfigurationError(
                 f"Annotation selector matched {len(matches)} assertions at {entry['path']}"
             )
-        return parent, slot, matches[0]
+        assertion = matches[0]
+        if not isinstance(assertion, dict):
+            raise ConfigurationError(
+                "Annotation selectors must identify stored mapping assertions; "
+                f"scalar selectors are unsupported at {entry['path']}"
+            )
+        return assertion
     if assertion_sha256(target) != digest:
         raise _SelectorNoMatch(
             f"Annotation selector matched zero assertions at {entry['path']}"
         )
-    return parent, slot, target
+    if not isinstance(target, dict):
+        raise ConfigurationError(
+            "Annotation selectors must identify stored mapping assertions; "
+            f"scalar selectors are unsupported at {entry['path']}"
+        )
+    return target
 
 
 def _apply_entry(
     record: dict[str, Any],
     entry: Mapping[str, str],
-    semantics_for_slot: Callable[[str], SlotSemantics],
+    *,
+    compact: bool,
 ) -> None:
-    parent, slot, assertion = _matched_assertion(record, entry)
-    if isinstance(assertion, dict):
-        _attach_to_object(assertion, entry)
+    assertion = _matched_assertion(record, entry)
+    if compact:
+        _attach_compact_to_object(assertion, entry)
     else:
-        _attach_scalar(parent, slot, assertion, entry, semantics_for_slot)
+        _attach_to_object(assertion, entry)
 
 
 def validate_annotation_companion(
@@ -511,10 +452,119 @@ def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
     return sources
 
 
+def compact_enrichment_view(
+    record: Mapping[str, Any],
+    companion: Mapping[str, object] | None,
+) -> dict[str, Any]:
+    """Build a detached compact-PAV view for pinned enrichment helpers.
+
+    The pinned helpers match ownership only in their compact annotation form.
+    This view is therefore deliberately distinct from the expanded join used
+    for schema validation and RDF conversion.
+    """
+
+    working = deepcopy(dict(record))
+    validate_stored_record(working)
+    pid = working.get("pid")
+    if not isinstance(pid, str) or not pid:
+        raise ConfigurationError("Enrichment-view Thing requires a non-empty PID")
+    if companion is None:
+        return working
+    for entry in _validated_companion(companion, pid):
+        _apply_entry(working, entry, compact=True)
+    return working
+
+
+def _pointer_token(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def split_enrichment_view(
+    working: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, object] | None]:
+    """Split compact machine PAV from a detached enrichment-helper result.
+
+    The returned record contains all semantic assertion objects and no machine
+    PAV.  The optional companion contains only PAV selectors for those stored
+    mappings.  Rejoining the two values is the inverse operation for the
+    supported compact machine annotations.
+    """
+
+    record = deepcopy(dict(working))
+    pid = record.get("pid")
+    if not isinstance(pid, str) or not pid:
+        raise ConfigurationError("Enrichment-view Thing requires a non-empty PID")
+    entries: list[dict[str, str]] = []
+
+    def inspect_mapping(value: dict[str, Any], path: str) -> None:
+        raw_annotations = value.get("annotations")
+        if raw_annotations is not None:
+            if not isinstance(raw_annotations, Mapping):
+                raise ConfigurationError(
+                    "Enrichment-view annotations must be a mapping"
+                )
+            annotations = deepcopy(dict(raw_annotations))
+            present = {
+                tag
+                for tag in (PAV_IMPORTED_BY, PAV_IMPORTED_FROM)
+                if tag in annotations
+            }
+            if present and present != {PAV_IMPORTED_BY, PAV_IMPORTED_FROM}:
+                raise ConfigurationError(
+                    "Enrichment-view machine provenance requires both "
+                    "pav:importedBy and pav:importedFrom"
+                )
+            if present:
+                if not path:
+                    raise ConfigurationError(
+                        "The top-level Thing cannot be an imported assertion"
+                    )
+                imported_by = _line(
+                    annotations.pop(PAV_IMPORTED_BY), PAV_IMPORTED_BY
+                )
+                imported_from = _line(
+                    annotations.pop(PAV_IMPORTED_FROM), PAV_IMPORTED_FROM
+                )
+                if annotations:
+                    value["annotations"] = annotations
+                else:
+                    value.pop("annotations", None)
+                entries.append(
+                    {
+                        "path": path,
+                        "assertion_sha256": assertion_sha256(value),
+                        PAV_IMPORTED_BY: imported_by,
+                        PAV_IMPORTED_FROM: imported_from,
+                    }
+                )
+
+        for key, child in tuple(value.items()):
+            if key == "annotations":
+                continue
+            if not isinstance(key, str):
+                raise ConfigurationError(
+                    "Enrichment-view mapping keys must be strings"
+                )
+            child_path = f"{path}/{_pointer_token(key)}"
+            if isinstance(child, dict):
+                inspect_mapping(child, child_path)
+            elif isinstance(child, list):
+                for item in child:
+                    if isinstance(item, dict):
+                        inspect_mapping(item, child_path)
+
+    inspect_mapping(record, "")
+    validate_stored_record(record)
+    if not entries:
+        return record, None
+    companion = annotation_companion(pid, entries)
+    validate_annotation_companion(record, companion)
+    return record, companion
+
+
 def join_annotations(
     record: Mapping[str, Any],
     companion: Mapping[str, object] | None,
-    semantics_for_slot: Callable[[str], SlotSemantics],
 ) -> dict[str, Any]:
     """Join one stored Thing and its optional annotation companion."""
 
@@ -526,5 +576,5 @@ def join_annotations(
     if companion is None:
         return joined
     for entry in _validated_companion(companion, pid):
-        _apply_entry(joined, entry, semantics_for_slot)
+        _apply_entry(joined, entry, compact=False)
     return joined
