@@ -2,9 +2,9 @@
 
 Status: normative specification
 
-This document defines a host-neutral source-adapter contract and the GitHub profile that Orinoco Lite will implement first.
-The GitHub profile includes a small stateless authentication and comment service for its hosted review application.
-That service is not a metadata service or durable curation store.
+This document defines a host-neutral source-adapter contract.
+The initial hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
+Its small stateless authentication and comment service is not a metadata service or durable curation store.
 This document does not define a Python ABI, plugin protocol, or persistent metadata service.
 Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
 
@@ -277,9 +277,9 @@ It attaches annotations directly to the selected stored object, including import
 It MUST NOT manufacture an `AttributeSpecification`, `Statement`, or other semantic assertion from a scalar companion selector.
 The joined representation uses the expanded `annotation_tag` and `annotation_value` objects required by the pinned runtime and MUST pass JSON-to-RDF-to-JSON and projection round trips with the locked Things Schema.
 
-### Upstream scalar-update compatibility gate
+### Upstream-compatible qualified assertions
 
-Status: specification review required before adapter implementation continues.
+Status: accepted.
 
 The pinned `update_data_property()` behavior separates a topical slot from its qualified source assertion.
 It fills the topical slot only when that slot is absent.
@@ -291,7 +291,7 @@ It contains no assertion value of its own, so a join can only derive a qualified
 When the source and topical values differ, deriving from the topical value loses the source claim, while replacing the topical value creates a local ownership behavior that the pinned helper does not have.
 Putting the differing source value in the companion would turn the provenance companion into a second metadata store, contrary to its exact schema and authority boundary.
 
-The proposed upstream-compatible resolution is to store the qualified assertion content as canonical metadata and separate only its PAV:
+The upstream-compatible resolution stores the qualified assertion content as canonical metadata and separates only its PAV:
 
 - a data value is a schema-valid `dlthings:AttributeSpecification` under `attributes`, with the schema-induced predicate and source value;
 - a class-range URI is the pinned `Statement` under `characterized_by`, with the schema-induced predicate and source URI object and no `schema_type`;
@@ -319,13 +319,12 @@ The alternatives and their compatibility costs are:
 | Preserve the topical value and emit no qualified source assertion | Avoids overwriting curated data. | Drops a material source claim from the canonical graph and Git diff, so it cannot be reviewed or reproduced as upstream represents it. |
 | Restore inline PAV | Uses upstream storage bytes directly. | Reintroduces machine-only provenance noise into human-facing records and abandons the accepted companion boundary even though storing the unannotated qualified assertion is sufficient. |
 
-One rare upstream edge remains part of the review.
 If the topical slot is absent but an equivalent human- or unowned qualified assertion already exists, the pinned helper fills the topical slot and does not add machine PAV because its subset match ignores ownership.
-Failing closed preserves the rule that every machine-provided assertion object has PAV; allowing the topical convenience copy would match the helper but leave only Git/DataLad proposal attribution for that copied scalar.
-The proposed default is to fail closed until a reviewer explicitly resolves that record rather than infer ownership or add provenance-only PAV.
+The adapter MUST follow that upstream behavior: it proposes the topical convenience copy as a normal metadata change without claiming ownership of the existing qualified assertion and without adding new PAV.
+Human review may accept, reject, or defer that proposal.
+The proposal commit and review history attribute the copied topical value; the pre-existing qualified assertion remains human- or unowned.
 
-Until this proposed resolution is reviewed, adapters MUST fail before candidate generation if any source-mapped machine claim has a data or class range, whether its topical slot is absent, equal, or different.
-They MUST NOT emit a scalar-path companion, omit the qualified object, classify the source field as unused, use the general visible-replacement rule to overwrite a populated topical scalar, or extend the companion schema.
+Adapters MUST NOT emit a scalar-path companion, omit a source-qualified object, classify a source field as unused merely because a topical value is populated, use the general visible-replacement rule to overwrite a populated topical scalar, or extend the companion schema.
 Implementation evidence MUST compare the local split/join result with the pinned enrichment helper for missing, equal, differing, same-owner, human-owned, and differently owned values; cover string, typed non-string, class-range, and multivalued cases; and prove locked-schema RDF and projection round trips.
 Any accepted qualified-assertion additions to the existing corpus are source-adapter metadata changes reviewed through the normal proposal workflow, not part of the separate canonical-serialization normalization pull request.
 
@@ -363,78 +362,8 @@ No second host implementation is required until the GitHub profile is complete, 
 
 ### GitHub profile
 
-The initial supported profile MUST:
-
-- start from a default-branch `workflow_dispatch` and open one draft pull request;
-- show user-facing record changes under `metadata/records/` in **Files changed**, with machine provenance confined to the mirrored annotation-overlay tree;
-- have the trusted workflow render an accessible pull-request summary and fallback headed by friendly labels and canonical PIDs, with source-native identifiers, paths, blockers, and hashes as secondary details and a link to the supported review application;
-- provide the supported decision controls in the hosted review application defined below;
-- support attributed comment suggestions, direct metadata commits, and SHACL Vue bundle application on the same branch;
-- accept a complete structured form through an exact `/curation submit` comment posted on behalf of the authenticated reviewer;
-- treat the authenticated submitter as the reviewer attesting the whole form;
-- accept submissions only from collaborators with `write` or `admin` access;
-- load executable workflow and adapter code from the trusted default branch;
-- treat the pull-request branch and source checkout only as data while a write token is available;
-- verify the form against the initial proposal, preserve later attributed human metadata changes, and validate the resulting tree before applying decisions;
-- restrict changes to both declared metadata trees and the decision-cache path;
-- push against the exact observed head with a lease; and
-- dispatch normal validation without approving, merging, or deploying.
-
-#### Hosted review application
-
-The supported decision interface is a deployed web application backed by a minimal stateless GitHub App user-authorization service.
-Native pull-request Markdown is an accessible summary and fallback, not a substitute for mutually exclusive form controls or complete-submission validation.
-
-The application MUST:
-
-- accept or link directly to a repository and pull-request number;
-- use the authenticated GitHub API to load the current pull request, trusted-workflow summary, proposal commit, and metadata changes rather than accepting client-supplied metadata as authoritative;
-- display responsive before-and-after record diffs and identify records primarily by friendly IDs and labels;
-- expose source identifiers, paths, blockers, and hashes as secondary details;
-- provide exactly one mutually exclusive `accept`, `reject`, or `defer` control for every current candidate;
-- support filtering, a changed-only view, keyboard navigation, and complete-submission validation;
-- bind the submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete ordered candidate set; and
-- post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
-
-The trusted proposal workflow performs adapter and source execution and produces the actual Git diff plus the accessible pull-request summary.
-The application reads those GitHub objects and MUST NOT run an adapter or reacquire the source.
-The summary is a human-facing rendering of the ephemeral plan, not a second tracked proposal or a hidden candidate descriptor.
-
-The structured comment MUST begin with the exact line `/curation submit` and contain one JSON object with the format value `orinoco-lite-curation-submission-v1`.
-That object contains exactly `format`, `repository`, `pull_request`, `proposal_sha`, `head_sha`, `adapter`, `source_coordinate`, and `decisions`.
-Each decision contains exactly the initial proposal's canonical `pid`, `record_path`, `operation`, and the human's `disposition`.
-Candidate decisions MUST use deterministic candidate-plan order.
-The browser MUST NOT supply reviewer identity; the workflow derives it from the authenticated GitHub comment event.
-
-The GitHub App requests only repository metadata read, contents read, and pull-requests write access for selected repositories.
-It uses a short-lived user access token so the posted comment is attributed jointly to the authenticated user and app.
-The service MAY retain signed or encrypted OAuth state and a short-lived authentication session as operational state.
-It MUST NOT retain the proposal, candidate plan, decision payload, metadata, source data, user access token, or refresh token after the submission or session expires.
-
-The application and service MUST NOT:
-
-- become a metadata, decision, candidate, provenance, or credential store;
-- commit metadata or decision-cache changes;
-- execute code from the pull request or external source;
-- choose or infer a disposition;
-- approve, merge, deploy, or write to an external source; or
-- introduce a custom manifest, attestation, transaction log, or recovery protocol.
-
-The default-branch GitHub Action remains the trusted commit boundary.
-For each submitted comment it MUST re-read the pull request and source coordinates, regenerate the candidate plan with trusted code, verify the proposal commit and observed head, require exact ordered candidate-set equality, and verify the source-native identifiers and claim digests that were shown as secondary review details.
-It then rejects stale or incomplete submissions or applies the decisions, validates the joined graph, and commits the resulting metadata and compact decision cache.
-No second copy of the proposal or decisions is retained by the service.
-
-In a public repository, proposed metadata remains visible in Git history even when review later rejects it.
-The workflow MUST disclose that retention and require an explicit acknowledgment before proposing public data.
-Secrets and data that are not approved for repository history MUST be excluded before the proposal commit.
-
-Reviewers MUST NOT need a local checkout.
-Local execution MAY expose the same deterministic operations for development and reproduction.
-
-Adapter review pull requests MUST use a merge commit.
-Rebase merge and squash merge both rewrite required DataLad or human-review commits and MUST NOT be used.
-The pull-request opening text MUST prominently state that requirement, and the host MUST permit an exact-commit-preserving merge method.
+The initial supported host implementation MUST conform to the normative [`GitHub source-adapter curation profile`](github-curation-review.md).
+That profile owns GitHub-specific workflow, authentication, interface, comment, and hosting behavior without changing this document's metadata, provenance, decision, or history contract.
 
 ## Security and complexity guardrails
 
@@ -474,7 +403,7 @@ In particular, reuse `things-enrichment-tools` ownership-aware update helpers wh
 A local replacement MUST have focused parity tests and a documented reason it remains local.
 The pinned source Things Schema and exact `dlthings:*` CURIE spellings remain authoritative.
 
-The proposed scalar resolution keeps the ownership algorithm upstream rather than forking it.
+The accepted qualified-assertion resolution keeps the ownership algorithm upstream rather than forking it.
 An adapter would build an ephemeral enrichment view in which companion PAV is attached to its selected assertion objects in the compact string form understood by the pinned helper, run that helper unchanged, and then split machine PAV back into companions while retaining every semantic assertion object in the record.
 The RDF-validation join's expanded annotation objects MUST NOT be passed directly to the current helper because its owner matching does not recognize that representation.
 The split and join MUST be inverse for supported machine PAV.
@@ -505,7 +434,7 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Separate per-record GitAudit log | Record Git history plus PID-keyed cache and review commit | Avoids a duplicate audit store while retaining human attribution. |
 | Service records curator and author IDs | Reviewer is Git author; bot is committer | Host-specific equivalent of the upstream distinction. |
 | Enrichment tools do not use DataLad as semantic provenance | DataLad records proposal and Pixi-applied metadata changes | Orinoco execution provenance only; not claimed as upstream alignment. |
-| Ownership-aware helpers preserve populated topical data and allow differently owned qualified values to coexist | M5-Q001 proposes retaining that behavior by storing qualified assertions and limiting visible replacement to cases not governed by the scalar helper | Avoids inferring ownership for a direct scalar or making pull-request acceptance a permanent scalar-update fork. Review is still required before this becomes active. |
+| Ownership-aware helpers preserve populated topical data and allow differently owned qualified values to coexist | Store qualified assertions as canonical record content, split only PAV into companions, and limit visible replacement to behavior performed by the pinned helper | Avoids inferring ownership for a direct scalar or making pull-request acceptance a permanent scalar-update fork. |
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | The ephemeral update view uses compact PAV, while the joined validation/RDF view uses expanded annotation objects | The pinned helper recognizes compact ownership and the pinned converter requires expanded annotations for lossless round trips. The conversion is transient and parity-tested. |

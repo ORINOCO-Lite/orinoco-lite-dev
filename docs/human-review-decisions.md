@@ -504,7 +504,7 @@ Local execution remains available for development and reproduction but is not a 
 
 **Decided and refined by/date:** John Lee, 2026-08-20.
 
-**Follow-up:** Implement and accept the GitHub profile under the normative [`source-adapters.md`](source-adapters.md) contract.
+**Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](github-curation-review.md) under the host-neutral [`source-adapters.md`](source-adapters.md) contract.
 
 ### HR-207 — Define source-adapter decision defaults
 
@@ -542,7 +542,8 @@ Do not add `schema_type` to the derived `Statement`, and do not coerce topical v
 
 **Rationale:** Encoding a class-range URI as an attribute value changes an RDF resource into a literal, while putting a raw integer or boolean into `AttributeSpecification.value` violates the locked schema.
 The accepted forms preserve native topical semantics and round trip through the pinned JSON/RDF converters.
-This decision fixes the qualified-object shapes, not whether those objects are stored in canonical records or synthesized from scalar companion selectors; HR-212 reopens that placement after the pinned update behavior exposed a representational incompatibility.
+This decision fixes the qualified-object shapes.
+HR-212 subsequently fixed their canonical placement after the pinned update behavior exposed the representational incompatibility of scalar companion selectors.
 
 **Decided by/date:** John Lee, 2026-08-20.
 
@@ -568,7 +569,7 @@ These rules keep the durable cache small, avoid whole-record restoration that ca
 
 ### HR-212 — Preserve upstream qualified scalar updates
 
-**Status:** in review
+**Status:** accepted
 
 **Question:** When a source data or class-range value differs from an already populated topical slot, should Orinoco Lite preserve the pinned enrichment helper's qualified-assertion behavior or adopt a local scalar replacement model?
 
@@ -591,16 +592,19 @@ This keeps records compact but turns the PAV companion into a second semantic me
 5. Ignore a conflicting source scalar.
 This avoids overwriting curated data but drops the upstream qualified source claim from the canonical graph and review diff.
 
-**Preferred direction:** John prefers updating canonical data to remain compatible with upstream rather than pinning a storage-driven semantic divergence.
-The proposed contract is option 1, with direct scalar companion selectors removed and the join reduced to attaching PAV to an existing assertion object.
-This preference is not yet approval of the detailed storage and projection contract.
+**Outcome:** Use option 1.
+Canonical records store the same topical fields and qualified `AttributeSpecification` or `Statement` objects produced by pinned upstream enrichment behavior.
+The annotation companion stores only PAV removed from those objects, and joining the two trees reproduces the upstream Things assertion graph.
+The join never derives qualified assertions from top-level scalar fields.
+A human-reviewed edit to a top-level curated field is a separate curation action.
 
-**Open edge:** If a topical slot is absent but an equivalent human- or unowned qualified assertion exists, upstream fills the topical slot without adding machine PAV.
-The proposed default is to fail closed for review rather than infer ownership or weaken the requirement that every machine assertion object has companion PAV.
+When a topical slot is absent but an equivalent human- or unowned qualified assertion already exists, follow upstream rather than failing closed.
+The adapter proposes copying the assertion value into the topical slot without claiming ownership of the existing assertion and without adding PAV.
+Human review may accept, reject, or defer that proposal.
 
-**Raised by/date:** John Lee, 2026-08-20.
+**Decided by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Review M5-Q001 in the normative source-adapter specification, then either accept HR-212 and replace the provisional scalar-join implementation or select another option before either concrete adapter writes metadata.
+**Follow-up:** Replace the provisional scalar-selector join, add pinned-helper parity evidence, and conform both adapters before either writes existing-corpus metadata.
 
 ## P2 — strategic decisions
 

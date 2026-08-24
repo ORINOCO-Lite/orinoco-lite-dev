@@ -8,6 +8,8 @@ Predecessor: [`milestone-4.md`](milestone-4.md)
 
 Normative contract: [`source-adapters.md`](source-adapters.md)
 
+GitHub review profile: [`github-curation-review.md`](github-curation-review.md)
+
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
 Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
@@ -54,7 +56,8 @@ Exact implementation bases, releases, source versions, and reviewed heads are re
 - After that implementation is reviewed, normalize the existing metadata corpus once in a separate pull request.
 - Implement the annotation-overlay format, selector validation, deterministic join, schema validation, JSON/RDF round trip, and projection behavior.
 - Match pinned enrichment behavior for imported objects and qualified data and class-range assertions.
-- Resolve M5-Q001 before adapter work continues: canonical records should store the real `AttributeSpecification` and `Statement` objects, companions should retain only their PAV, and the join should attach annotations rather than derive semantic objects from scalar selectors.
+- Implement M5-D012: canonical records store the real `AttributeSpecification` and `Statement` objects, companions retain only their PAV, and the join attaches annotations rather than deriving semantic objects from scalar selectors.
+- Follow the pinned helper when an equivalent assertion exists but its topical slot is missing: propose the topical convenience copy without claiming ownership or adding PAV.
 - Preserve non-string topical types with schema-derived typed attribute values, and use a reversible ephemeral compact-PAV view rather than forking the pinned ownership helper.
 
 Gate: the canonical corpus produces stable review diffs, joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML, and the reviewed HR-212 outcome has focused helper-parity, RDF, and projection evidence.
@@ -72,6 +75,8 @@ Gate: the canonical corpus produces stable review diffs, joined records preserve
 Gate: Zotero and `dump-research-info` independently satisfy the same observable contract without sharing source-specific policy.
 
 ### 3. Complete the GitHub profile
+
+Implement the separately reviewed normative [`GitHub source-adapter curation profile`](github-curation-review.md):
 
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
 - Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible summary and review-application link in the pull-request body.
