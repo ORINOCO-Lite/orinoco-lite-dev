@@ -84,7 +84,10 @@ It MUST be an idempotent shared library operation with focused upstream-parity t
 Every record in the canonical corpus MUST already conform to that serialization.
 An adapter run serializes only records it writes and does not reserialize untouched records.
 
-Record comparison operates on canonical metadata without machine-source annotations, claim hashing on its canonical source-mapped proposal fragment, and the Git diff on deterministic record and annotation-companion serialization.
+Record comparison operates on canonical metadata without machine-source annotations, claim hashing on its canonical source-mapped semantic proposal fragment, and the Git diff on deterministic record and annotation-companion serialization.
+That claim fragment contains every adapter-owned unannotated semantic assertion produced by source mapping and policy, including qualified predicates, values, objects, ranges, and policy-created output.
+It excludes PAV, baseline and human-owned content, formatting, unused source facts, and the adapter version by itself.
+An implementation or policy change that changes semantic output therefore changes the claim digest, while a compatible version change with identical output does not reopen review.
 This makes formatting and unused source changes invisible while retaining meaningful source and metadata changes for review.
 
 ### Candidate plan
@@ -304,7 +307,7 @@ Under this resolution, adding a missing qualified assertion is a substantive met
 It records the source's qualified claim in the canonical graph; it is not a provenance-only rewrite.
 If an equivalent qualified assertion already exists, the upstream subset match preserves the richer existing object and its current ownership and produces no PAV-only diff.
 Same-owner obsolete qualified assertions are removed, human- or differently owned assertions survive, existing order is preserved, and missing desired assertions are appended in deterministic source order.
-The claim digest remains over normalized source-mapped facts with native source value types, not over PAV or the storage bridge.
+The claim digest remains over the normalized source-mapped semantic fragment with native source value types and the qualified assertion content produced by policy, not over PAV or the storage bridge.
 A changed source value therefore reopens review and updates only the adapter-owned qualified assertion, while the populated topical slot remains unchanged.
 If a reviewer later edits or removes the qualified assertion, the accepted unchanged claim stays suppressed under the ordinary human-correction rule.
 

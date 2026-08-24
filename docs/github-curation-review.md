@@ -33,6 +33,17 @@ The trusted proposal workflow performs all adapter and source execution.
 It produces the actual Git diff and the accessible summary from the ephemeral candidate plan.
 The summary is a human-facing fallback and navigation aid, not a tracked proposal, hidden candidate descriptor, or separate authority.
 
+The summary uses one visible `## Curation proposal` section containing `Adapter`, `Proposal commit`, and `Source coordinate` fields, followed by one visible `## Candidate review` section.
+The source coordinate is the canonical single-line JSON object rendered in a fenced `json` block.
+Each candidate is a level-three heading using its friendly ID and label, followed by visible `PID`, `Source record`, `Record path`, `Operation`, `Claim SHA-256`, and `Blockers` fields.
+`Blockers` is either `None` or an indented list.
+The workflow renders candidate sections in deterministic candidate-plan order.
+
+The application MUST derive the candidate set and add, modify, or delete operations from the proposal commit's actual record changes.
+It cross-checks the visible summary fields against those paths and operations and refuses an incomplete or inconsistent rendering.
+Source-native identifiers, labels, claim hashes, and blockers remain display facts that the trusted Action regenerates before finalization.
+The summary therefore adds no hidden candidate block, aggregate attestation, or durable authority beyond the pull request and its actual diff.
+
 Reviewers MAY inspect and edit the metadata diff through GitHub's browser tools or a local checkout.
 Neither path changes the candidate, provenance, validation, or finalization rules in the source-adapter specification.
 
