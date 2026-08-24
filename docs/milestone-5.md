@@ -18,7 +18,7 @@ Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
 
 Milestone 5 completes the Orinoco Lite source-adapter system defined by the normative source-adapter specification.
 It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent metadata service or required local checkout.
-The hosted decision path uses a small stateless GitHub authentication and comment service; GitHub remains the metadata, decision, and provenance authority.
+The hosted decision path uses a small stateless GitHub authentication and comment service plus one expiring GitHub Actions presentation artifact; GitHub commits and the authenticated comment remain the durable authorities.
 
 Zotero is the reusable-looking case.
 `dump-research-info` is the deliberately CON-specific case.
@@ -34,7 +34,7 @@ Milestone 5 preserves the accepted Milestone 4 distribution unless this mileston
 
 - a downstream is one ordinary Git repository without submodules or gitlinks;
 - concrete adapters and their policy are site-owned under `source-adapters/`;
-- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review uses only the normative stateless GitHub authentication and comment service;
+- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review uses only the normative stateless GitHub authentication and comment service plus an untracked, expiring presentation artifact;
 - human review is authoritative, and automation never chooses a disposition, approves, merges, deploys, or writes to an external source;
 - the real `centerforopenneuroscience.org` repository remains read-only; and
 - open identity, publication, venue, topic, eligibility, governance, and production decisions remain open.
@@ -79,9 +79,12 @@ Gate: Zotero and `dump-research-info` independently satisfy the same observable 
 Implement the separately reviewed normative [`GitHub source-adapter curation profile`](github-curation-review.md):
 
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
-- Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible summary and review-application link in the pull-request body.
+- Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible fallback and review-application link in the pull-request body.
 - Provide responsive before-and-after record diffs, mutually exclusive per-record controls, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
-- Have the trusted workflow generate the actual diff and accessible summary; the application reads those GitHub objects without running adapter or source logic.
+- Have the trusted workflow generate the actual diff and exactly one untracked, expiring, reproducible Actions presentation bundle containing source and proposal coordinates plus per-record UI facts.
+- Have the application use GitHub Actions read access to load that bundle, derive candidate membership and operations from the proposal commit's metadata diff, and run no adapter or source logic.
+- Keep pull-request Markdown as an accessible fallback rather than a machine protocol or native-diff-size conformance boundary.
+- Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
 - Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
 - Support attributed comment suggestions, direct human commits, and SHACL Vue bundles applied through the project Pixi/DataLad task.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
@@ -130,7 +133,7 @@ Milestone 5 does not:
 - require a persistent metadata or credential service, durable hosted curation state, automatic approval, automatic merge, or pull-request deployment;
 - add another semantic overlay, generic plugin ABI, persistent adapter service, or second hosted implementation;
 - use SSSOM without a genuine ontology-mapping set or add W3C PROV without a demonstrated lineage question;
-- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, or custom attestation graphs; or
+- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, custom attestation graphs, or the expiring presentation bundle as durable state; or
 - promote `dump-research-info` into a generic adapter.
 
 ## Exit gate

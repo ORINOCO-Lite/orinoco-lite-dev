@@ -4,7 +4,7 @@ Status: normative specification
 
 This document defines a host-neutral source-adapter contract.
 The initial hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
-Its small stateless authentication and comment service is not a metadata service or durable curation store.
+Its small stateless authentication and comment service and its expiring GitHub Actions presentation artifact are not a metadata service or durable curation store.
 This document does not define a Python ABI, plugin protocol, or persistent metadata service.
 Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
 
@@ -44,10 +44,12 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
+| Hosted review presentation | One expiring GitHub Actions artifact | Reproducibly present source and proposal coordinates plus per-record UI facts without becoming metadata, candidate, decision, or provenance authority. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
-Generated projections, candidate plans, caches, diagnostics, and hosted form renderings are not canonical metadata.
+Generated projections, candidate plans, caches, diagnostics, hosted form renderings, and the expiring presentation artifact are not canonical metadata.
+For hosted review, the proposal commit and its metadata diff remain authoritative for candidate membership and operations.
 
 ## Core adapter contract
 
@@ -106,6 +108,9 @@ The plan drives proposal generation, hosted review rendering, and submission val
 It MUST be reproducible and MUST NOT be tracked.
 Full records, opaque candidate IDs, transaction IDs, or copies of Git diffs MUST NOT be stored as review provenance.
 Internal digests MUST NOT be the primary human identifier.
+
+A host MAY materialize reproducible presentation output from the plan and identified proposal for the duration of review.
+Such output MUST remain untracked and non-authoritative, and its expiry or absence MUST NOT alter metadata, a decision, or review history.
 
 ### Proposal
 
@@ -368,6 +373,18 @@ No second host implementation is required until the GitHub profile is complete, 
 The initial supported host implementation MUST conform to the normative [`GitHub source-adapter curation profile`](github-curation-review.md).
 That profile owns GitHub-specific workflow, authentication, interface, comment, and hosting behavior without changing this document's metadata, provenance, decision, or history contract.
 
+The trusted proposal workflow MUST publish exactly one untracked, expiring, reproducible GitHub Actions presentation bundle for the hosted application.
+The bundle contains the identified source and proposal coordinates and the per-record facts required to render the review interface.
+The application MUST derive candidate membership and add, modify, or delete operations from the proposal commit's metadata diff and use the bundle only for presentation.
+It therefore requests GitHub Actions read access in addition to the permissions needed to read the proposal and post the authenticated comment.
+
+Pull-request Markdown remains an accessible summary and link, not a machine protocol, candidate authority, or reason to impose GitHub's native diff-display limits as conformance limits.
+The presentation bundle expires under ordinary GitHub artifact retention and MAY be reproduced from the same identified inputs; it is not a persistent store, attestation, journal, or recovery artifact.
+Git commits, the authenticated submission comment, and the compact decision cache remain the durable review state.
+
+The project MAY publish one central application origin by default.
+That origin MUST remain configurable, and a downstream MAY self-host the same stateless application without creating another host profile or durable authority.
+
 ## Security and complexity guardrails
 
 The supported threat model trusts collaborators who already have repository `write` or `admin` permission as authorized curators.
@@ -386,6 +403,7 @@ Beyond that boundary:
 - No custom distributed transaction, journal, lock service, or crash-recovery protocol is introduced.
 - No tracked inventory, review document, exhaustive manifest, DataLad sidecar, reconciliation report, or custom attestation graph is introduced.
 - No artifact is added merely to authenticate another artifact produced by the same trusted workflow.
+- The GitHub Actions presentation bundle is transient UI output, not a candidate inventory, attestation, journal, or recovery mechanism.
 - No semantic overlay beyond `annotations` is introduced without a focused specification change and a source or human state that Git, PAV, and the compact decision cache cannot represent.
 - A stronger attacker or availability model requires a separate reviewed design rather than incremental workflow machinery.
 

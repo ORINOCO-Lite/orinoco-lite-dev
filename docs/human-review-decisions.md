@@ -491,18 +491,23 @@ Accept intentional modernization rather than requiring pixel parity, but record 
 
 **Question:** Should normal source-adapter review require a local bundle handoff, or provide a least-privilege authenticated branch and pull-request workflow?
 
-**Outcome:** The trusted GitHub workflow opens one draft pull request containing the actual metadata proposal, an accessible summary, and a link to the supported decision application.
+**Outcome:** The trusted GitHub workflow opens one draft pull request containing the actual metadata proposal, an accessible Markdown fallback, and a link to the supported decision application.
 A deployed web application backed by a minimal stateless GitHub App user-authorization service provides friendly before-and-after record diffs and mutually exclusive accept, reject, or defer controls.
+The workflow publishes exactly one untracked, expiring, reproducible GitHub Actions presentation bundle containing the identified source and proposal coordinates and per-record UI facts.
+The application uses Actions read access to load that bundle, while deriving candidate membership and operations from the proposal commit's metadata diff.
 It posts the complete head- and source-bound decision payload on the authorized collaborator's behalf and retains no second copy of metadata or curation state.
-It reads the workflow-generated GitHub proposal objects and does not execute adapter or source logic.
+It reads the workflow-generated GitHub proposal and Actions objects and does not execute adapter or source logic.
 GitHub Actions applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
-The service retains only OAuth state and short-lived authentication sessions as operational state; it is not a persistent metadata or credential service.
+The service retains only OAuth state and short-lived authentication sessions as operational state; the presentation bundle expires under ordinary GitHub artifact retention and neither is a persistent metadata or credential service.
+Git commits and the authenticated submission comment remain the durable review record.
+Pull-request Markdown is not a machine protocol and its native rendering limits are not curation conformance limits.
+The project may publish one central application origin by default, but that origin remains configurable and the same stateless implementation may be self-hosted.
 
 **Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review, but native Markdown cannot provide dynamic mutually exclusive controls, typed complete submission, or useful compact review for a large candidate set.
-The custom page is only the decision transport; GitHub remains authoritative for the proposal, authenticated comment, commit boundary, compact cache, and review history.
+The custom page and expiring bundle are only presentation and decision transport; GitHub remains authoritative for the proposal, authenticated comment, commit boundary, compact cache, and review history.
 Local execution remains available for development and reproduction but is not a condition of normal curation.
 
-**Decided and refined by/date:** John Lee, 2026-08-20.
+**Decided and refined by/date:** John Lee, 2026-08-24.
 
 **Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](github-curation-review.md) under the host-neutral [`source-adapters.md`](source-adapters.md) contract.
 
