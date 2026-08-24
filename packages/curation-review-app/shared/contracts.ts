@@ -66,3 +66,51 @@ export type SessionStatus = AnonymousSession | AuthenticatedSession;
 export interface SubmitResult {
   comment_url: string;
 }
+
+export interface ShaclReviewRecord {
+  pid: string;
+  rdf_turtle: string;
+  schema_type: string;
+  source_path: string;
+  source_sha256: string;
+}
+
+export interface ShaclReviewBundle {
+  format: "orinoco-shacl-review-bundle";
+  records: ShaclReviewRecord[];
+  source_commit: string;
+  version: 2;
+}
+
+export interface ShaclPullRequestTarget {
+  expected_head_sha: string;
+  kind: "pull_request";
+  pull_request: number;
+}
+
+export interface ShaclStandaloneTarget {
+  kind: "standalone";
+}
+
+export type ShaclProposalTarget =
+  ShaclPullRequestTarget | ShaclStandaloneTarget;
+
+export interface ShaclProposalRequest {
+  bundle: ShaclReviewBundle;
+  format: "orinoco-lite-shacl-proposal-v1";
+  repository: string;
+  target: ShaclProposalTarget;
+}
+
+export interface ShaclProposalResult {
+  commit_sha: string;
+  commit_url: string;
+  pull_request: number;
+  pull_request_url: string;
+}
+
+export interface ShaclBundleMessage {
+  bundle: ShaclReviewBundle;
+  format: "orinoco-lite-shacl-bundle-message-v1";
+  repository: string;
+}

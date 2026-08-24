@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewProposal } from "../shared/contracts";
+import type { ReviewProposal, ShaclReviewBundle } from "../shared/contracts";
 import App from "./App";
 import { ARTIFACT_ID, proposal } from "../tests/fixtures";
 
@@ -46,6 +46,24 @@ function installFetch(
   return fetchMock;
 }
 
+function shaclBundle(): ShaclReviewBundle {
+  return {
+    format: "orinoco-shacl-review-bundle",
+    records: [
+      {
+        pid: "example:one",
+        rdf_turtle:
+          '<https://example.test/one> <https://example.test/p> "x" .\n',
+        schema_type: "example:Thing",
+        source_path: "metadata/records/Thing/one.yaml",
+        source_sha256: "b".repeat(64),
+      },
+    ],
+    source_commit: "a".repeat(40),
+    version: 2,
+  };
+}
+
 beforeEach(() => {
   window.history.replaceState(
     {},
@@ -57,6 +75,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  Object.defineProperty(window, "opener", {
+    configurable: true,
+    value: null,
+    writable: true,
+  });
 });
 
 describe("curation review interface", () => {
@@ -207,5 +230,207 @@ describe("curation review interface", () => {
       `/api/auth/start?artifact_id=${ARTIFACT_ID}&pull_request=42&repository=example%2Fsite`,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("SHACL Vue browser-memory proposal wrapper", () => {
+  it("exposes a standalone /edit entry without inventing an editor URL", () => {
+    window.history.replaceState({}, "", "/");
+    render(<App />);
+    expect(
+      screen.getByRole("heading", { name: "Propose a SHACL Vue edit" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open edit handoff" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Edit in SHACL Vue" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("preserves exact existing-PR coordinates through user authentication", async () => {
+    const source = "a".repeat(40);
+    window.history.replaceState(
+      {},
+      "",
+      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json({ authenticated: false })),
+    );
+    render(<App />);
+    expect(
+      await screen.findByRole("link", { name: "Continue with GitHub" }),
+    ).toHaveAttribute(
+      "href",
+      `/api/auth/shacl-start?repository=example%2Fsite&expected_head_sha=${source}&pull_request=42`,
+    );
+  });
+
+  it("receives the normal bundle event in memory and performs one explicit write", async () => {
+    window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/session") {
+          return json({
+            authenticated: true,
+            csrf_token: "csrf-token",
+            login: "octocat",
+          });
+        }
+        if (url === "/api/shacl/propose") {
+          expect(init?.headers).toMatchObject({
+            "X-CSRF-Token": "csrf-token",
+          });
+          return json(
+            {
+              commit_sha: "c".repeat(40),
+              commit_url: `https://github.com/example/site/commit/${"c".repeat(40)}`,
+              pull_request: 43,
+              pull_request_url: "https://github.com/example/site/pull/43",
+            },
+            201,
+          );
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", {
+      name: "Waiting for a SHACL Vue v2 bundle",
+    });
+    const bundle = shaclBundle();
+    window.dispatchEvent(
+      new CustomEvent("orinoco:review-bundle", { detail: bundle }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "1 edited record" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("example:one")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Propose via GitHub" }),
+    );
+    await screen.findByRole("link", { name: "Open draft pull request" });
+    const write = fetchMock.mock.calls.find(
+      ([url]) => url === "/api/shacl/propose",
+    );
+    const submitted = JSON.parse(
+      String((write?.[1] as RequestInit).body),
+    ) as Record<string, unknown>;
+    expect(submitted).toEqual({
+      bundle,
+      format: "orinoco-lite-shacl-proposal-v1",
+      repository: "example/site",
+      target: { kind: "standalone" },
+    });
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("accepts the typed bundle message only from the editor opener", async () => {
+    window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
+    Object.defineProperty(window, "opener", {
+      configurable: true,
+      value: window,
+      writable: true,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+        }),
+      ),
+    );
+    render(<App />);
+    await screen.findByRole("heading", {
+      name: "Waiting for a SHACL Vue v2 bundle",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          bundle: shaclBundle(),
+          format: "orinoco-lite-shacl-bundle-message-v1",
+          repository: "example/site",
+        },
+        origin: "https://editor.example",
+        source: window,
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "1 edited record" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Browser source: https://editor.example"),
+    ).toBeInTheDocument();
+  });
+
+  it("binds an existing-PR handoff to the received source commit", async () => {
+    const source = "a".repeat(40);
+    window.history.replaceState(
+      {},
+      "",
+      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+    );
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session") {
+          return json({
+            authenticated: true,
+            csrf_token: "csrf-token",
+            login: "octocat",
+          });
+        }
+        const body = JSON.parse(String(init?.body)) as {
+          target: Record<string, unknown>;
+        };
+        expect(body.target).toEqual({
+          expected_head_sha: source,
+          kind: "pull_request",
+          pull_request: 42,
+        });
+        return json(
+          {
+            commit_sha: "c".repeat(40),
+            commit_url: `https://github.com/example/site/commit/${"c".repeat(40)}`,
+            pull_request: 42,
+            pull_request_url: "https://github.com/example/site/pull/42",
+          },
+          201,
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", {
+      name: "Waiting for a SHACL Vue v2 bundle",
+    });
+    window.dispatchEvent(
+      new CustomEvent("orinoco:review-bundle", { detail: shaclBundle() }),
+    );
+    await screen.findByRole("heading", { name: "1 edited record" });
+    expect(
+      screen.getByRole("spinbutton", { name: "Draft pull request" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("radio", {
+        name: "Create a branch and new draft pull request",
+      }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(`Bound to draft pull request #42 at`, { exact: false }),
+    ).toHaveTextContent(source);
+    await user.click(
+      screen.getByRole("button", { name: "Propose via GitHub" }),
+    );
+    await screen.findByRole("link", { name: "Open draft pull request" });
   });
 });

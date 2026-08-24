@@ -57,9 +57,21 @@ export async function onRequest(context: EventContext): Promise<Response> {
   );
   const user = await new GitHubClient(token.accessToken).currentUser();
   const destination = new URL("/", origin);
-  destination.searchParams.set("artifact_id", String(oauth.artifact_id));
-  destination.searchParams.set("repository", oauth.repository);
-  destination.searchParams.set("pull_request", String(oauth.pull_request));
+  if (oauth.kind === "review") {
+    destination.searchParams.set("artifact_id", String(oauth.artifact_id));
+    destination.searchParams.set("repository", oauth.repository);
+    destination.searchParams.set("pull_request", String(oauth.pull_request));
+  } else {
+    destination.pathname = "/edit";
+    destination.searchParams.set("repository", oauth.repository);
+    if (oauth.pull_request !== null && oauth.expected_head_sha !== null) {
+      destination.searchParams.set(
+        "expected_head_sha",
+        oauth.expected_head_sha,
+      );
+      destination.searchParams.set("pull_request", String(oauth.pull_request));
+    }
+  }
   const headers = new Headers({
     "Cache-Control": "no-store",
     Location: destination.toString(),

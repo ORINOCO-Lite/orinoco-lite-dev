@@ -36,6 +36,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
       "Set-Cookie": await createOAuthCookie(context.env, {
         artifact_id: target.artifactId,
         code_verifier: codeVerifier,
+        kind: "review",
         origin,
         pull_request: target.pullRequest,
         repository: target.repository,

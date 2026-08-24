@@ -5,6 +5,10 @@ import type {
   ReviewCandidate,
   ReviewProposal,
   SessionStatus,
+  ShaclBundleMessage,
+  ShaclProposalRequest,
+  ShaclProposalResult,
+  ShaclReviewBundle,
 } from "../shared/contracts";
 import {
   ApiError,
@@ -12,6 +16,8 @@ import {
   loadProposal,
   loadSession,
   logout,
+  proposeShaclEdit,
+  shaclAuthenticationUrl,
   submitDecisions,
 } from "./api";
 
@@ -21,10 +27,17 @@ interface Target {
   repository: string;
 }
 
+interface ShaclTarget {
+  expectedHeadSha?: string;
+  pullRequest?: number;
+  repository: string;
+}
+
 type DecisionState = Record<string, Disposition | undefined>;
 type DecisionFilter = "all" | "unresolved" | Disposition;
 
 function currentTarget(): Target | null {
+  if (window.location.pathname !== "/") return null;
   const query = new URLSearchParams(window.location.search);
   const artifact = query.get("artifact_id");
   const repository = query.get("repository");
@@ -46,6 +59,45 @@ function currentTarget(): Target | null {
   return { artifactId, pullRequest: Number(number), repository };
 }
 
+function validRepository(value: string | null): value is string {
+  return (
+    value !== null &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/.test(
+      value,
+    ) &&
+    !value.includes("..")
+  );
+}
+
+function currentShaclTarget(): ShaclTarget | null {
+  if (window.location.pathname !== "/edit") return null;
+  const query = new URLSearchParams(window.location.search);
+  const allowed = new Set(["expected_head_sha", "pull_request", "repository"]);
+  if ([...query.keys()].some((key) => !allowed.has(key))) return null;
+  const repository = query.get("repository");
+  if (query.getAll("repository").length !== 1 || !validRepository(repository)) {
+    return null;
+  }
+  const pullValues = query.getAll("pull_request");
+  const headValues = query.getAll("expected_head_sha");
+  if (pullValues.length === 0 && headValues.length === 0) {
+    return { repository };
+  }
+  if (
+    pullValues.length !== 1 ||
+    headValues.length !== 1 ||
+    !/^[1-9][0-9]{0,9}$/.test(pullValues[0] ?? "") ||
+    !/^[0-9a-f]{40}$/.test(headValues[0] ?? "")
+  ) {
+    return null;
+  }
+  return {
+    expectedHeadSha: headValues[0],
+    pullRequest: Number(pullValues[0]),
+    repository,
+  };
+}
+
 function message(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return "The review could not be loaded.";
@@ -61,6 +113,15 @@ function Landing(): React.JSX.Element {
       repository: String(data.get("repository") ?? ""),
     });
     window.location.assign(`/?${query.toString()}`);
+  }
+
+  function openEdit(event: React.FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const query = new URLSearchParams({
+      repository: String(data.get("repository") ?? ""),
+    });
+    window.location.assign(`/edit?${query.toString()}`);
   }
 
   return (
@@ -106,6 +167,26 @@ function Landing(): React.JSX.Element {
         </label>
         <button type="submit">Open review</button>
       </form>
+      <section className="edit-entry" aria-labelledby="edit-entry-title">
+        <h2 id="edit-entry-title">Propose a SHACL Vue edit</h2>
+        <p>
+          Open the browser-memory handoff for a normal SHACL Vue v2 bundle. The
+          service does not retain the bundle.
+        </p>
+        <form className="edit-target-form" onSubmit={openEdit}>
+          <label>
+            Repository
+            <input
+              autoComplete="off"
+              name="repository"
+              pattern="[^/]+/[^/]+"
+              placeholder="owner/repository"
+              required
+            />
+          </label>
+          <button type="submit">Open edit handoff</button>
+        </form>
+      </section>
       <p className="quiet">
         The application stores no metadata or review decisions.
       </p>
@@ -135,6 +216,340 @@ function SignIn({ target }: { target: Target }): React.JSX.Element {
       </a>
       <p className="quiet">Repository: {target.repository}</p>
     </main>
+  );
+}
+
+function ShaclSignIn({ target }: { target: ShaclTarget }): React.JSX.Element {
+  return (
+    <main className="landing" id="main-content">
+      <p className="eyebrow">Authenticated human edit</p>
+      <h1>Sign in to propose a SHACL Vue edit</h1>
+      <p className="lede">
+        GitHub limits this explicit write operation to collaborators with write
+        or admin permission. Keep the editor window open: after sign-in it can
+        send the bundle again without storing it on the service.
+      </p>
+      <a
+        className="button-link"
+        href={shaclAuthenticationUrl(
+          target.repository,
+          target.pullRequest,
+          target.expectedHeadSha,
+        )}
+      >
+        Continue with GitHub
+      </a>
+      <p className="quiet">Repository: {target.repository}</p>
+    </main>
+  );
+}
+
+function browserBundle(value: unknown): ShaclReviewBundle | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return null;
+  const record = value as Record<string, unknown>;
+  if (
+    record.format !== "orinoco-shacl-review-bundle" ||
+    record.version !== 2 ||
+    typeof record.source_commit !== "string" ||
+    !/^[0-9a-f]{40}$/.test(record.source_commit) ||
+    !Array.isArray(record.records) ||
+    record.records.length === 0 ||
+    record.records.length > 50 ||
+    record.records.some(
+      (item) =>
+        item === null ||
+        typeof item !== "object" ||
+        Array.isArray(item) ||
+        typeof (item as Record<string, unknown>).pid !== "string" ||
+        typeof (item as Record<string, unknown>).rdf_turtle !== "string" ||
+        typeof (item as Record<string, unknown>).schema_type !== "string" ||
+        typeof (item as Record<string, unknown>).source_path !== "string" ||
+        typeof (item as Record<string, unknown>).source_sha256 !== "string",
+    )
+  ) {
+    return null;
+  }
+  return value as ShaclReviewBundle;
+}
+
+function messageBundle(
+  value: unknown,
+  repository: string,
+): ShaclReviewBundle | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return null;
+  const message = value as Partial<ShaclBundleMessage>;
+  if (
+    message.format !== "orinoco-lite-shacl-bundle-message-v1" ||
+    typeof message.repository !== "string" ||
+    message.repository.toLowerCase() !== repository.toLowerCase()
+  ) {
+    return null;
+  }
+  return browserBundle(message.bundle);
+}
+
+interface ShaclHandoffProps {
+  session: Extract<SessionStatus, { authenticated: true }>;
+  target: ShaclTarget;
+}
+
+function ShaclHandoff({
+  session,
+  target,
+}: ShaclHandoffProps): React.JSX.Element {
+  const [bundle, setBundle] = useState<ShaclReviewBundle | null>(null);
+  const [bundleOrigin, setBundleOrigin] = useState<string | null>(null);
+  const [kind, setKind] = useState<"pull_request" | "standalone">(
+    target.pullRequest === undefined ? "standalone" : "pull_request",
+  );
+  const [pullRequest, setPullRequest] = useState(
+    target.pullRequest === undefined ? "" : String(target.pullRequest),
+  );
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [result, setResult] = useState<ShaclProposalResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    function receive(value: unknown, origin: string): void {
+      const received = browserBundle(value);
+      if (received === null) {
+        setFeedback("The received value is not a normal SHACL Vue v2 bundle.");
+        return;
+      }
+      setBundle(received);
+      setBundleOrigin(origin);
+      setFeedback(null);
+      setResult(null);
+    }
+
+    function customEvent(event: Event): void {
+      receive((event as CustomEvent<unknown>).detail, window.location.origin);
+    }
+
+    function postedMessage(event: MessageEvent<unknown>): void {
+      if (window.opener === null || event.source !== window.opener) return;
+      const received = messageBundle(event.data, target.repository);
+      if (received === null) return;
+      setBundle(received);
+      setBundleOrigin(event.origin);
+      setFeedback(null);
+      setResult(null);
+    }
+
+    window.addEventListener("orinoco:review-bundle", customEvent);
+    window.addEventListener("message", postedMessage);
+    window.opener?.postMessage(
+      {
+        format: "orinoco-lite-shacl-handoff-ready-v1",
+        repository: target.repository,
+      },
+      "*",
+    );
+    return () => {
+      window.removeEventListener("orinoco:review-bundle", customEvent);
+      window.removeEventListener("message", postedMessage);
+    };
+  }, [target.repository]);
+
+  async function propose(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    if (bundle === null) {
+      setFeedback("Generate and send a SHACL Vue bundle before proposing it.");
+      return;
+    }
+    if (
+      target.expectedHeadSha !== undefined &&
+      target.expectedHeadSha !== bundle.source_commit
+    ) {
+      setFeedback(
+        "The received bundle does not match the exact pull-request head used to open this handoff.",
+      );
+      return;
+    }
+    let proposalTarget: ShaclProposalRequest["target"];
+    if (kind === "pull_request") {
+      if (!/^[1-9][0-9]{0,9}$/.test(pullRequest)) {
+        setFeedback("Enter a valid draft pull-request number.");
+        return;
+      }
+      proposalTarget = {
+        expected_head_sha: bundle.source_commit,
+        kind: "pull_request",
+        pull_request: Number(pullRequest),
+      };
+    } else {
+      proposalTarget = { kind: "standalone" };
+    }
+    const proposal: ShaclProposalRequest = {
+      bundle,
+      format: "orinoco-lite-shacl-proposal-v1",
+      repository: target.repository,
+      target: proposalTarget,
+    };
+    setSubmitting(true);
+    setFeedback(null);
+    try {
+      const created = await proposeShaclEdit(proposal, session.csrf_token);
+      setResult(created);
+      setBundle(null);
+      setBundleOrigin(null);
+      setFeedback(
+        kind === "standalone"
+          ? "GitHub created the attributed bundle commit and draft pull request. The in-memory bundle was released."
+          : "GitHub appended the attributed bundle commit at the exact draft pull-request head. The in-memory bundle was released.",
+      );
+    } catch (error) {
+      setFeedback(message(error));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function signOut(): Promise<void> {
+    await logout(session.csrf_token);
+    window.location.reload();
+  }
+
+  return (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">SHACL Vue proposal</p>
+          <h1>{target.repository}</h1>
+        </div>
+        <div className="account">
+          <span>
+            Signed in as <strong>{session.login}</strong>
+          </span>
+          <button
+            className="text-button"
+            onClick={() => void signOut()}
+            type="button"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+      <main id="main-content">
+        <section className="review-summary">
+          <div>
+            <p className="eyebrow">Browser-memory handoff</p>
+            <h2>Propose the normal SHACL Vue bundle through GitHub</h2>
+            <p>
+              This wrapper receives the bundle from the editor in browser
+              memory. The service writes only the fixed temporary bundle path;
+              the trusted workflow performs conversion and validation.
+            </p>
+            {target.pullRequest !== undefined &&
+              target.expectedHeadSha !== undefined && (
+                <p className="coordinate-lock">
+                  Bound to draft pull request #{target.pullRequest} at{" "}
+                  <code>{target.expectedHeadSha}</code>.
+                </p>
+              )}
+          </div>
+        </section>
+
+        {bundle === null ? (
+          <section className="handoff-waiting" aria-live="polite">
+            <h2>Waiting for a SHACL Vue v2 bundle</h2>
+            <p>
+              Generate the normal bundle in the editor and choose its GitHub
+              proposal action. Keep that editor window open through sign-in so
+              it can resend the in-memory value.
+            </p>
+          </section>
+        ) : (
+          <section className="handoff-bundle" aria-labelledby="bundle-title">
+            <div>
+              <p className="eyebrow">Bundle received</p>
+              <h2 id="bundle-title">
+                {bundle.records.length} edited{" "}
+                {bundle.records.length === 1 ? "record" : "records"}
+              </h2>
+              <p>
+                Source commit: <code>{bundle.source_commit}</code>
+              </p>
+              {bundleOrigin !== null && (
+                <p className="quiet">Browser source: {bundleOrigin}</p>
+              )}
+            </div>
+            <ul>
+              {bundle.records.map((record) => (
+                <li key={record.pid}>
+                  <strong>{record.pid}</strong>
+                  <span>{record.source_path}</span>
+                  <span>sha256:{record.source_sha256}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <form
+          className="handoff-form"
+          onSubmit={(event) => void propose(event)}
+        >
+          <fieldset>
+            <legend>GitHub proposal target</legend>
+            <label>
+              <input
+                checked={kind === "pull_request"}
+                name="proposal-kind"
+                onChange={() => setKind("pull_request")}
+                type="radio"
+              />
+              Append to an existing same-repository draft pull request
+            </label>
+            <label>
+              <input
+                checked={kind === "standalone"}
+                disabled={target.pullRequest !== undefined}
+                name="proposal-kind"
+                onChange={() => setKind("standalone")}
+                type="radio"
+              />
+              Create a branch and new draft pull request
+            </label>
+          </fieldset>
+          {kind === "pull_request" && (
+            <label>
+              Draft pull request
+              <input
+                disabled={target.pullRequest !== undefined}
+                inputMode="numeric"
+                min="1"
+                onChange={(event) => setPullRequest(event.target.value)}
+                required
+                type="number"
+                value={pullRequest}
+              />
+            </label>
+          )}
+          <p className="handoff-warning">
+            The temporary bundle is public while its Git ref exists and may be
+            retained by GitHub after the ref becomes unreachable. Do not merge
+            while the temporary bundle path exists.
+          </p>
+          <button disabled={bundle === null || submitting} type="submit">
+            {submitting ? "Writing to GitHub…" : "Propose via GitHub"}
+          </button>
+        </form>
+        {feedback !== null && (
+          <p
+            className={result === null ? "feedback" : "feedback success"}
+            role="status"
+          >
+            {feedback}{" "}
+            {result !== null && (
+              <a href={result.pull_request_url}>Open draft pull request</a>
+            )}
+          </p>
+        )}
+      </main>
+    </>
   );
 }
 
@@ -565,19 +980,20 @@ function Review({
 
 export default function App(): React.JSX.Element {
   const target = currentTarget();
+  const shaclTarget = currentShaclTarget();
   const [session, setSession] = useState<SessionStatus | null>(null);
   const [proposal, setProposal] = useState<ReviewProposal | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
-    if (target === null) return;
+    if (target === null && shaclTarget === null) return;
     let active = true;
     void (async () => {
       try {
         const current = await loadSession();
         if (!active) return;
         setSession(current);
-        if (current.authenticated) {
+        if (current.authenticated && target !== null) {
           const loaded = await loadProposal(
             target.repository,
             target.pullRequest,
@@ -592,16 +1008,23 @@ export default function App(): React.JSX.Element {
     return () => {
       active = false;
     };
-  }, [target?.artifactId, target?.pullRequest, target?.repository]);
+  }, [
+    shaclTarget?.expectedHeadSha,
+    shaclTarget?.pullRequest,
+    shaclTarget?.repository,
+    target?.artifactId,
+    target?.pullRequest,
+    target?.repository,
+  ]);
 
-  if (target === null) return <Landing />;
+  if (target === null && shaclTarget === null) return <Landing />;
   if (failure !== null) {
     return (
       <main className="landing" id="main-content">
         <p className="eyebrow">Review unavailable</p>
         <h1>The proposal could not be opened</h1>
         <p className="feedback">{failure}</p>
-        <a href="/">Choose another pull request</a>
+        <a href="/">Return to the service entry page</a>
       </main>
     );
   }
@@ -611,6 +1034,11 @@ export default function App(): React.JSX.Element {
         <p>Loading review…</p>
       </main>
     );
+  if (shaclTarget !== null) {
+    if (!session.authenticated) return <ShaclSignIn target={shaclTarget} />;
+    return <ShaclHandoff session={session} target={shaclTarget} />;
+  }
+  if (target === null) return <Landing />;
   if (!session.authenticated) return <SignIn target={target} />;
   if (proposal === null)
     return (

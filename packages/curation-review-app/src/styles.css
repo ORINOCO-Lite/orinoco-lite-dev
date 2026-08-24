@@ -123,6 +123,25 @@ h1 {
   margin-top: 1.5rem;
 }
 
+.edit-entry {
+  border-top: 1px solid var(--line);
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+}
+.edit-entry h2 {
+  font-size: 1.35rem;
+  margin-bottom: 0.4rem;
+}
+.edit-entry p {
+  color: var(--muted);
+}
+.edit-target-form {
+  align-items: end;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(14rem, 1fr) auto;
+}
+
 .target-form {
   align-items: end;
   display: grid;
@@ -448,8 +467,99 @@ pre {
   text-align: center;
 }
 
+.handoff-waiting,
+.handoff-bundle,
+.handoff-form {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.4rem;
+}
+.coordinate-lock {
+  background: var(--warm);
+  border-radius: 0.4rem;
+  color: var(--ink) !important;
+  padding: 0.7rem 0.85rem;
+}
+.coordinate-lock code {
+  overflow-wrap: anywhere;
+}
+.handoff-waiting {
+  border-style: dashed;
+}
+.handoff-waiting p {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+.handoff-bundle {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(16rem, 0.7fr) minmax(18rem, 1fr);
+}
+.handoff-bundle code {
+  overflow-wrap: anywhere;
+}
+.handoff-bundle ul {
+  margin: 0;
+  max-height: 20rem;
+  overflow: auto;
+  padding-left: 1.2rem;
+}
+.handoff-bundle li + li {
+  margin-top: 0.65rem;
+}
+.handoff-bundle li span {
+  color: var(--muted);
+  display: block;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.handoff-form {
+  display: grid;
+  gap: 1rem;
+}
+.handoff-form fieldset {
+  border: 0;
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+}
+.handoff-form legend {
+  color: var(--ink);
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+.handoff-form fieldset label {
+  align-items: center;
+  color: var(--ink);
+  display: flex;
+  gap: 0.55rem;
+}
+.handoff-form fieldset input {
+  display: inline;
+  margin: 0;
+  min-height: auto;
+  width: auto;
+}
+.handoff-form > label {
+  max-width: 16rem;
+}
+.handoff-form button {
+  justify-self: start;
+}
+.handoff-warning {
+  background: #fff4dc;
+  border-left: 0.3rem solid #bb7a12;
+  margin: 0;
+  padding: 0.8rem 1rem;
+}
+
 @media (max-width: 760px) {
   .target-form,
+  .edit-target-form,
   .filters {
     grid-template-columns: 1fr;
   }
@@ -473,6 +583,9 @@ pre {
     border-top: 1px solid var(--line);
   }
   .decision-group {
+    grid-template-columns: 1fr;
+  }
+  .handoff-bundle {
     grid-template-columns: 1fr;
   }
   .keyboard-help {
@@ -529,6 +642,9 @@ pre {
     color: #c8bcf2;
   }
   .blockers {
+    background: #3b311e;
+  }
+  .handoff-warning {
     background: #3b311e;
   }
   .feedback {

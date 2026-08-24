@@ -2,6 +2,8 @@ import type {
   CurationSubmission,
   ReviewProposal,
   SessionStatus,
+  ShaclProposalRequest,
+  ShaclProposalResult,
   SubmitResult,
 } from "../shared/contracts";
 
@@ -69,6 +71,19 @@ export function authenticationUrl(
   return `/api/auth/start?${targetQuery(repository, pullRequest, artifactId)}`;
 }
 
+export function shaclAuthenticationUrl(
+  repository: string,
+  pullRequest?: number,
+  expectedHeadSha?: string,
+): string {
+  const query = new URLSearchParams({ repository });
+  if (pullRequest !== undefined && expectedHeadSha !== undefined) {
+    query.set("expected_head_sha", expectedHeadSha);
+    query.set("pull_request", String(pullRequest));
+  }
+  return `/api/auth/shacl-start?${query.toString()}`;
+}
+
 export async function loadSession(): Promise<SessionStatus> {
   return responseJson<SessionStatus>(
     await fetch("/api/session", { headers: { Accept: "application/json" } }),
@@ -108,6 +123,23 @@ export async function submitDecisions(
         method: "POST",
       },
     ),
+  );
+}
+
+export async function proposeShaclEdit(
+  proposal: ShaclProposalRequest,
+  csrfToken: string,
+): Promise<ShaclProposalResult> {
+  return responseJson<ShaclProposalResult>(
+    await fetch("/api/shacl/propose", {
+      body: JSON.stringify(proposal),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      method: "POST",
+    }),
   );
 }
 

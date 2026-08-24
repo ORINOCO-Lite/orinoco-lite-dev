@@ -22,14 +22,18 @@ export function decodeUtf8(value: Uint8Array): string {
 }
 
 export function base64urlEncode(value: Uint8Array): string {
+  return base64Encode(value)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+export function base64Encode(value: Uint8Array): string {
   let binary = "";
   for (let offset = 0; offset < value.length; offset += 8_192) {
     binary += String.fromCharCode(...value.subarray(offset, offset + 8_192));
   }
-  return btoa(binary)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
+  return btoa(binary);
 }
 
 export function base64urlDecode(value: string): Uint8Array {

@@ -15,16 +15,32 @@ const VERSION = "v1";
 const OAUTH_TTL_SECONDS = 600;
 const MAX_SESSION_TTL_SECONDS = 28_800;
 
-export interface OAuthCookieState {
-  artifact_id: number;
+interface OAuthCookieCommon {
   code_verifier: string;
   expires_at: number;
   issued_at: number;
   origin: string;
-  pull_request: number;
   repository: string;
   state: string;
 }
+
+export interface ReviewOAuthCookieState extends OAuthCookieCommon {
+  artifact_id: number;
+  kind: "review";
+  pull_request: number;
+}
+
+export interface ShaclOAuthCookieState extends OAuthCookieCommon {
+  expected_head_sha: string | null;
+  kind: "shacl";
+  pull_request: number | null;
+}
+
+export type OAuthCookieState = ReviewOAuthCookieState | ShaclOAuthCookieState;
+
+type OAuthCookieInput =
+  | Omit<ReviewOAuthCookieState, "expires_at" | "issued_at">
+  | Omit<ShaclOAuthCookieState, "expires_at" | "issued_at">;
 
 export interface SessionCookieState {
   access_token: string;
@@ -170,7 +186,7 @@ async function unseal(
 
 export async function createOAuthCookie(
   env: Env,
-  state: Omit<OAuthCookieState, "expires_at" | "issued_at">,
+  state: OAuthCookieInput,
 ): Promise<string> {
   const issuedAt = nowSeconds();
   return cookie(
@@ -197,18 +213,39 @@ export async function readOAuthCookie(
     );
   }
   const value = await unseal(env, "oauth", encoded);
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpError(
+      401,
+      "invalid_oauth_state",
+      "The OAuth state is invalid or expired.",
+    );
+  }
+  const kind = (value as Record<string, unknown>).kind;
   requireExactKeys(
     value,
-    [
-      "artifact_id",
-      "code_verifier",
-      "expires_at",
-      "issued_at",
-      "origin",
-      "pull_request",
-      "repository",
-      "state",
-    ],
+    kind === "review"
+      ? [
+          "artifact_id",
+          "code_verifier",
+          "expires_at",
+          "issued_at",
+          "kind",
+          "origin",
+          "pull_request",
+          "repository",
+          "state",
+        ]
+      : [
+          "code_verifier",
+          "expected_head_sha",
+          "expires_at",
+          "issued_at",
+          "kind",
+          "origin",
+          "pull_request",
+          "repository",
+          "state",
+        ],
     "OAuth state",
   );
   const issuedAt = requireTimestamp(value.issued_at, "OAuth issued_at");
@@ -220,6 +257,45 @@ export async function readOAuthCookie(
     !validOneLine(value.origin, 256) ||
     !validOneLine(value.repository, 200) ||
     !validOneLine(value.state, 128) ||
+    (value.kind !== "review" && value.kind !== "shacl")
+  ) {
+    throw new HttpError(
+      401,
+      "invalid_oauth_state",
+      "The OAuth state is invalid or expired.",
+    );
+  }
+  const common = {
+    code_verifier: value.code_verifier,
+    expires_at: expiresAt,
+    issued_at: issuedAt,
+    origin: value.origin,
+    repository: value.repository,
+    state: value.state,
+  };
+  if (value.kind === "shacl") {
+    const standalone =
+      value.expected_head_sha === null && value.pull_request === null;
+    const existing =
+      typeof value.expected_head_sha === "string" &&
+      /^[0-9a-f]{40}$/.test(value.expected_head_sha) &&
+      Number.isSafeInteger(value.pull_request) &&
+      Number(value.pull_request) > 0;
+    if (!standalone && !existing) {
+      throw new HttpError(
+        401,
+        "invalid_oauth_state",
+        "The OAuth state is invalid or expired.",
+      );
+    }
+    return {
+      ...common,
+      expected_head_sha: existing ? String(value.expected_head_sha) : null,
+      kind: "shacl",
+      pull_request: existing ? Number(value.pull_request) : null,
+    };
+  }
+  if (
     !Number.isSafeInteger(value.artifact_id) ||
     Number(value.artifact_id) < 1 ||
     !Number.isSafeInteger(value.pull_request) ||
@@ -232,14 +308,10 @@ export async function readOAuthCookie(
     );
   }
   return {
+    ...common,
     artifact_id: Number(value.artifact_id),
-    code_verifier: value.code_verifier,
-    expires_at: expiresAt,
-    issued_at: issuedAt,
-    origin: value.origin,
+    kind: "review",
     pull_request: Number(value.pull_request),
-    repository: value.repository,
-    state: value.state,
   };
 }
 

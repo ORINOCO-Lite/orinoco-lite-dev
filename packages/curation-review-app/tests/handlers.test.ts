@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequest as authorizationStart } from "../functions/api/auth/start";
+import { onRequest as shaclAuthorizationStart } from "../functions/api/auth/shacl-start";
 import { onRequest as authorizationCallback } from "../functions/api/auth/callback";
 import { onRequest as loadProposal } from "../functions/api/proposal";
 import { onRequest as submitDecisions } from "../functions/api/submit";
@@ -312,6 +313,59 @@ describe("GitHub App user-to-server handlers", () => {
       ),
     ).rejects.toMatchObject({ code: "invalid_oauth_state", status: 401 });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("round-trips an exact standalone or existing-PR SHACL wrapper target", async () => {
+    const start = await shaclAuthorizationStart(
+      context(
+        new Request(
+          `${ORIGIN}/api/auth/shacl-start?repository=example%2Fsite&pull_request=42&expected_head_sha=${HEAD_SHA}`,
+        ),
+      ),
+    );
+    const oauthCookie = cookiePair(
+      start.headers.get("set-cookie") as string,
+      OAUTH_COOKIE,
+    );
+    const oauth = await readOAuthCookie(
+      new Request(ORIGIN, { headers: { Cookie: oauthCookie } }),
+      env,
+    );
+    expect(oauth).toMatchObject({
+      expected_head_sha: HEAD_SHA,
+      kind: "shacl",
+      pull_request: 42,
+      repository: "example/site",
+    });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL): Promise<Response> => {
+        const url = String(input);
+        if (url === "https://github.com/login/oauth/access_token") {
+          return Response.json({
+            access_token: "ghu_short_lived",
+            expires_in: 28_800,
+            scope: "",
+            token_type: "bearer",
+          });
+        }
+        if (url === "https://api.github.com/user") {
+          return Response.json({ id: 1, login: "octocat" });
+        }
+        throw new Error(`Unexpected GitHub request: ${url}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const callback = await authorizationCallback(
+      context(
+        new Request(
+          `${ORIGIN}/api/auth/callback?code=temporary-code&state=${oauth.state}`,
+          { headers: { Cookie: oauthCookie } },
+        ),
+      ),
+    );
+    expect(callback.headers.get("location")).toBe(
+      `${ORIGIN}/edit?repository=example%2Fsite&expected_head_sha=${HEAD_SHA}&pull_request=42`,
+    );
   });
 });
 
