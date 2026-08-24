@@ -96,6 +96,7 @@ export type ShaclProposalTarget =
   ShaclPullRequestTarget | ShaclStandaloneTarget;
 
 export interface ShaclProposalRequest {
+  acknowledge_public_data: true;
   bundle: ShaclReviewBundle;
   format: "orinoco-lite-shacl-proposal-v1";
   repository: string;

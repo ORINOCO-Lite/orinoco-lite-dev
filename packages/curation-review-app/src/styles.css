@@ -245,7 +245,13 @@ main:not(.landing) {
 }
 .filters a {
   align-self: center;
-  justify-self: end;
+}
+.review-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: end;
 }
 .checkbox {
   align-items: center;
@@ -476,6 +482,45 @@ pre {
   margin-top: 1.5rem;
   padding: 1.25rem 1.4rem;
 }
+.editor-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+.editor-heading {
+  align-items: center;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  padding: 1.1rem 1.4rem 0;
+}
+.editor-heading h2 {
+  margin-bottom: 0.35rem;
+}
+.editor-status,
+.editor-copy {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.editor-status {
+  margin-bottom: 0;
+  text-align: right;
+}
+.editor-copy {
+  margin: 0;
+  max-width: 62rem;
+  padding: 0 1.4rem 1rem;
+}
+.editor-frame {
+  background: white;
+  border: 0;
+  border-top: 1px solid var(--line);
+  display: block;
+  height: clamp(34rem, 72vh, 58rem);
+  width: 100%;
+}
 .coordinate-lock {
   background: var(--warm);
   border-radius: 0.4rem;
@@ -547,6 +592,19 @@ pre {
 .handoff-form > label {
   max-width: 16rem;
 }
+.handoff-form > .public-data-acknowledgement {
+  align-items: start;
+  color: var(--ink);
+  display: flex;
+  gap: 0.7rem;
+  max-width: 56rem;
+}
+.public-data-acknowledgement input {
+  flex: 0 0 auto;
+  margin: 0.25rem 0 0;
+  min-height: auto;
+  width: auto;
+}
 .handoff-form button {
   justify-self: start;
 }
@@ -575,6 +633,9 @@ pre {
   .filters a {
     justify-self: start;
   }
+  .review-actions {
+    justify-content: start;
+  }
   .record-diff {
     grid-template-columns: 1fr;
   }
@@ -587,6 +648,17 @@ pre {
   }
   .handoff-bundle {
     grid-template-columns: 1fr;
+  }
+  .editor-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .editor-status {
+    text-align: left;
+  }
+  .editor-frame {
+    height: 42rem;
   }
   .keyboard-help {
     display: none;

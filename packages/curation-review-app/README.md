@@ -2,7 +2,8 @@
 
 This package implements the stateless browser and authentication surface in [`docs/github-curation-review.md`](../../docs/github-curation-review.md).
 It reads a workflow-generated metadata proposal and ephemeral presentation artifact from GitHub, presents one complete set of record decisions, and posts that set as the authenticated user's pull-request comment.
-It does not run adapters, apply decisions, or retain metadata or curation state.
+It also implements the thin GitHub wrapper in [`docs/github-shacl-vue-edit.md`](../../docs/github-shacl-vue-edit.md): it verifies exact-head editor input, combines that data in browser memory with a released generic editor, and creates an explicit temporary Git handoff for trusted Python replacement.
+It does not run adapters, convert metadata, apply decisions, or retain metadata, bundles, artifacts, or curation state.
 
 ## Local verification
 
@@ -29,11 +30,13 @@ Register a GitHub App with user authorization and expiring user-to-server tokens
 Configure its callback URL as `PUBLIC_ORIGIN/api/auth/callback`, install it only on selected repositories, and grant these repository permissions:
 
 - Metadata: read (the GitHub-required baseline permission)
-- Contents: read
 - Actions: read
+- Contents: write
 - Pull requests: write
 
-The write permission is used only to create the authenticated pull-request comment.
+Pull requests write posts authenticated decision comments and creates an explicit standalone draft proposal.
+Contents write includes the read access needed by both profiles and is used for writes only to create the exact, fixed-path SHACL Vue handoff branch and commit requested by the curator.
+The source-adapter decision path never writes repository contents through the service.
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
 
 Configure these Pages runtime values:
@@ -49,6 +52,10 @@ Do not configure KV, D1, R2, Durable Objects, queues, or analytics-backed curati
 OAuth state and the short-lived GitHub access token exist only in encrypted, host-only browser cookies.
 Refresh tokens are discarded.
 
+Before deploying the SHACL Vue path, stage the generic editor shell and Things schema from one immutable Orinoco Lite runtime release.
+`tools/stage-editor-runtime.mjs` verifies the release's `runtime-manifest.json` digest and every selected file before placing those static resources in the application build.
+Never stage editor executable code or schema from a downstream pull request or Actions artifact.
+
 ## Cloudflare Pages
 
 The Pages build command is `npm run build` and the output directory is `dist`.
@@ -58,6 +65,9 @@ Cloudflare stores the client secret and session-sealing key separately as encryp
 
 The central `https://orinoco-curation-review.pages.dev/` deployment is the default hosted option, but `PUBLIC_ORIGIN` is configurable and downstreams select their review-application origin independently.
 The origin is not embedded in a submission or PR-body machine protocol.
+
+The SHACL Vue path reuses this same application deployment.
+It does not add a separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service.
 
 A review link has this form:
 
@@ -78,6 +88,28 @@ Oversized artifacts, candidate sets, and proposal paths are rejected before reco
 The pull-request body is only an accessible fallback and review link.
 The application never parses it for candidate identity, ordering, source coordinates, or completeness.
 It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for presentation facts.
+
+## Exact-head SHACL Vue input
+
+The source-adapter decision artifact above remains the proposal's single `orinoco-curation-review-<proposal_sha>` artifact.
+It is not reused as SHACL Vue input.
+
+For every exact pull-request or current default-branch commit exposed for editing, a trusted default-branch workflow publishes exactly one `orinoco-shacl-vue-input-<source_sha>` artifact.
+Its ZIP contains exactly three ordinary data files:
+
+- `edit/config.json`;
+- `edit/records.ttl`; and
+- `edit/data/record-sources.json`.
+
+The application uses Actions read access to verify that the artifact is unexpired, belongs to the selected repository and exact commit, and came from the successful reviewed workflow.
+It rejects a stale catalog or head.
+The browser combines the three files only in memory with the staged immutable editor shell and schema; neither the service nor the browser converts RDF to canonical YAML.
+The artifact is reproducible presentation input, not canonical metadata, a generated version 2 bundle, provenance, or durable curation state.
+
+After the released editor emits its unchanged version 2 bundle, **Propose via GitHub** requires an explicit acknowledgment that the bundle contains only public-approved data and no secrets.
+The service then creates the fixed `.orinoco-lite/shacl-vue-review-bundle.json` handoff commit at the exact head.
+Trusted default-branch Python validates and replaces that one commit with the equivalent attributed canonical YAML commit; the final branch contains no bundle.
+Pull-request Markdown is not parsed to locate or validate either artifact.
 
 Provisioning the Pages project, registering the GitHub App, setting secrets, and deploying are separately reviewed external operations.
 This package does not perform them.

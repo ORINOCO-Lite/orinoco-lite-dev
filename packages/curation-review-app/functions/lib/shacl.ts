@@ -179,14 +179,19 @@ export function parseShaclProposalRequest(
 ): ShaclProposalRequest {
   requireExactKeys(
     value,
-    ["bundle", "format", "repository", "target"],
+    ["acknowledge_public_data", "bundle", "format", "repository", "target"],
     "SHACL proposal",
   );
-  if (value.format !== "orinoco-lite-shacl-proposal-v1") {
+  if (
+    value.format !== "orinoco-lite-shacl-proposal-v1" ||
+    value.acknowledge_public_data !== true
+  ) {
     throw new HttpError(
       400,
       "invalid_shacl_proposal",
-      "The SHACL proposal format is invalid.",
+      value.acknowledge_public_data !== true
+        ? "The SHACL proposal requires explicit confirmation that its bundle contains no secrets and is approved for public Git history."
+        : "The SHACL proposal format is invalid.",
     );
   }
   const bundle = parseShaclReviewBundle(value.bundle);
@@ -202,6 +207,7 @@ export function parseShaclProposalRequest(
     );
   }
   return {
+    acknowledge_public_data: true,
     bundle,
     format: "orinoco-lite-shacl-proposal-v1",
     repository: parseRepository(

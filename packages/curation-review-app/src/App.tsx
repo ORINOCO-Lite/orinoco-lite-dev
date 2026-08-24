@@ -226,8 +226,8 @@ function ShaclSignIn({ target }: { target: ShaclTarget }): React.JSX.Element {
       <h1>Sign in to propose a SHACL Vue edit</h1>
       <p className="lede">
         GitHub limits this explicit write operation to collaborators with write
-        or admin permission. Keep the editor window open: after sign-in it can
-        send the bundle again without storing it on the service.
+        or admin permission. After sign-in, the exact-coordinate editor opens
+        here without storing its generated bundle on the service.
       </p>
       <a
         className="button-link"
@@ -299,8 +299,10 @@ function ShaclHandoff({
   session,
   target,
 }: ShaclHandoffProps): React.JSX.Element {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [bundle, setBundle] = useState<ShaclReviewBundle | null>(null);
-  const [bundleOrigin, setBundleOrigin] = useState<string | null>(null);
+  const [editorLoading, setEditorLoading] = useState(true);
+  const [acknowledgePublicData, setAcknowledgePublicData] = useState(false);
   const [kind, setKind] = useState<"pull_request" | "standalone">(
     target.pullRequest === undefined ? "standalone" : "pull_request",
   );
@@ -310,45 +312,37 @@ function ShaclHandoff({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [result, setResult] = useState<ShaclProposalResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const editorSource = useMemo(() => {
+    const query = new URLSearchParams({ repository: target.repository });
+    if (
+      target.pullRequest !== undefined &&
+      target.expectedHeadSha !== undefined
+    ) {
+      query.set("expected_head_sha", target.expectedHeadSha);
+      query.set("pull_request", String(target.pullRequest));
+    }
+    return `/api/shacl/editor?${query.toString()}`;
+  }, [target.expectedHeadSha, target.pullRequest, target.repository]);
 
   useEffect(() => {
-    function receive(value: unknown, origin: string): void {
-      const received = browserBundle(value);
-      if (received === null) {
-        setFeedback("The received value is not a normal SHACL Vue v2 bundle.");
+    function postedMessage(event: MessageEvent<unknown>): void {
+      if (
+        event.origin !== window.location.origin ||
+        iframeRef.current === null ||
+        event.source !== iframeRef.current.contentWindow
+      ) {
         return;
       }
-      setBundle(received);
-      setBundleOrigin(origin);
-      setFeedback(null);
-      setResult(null);
-    }
-
-    function customEvent(event: Event): void {
-      receive((event as CustomEvent<unknown>).detail, window.location.origin);
-    }
-
-    function postedMessage(event: MessageEvent<unknown>): void {
-      if (window.opener === null || event.source !== window.opener) return;
       const received = messageBundle(event.data, target.repository);
       if (received === null) return;
       setBundle(received);
-      setBundleOrigin(event.origin);
+      setAcknowledgePublicData(false);
       setFeedback(null);
       setResult(null);
     }
 
-    window.addEventListener("orinoco:review-bundle", customEvent);
     window.addEventListener("message", postedMessage);
-    window.opener?.postMessage(
-      {
-        format: "orinoco-lite-shacl-handoff-ready-v1",
-        repository: target.repository,
-      },
-      "*",
-    );
     return () => {
-      window.removeEventListener("orinoco:review-bundle", customEvent);
       window.removeEventListener("message", postedMessage);
     };
   }, [target.repository]);
@@ -357,6 +351,12 @@ function ShaclHandoff({
     event.preventDefault();
     if (bundle === null) {
       setFeedback("Generate and send a SHACL Vue bundle before proposing it.");
+      return;
+    }
+    if (!acknowledgePublicData) {
+      setFeedback(
+        "Confirm that the bundle contains no secrets and is approved for public Git history.",
+      );
       return;
     }
     if (
@@ -383,6 +383,7 @@ function ShaclHandoff({
       proposalTarget = { kind: "standalone" };
     }
     const proposal: ShaclProposalRequest = {
+      acknowledge_public_data: true,
       bundle,
       format: "orinoco-lite-shacl-proposal-v1",
       repository: target.repository,
@@ -394,7 +395,7 @@ function ShaclHandoff({
       const created = await proposeShaclEdit(proposal, session.csrf_token);
       setResult(created);
       setBundle(null);
-      setBundleOrigin(null);
+      setAcknowledgePublicData(false);
       setFeedback(
         kind === "standalone"
           ? "GitHub created the attributed bundle commit and draft pull request. The in-memory bundle was released."
@@ -438,9 +439,10 @@ function ShaclHandoff({
             <p className="eyebrow">Browser-memory handoff</p>
             <h2>Propose the normal SHACL Vue bundle through GitHub</h2>
             <p>
-              This wrapper receives the bundle from the editor in browser
-              memory. The service writes only the fixed temporary bundle path;
-              the trusted workflow performs conversion and validation.
+              The exact-coordinate editor below keeps the generated bundle in
+              browser memory. Its normal Download bundle action is unchanged;
+              this wrapper also receives that same bundle for an explicit Git
+              proposal. The trusted workflow performs conversion and validation.
             </p>
             {target.pullRequest !== undefined &&
               target.expectedHeadSha !== undefined && (
@@ -452,13 +454,43 @@ function ShaclHandoff({
           </div>
         </section>
 
+        <section
+          aria-busy={editorLoading}
+          aria-labelledby="editor-title"
+          className="editor-panel"
+        >
+          <div className="editor-heading">
+            <div>
+              <p className="eyebrow">Human edit</p>
+              <h2 id="editor-title">Edit in SHACL Vue</h2>
+            </div>
+            <p aria-live="polite" className="editor-status">
+              {editorLoading
+                ? "Loading the exact-coordinate editor…"
+                : "Editor loaded. Generate the normal bundle when your edit is complete."}
+            </p>
+          </div>
+          <p className="editor-copy">
+            Download bundle continues to save the normal SHACL Vue result. The
+            proposal control below becomes available only after this embedded,
+            same-origin editor sends that exact result to the wrapper.
+          </p>
+          <iframe
+            className="editor-frame"
+            onLoad={() => setEditorLoading(false)}
+            ref={iframeRef}
+            src={editorSource}
+            title="SHACL Vue metadata editor"
+          />
+        </section>
+
         {bundle === null ? (
           <section className="handoff-waiting" aria-live="polite">
             <h2>Waiting for a SHACL Vue v2 bundle</h2>
             <p>
-              Generate the normal bundle in the editor and choose its GitHub
-              proposal action. Keep that editor window open through sign-in so
-              it can resend the in-memory value.
+              Generate the normal bundle in the embedded editor. The same result
+              remains available for download and is delivered here in browser
+              memory for the GitHub proposal action.
             </p>
           </section>
         ) : (
@@ -472,9 +504,7 @@ function ShaclHandoff({
               <p>
                 Source commit: <code>{bundle.source_commit}</code>
               </p>
-              {bundleOrigin !== null && (
-                <p className="quiet">Browser source: {bundleOrigin}</p>
-              )}
+              <p className="quiet">Browser source: this embedded editor</p>
             </div>
             <ul>
               {bundle.records.map((record) => (
@@ -533,7 +563,25 @@ function ShaclHandoff({
             retained by GitHub after the ref becomes unreachable. Do not merge
             while the temporary bundle path exists.
           </p>
-          <button disabled={bundle === null || submitting} type="submit">
+          <label className="public-data-acknowledgement">
+            <input
+              checked={acknowledgePublicData}
+              onChange={(event) =>
+                setAcknowledgePublicData(event.target.checked)
+              }
+              required
+              type="checkbox"
+            />
+            <span>
+              I confirm this bundle contains no secrets and is approved for
+              public Git history, including GitHub retention after its temporary
+              ref becomes unreachable.
+            </span>
+          </label>
+          <button
+            disabled={bundle === null || !acknowledgePublicData || submitting}
+            type="submit"
+          >
             {submitting ? "Writing to GitHub…" : "Propose via GitHub"}
           </button>
         </form>
@@ -912,9 +960,24 @@ function Review({
             />
             Changed at current head only
           </label>
-          <a href={proposal.pull_request_url} rel="noreferrer" target="_blank">
-            Open GitHub diff
-          </a>
+          <div className="review-actions">
+            <a
+              href={`/edit?${new URLSearchParams({
+                expected_head_sha: proposal.head_sha,
+                pull_request: String(proposal.pull_request),
+                repository: proposal.repository,
+              }).toString()}`}
+            >
+              Edit in SHACL Vue
+            </a>
+            <a
+              href={proposal.pull_request_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open GitHub diff
+            </a>
+          </div>
         </section>
 
         <p className="keyboard-help">

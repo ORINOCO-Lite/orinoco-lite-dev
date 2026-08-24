@@ -3,7 +3,14 @@ import type { EventContext } from "../lib/pages";
 
 export async function onRequest(context: EventContext): Promise<Response> {
   try {
-    return withApiHeaders(await context.next());
+    const response = await context.next();
+    const editorHtml =
+      new URL(context.request.url).pathname === "/api/shacl/editor" &&
+      response.headers
+        .get("content-type")
+        ?.toLowerCase()
+        .startsWith("text/html");
+    return editorHtml ? response : withApiHeaders(response);
   } catch (error) {
     return errorResponse(error);
   }

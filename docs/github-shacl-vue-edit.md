@@ -18,9 +18,32 @@ The Orinoco wrapper MAY offer **Propose via GitHub** when it receives that event
 It MUST bind the editor input and resulting bundle to an exact repository and Git commit and MUST NOT modify the bundle, choose metadata values, or retain a copy after the request completes.
 The central service origin is configurable; a downstream may use the central deployment or host the same code.
 
-For an existing source-adapter pull request, **Edit in SHACL Vue** MUST open editor input bound to that pull request's exact current head.
-For a standalone edit, the editor input MUST be bound to the exact reviewed default-branch commit from which the new branch will start.
-A stale editor or bundle is rejected rather than rebased or retargeted.
+## Exact-head editor input
+
+For every exact pull-request or default-branch commit that it materializes, a trusted workflow loaded only from the reviewed default branch MUST publish exactly one untracked, expiring, reproducible editor-input artifact named `orinoco-shacl-vue-input-<source_sha>`.
+Its ZIP contains exactly these three ordinary files and no executable editor code:
+
+- `edit/config.json`;
+- `edit/records.ttl`; and
+- `edit/data/record-sources.json`.
+
+The workflow MUST produce those files deterministically from the canonical records and annotation companions at the exact source commit.
+The record catalog's `source_commit` MUST equal that commit.
+For an existing source-adapter pull request, **Edit in SHACL Vue** MUST select the pull request's exact current head.
+For a standalone edit, it MUST select the repository's exact current default-branch head, which is also the commit from which a proposal branch may start.
+A stale editor input or resulting bundle is rejected rather than rebased or retargeted.
+
+The central stateless application MUST verify the selected repository, exact source commit, unexpired artifact, and successful trusted workflow run before exposing those files.
+In the browser it combines the three data files only in memory with a generic SHACL Vue shell and Things schema taken from one immutable, digest-verified Orinoco Lite runtime release.
+It MUST NOT use editor executable code, schema, or conversion behavior from the pull request or editor-input artifact, and it MUST NOT retain the assembled input.
+
+The editor-input artifact is reproducible presentation input.
+It is not canonical metadata, the generated version 2 bundle, a source-adapter candidate or decision artifact, provenance, or a durable curation record.
+Its expiry cannot change metadata, a decision, or Git history.
+It is distinct from the source-adapter decision profile's exactly one `orinoco-curation-review-<proposal_sha>` artifact and does not relax that one-artifact contract.
+Neither profile parses pull-request Markdown as a machine protocol.
+
+This presentation path reuses the existing central application and MUST NOT add a separate Worker, browser-side metadata converter, conversion service, database, object store, or artifact cache.
 
 ## Ephemeral Git handoff
 
@@ -43,7 +66,8 @@ The service MUST NOT create a pull request against another repository, write to 
 The handoff is ephemeral transport, not a metadata proposal, review bundle, manifest, provenance record, or durable curation authority.
 It MUST NOT be merged.
 The pull request MUST remain draft while a handoff is present.
-Because a public Git host can retain unreachable objects, the wrapper MUST warn that the bundle is temporarily public and MUST reject secrets or data not approved for public repository history.
+Before creating the handoff, the wrapper MUST require the curator to acknowledge explicitly that the bundle contains only data approved for public repository history and contains no secrets.
+Because a public Git host can retain unreachable objects, the wrapper MUST also warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement.
 
 ## Trusted replacement
 
@@ -71,7 +95,8 @@ The normal trusted workflow validates the resulting joined graph and adds the co
 
 The shared GitHub App requests repository metadata read, Actions read, contents write, and pull requests write for selected repositories.
 Contents write is used only for the explicit human handoff branch and commit operations in this profile.
-The decision-review profile continues to use contents read behavior and never commits through the service.
+The decision-review profile reads repository contents and never commits through the service.
+Actions read retrieves the two profiles' distinct expiring artifacts; it does not authorize an artifact store.
 
 The service and workflow MUST NOT:
 
@@ -81,7 +106,7 @@ The service and workflow MUST NOT:
 - infer or choose a source-adapter disposition;
 - add machine PAV or decision-cache entries to a human edit;
 - approve, mark ready, merge, deploy, or write to an external source; or
-- introduce a database, persistent metadata service, recovery protocol, manifest, journal, or transaction graph.
+- introduce another Worker, a browser or hosted metadata converter, a database, persistent metadata service, object store, artifact cache, recovery protocol, manifest, journal, or transaction graph.
 
 OAuth state and short-lived authentication sessions remain operational state.
 Git commits and pull-request history are the durable record of the resulting human proposal.

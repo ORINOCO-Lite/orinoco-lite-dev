@@ -20,7 +20,8 @@ Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
 
 Milestone 5 completes the Orinoco Lite source-adapter system defined by the normative source-adapter specification.
 It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent metadata service or required local checkout.
-The hosted decision path uses a small stateless GitHub authentication and comment service plus one expiring GitHub Actions presentation artifact; GitHub commits and the authenticated comment remain the durable authorities.
+The hosted decision path uses a small stateless GitHub authentication application plus one expiring GitHub Actions decision-review artifact; GitHub commits and the authenticated comment remain the durable authorities.
+The separate SHACL Vue path reuses that application and adds one expiring exact-head editor-input artifact without making either artifact durable state.
 
 Zotero is the reusable-looking case.
 `dump-research-info` is the deliberately CON-specific case.
@@ -36,7 +37,7 @@ Milestone 5 preserves the accepted Milestone 4 distribution unless this mileston
 
 - a downstream is one ordinary Git repository without submodules or gitlinks;
 - concrete adapters and their policy are site-owned under `source-adapters/`;
-- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review uses only the normative stateless GitHub authentication and comment service plus an untracked, expiring presentation artifact;
+- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review and human editing use only the normative stateless GitHub authentication application plus their distinct untracked, expiring presentation artifacts;
 - human review is authoritative, and automation never chooses a disposition, approves, merges, deploys, or writes to an external source;
 - the real `centerforopenneuroscience.org` repository remains read-only; and
 - open identity, publication, venue, topic, eligibility, governance, and production decisions remain open.
@@ -85,6 +86,7 @@ Implement the separately reviewed normative [`GitHub source-adapter curation pro
 - Provide responsive before-and-after record diffs, mutually exclusive per-record controls, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
 - Have the trusted workflow generate the actual diff and exactly one untracked, expiring, reproducible Actions presentation bundle containing source and proposal coordinates plus per-record UI facts.
 - Have the application use GitHub Actions read access to load that bundle, derive candidate membership and operations from the proposal commit's metadata diff, and run no adapter or source logic.
+- Keep that proposal-review artifact distinct from the SHACL Vue editor-input artifact; the latter never changes this exactly-one proposal artifact contract or enters decision finalization.
 - Keep pull-request Markdown as an accessible fallback rather than a machine protocol or native-diff-size conformance boundary.
 - Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
 - Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
@@ -100,11 +102,15 @@ Gate: an authorized reviewer can complete the entire workflow in one pull reques
 
 - Preserve the normal **Download bundle** workflow and expose the exact generated object through a neutral browser event.
 - Add **Propose via GitHub** only in the thin Orinoco wrapper.
-- For an existing curation pull request, bind **Edit in SHACL Vue** to its exact head; for a standalone edit, bind to an exact default-branch commit.
+- Have a trusted default-branch workflow publish exactly one expiring, reproducible `orinoco-shacl-vue-input-<source_sha>` artifact for each exact pull-request or current default-branch commit exposed for editing.
+- Limit that artifact to `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`; it is presentation input, not metadata, a generated bundle, provenance, or durable curation state.
+- Have the stateless application verify the trusted workflow and exact source commit, then combine those data files only in browser memory with the generic editor shell and schema from an immutable, digest-verified runtime release.
+- For an existing curation pull request, bind **Edit in SHACL Vue** to its exact head; for a standalone edit, bind to the exact current default-branch commit.
 - Use the authenticated curator's GitHub identity to append one temporary bundle-only handoff commit to a same-repository draft pull-request branch.
 - Have trusted default-branch Python code replace only that exact handoff commit with the equivalent canonical record and annotation-overlay commit, preserving every earlier commit.
 - Validate the joined graph and add the configurable curation-service link without retaining the bundle or choosing any metadata or decision.
-- Confine contents write to this explicit human proposal operation and retain no service-side copy.
+- Require explicit acknowledgment that the handoff contains only public-approved data and no secrets.
+- Confine contents write to this explicit human proposal operation, retain no service-side copy, and add no separate Worker, conversion service, database, object store, or artifact cache.
 
 Gate: the final branch contains the attributed human metadata commit and no handoff bundle, stale heads fail, and neither SHACL Vue nor the service gains source-adapter semantics or durable curation state.
 
@@ -148,7 +154,7 @@ Milestone 5 does not:
 - require a persistent metadata or credential service, durable hosted curation state, automatic approval, automatic merge, or pull-request deployment;
 - add another semantic overlay, generic plugin ABI, persistent adapter service, or second hosted implementation;
 - use SSSOM without a genuine ontology-mapping set or add W3C PROV without a demonstrated lineage question;
-- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, custom attestation graphs, or the expiring presentation bundle as durable state; or
+- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, custom attestation graphs, or either expiring presentation artifact as durable state; or
 - promote `dump-research-info` into a generic adapter.
 
 ## Exit gate

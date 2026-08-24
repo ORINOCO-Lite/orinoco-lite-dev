@@ -1,5 +1,7 @@
 import {
+  act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -64,6 +66,26 @@ function shaclBundle(): ShaclReviewBundle {
   };
 }
 
+function sendEditorBundle(
+  frame: HTMLIFrameElement,
+  value: ShaclReviewBundle = shaclBundle(),
+  options: { origin?: string; source?: MessageEventSource | null } = {},
+): void {
+  act(() => {
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          bundle: value,
+          format: "orinoco-lite-shacl-bundle-message-v1",
+          repository: "example/site",
+        },
+        origin: options.origin ?? window.location.origin,
+        source: options.source ?? frame.contentWindow,
+      }),
+    );
+  });
+}
+
 beforeEach(() => {
   window.history.replaceState(
     {},
@@ -75,11 +97,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  Object.defineProperty(window, "opener", {
-    configurable: true,
-    value: null,
-    writable: true,
-  });
 });
 
 describe("curation review interface", () => {
@@ -101,6 +118,12 @@ describe("curation review interface", () => {
     await user.click(reject);
     expect(reject).toBeChecked();
     expect(accept).not.toBeChecked();
+    expect(
+      screen.getByRole("link", { name: "Edit in SHACL Vue" }),
+    ).toHaveAttribute(
+      "href",
+      `/edit?expected_head_sha=${proposal().head_sha}&pull_request=42&repository=example%2Fsite`,
+    );
   });
 
   it("supports filtering, changed-only view, and keyboard decisions", async () => {
@@ -234,7 +257,7 @@ describe("curation review interface", () => {
 });
 
 describe("SHACL Vue browser-memory proposal wrapper", () => {
-  it("exposes a standalone /edit entry without inventing an editor URL", () => {
+  it("exposes a standalone /edit entry", () => {
     window.history.replaceState({}, "", "/");
     render(<App />);
     expect(
@@ -268,7 +291,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     );
   });
 
-  it("receives the normal bundle event in memory and performs one explicit write", async () => {
+  it("embeds the same-origin editor and performs one acknowledged explicit write", async () => {
     window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -303,17 +326,40 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     await screen.findByRole("heading", {
       name: "Waiting for a SHACL Vue v2 bundle",
     });
-    const bundle = shaclBundle();
-    window.dispatchEvent(
-      new CustomEvent("orinoco:review-bundle", { detail: bundle }),
+    const frame = screen.getByTitle(
+      "SHACL Vue metadata editor",
+    ) as HTMLIFrameElement;
+    expect(frame).toHaveAttribute(
+      "src",
+      "/api/shacl/editor?repository=example%2Fsite",
     );
+    const editor = screen.getByRole("region", { name: "Edit in SHACL Vue" });
+    expect(editor).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByText("Loading the exact-coordinate editor…"),
+    ).toBeInTheDocument();
+    fireEvent.load(frame);
+    expect(editor).toHaveAttribute("aria-busy", "false");
+    expect(
+      screen.getByText(
+        "Editor loaded. Generate the normal bundle when your edit is complete.",
+      ),
+    ).toBeInTheDocument();
+    const bundle = shaclBundle();
+    sendEditorBundle(frame, bundle);
     expect(
       await screen.findByRole("heading", { name: "1 edited record" }),
     ).toBeInTheDocument();
     expect(screen.getByText("example:one")).toBeInTheDocument();
+    const propose = screen.getByRole("button", { name: "Propose via GitHub" });
+    expect(propose).toBeDisabled();
     await user.click(
-      screen.getByRole("button", { name: "Propose via GitHub" }),
+      screen.getByRole("checkbox", {
+        name: /I confirm this bundle contains no secrets/,
+      }),
     );
+    expect(propose).toBeEnabled();
+    await user.click(propose);
     await screen.findByRole("link", { name: "Open draft pull request" });
     const write = fetchMock.mock.calls.find(
       ([url]) => url === "/api/shacl/propose",
@@ -322,6 +368,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
       String((write?.[1] as RequestInit).body),
     ) as Record<string, unknown>;
     expect(submitted).toEqual({
+      acknowledge_public_data: true,
       bundle,
       format: "orinoco-lite-shacl-proposal-v1",
       repository: "example/site",
@@ -332,13 +379,8 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("accepts the typed bundle message only from the editor opener", async () => {
+  it("accepts the typed bundle message only from its same-origin iframe", async () => {
     window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
-    Object.defineProperty(window, "opener", {
-      configurable: true,
-      value: window,
-      writable: true,
-    });
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -353,23 +395,53 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     await screen.findByRole("heading", {
       name: "Waiting for a SHACL Vue v2 bundle",
     });
-    window.dispatchEvent(
-      new MessageEvent("message", {
-        data: {
-          bundle: shaclBundle(),
-          format: "orinoco-lite-shacl-bundle-message-v1",
-          repository: "example/site",
-        },
-        origin: "https://editor.example",
-        source: window,
-      }),
-    );
+    const frame = screen.getByTitle(
+      "SHACL Vue metadata editor",
+    ) as HTMLIFrameElement;
+    sendEditorBundle(frame, shaclBundle(), {
+      origin: "https://editor.example",
+    });
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
+    sendEditorBundle(frame, shaclBundle(), { source: window });
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
+    sendEditorBundle(frame);
     expect(
       await screen.findByRole("heading", { name: "1 edited record" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Browser source: https://editor.example"),
+      screen.getByText("Browser source: this embedded editor"),
     ).toBeInTheDocument();
+  });
+
+  it("binds the embedded editor to exact existing-PR coordinates", async () => {
+    const source = "a".repeat(40);
+    window.history.replaceState(
+      {},
+      "",
+      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+        }),
+      ),
+    );
+    render(<App />);
+    const frame = (await screen.findByTitle(
+      "SHACL Vue metadata editor",
+    )) as HTMLIFrameElement;
+    expect(frame).toHaveAttribute(
+      "src",
+      `/api/shacl/editor?repository=example%2Fsite&expected_head_sha=${source}&pull_request=42`,
+    );
   });
 
   it("binds an existing-PR handoff to the received source commit", async () => {
@@ -413,9 +485,10 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     await screen.findByRole("heading", {
       name: "Waiting for a SHACL Vue v2 bundle",
     });
-    window.dispatchEvent(
-      new CustomEvent("orinoco:review-bundle", { detail: shaclBundle() }),
-    );
+    const frame = screen.getByTitle(
+      "SHACL Vue metadata editor",
+    ) as HTMLIFrameElement;
+    sendEditorBundle(frame);
     await screen.findByRole("heading", { name: "1 edited record" });
     expect(
       screen.getByRole("spinbutton", { name: "Draft pull request" }),
@@ -428,6 +501,11 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     expect(
       screen.getByText(`Bound to draft pull request #42 at`, { exact: false }),
     ).toHaveTextContent(source);
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /I confirm this bundle contains no secrets/,
+      }),
+    );
     await user.click(
       screen.getByRole("button", { name: "Propose via GitHub" }),
     );

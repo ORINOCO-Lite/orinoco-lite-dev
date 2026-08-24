@@ -2,7 +2,7 @@
 
 Status: Milestone 4 accepted; Milestone 5 active; production-graduation review remains open
 
-Review snapshot: 2026-08-20
+Review snapshot: 2026-08-24
 
 This is the single working list of unresolved **human choices** accumulated through the clean migration, full migration, complete-content migration, and single-repository distribution work.
 It separates policy from facts with an objectively testable answer.
@@ -620,22 +620,29 @@ Human review may accept, reject, or defer that proposal.
 **Question:** How should SHACL Vue propose an attributed metadata edit without embedding GitHub or source-adapter behavior in the editor or reimplementing the pinned RDF-to-Things conversion in TypeScript?
 
 **Outcome:** Preserve SHACL Vue's normal **Download bundle** workflow and expose the exact generated version 2 bundle through a neutral browser event.
+A trusted default-branch workflow first publishes one expiring, reproducible editor-input artifact for the exact pull-request or current default-branch commit being edited.
+It contains only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`.
+The central stateless application verifies the trusted run and exact commit, then combines those data files only in browser memory with the generic SHACL Vue shell and Things schema from an immutable, digest-verified Orinoco Lite runtime release.
+
 A thin Orinoco wrapper adds **Propose via GitHub** and uses the authenticated curator's GitHub identity.
 For an existing curation pull request it appends one bundle-only handoff commit to the exact head; for a standalone edit it creates a branch at the exact source commit, appends the handoff, and opens a draft pull request.
+Before that write, the curator explicitly acknowledges that the bundle contains only public-approved data and no secrets.
 
 Trusted default-branch Python applies the pinned Orinoco editor conversion, validates the joined graph, and replaces only the exact handoff commit with an equivalent attributed human metadata commit sharing its parent.
 This preserves prior proposal and human commits while removing the bundle from the branch.
-The shared GitHub App adds contents write solely for these explicit same-repository human proposal operations.
+The shared GitHub App uses metadata read, Actions read, contents write, and pull requests write, with contents write confined to these explicit same-repository human proposal operations.
 The service retains no bundle or metadata.
 
 **Rationale:** The normal bundle carries RDF rather than canonical YAML and annotation companions.
 Using the pinned Python conversion avoids a divergent TypeScript implementation and needs no additional deployed runtime service.
+The exact-head artifact is only reproducible presentation input and is distinct from the source-adapter profile's exactly-one decision-review artifact; it is not metadata, the generated bundle, provenance, or durable curation state.
+Combining trusted released editor code with exact-commit data in browser memory avoids pull-request executable code, browser-side conversion, another Worker, a database, an object store, or an artifact cache.
 The temporary commit gives the trusted Action a bounded handoff while exact-head replacement keeps it out of mergeable history.
 A public Git host can retain unreachable objects, so the path is limited to data already approved for public repository history.
 
 **Decided and refined by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), including exact-head editing, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
+**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), including the exact-head editor-input artifact and immutable released shell, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
 
 ## P2 — strategic decisions
 

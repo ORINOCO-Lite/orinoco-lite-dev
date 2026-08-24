@@ -83,6 +83,7 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
   it("binds an existing-PR request to the same exact source and head", () => {
     expect(
       parseShaclProposalRequest({
+        acknowledge_public_data: true,
         bundle: bundle(),
         format: "orinoco-lite-shacl-proposal-v1",
         repository: "example/site",
@@ -98,6 +99,7 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
     });
     expect(() =>
       parseShaclProposalRequest({
+        acknowledge_public_data: true,
         bundle: bundle(),
         format: "orinoco-lite-shacl-proposal-v1",
         repository: "example/site",
@@ -110,6 +112,7 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
     ).toThrow("does not match the expected pull-request head");
     expect(() =>
       parseShaclProposalRequest({
+        acknowledge_public_data: true,
         bundle: bundle(),
         format: "orinoco-lite-shacl-proposal-v1",
         repository: "example/site",
@@ -155,6 +158,7 @@ describe("SHACL proposal API boundary", () => {
         context(
           new Request(`${ORIGIN}/api/shacl/propose`, {
             body: JSON.stringify({
+              acknowledge_public_data: true,
               bundle: bundle(),
               format: "orinoco-lite-shacl-proposal-v1",
               repository: "example/site",
@@ -182,6 +186,7 @@ describe("SHACL proposal API boundary", () => {
         context(
           new Request(`${ORIGIN}/api/shacl/propose`, {
             body: JSON.stringify({
+              acknowledge_public_data: true,
               bundle: bundle(),
               durable_copy: true,
               format: "orinoco-lite-shacl-proposal-v1",
@@ -199,6 +204,39 @@ describe("SHACL proposal API boundary", () => {
         ),
       ),
     ).rejects.toThrow("missing or unexpected fields");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("requires explicit public-data acknowledgement before contacting GitHub", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    for (const acknowledgement of [undefined, false]) {
+      const request = {
+        bundle: bundle(),
+        format: "orinoco-lite-shacl-proposal-v1",
+        repository: "example/site",
+        target: { kind: "standalone" },
+        ...(acknowledgement === undefined
+          ? {}
+          : { acknowledge_public_data: acknowledgement }),
+      };
+      await expect(
+        proposeShacl(
+          context(
+            new Request(`${ORIGIN}/api/shacl/propose`, {
+              body: JSON.stringify(request),
+              headers: {
+                "Content-Type": "application/json",
+                Cookie: await sessionCookie(),
+                Origin: ORIGIN,
+                "X-CSRF-Token": "csrf-token",
+              },
+              method: "POST",
+            }),
+          ),
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

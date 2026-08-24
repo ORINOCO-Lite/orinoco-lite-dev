@@ -5,7 +5,8 @@ Status: normative specification
 This document defines a host-neutral source-adapter contract.
 The initial hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
 The distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
-Its small stateless authentication and comment service and its expiring GitHub Actions presentation artifact are not a metadata service or durable curation store.
+The GitHub profiles reuse one small stateless authentication application and keep their two expiring GitHub Actions presentation artifacts distinct: one proposal-review bundle and one exact-head editor input.
+Neither artifact is a metadata service or durable curation store.
 This document does not define a Python ABI, plugin protocol, or persistent metadata service.
 Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
 
@@ -45,11 +46,12 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
-| Hosted review presentation | One expiring GitHub Actions artifact | Reproducibly present source and proposal coordinates plus per-record UI facts without becoming metadata, candidate, decision, or provenance authority. |
+| Hosted decision-review presentation | One expiring GitHub Actions artifact per proposal | Reproducibly present source and proposal coordinates plus per-record UI facts without becoming metadata, candidate, decision, or provenance authority. |
+| Hosted SHACL Vue presentation | One expiring GitHub Actions artifact per exact input commit | Present only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` for in-memory combination with an immutable released editor shell and schema; it is not metadata, a generated editor bundle, provenance, or durable state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
-Generated projections, candidate plans, caches, diagnostics, hosted form renderings, and the expiring presentation artifact are not canonical metadata.
+Generated projections, candidate plans, caches, diagnostics, hosted form renderings, and the expiring presentation artifacts are not canonical metadata.
 For hosted review, the proposal commit and its metadata diff remain authoritative for candidate membership and operations.
 
 ## Core adapter contract
@@ -181,6 +183,9 @@ Supported inputs include:
 
 SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), not this decision-review and finalization profile.
 Its existing generated bundle is exposed to a thin Orinoco GitHub wrapper, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
+Trusted default-branch code first publishes an exact-commit editor-input artifact containing only the three normal static editor data files.
+The stateless application verifies that artifact and combines its data in browser memory with the generic shell and schema from one immutable, digest-verified runtime release.
+The resulting unchanged bundle then enters the profile's fixed-path Git handoff and trusted Python replacement; the browser and hosted service perform no metadata conversion.
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
@@ -385,6 +390,17 @@ Pull-request Markdown remains an accessible summary and link, not a machine prot
 The presentation bundle expires under ordinary GitHub artifact retention and MAY be reproduced from the same identified inputs; it is not a persistent store, attestation, journal, or recovery artifact.
 Git commits, the authenticated submission comment, and the compact decision cache remain the durable review state.
 
+The separate SHACL Vue profile MUST preserve this exactly-one decision-review artifact contract.
+For every exact pull-request or current default-branch commit that it exposes for editing, trusted default-branch code publishes exactly one additional artifact named `orinoco-shacl-vue-input-<source_sha>` containing only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`.
+The central application verifies the trusted run and exact source commit, then combines those files only in browser memory with a generic shell and schema from an immutable, digest-verified runtime release.
+That artifact is reproducible presentation input, not canonical metadata, a generated editor bundle, candidate or decision state, provenance, or a durable curation record.
+It neither changes candidate membership nor enters the source-adapter finalizer.
+
+The shared GitHub App requests metadata read, Actions read, contents write, and pull requests write.
+Contents write is confined to an explicit SHACL Vue handoff at exact Git coordinates; the decision-review path only reads contents and posts the authenticated comment.
+The wrapper MUST require an explicit public-data and no-secrets acknowledgment before it creates the fixed-path bundle handoff.
+No separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this presentation path.
+
 The project MAY publish one central application origin by default.
 That origin MUST remain configurable, and a downstream MAY self-host the same stateless application without creating another host profile or durable authority.
 
@@ -406,7 +422,7 @@ Beyond that boundary:
 - No custom distributed transaction, journal, lock service, or crash-recovery protocol is introduced.
 - No tracked inventory, review document, exhaustive manifest, DataLad sidecar, reconciliation report, or custom attestation graph is introduced.
 - No artifact is added merely to authenticate another artifact produced by the same trusted workflow.
-- The GitHub Actions presentation bundle is transient UI output, not a candidate inventory, attestation, journal, or recovery mechanism.
+- The GitHub Actions decision-review bundle and exact-head editor-input artifact are transient UI output, not candidate inventories, generated editor bundles, attestations, journals, provenance, or recovery mechanisms.
 - No semantic overlay beyond `annotations` is introduced without a focused specification change and a source or human state that Git, PAV, and the compact decision cache cannot represent.
 - A stronger attacker or availability model requires a separate reviewed design rather than incremental workflow machinery.
 
@@ -420,7 +436,7 @@ Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter st
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
 A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things or metadata service for validation, review, build, or publication.
-The stateless GitHub authentication and comment service is the hosted decision transport, not a metadata runtime dependency.
+The stateless GitHub authentication application is hosted decision and explicit human-handoff transport, not a metadata runtime dependency.
 
 Prefer released upstream acquisition, matching, serialization, and update helpers.
 In particular, reuse `things-enrichment-tools` ownership-aware update helpers when their data model and pinned runtime are compatible.
