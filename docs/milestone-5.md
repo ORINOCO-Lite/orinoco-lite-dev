@@ -8,6 +8,10 @@ Predecessor: [`milestone-4.md`](milestone-4.md)
 
 Normative contract: [`source-adapters.md`](source-adapters.md)
 
+GitHub review profile: [`github-curation-review.md`](github-curation-review.md)
+
+GitHub human-edit profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
 Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
@@ -15,7 +19,9 @@ Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
 ## Outcome
 
 Milestone 5 completes the Orinoco Lite source-adapter system defined by the normative source-adapter specification.
-It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent service or required local checkout.
+It delivers two materially different adapters, durable human decisions, upstream-compatible assertion provenance, and a complete GitHub review workflow without a persistent metadata service or required local checkout.
+The hosted decision path uses a small stateless GitHub authentication application plus one expiring GitHub Actions decision-review artifact; GitHub commits and the authenticated comment remain the durable authorities.
+The separate SHACL Vue path reuses that application and adds one expiring exact-head editor-input artifact without making either artifact durable state.
 
 Zotero is the reusable-looking case.
 `dump-research-info` is the deliberately CON-specific case.
@@ -31,7 +37,7 @@ Milestone 5 preserves the accepted Milestone 4 distribution unless this mileston
 
 - a downstream is one ordinary Git repository without submodules or gitlinks;
 - concrete adapters and their policy are site-owned under `source-adapters/`;
-- static validation, build, review, and deployment require no persistent metadata service;
+- static validation, build, and deployment require no persistent metadata service, while hosted source-adapter review and human editing use only the normative stateless GitHub authentication application plus their distinct untracked, expiring presentation artifacts;
 - human review is authoritative, and automation never chooses a disposition, approves, merges, deploys, or writes to an external source;
 - the real `centerforopenneuroscience.org` repository remains read-only; and
 - open identity, publication, venue, topic, eligibility, governance, and production decisions remain open.
@@ -52,30 +58,61 @@ Exact implementation bases, releases, source versions, and reviewed heads are re
 - Prove parity and idempotence with focused tests.
 - After that implementation is reviewed, normalize the existing metadata corpus once in a separate pull request.
 - Implement the annotation-overlay format, selector validation, deterministic join, schema validation, JSON/RDF round trip, and projection behavior.
+- Match pinned enrichment behavior for imported objects and qualified data and class-range assertions.
+- Implement M5-D012: canonical records store the real `AttributeSpecification` and `Statement` objects, companions retain only their PAV, and the join attaches annotations rather than deriving semantic objects from scalar selectors.
+- Follow the pinned helper when an equivalent assertion exists but its topical slot is missing: propose the topical convenience copy without claiming ownership or adding PAV.
+- Preserve non-string topical types with schema-derived typed attribute values, and use a reversible ephemeral compact-PAV view rather than forking the pinned ownership helper.
 
-Gate: the canonical corpus produces stable review diffs, and joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML.
+Gate: the canonical corpus produces stable review diffs, joined records preserve the complete upstream Things semantics without exposing machine annotations in human-facing record YAML, and the reviewed HR-212 outcome has focused helper-parity, RDF, and projection evidence.
 
 ### 2. Conform both adapters
 
 - Derive an ephemeral candidate plan from stable source identifiers, normalized metadata-affecting source facts, current canonical metadata, adapter policy, and the compact decision cache.
 - Produce deterministic additions, modifications, and deletions in the record and annotation-overlay trees.
 - Implement only `accept`, `reject`, and `defer` with the behavior defined by the specification.
-- Store current decisions in the adapter-owned compact cache and rely on Git for history.
-- Preserve semantically unchanged assertions and their existing PAV; do not produce provenance-only changes.
+- Store PID-keyed current decisions and only their referenced authenticated-comment review blocks in the adapter-owned compact v1 cache; rely on Git for history.
+- Coalesce same-adapter source rows per PID, keep candidate PID/path fixed during review, and use correction-safe three-way reversal for rejection and deferral.
+- Preserve semantically unchanged qualified assertions and their existing PAV; do not produce provenance-only changes or infer ownership from a topical scalar.
 - Reuse pinned upstream validation, serialization, PAV, and ownership-aware update primitives where compatible, with focused parity tests for local replacements.
 
 Gate: Zotero and `dump-research-info` independently satisfy the same observable contract without sharing source-specific policy.
 
 ### 3. Complete the GitHub profile
 
+Implement the separately reviewed normative [`GitHub source-adapter curation profile`](github-curation-review.md):
+
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
-- Create the proposal with one inline `datalad run --explicit` commit and render friendly per-record task-list controls in the pull-request body.
-- Support attributed comment suggestions, direct human commits, and SHACL Vue bundles applied through the project Pixi/DataLad task.
+- Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible fallback and review-application link in the pull-request body.
+- Provide responsive before-and-after record diffs, mutually exclusive per-record controls, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
+- Have the trusted workflow generate the actual diff and exactly one untracked, expiring, reproducible Actions presentation bundle containing source and proposal coordinates plus per-record UI facts.
+- Have the application use GitHub Actions read access to load that bundle, derive candidate membership and operations from the proposal commit's metadata diff, and run no adapter or source logic.
+- Keep that proposal-review artifact distinct from the SHACL Vue editor-input artifact; the latter never changes this exactly-one proposal artifact contract or enters decision finalization.
+- Keep pull-request Markdown as an accessible fallback rather than a machine protocol or native-diff-size conformance boundary.
+- Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
+- Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
+- Support attributed comment suggestions and direct human metadata commits through ordinary GitHub collaboration.
+- Keep SHACL Vue proposal editing in the distinct [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) rather than making its bundle an input to this decision workflow.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
 - Keep trusted workflow code separate from pull-request data, use exact-head compare-and-swap for automated commits, and require no local checkout from reviewers.
 - Preserve every proposal and human-review commit through a merge commit; never squash or rebase the reviewed lineage.
 
 Gate: an authorized reviewer can complete the entire workflow in one pull request, and automation neither decides nor publishes on the reviewer's behalf.
+
+### 3a. Complete the SHACL Vue human-edit profile
+
+- Preserve the normal **Download bundle** workflow and expose the exact generated object through a neutral browser event.
+- Add **Propose via GitHub** only in the thin Orinoco wrapper.
+- Have a trusted default-branch workflow publish exactly one expiring, reproducible `orinoco-shacl-vue-input-<source_sha>` artifact for each exact pull-request or current default-branch commit exposed for editing.
+- Limit that artifact to `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`; it is presentation input, not metadata, a generated bundle, provenance, or durable curation state.
+- Have the stateless application verify the trusted workflow and exact source commit, then combine those data files only in browser memory with the generic editor shell and schema from an immutable, digest-verified runtime release.
+- For an existing curation pull request, bind **Edit in SHACL Vue** to its exact head; for a standalone edit, bind to the exact current default-branch commit.
+- Use the authenticated curator's GitHub identity to append one temporary bundle-only handoff commit to a same-repository draft pull-request branch.
+- Have trusted default-branch Python code replace only that exact handoff commit with the equivalent canonical record and annotation-overlay commit, preserving every earlier commit.
+- Validate the joined graph and add the configurable curation-service link without retaining the bundle or choosing any metadata or decision.
+- Require explicit acknowledgment that the handoff contains only public-approved data and no secrets.
+- Confine contents write to this explicit human proposal operation, retain no service-side copy, and add no separate Worker, conversion service, database, object store, or artifact cache.
+
+Gate: the final branch contains the attributed human metadata commit and no handoff bundle, stale heads fail, and neither SHACL Vue nor the service gains source-adapter semantics or durable curation state.
 
 ### 4. Exercise interaction and recovery
 
@@ -114,10 +151,10 @@ Milestone 5 does not:
 - modify or graduate the production site;
 - write to Zotero or another external source;
 - resolve identity, publication, venue, topic, eligibility, approver, hosting, or production policy;
-- require a persistent service, custom credential service, automatic approval, automatic merge, or pull-request deployment;
+- require a persistent metadata or credential service, durable hosted curation state, automatic approval, automatic merge, or pull-request deployment;
 - add another semantic overlay, generic plugin ABI, persistent adapter service, or second hosted implementation;
 - use SSSOM without a genuine ontology-mapping set or add W3C PROV without a demonstrated lineage question;
-- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, or custom attestation graphs; or
+- retain candidate inventories, review documents, exhaustive manifests, DataLad sidecars, reconciliation reports, custom attestation graphs, or either expiring presentation artifact as durable state; or
 - promote `dump-research-info` into a generic adapter.
 
 ## Exit gate

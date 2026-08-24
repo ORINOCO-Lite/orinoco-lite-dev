@@ -22,7 +22,9 @@ vi.mock('@/modules/utils', () => ({
 
 const {
     buildReviewBundle,
+    dispatchReviewBundle,
     recordSubmissionLabel,
+    REVIEW_BUNDLE_EVENT,
     reviewBundleFilename,
     validateRecordCatalog,
 } = await import('../src/modules/review-bundle');
@@ -86,6 +88,32 @@ describe('Orinoco review bundles', () => {
             source_sha256: SOURCE_SHA256,
         });
         expect(bundle.records[0].rdf_turtle).toContain('Changed label');
+    });
+
+    it('exposes the exact generated bundle through a browser event', async () => {
+        const graph = new Store([
+            quad(IRI, namedNode('http://www.w3.org/2000/01/rdf-schema#label'), literal('Changed label')),
+        ]);
+        const bundle = await buildReviewBundle({
+            catalog,
+            graph,
+            prefixes: {
+                rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+                xyzrins: 'https://example.test/r/',
+            },
+            selectedNodes: [{ node_iri: IRI }],
+        });
+        let observed;
+        window.addEventListener(
+            REVIEW_BUNDLE_EVENT,
+            (event) => {
+                observed = event.detail;
+            },
+            { once: true }
+        );
+
+        expect(dispatchReviewBundle(bundle)).toBe(true);
+        expect(observed).toBe(bundle);
     });
 
     it('rejects old catalogs and produces deterministic filenames', () => {

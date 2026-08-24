@@ -4,6 +4,13 @@ import { getRecordQuads, quadsToTTL, toCURIE } from '@/modules/utils';
 
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 2;
+export const REVIEW_BUNDLE_EVENT = 'orinoco:review-bundle';
+
+export function dispatchReviewBundle(bundle, target = window) {
+    return target.dispatchEvent(
+        new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle })
+    );
+}
 
 export function recordSubmissionLabel({
     classLabel,

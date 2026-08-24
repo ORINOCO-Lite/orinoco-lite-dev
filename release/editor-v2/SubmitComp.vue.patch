@@ -5,7 +5,7 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
 @@ -139 +140 @@
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
-+import { buildReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
++import { buildReviewBundle, dispatchReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
 @@ -174,0 +176,21 @@
 +
 +function accessibleRecordSubmissionLabel(record) {
@@ -28,3 +28,5 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +        recordLabel,
 +    });
 +}
+@@ -255,0 +278 @@
++            dispatchReviewBundle(bundle);

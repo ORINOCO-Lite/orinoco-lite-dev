@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import yaml
 
+from .annotations import (
+    companion_sources,
+    join_annotations,
+    validate_stored_record,
+)
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
 
@@ -57,6 +63,7 @@ def record_sources(workspace: WorkspaceConfig) -> list[dict[str, str]]:
         value = yaml.safe_load(content)
         if not isinstance(value, dict):
             raise ConfigurationError(f"Metadata record must be a mapping: {path}")
+        validate_stored_record(value)
         pid = value.get("pid")
         schema_type = value.get("schema_type")
         if not isinstance(pid, str) or not isinstance(schema_type, str):
@@ -75,3 +82,38 @@ def record_sources(workspace: WorkspaceConfig) -> list[dict[str, str]]:
         )
     records.sort(key=lambda item: (item["pid"], item["path"]))
     return records
+
+
+def stored_records(workspace: WorkspaceConfig) -> list[dict[str, Any]]:
+    """Load the human-facing record tree without machine annotations."""
+
+    return [yaml.safe_load(source["content"]) for source in record_sources(workspace)]
+
+
+def joined_records(
+    workspace: WorkspaceConfig,
+    schema: Path,
+) -> list[dict[str, Any]]:
+    """Load records joined with their mirrored machine PAV companions."""
+
+    # Retain the schema argument as part of the established record-loading
+    # surface.  Annotation joining no longer derives assertions from scalar
+    # slots and therefore does not need schema slot semantics.
+    del schema
+
+    sources = record_sources(workspace)
+    companions = {
+        source.record_path.resolve(): source.value
+        for source in companion_sources(workspace)
+    }
+    if not companions:
+        return [yaml.safe_load(source["content"]) for source in sources]
+
+    joined: list[dict[str, Any]] = []
+    for source in sources:
+        path = workspace.root / source["path"]
+        record = yaml.safe_load(source["content"])
+        joined.append(
+            join_annotations(record, companions.get(path.resolve()))
+        )
+    return joined

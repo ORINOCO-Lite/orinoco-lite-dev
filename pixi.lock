@@ -44,6 +44,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026c-h151e31d_0.conda
       - pypi: ./packages/orinoco-lite
+      - pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=2e6a5ddc92928a6165b81fdae24a52c447967c7d#2e6a5ddc92928a6165b81fdae24a52c447967c7d
       - pypi: https://files.pythonhosted.org/packages/00/cc/7fbd75d3362e939eb98bcf9bd22f3f7df8c237a85148899ed3d38e5614e5/json_flattener-0.1.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/01/c4/4fa4c8b3097a11f3c5f09a35b72ed6855fb1d332469504962ab7bafcc702/charset_normalizer-3.4.9-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
@@ -199,6 +200,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/readline-8.3-h46df422_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tk-8.6.13-hd3d0363_3.conda
       - pypi: ./packages/orinoco-lite
+      - pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=2e6a5ddc92928a6165b81fdae24a52c447967c7d#2e6a5ddc92928a6165b81fdae24a52c447967c7d
       - pypi: https://files.pythonhosted.org/packages/00/cc/7fbd75d3362e939eb98bcf9bd22f3f7df8c237a85148899ed3d38e5614e5/json_flattener-0.1.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl
@@ -865,6 +867,11 @@ packages:
   - pydantic==2.13.4
   - pyyaml==6.0.2
   - rdflib==7.6.0
+  - things-enrichment-tools @ git+https://github.com/leej3/things-enrichment-tools.git@2e6a5ddc92928a6165b81fdae24a52c447967c7d
+  requires_python: '>=3.12'
+- pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=2e6a5ddc92928a6165b81fdae24a52c447967c7d#2e6a5ddc92928a6165b81fdae24a52c447967c7d
+  name: things-enrichment-tools
+  version: 0.1.dev56+g2e6a5ddc9
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/00/cc/7fbd75d3362e939eb98bcf9bd22f3f7df8c237a85148899ed3d38e5614e5/json_flattener-0.1.9-py3-none-any.whl
   name: json-flattener

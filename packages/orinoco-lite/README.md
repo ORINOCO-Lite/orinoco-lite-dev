@@ -19,6 +19,7 @@ The engine owns:
 - exact engine, runtime, manifest, and resource integrity checks;
 - verified asset hydration and fetch-free verification;
 - semantic validation and deterministic projection through released drivers;
+- canonical source-adapter serialization, annotation joining, candidate planning, compact decisions, and Git-based finalization primitives;
 - deterministic static builds for root-relative local preview or an explicit public project-path base;
 - serving an already built artifact without rewriting it;
 - validation and optional application of static-editor review bundles; and
@@ -54,7 +55,9 @@ The template can compose prerequisites and platform compatibility checks that a 
 
 `orinoco.yaml` names the site, public base URL, normalized site-owned roots, and optional released-driver aliases.
 The current configuration contract is version 2; version 1 is intentionally rejected rather than translated implicitly.
-The metadata interface is deliberately singular: `paths.records` defaults to `metadata/records`, and every Thing below that root participates in validation and projection.
+The semantic metadata interface comprises reviewed Things under `metadata/records/` and their machine-managed PAV companions under `metadata/overlays/annotations/`.
+`paths.records` defaults to `metadata/records`; the companion tree mirrors that fixed record path below its overlay namespace, and the deterministic join is the validation and RDF boundary.
+Every Thing below the configured record root participates in validation and projection.
 Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
 Site-owned source adapters use `paths.source_adapters` (default `source-adapters`), while framework provenance defaults to `.orinoco-lite/provenance`.
 There are no legacy `canonical`, `reference`, or `integrations` path aliases.

@@ -22,6 +22,7 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
 }
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
+REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
 
 
 def _run(
@@ -91,7 +92,7 @@ def _apply_submission_accessibility_patch(
     component: Path,
     patch_path: Path,
 ) -> None:
-    """Apply and verify the reviewed, source-level accessibility overlay."""
+    """Apply and verify the reviewed, source-level submission overlay."""
 
     if patch_path.is_symlink() or not patch_path.is_file():
         raise DriverError("Editor submission accessibility patch is missing")
@@ -100,11 +101,14 @@ def _apply_submission_accessibility_patch(
     source = component.read_text(encoding="utf-8")
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
+        or source.count(REVIEW_BUNDLE_DISPATCH) != 1
         or "return recordSubmissionLabel({" not in source
         or "recordIri: record.node_iri" not in source
         or "prefixes: allPrefixes" not in source
+        or source.index("dlJSON(bundle, reviewBundleFilename(bundle.records));")
+        > source.index(REVIEW_BUNDLE_DISPATCH)
     ):
-        raise DriverError("Editor submission accessibility patch is incomplete")
+        raise DriverError("Editor submission patch is incomplete")
 
 
 def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, Any]:

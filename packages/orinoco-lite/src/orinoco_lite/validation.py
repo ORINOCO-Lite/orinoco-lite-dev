@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 import yaml
 
+from .annotations import annotation_root, companion_sources, validate_stored_record
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
 from .integrity import tree_sha256
@@ -48,6 +49,7 @@ def _load_record(path: Path) -> dict[str, Any]:
         raise ConfigurationError(f"Metadata record is invalid UTF-8 YAML: {path}") from error
     if not isinstance(value, dict):
         raise ConfigurationError(f"Metadata record must be a YAML mapping: {path}")
+    validate_stored_record(value)
     pid = value.get("pid")
     schema_type = value.get("schema_type")
     if not isinstance(pid, str) or not pid or not isinstance(schema_type, str) or not schema_type:
@@ -81,7 +83,7 @@ def _gitlinks(root: Path) -> list[str]:
 
 
 def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
-    """Reject metadata content that is not part of the configured record tree."""
+    """Allow only records and the specification-defined annotation overlay."""
 
     metadata_root = workspace.root / "metadata"
     if not metadata_root.exists():
@@ -91,17 +93,24 @@ def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
             f"The metadata boundary must be a regular directory: {metadata_root}"
         )
     records_root = workspace.path("records")
+    annotations_root = annotation_root(workspace)
+    allowed_roots = (records_root, annotations_root)
     for candidate in sorted(metadata_root.rglob("*")):
         if candidate.is_symlink():
             raise ConfigurationError(
                 f"Site-owned paths cannot contain symlinks: {candidate}"
             )
-        if candidate == records_root or records_root in candidate.parents:
+        if any(candidate == root or root in candidate.parents for root in allowed_roots):
             continue
-        if candidate in records_root.parents:
+        if any(candidate in root.parents for root in allowed_roots):
+            if not candidate.is_dir():
+                raise ConfigurationError(
+                    f"Metadata namespace parent must be a directory: {candidate}"
+                )
             continue
         raise ConfigurationError(
-            "Everything below metadata must be part of paths.records; "
+            "Everything below metadata must be part of paths.records or "
+            "metadata/overlays/annotations; "
             f"found undeclared content: {candidate}"
         )
 
@@ -144,6 +153,8 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         pids[pid] = path
         classes[record["schema_type"]] += 1
 
+    companions = companion_sources(workspace)
+
     asset_manifest = workspace.path("assets") / "manifest.yaml"
     if not asset_manifest.is_file() or asset_manifest.is_symlink():
         raise ConfigurationError(
@@ -157,14 +168,20 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         name: sum(1 for _ in _files(workspace.path(name)))
         for name in REQUIRED_INPUT_PATHS
     }
+    file_counts["annotations"] = len(companions)
+    assertion_count = sum(source.assertion_count for source in companions)
+    tree_hashes = {
+        name: tree_sha256(workspace.path(name)) for name in REQUIRED_INPUT_PATHS
+    }
+    tree_hashes["annotations"] = tree_sha256(annotation_root(workspace))
     return {
+        "annotation_assertions": assertion_count,
+        "annotation_companions": len(companions),
         "records": len(records),
         "record_classes": dict(sorted(classes.items())),
         "files": file_counts,
         "site": workspace.site_name,
-        "site_owned_tree_sha256": {
-            name: tree_sha256(workspace.path(name)) for name in REQUIRED_INPUT_PATHS
-        },
+        "site_owned_tree_sha256": tree_hashes,
         "version": 2,
     }
 

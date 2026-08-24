@@ -1,0 +1,4 @@
+GITHUB_CLIENT_ID="replace-with-github-app-client-id"
+GITHUB_CLIENT_SECRET="replace-with-github-app-client-secret"
+PUBLIC_ORIGIN="http://127.0.0.1:8788"
+SESSION_SEAL_KEY="replace-with-base64url-encoded-32-byte-key"

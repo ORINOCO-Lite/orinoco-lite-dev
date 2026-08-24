@@ -2,7 +2,7 @@
 
 Status: Milestone 4 accepted; Milestone 5 active; production-graduation review remains open
 
-Review snapshot: 2026-08-20
+Review snapshot: 2026-08-24
 
 This is the single working list of unresolved **human choices** accumulated through the clean migration, full migration, complete-content migration, and single-repository distribution work.
 It separates policy from facts with an objectively testable answer.
@@ -66,6 +66,7 @@ Priorities mean:
 | HR-207 | P2 | Source adapters | Use shared accept/reject/defer behavior with adapter-owned source semantics |
 | HR-210 | P2 | Test fixture | Choose the long-term role of the full-content test consumer |
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
+| HR-213 | P2 | Hosted editing | Turn the normal SHACL Vue bundle into an attributed GitHub metadata proposal |
 
 ## P0 — close the current engineering review
 
@@ -491,17 +492,26 @@ Accept intentional modernization rather than requiring pixel parity, but record 
 
 **Question:** Should normal source-adapter review require a local bundle handoff, or provide a least-privilege authenticated branch and pull-request workflow?
 
-**Outcome:** The GitHub profile opens one draft pull request containing the actual metadata proposal and friendly per-record controls.
-An authorized collaborator can review, modify, and submit the complete decision state without a local checkout.
-Automation applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
-The workflow uses the repository's normal GitHub Actions credential and does not introduce a persistent service or custom credential system.
+**Outcome:** The trusted GitHub workflow opens one draft pull request containing the actual metadata proposal, an accessible Markdown fallback, and a link to the supported decision application.
+A deployed web application backed by a minimal stateless GitHub App user-authorization service provides friendly before-and-after record diffs and mutually exclusive accept, reject, or defer controls.
+The workflow publishes exactly one untracked, expiring, reproducible GitHub Actions presentation bundle containing the identified source and proposal coordinates and per-record UI facts.
+The application uses Actions read access to load that bundle, while deriving candidate membership and operations from the proposal commit's metadata diff.
+It posts the complete head- and source-bound decision payload on the authorized collaborator's behalf and retains no second copy of metadata or curation state.
+It reads the workflow-generated GitHub proposal and Actions objects and does not execute adapter or source logic.
+GitHub Actions applies the human's decisions and attributed changes but never chooses a disposition, approves, merges, deploys, or writes to the external source.
+The service retains only OAuth state and short-lived authentication sessions as operational state; the presentation bundle expires under ordinary GitHub artifact retention and neither is a persistent metadata or credential service.
+Git commits and the authenticated submission comment remain the durable review record.
+Pull-request Markdown is not a machine protocol and its native rendering limits are not curation conformance limits.
+The project may publish one central application origin by default, but that origin remains configurable and the same stateless implementation may be self-hosted.
 
-**Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review.
+**Rationale:** The metadata diff and human decisions belong in one ordinary pull-request review, but native Markdown cannot provide dynamic mutually exclusive controls, typed complete submission, or useful compact review for a large candidate set.
+The custom page and expiring bundle are only presentation and decision transport; GitHub remains authoritative for the proposal, authenticated comment, commit boundary, compact cache, and review history.
 Local execution remains available for development and reproduction but is not a condition of normal curation.
 
-**Decided by/date:** John Lee, 2026-08-20.
+**Decided and refined by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Implement and accept the GitHub profile under the normative [`source-adapters.md`](source-adapters.md) contract.
+**Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](github-curation-review.md) under the host-neutral [`source-adapters.md`](source-adapters.md) contract.
+Treat SHACL Vue's existing download and future GitHub proposal integration as a separate human-edit profile; it is not a bundle input or contents-write requirement for this decision-review profile.
 
 ### HR-207 — Define source-adapter decision defaults
 
@@ -526,6 +536,113 @@ This decision does not settle identity, publication, venue, topic, or eligibilit
 **Decided by/date:** John Lee, 2026-08-20.
 
 **Follow-up:** Complete Zotero and `dump-research-info` conformance and the hosted review workflow under Milestone 5.
+
+### HR-208 — Preserve source-adapter assertion types during annotation join
+
+**Status:** accepted
+
+**Question:** How should the annotation overlay qualify machine-provided class-range URIs and non-string data without changing their RDF meaning or coercing stored topical metadata?
+
+**Outcome:** Follow the pinned upstream enrichment pattern for class-range URI assertions by deriving an annotated `Statement` under `characterized_by`, with the schema-induced predicate and topical URI object.
+For non-string data, retain the native topical value and derive an `AttributeSpecification` whose string-valued `value` is the canonical lexical form and whose `range` is the locked LinkML datatype.
+Do not add `schema_type` to the derived `Statement`, and do not coerce topical values to strings.
+
+**Rationale:** Encoding a class-range URI as an attribute value changes an RDF resource into a literal, while putting a raw integer or boolean into `AttributeSpecification.value` violates the locked schema.
+The accepted forms preserve native topical semantics and round trip through the pinned JSON/RDF converters.
+This decision fixes the qualified-object shapes.
+HR-212 subsequently fixed their canonical placement after the pinned update behavior exposed the representational incompatibility of scalar companion selectors.
+
+**Decided by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Add focused parity and locked-schema round-trip evidence to Milestone 5 acceptance.
+
+### HR-209 — Keep review finalization compact and correction-safe
+
+**Status:** accepted
+
+**Question:** What exact durable cache and patch behavior preserve human corrections without reintroducing transaction artifacts or silently discarding work?
+
+**Outcome:** Use the normative compact v1 canonical-YAML cache with PID-keyed current decisions and only their referenced authenticated GitHub-comment review blocks.
+Reject and defer reverse each candidate's proposal patch using Git three-way semantics, preserve clean non-overlapping human edits, and fail on overlap.
+For accepted human corrections, remove only untouched proposal-added PAV entries made stale by the correction and fail on human-edited or ambiguous companion state.
+Delete empty companions, coalesce same-adapter rows into one claim per PID, and keep the candidate PID and path fixed during one review.
+
+**Rationale:** Git already supplies patch merging, conflicts, correction, retry, and history.
+These rules keep the durable cache small, avoid whole-record restoration that can discard unrelated edits, and make ambiguous ownership or identity changes visible to the reviewer.
+
+**Decided by/date:** John Lee, 2026-08-20.
+
+**Follow-up:** Add focused cache, correction, overlap, all-rejected, and rerun evidence to Milestone 5 acceptance.
+
+### HR-212 — Preserve upstream qualified scalar updates
+
+**Status:** accepted
+
+**Question:** When a source data or class-range value differs from an already populated topical slot, should Orinoco Lite preserve the pinned enrichment helper's qualified-assertion behavior or adopt a local scalar replacement model?
+
+**Evidence:** Pinned `update_data_property()` populates a topical slot only when it is absent.
+It independently maintains machine-owned `AttributeSpecification` or `Statement` objects, preserves differently owned qualified values, and leaves an existing topical value unchanged.
+The current scalar-path companion can derive only the current topical value, so it cannot represent a different machine source value.
+An unannotated qualified object stored in the record and selected by the existing companion rejoins to the same RDF assertion as upstream inline PAV.
+
+**Options:**
+
+1. Store every qualified assertion object as canonical record content, retain only its PAV in the companion, and use an ephemeral compact-PAV view to run the pinned helper.
+This preserves upstream semantics and confines local behavior to reversible PAV splitting and locked-schema typed normalization.
+It also means an initial source run can add substantive qualified objects even when a topical value already matches, and public projections must tolerate those real semantic objects.
+2. Derive the qualified object from a scalar companion and visibly replace conflicting topical values.
+This keeps records shorter and top-level fields current, but permanently forks upstream ownership and coexistence semantics and requires a locally maintained merge algorithm.
+3. Replace only a scalar inferred to be same-owner.
+Upstream does not encode ownership on the topical scalar, so this requires new state or inference and is not sustainable under the accepted authority boundary.
+4. Put the alternate source value in the companion.
+This keeps records compact but turns the PAV companion into a second semantic metadata store and changes its schema, hashing, review, and migration contract.
+5. Ignore a conflicting source scalar.
+This avoids overwriting curated data but drops the upstream qualified source claim from the canonical graph and review diff.
+
+**Outcome:** Use option 1.
+Canonical records store the same topical fields and qualified `AttributeSpecification` or `Statement` objects produced by pinned upstream enrichment behavior.
+The annotation companion stores only PAV removed from those objects, and joining the two trees reproduces the upstream Things assertion graph.
+The join never derives qualified assertions from top-level scalar fields.
+A human-reviewed edit to a top-level curated field is a separate curation action.
+
+When a topical slot is absent but an equivalent human- or unowned qualified assertion already exists, follow upstream rather than failing closed.
+The adapter proposes copying the assertion value into the topical slot without claiming ownership of the existing assertion and without adding PAV.
+Human review may accept, reject, or defer that proposal.
+
+**Decided by/date:** John Lee, 2026-08-24.
+
+**Follow-up:** Replace the provisional scalar-selector join, add pinned-helper parity evidence, and conform both adapters before either writes existing-corpus metadata.
+
+### HR-213 — Add the SHACL Vue GitHub human-edit path
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** How should SHACL Vue propose an attributed metadata edit without embedding GitHub or source-adapter behavior in the editor or reimplementing the pinned RDF-to-Things conversion in TypeScript?
+
+**Outcome:** Preserve SHACL Vue's normal **Download bundle** workflow and expose the exact generated version 2 bundle through a neutral browser event.
+A trusted default-branch workflow first publishes one expiring, reproducible editor-input artifact for the exact pull-request or current default-branch commit being edited.
+It contains only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`.
+The central stateless application verifies the trusted run and exact commit, then combines those data files only in browser memory with the generic SHACL Vue shell and Things schema from an immutable, digest-verified Orinoco Lite runtime release.
+
+A thin Orinoco wrapper adds **Propose via GitHub** and uses the authenticated curator's GitHub identity.
+For an existing curation pull request it appends one bundle-only handoff commit to the exact head; for a standalone edit it creates a branch at the exact source commit, appends the handoff, and opens a draft pull request.
+Before that write, the curator explicitly acknowledges that the bundle contains only public-approved data and no secrets.
+
+Trusted default-branch Python applies the pinned Orinoco editor conversion, validates the joined graph, and replaces only the exact handoff commit with an equivalent attributed human metadata commit sharing its parent.
+This preserves prior proposal and human commits while removing the bundle from the branch.
+The shared GitHub App uses metadata read, Actions read, contents write, and pull requests write, with contents write confined to these explicit same-repository human proposal operations.
+The service retains no bundle or metadata.
+
+**Rationale:** The normal bundle carries RDF rather than canonical YAML and annotation companions.
+Using the pinned Python conversion avoids a divergent TypeScript implementation and needs no additional deployed runtime service.
+The exact-head artifact is only reproducible presentation input and is distinct from the source-adapter profile's exactly-one decision-review artifact; it is not metadata, the generated bundle, provenance, or durable curation state.
+Combining trusted released editor code with exact-commit data in browser memory avoids pull-request executable code, browser-side conversion, another Worker, a database, an object store, or an artifact cache.
+The temporary commit gives the trusted Action a bounded handoff while exact-head replacement keeps it out of mergeable history.
+A public Git host can retain unreachable objects, so the path is limited to data already approved for public repository history.
+
+**Decided and refined by/date:** John Lee, 2026-08-24.
+
+**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), including the exact-head editor-input artifact and immutable released shell, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
 
 ## P2 — strategic decisions
 

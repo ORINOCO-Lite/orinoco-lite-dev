@@ -7,6 +7,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import yaml
+
+from orinoco_lite.annotations import annotation_companion, assertion_sha256
+from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import load_workspace
 from orinoco_lite.editor import (
     BUNDLE_FORMAT,
@@ -16,7 +20,7 @@ from orinoco_lite.editor import (
     apply_bundle_report,
     record_catalog,
 )
-from orinoco_lite.errors import DriverError
+from orinoco_lite.errors import ConfigurationError, DriverError
 
 
 CONFIG = """\
@@ -25,6 +29,14 @@ site:
   name: Editor fixture
   base_url: https://example.invalid/editor/
 """
+
+
+def display_label_assertion(value: str) -> dict[str, str]:
+    return {
+        "predicate": "skos:prefLabel",
+        "schema_type": "dlthings:AttributeSpecification",
+        "value": value,
+    }
 
 
 class EditorBundleTests(unittest.TestCase):
@@ -75,7 +87,11 @@ class EditorBundleTests(unittest.TestCase):
         self.first.write_text(
             "pid: xyzrins:persons/first\n"
             "schema_type: xyzri:XYZPerson\n"
-            "display_label: First\n",
+            "display_label: First\n"
+            "attributes:\n"
+            "- predicate: skos:prefLabel\n"
+            "  schema_type: dlthings:AttributeSpecification\n"
+            "  value: First\n",
             encoding="utf-8",
         )
         self.second.write_text(
@@ -234,6 +250,127 @@ class EditorBundleTests(unittest.TestCase):
                 _atomic_apply(updates)
         self.assertEqual(self.first.read_bytes(), originals[self.first])
         self.assertEqual(self.second.read_bytes(), originals[self.second])
+
+    def test_human_replacement_reconciles_companion_in_the_same_apply(self) -> None:
+        companion = (
+            self.root
+            / "metadata/overlays/annotations/XYZPerson/first.yaml"
+        )
+        companion.parent.mkdir(parents=True)
+        companion.write_text(
+            canonical_yaml(
+                annotation_companion(
+                    "xyzrins:persons/first",
+                    [
+                        {
+                            "path": "/attributes",
+                            "assertion_sha256": assertion_sha256(
+                                display_label_assertion("First")
+                            ),
+                            "pav:importedBy": "xyzrins:source-adapters/example/v1",
+                            "pav:importedFrom": "https://source.example/people/first",
+                        }
+                    ],
+                )
+            ),
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.root), "commit", "-qm", "add companion"],
+            check=True,
+        )
+        bundle = self._bundle({"xyzrins:persons/first": "Human replacement"})
+
+        report = apply_bundle_report(
+            self.workspace, self.runtime, bundle, write=False
+        )
+
+        self.assertEqual(
+            report["changed_paths"],
+            [
+                "metadata/overlays/annotations/XYZPerson/first.yaml",
+                "metadata/records/XYZPerson/first.yaml",
+            ],
+        )
+        self.assertIn("- assertion_sha256:", report["diff"])
+        apply_bundle(self.workspace, self.runtime, bundle, write=True)
+        self.assertEqual(
+            yaml.safe_load(companion.read_text(encoding="utf-8"))["assertions"],
+            [],
+        )
+        self.assertEqual(
+            self.first.read_text(encoding="utf-8"),
+            canonical_yaml(
+                {
+                    "display_label": "Human replacement",
+                    "pid": "xyzrins:persons/first",
+                    "schema_type": "xyzri:XYZPerson",
+                }
+            ),
+        )
+
+    def test_dirty_companion_and_bundle_inline_pav_fail_closed(self) -> None:
+        companion = (
+            self.root
+            / "metadata/overlays/annotations/XYZPerson/first.yaml"
+        )
+        companion.parent.mkdir(parents=True)
+        companion.write_text(
+            canonical_yaml(
+                annotation_companion(
+                    "xyzrins:persons/first",
+                    [
+                        {
+                            "path": "/attributes",
+                            "assertion_sha256": assertion_sha256(
+                                display_label_assertion("First")
+                            ),
+                            "pav:importedBy": "xyzrins:source-adapters/example/v1",
+                            "pav:importedFrom": "https://source.example/people/first",
+                        }
+                    ],
+                )
+            ),
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.root), "commit", "-qm", "add companion"],
+            check=True,
+        )
+        bundle = self._bundle({"xyzrins:persons/first": "Human replacement"})
+        companion.write_text(
+            canonical_yaml(
+                annotation_companion("xyzrins:persons/first", [])
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(DriverError, "conflicting local change"):
+            apply_bundle(self.workspace, self.runtime, bundle, write=False)
+
+        subprocess.run(
+            ["git", "-C", str(self.root), "restore", companion.relative_to(self.root)],
+            check=True,
+        )
+
+        class InlinePavConverter:
+            def convert(self, _value, class_name):
+                return {
+                    "pid": "xyzrins:persons/first",
+                    "schema_type": f"xyzri:{class_name}",
+                    "display_label": "Human replacement",
+                    "annotations": {"pav:importedBy": "bypass"},
+                }
+
+        with patch(
+            "orinoco_lite.editor._converters",
+            return_value=(InlinePavConverter(), InlinePavConverter()),
+        ):
+            with self.assertRaisesRegex(
+                ConfigurationError, "metadata/overlays/annotations"
+            ):
+                apply_bundle(self.workspace, self.runtime, bundle, write=False)
 
 
 if __name__ == "__main__":
