@@ -176,9 +176,10 @@ Review may revise proposed metadata before finalization.
 Supported inputs include:
 
 - attributed suggestions in review comments that automation applies;
-- one or more metadata commits pushed by authorized humans;
-- a SHACL Vue review bundle applied by an authenticated workflow; and
-- the same bundle operation invoked directly by a future SHACL Vue integration.
+- one or more metadata commits pushed by authorized humans.
+
+SHACL Vue proposal editing is a distinct human-edit profile, not an input to this decision-review and finalization profile.
+Its existing generated bundle may be handed to a separately reviewed GitHub wrapper, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
@@ -187,7 +188,7 @@ The PID and record path identifying an initial candidate remain fixed for that r
 A human identity retarget is expressed as rejection or deferral of the source candidate plus a separately attributed human deletion or addition; the cache never silently moves a source decision to another Thing.
 
 A direct human commit is already its own execution and attribution record.
-When automation applies a comment, patch, or bundle, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
+When automation applies a comment or patch, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
 The Pixi task MUST run through that DataLad recording path.
 The command SHOULD record an input identifier and content hash when available, but the input payload need not remain in the final tree or Git history.
 DataLad is not useful for a decision-cache-only commit.

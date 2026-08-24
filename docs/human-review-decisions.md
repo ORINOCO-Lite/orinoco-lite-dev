@@ -510,6 +510,7 @@ Local execution remains available for development and reproduction but is not a 
 **Decided and refined by/date:** John Lee, 2026-08-24.
 
 **Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](github-curation-review.md) under the host-neutral [`source-adapters.md`](source-adapters.md) contract.
+Treat SHACL Vue's existing download and future GitHub proposal integration as a separate human-edit profile; it is not a bundle input or contents-write requirement for this decision-review profile.
 
 ### HR-207 — Define source-adapter decision defaults
 

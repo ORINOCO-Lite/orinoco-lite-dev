@@ -83,11 +83,12 @@ Normative profile: [`github-curation-review.md`](github-curation-review.md)
 | Requirement | Required evidence | Status |
 | --- | --- | --- |
 | Proposal | Default-branch dispatch opens one draft pull request whose first commit is an inline `datalad run --explicit` metadata proposal. | pending |
-| Pull-request summary | Trusted workflow provides a friendly accessible summary, public-retention disclosure, secondary source/path/blocker/hash details, and link to the supported review application. | pending |
+| Pull-request summary | Trusted workflow provides a concise service link, source coordinate, retention notice, and merge-history requirement; detailed presentation facts remain in the ephemeral artifact. | pending |
 | Review application | Deployed application shows responsive before-and-after record diffs, friendly primary identifiers, secondary source/path/hash details, mutually exclusive controls, filters, changed-only views, keyboard navigation, and completion status. | pending |
-| Stateless service | GitHub App uses only metadata read, contents read, and pull-requests write access; OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | pending |
+| Stateless service | GitHub App uses only metadata read, contents read, Actions read, and pull-requests write access; OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | pending |
 | Complete decision state | Exact structured `/curation submit` binds repository, pull request, proposal commit, head, source, and the complete diff-derived candidate set; the trusted Action regenerates source IDs and claim digests and rejects missing, duplicate, unknown, or stale decisions. | pending |
-| Human modifications | Comments, direct commits, and a SHACL Vue bundle can produce attributed, validated metadata changes on the same branch. | pending |
+| Human modifications | Comments and direct commits can produce attributed, validated metadata changes on the same branch. | pending |
+| SHACL Vue editing | GitHub proposal editing through SHACL Vue is a distinct human-edit profile rather than a bundle input to this decision workflow. | deferred to a separate reviewed task |
 | DataLad boundary | Programmatic metadata changes use the project Pixi/DataLad task; decision-cache-only commits use ordinary Git. | pending |
 | Attribution | The GitHub App posts on the user's behalf; the Action derives the reviewer from authenticated comment context, and each bot commit uses the most recent triggering human as author and automation as committer. | pending |
 | Trusted execution | Write credentials are not exposed to pull-request executable code or source data. | pending |

@@ -86,7 +86,8 @@ Implement the separately reviewed normative [`GitHub source-adapter curation pro
 - Keep pull-request Markdown as an accessible fallback rather than a machine protocol or native-diff-size conformance boundary.
 - Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
 - Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
-- Support attributed comment suggestions, direct human commits, and SHACL Vue bundles applied through the project Pixi/DataLad task.
+- Support attributed comment suggestions and direct human metadata commits through ordinary GitHub collaboration.
+- Keep SHACL Vue proposal editing in a distinct, separately reviewed human-edit profile rather than making its bundle an input to this decision workflow.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
 - Keep trusted workflow code separate from pull-request data, use exact-head compare-and-swap for automated commits, and require no local checkout from reviewers.
 - Preserve every proposal and human-review commit through a merge commit; never squash or rebase the reviewed lineage.

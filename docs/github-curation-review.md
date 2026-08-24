@@ -18,7 +18,6 @@ The initial supported profile MUST:
 - render an accessible pull-request fallback and a review-application link containing the repository, pull-request number, and exact Actions artifact ID;
 - publish exactly one untracked, expiring, reproducible Actions presentation artifact for that proposal;
 - support normal GitHub collaboration on the same branch, including attributed comment suggestions and direct metadata commits;
-- support SHACL Vue bundle application through the project-locked Pixi/DataLad task;
 - accept a complete structured decision state through an exact `/curation submit` comment posted on behalf of the authenticated reviewer;
 - accept submissions only from collaborators with `write` or `admin` access;
 - load executable workflow and adapter code from the trusted default branch;
@@ -50,6 +49,10 @@ Artifact expiry or absence makes the hosted presentation unavailable but cannot 
 
 Reviewers MAY inspect and edit the metadata diff through GitHub's browser tools or a local checkout.
 Neither path changes the candidate, provenance, validation, or finalization rules in the source-adapter specification.
+
+SHACL Vue proposal editing is a separate human-edit profile and is not a bundle input to this decision-review application or trusted finalizer.
+This profile therefore requires repository contents read access, not write access.
+A separately reviewed wrapper may add an explicit, path-restricted human proposal operation without embedding GitHub or source-adapter semantics in SHACL Vue.
 
 ## Hosted review application
 
