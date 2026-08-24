@@ -1,6 +1,6 @@
 # Milestone 5 acceptance record
 
-Status: active; shared-foundation scalar compatibility is under specification review
+Status: active; shared metadata foundation implemented, cross-layer evidence pending
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
@@ -35,18 +35,15 @@ Live-source or authoritative-head drift is advisory and must not silently replac
 | --- | --- | --- |
 | Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | local pass `f413278a4ad8c6da0eb1f1d6412d42b06f5a759c`; review pending |
 | Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | pending |
-| Annotation selectors | Exact path/hash matching rejects missing or ambiguous mapping assertions; scalar targets are rejected | object-selector behavior passes at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; its scalar-selector evidence is superseded by M5-D012 and must be replaced |
-| Joined validation | Stored semantic assertion objects plus annotation companions validate as one Thing with the locked schema | object attachment passes at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; stored qualified data and class-range coverage pending M5-D012 implementation |
-| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | the qualified shapes pass at `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; direct-scalar synthesis is superseded evidence and stored-object parity is pending |
-| Projection | Stored qualified assertions reach normal semantic projections, joined PAV reaches the machine projection, and actual public rendering behavior is explicit | pending M5-D012 implementation and consumer evidence |
-| Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | local pass `e8cb3917dbc6d62a34ed3a07ede860322d26a317`; review pending |
-| Upstream scalar updates | Missing, equal, differing, same-owner, human-owned, and differently owned values match pinned `update_data_property()` after reversible compact-PAV split/join and typed normalization; the missing-topical/equivalent-unowned case copies the topical value without new PAV | approved by M5-D012/HR-212; implementation evidence pending |
+| Annotation selectors | Exact path/hash matching rejects missing or ambiguous mapping assertions; scalar targets are rejected | local pass `91ad2b6886a610aad24a9061d3e71ea2d39db042`; review pending |
+| Joined validation | Stored semantic assertion objects plus annotation companions validate as one Thing with the locked schema | local pass `91ad2b6886a610aad24a9061d3e71ea2d39db042` for object, typed data, and class-range assertions; review pending |
+| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | local pass `91ad2b6886a610aad24a9061d3e71ea2d39db042`; review pending |
+| Projection | Stored qualified assertions reach normal semantic projections, joined PAV reaches the machine projection, and actual public rendering behavior is explicit | joined machine projection and assertion fingerprints pass at `91ad2b6886a610aad24a9061d3e71ea2d39db042`; consumer rendering pending |
+| Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | local pass `91ad2b6886a610aad24a9061d3e71ea2d39db042`; review pending |
+| Upstream scalar updates | Missing, equal, differing, same-owner, human-owned, and differently owned values match pinned `update_data_property()` after reversible compact-PAV split/join and typed normalization; the missing-topical/equivalent-unowned case copies the topical value without new PAV | local parity pass `91ad2b6886a610aad24a9061d3e71ea2d39db042`; review pending |
 
-Foundation verification command: `pixi run test` at `e8cb3917dbc6d62a34ed3a07ede860322d26a317` on macOS 26.5.2 ARM64; 83 engine tests passed with 2 fixture skips and all 40 development tests passed.
-This remains valid evidence for canonicalization, object attachment, qualified-object shapes, and locked round trips, but not for the scalar storage/update behavior superseded by M5-D012.
-
-Replacement M5-D012 evidence must reject scalar companion targets and cover an absent topical slot, the absent-topical/equivalent-unowned convenience copy, an equal topical value without a qualifier, an identical richer qualifier, a changed same-owner qualifier, human- and differently owned qualifiers, multivalue order, compact-to-expanded PAV conversion, typed reverse normalization, class-range `Statement` storage, candidate/cache reopening, and the actual public projection effect.
-The rare absent-topical plus equivalent unowned-qualifier case must exercise the reviewed outcome rather than infer ownership.
+Foundation verification command: `pixi run test` at `cae538490cd70047955b064220de29e74c12cd32` on macOS 26.5.2 ARM64; 153 engine tests passed with 2 fixture skips and all 40 development tests passed.
+The tests cover scalar-target rejection; absent, equal, changed, same-owner, human-owned, and differently owned upstream paths; the approved missing-topical convenience copy; multivalue order; compact/expanded PAV; typed values; class-range `Statement` storage; joined RDF; projection fingerprints; and candidate/cache behavior.
 
 ## Shared review core
 
