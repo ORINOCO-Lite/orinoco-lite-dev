@@ -41,12 +41,13 @@ The service separately requires the signed-in user to have `write` or `admin` co
 
 Configure these Pages runtime values:
 
-| Name                   | Kind     | Purpose                               |
-| ---------------------- | -------- | ------------------------------------- |
-| `PUBLIC_ORIGIN`        | variable | Exact HTTPS deployment origin         |
-| `GITHUB_CLIENT_ID`     | variable | GitHub App client ID                  |
-| `GITHUB_CLIENT_SECRET` | secret   | OAuth code exchange                   |
-| `SESSION_SEAL_KEY`     | secret   | Base64url-encoded 32-byte AES-GCM key |
+| Name                             | Kind     | Purpose                                |
+| -------------------------------- | -------- | -------------------------------------- |
+| `PUBLIC_ORIGIN`                  | variable | Exact HTTPS deployment origin          |
+| `GITHUB_CLIENT_ID`               | variable | GitHub App client ID                   |
+| `EDITOR_RUNTIME_MANIFEST_SHA256` | variable | SHA-256 of the staged runtime manifest |
+| `GITHUB_CLIENT_SECRET`           | secret   | OAuth code exchange                    |
+| `SESSION_SEAL_KEY`               | secret   | Base64url-encoded 32-byte AES-GCM key  |
 
 Do not configure KV, D1, R2, Durable Objects, queues, or analytics-backed curation storage.
 OAuth state and the short-lived GitHub access token exist only in encrypted, host-only browser cookies.

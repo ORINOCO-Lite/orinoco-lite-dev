@@ -125,7 +125,7 @@ jobs:
             --entry submodules/things-schemas/src/demo-research-information/unreleased.yaml \
             --destination build/runtime-schema
           PYTHONPATH=packages/orinoco-lite/src \
-            python -m orinoco_lite release assemble \
+            python -m orinoco_lite.release_runtime \
             --spec "$spec" \
             --source-commit "$GITHUB_SHA" \
             --output "release/dist/orinoco-runtime-$version.tar.gz"
@@ -142,7 +142,7 @@ jobs:
           diff -qr build/runtime-editor-shell-first build/runtime-editor-shell
           diff -qr build/runtime-editor-licenses-first build/runtime-editor-licenses
           PYTHONPATH=packages/orinoco-lite/src \
-            python -m orinoco_lite release assemble \
+            python -m orinoco_lite.release_runtime \
             --spec "$spec" \
             --source-commit "$GITHUB_SHA" \
             --output "release/dist-repeat/orinoco-runtime-$version.tar.gz"
