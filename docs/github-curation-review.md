@@ -50,9 +50,9 @@ Artifact expiry or absence makes the hosted presentation unavailable but cannot 
 Reviewers MAY inspect and edit the metadata diff through GitHub's browser tools or a local checkout.
 Neither path changes the candidate, provenance, validation, or finalization rules in the source-adapter specification.
 
-SHACL Vue proposal editing is a separate human-edit profile and is not a bundle input to this decision-review application or trusted finalizer.
-This profile therefore requires repository contents read access, not write access.
-A separately reviewed wrapper may add an explicit, path-restricted human proposal operation without embedding GitHub or source-adapter semantics in SHACL Vue.
+SHACL Vue proposal editing follows the separate normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) and is not a bundle input to this decision-review application or trusted finalizer.
+Decision-review operations use repository contents read access only.
+The shared App's contents-write permission is confined to the other profile's explicit, path-restricted human handoff operation.
 
 ## Hosted review application
 
@@ -88,7 +88,8 @@ The Action compares the complete PID, path, and operation mapping independent of
 The browser MUST NOT supply reviewer identity.
 The Action derives identity, time, repository, pull request, and comment URL from the authenticated GitHub event.
 
-The GitHub App requests only repository metadata read, contents read, Actions read, and pull requests write access for selected repositories.
+For this profile, the GitHub App uses only repository metadata read, contents read, Actions read, and pull requests write access for selected repositories.
+The shared App registration also has contents write for the distinct SHACL Vue human-edit profile, but this decision path MUST NOT use it.
 It uses a short-lived user access token so the comment is attributed to the authenticated user and the App.
 Signed or encrypted OAuth state and a short-lived authentication session are operational state.
 

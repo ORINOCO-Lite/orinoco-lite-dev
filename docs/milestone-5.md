@@ -10,6 +10,8 @@ Normative contract: [`source-adapters.md`](source-adapters.md)
 
 GitHub review profile: [`github-curation-review.md`](github-curation-review.md)
 
+GitHub human-edit profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
 Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
@@ -87,12 +89,24 @@ Implement the separately reviewed normative [`GitHub source-adapter curation pro
 - Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
 - Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
 - Support attributed comment suggestions and direct human metadata commits through ordinary GitHub collaboration.
-- Keep SHACL Vue proposal editing in a distinct, separately reviewed human-edit profile rather than making its bundle an input to this decision workflow.
+- Keep SHACL Vue proposal editing in the distinct [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) rather than making its bundle an input to this decision workflow.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
 - Keep trusted workflow code separate from pull-request data, use exact-head compare-and-swap for automated commits, and require no local checkout from reviewers.
 - Preserve every proposal and human-review commit through a merge commit; never squash or rebase the reviewed lineage.
 
 Gate: an authorized reviewer can complete the entire workflow in one pull request, and automation neither decides nor publishes on the reviewer's behalf.
+
+### 3a. Complete the SHACL Vue human-edit profile
+
+- Preserve the normal **Download bundle** workflow and expose the exact generated object through a neutral browser event.
+- Add **Propose via GitHub** only in the thin Orinoco wrapper.
+- For an existing curation pull request, bind **Edit in SHACL Vue** to its exact head; for a standalone edit, bind to an exact default-branch commit.
+- Use the authenticated curator's GitHub identity to append one temporary bundle-only handoff commit to a same-repository draft pull-request branch.
+- Have trusted default-branch Python code replace only that exact handoff commit with the equivalent canonical record and annotation-overlay commit, preserving every earlier commit.
+- Validate the joined graph and add the configurable curation-service link without retaining the bundle or choosing any metadata or decision.
+- Confine contents write to this explicit human proposal operation and retain no service-side copy.
+
+Gate: the final branch contains the attributed human metadata commit and no handoff bundle, stale heads fail, and neither SHACL Vue nor the service gains source-adapter semantics or durable curation state.
 
 ### 4. Exercise interaction and recovery
 

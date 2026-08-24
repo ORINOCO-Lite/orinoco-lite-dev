@@ -66,6 +66,7 @@ Priorities mean:
 | HR-207 | P2 | Source adapters | Use shared accept/reject/defer behavior with adapter-owned source semantics |
 | HR-210 | P2 | Test fixture | Choose the long-term role of the full-content test consumer |
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
+| HR-213 | P2 | Hosted editing | Turn the normal SHACL Vue bundle into an attributed GitHub metadata proposal |
 
 ## P0 — close the current engineering review
 
@@ -611,6 +612,30 @@ Human review may accept, reject, or defer that proposal.
 **Decided by/date:** John Lee, 2026-08-24.
 
 **Follow-up:** Replace the provisional scalar-selector join, add pinned-helper parity evidence, and conform both adapters before either writes existing-corpus metadata.
+
+### HR-213 — Add the SHACL Vue GitHub human-edit path
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** How should SHACL Vue propose an attributed metadata edit without embedding GitHub or source-adapter behavior in the editor or reimplementing the pinned RDF-to-Things conversion in TypeScript?
+
+**Outcome:** Preserve SHACL Vue's normal **Download bundle** workflow and expose the exact generated version 2 bundle through a neutral browser event.
+A thin Orinoco wrapper adds **Propose via GitHub** and uses the authenticated curator's GitHub identity.
+For an existing curation pull request it appends one bundle-only handoff commit to the exact head; for a standalone edit it creates a branch at the exact source commit, appends the handoff, and opens a draft pull request.
+
+Trusted default-branch Python applies the pinned Orinoco editor conversion, validates the joined graph, and replaces only the exact handoff commit with an equivalent attributed human metadata commit sharing its parent.
+This preserves prior proposal and human commits while removing the bundle from the branch.
+The shared GitHub App adds contents write solely for these explicit same-repository human proposal operations.
+The service retains no bundle or metadata.
+
+**Rationale:** The normal bundle carries RDF rather than canonical YAML and annotation companions.
+Using the pinned Python conversion avoids a divergent TypeScript implementation and needs no additional deployed runtime service.
+The temporary commit gives the trusted Action a bounded handoff while exact-head replacement keeps it out of mergeable history.
+A public Git host can retain unreachable objects, so the path is limited to data already approved for public repository history.
+
+**Decided and refined by/date:** John Lee, 2026-08-24.
+
+**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), including exact-head editing, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
 
 ## P2 — strategic decisions
 

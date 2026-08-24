@@ -89,10 +89,10 @@ Normative profile: [`github-curation-review.md`](github-curation-review.md)
 | Proposal | Default-branch dispatch opens one draft pull request whose first commit is an inline `datalad run --explicit` metadata proposal. | pending |
 | Pull-request summary | Trusted workflow provides a concise service link, source coordinate, retention notice, and merge-history requirement; detailed presentation facts remain in the ephemeral artifact. | pending |
 | Review application | Deployed application shows responsive before-and-after record diffs, friendly primary identifiers, secondary source/path/hash details, mutually exclusive controls, filters, changed-only views, keyboard navigation, and completion status. | pending |
-| Stateless service | GitHub App uses only metadata read, contents read, Actions read, and pull-requests write access; OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | pending |
+| Stateless service | Decision operations use metadata read, contents read, Actions read, and pull-requests write; the shared App's contents write is confined to the separate explicit SHACL Vue handoff profile. OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | pending |
 | Complete decision state | Exact structured `/curation submit` binds repository, pull request, proposal commit, head, source, and the complete diff-derived candidate set; the trusted Action regenerates source IDs and claim digests and rejects missing, duplicate, unknown, or stale decisions. | pending |
 | Human modifications | Comments and direct commits can produce attributed, validated metadata changes on the same branch. | pending |
-| SHACL Vue editing | GitHub proposal editing through SHACL Vue is a distinct human-edit profile rather than a bundle input to this decision workflow. | deferred to a separate reviewed task |
+| SHACL Vue editing | GitHub proposal editing through SHACL Vue remains a distinct human-edit profile rather than a bundle input to this decision workflow. | profile implementation pending |
 | DataLad boundary | Programmatic metadata changes use the project Pixi/DataLad task; decision-cache-only commits use ordinary Git. | pending |
 | Attribution | The GitHub App posts on the user's behalf; the Action derives the reviewer from authenticated comment context, and each bot commit uses the most recent triggering human as author and automation as committer. | pending |
 | Trusted execution | Write credentials are not exposed to pull-request executable code or source data. | pending |
@@ -110,6 +110,22 @@ Cloudflare deployment `a69a83f5-4d0c-4512-a608-48836ba8f794` serves both `https:
 The public GitHub App `orinoco-lite-curation-review` (App 4704454) is registered for metadata read, contents read, Actions read, and pull-requests write.
 Installation 156254062 remains limited to `con/test-orinoco-downstream-website`; its added Actions permission awaits approval by a `con` organization owner.
 Infrastructure pull request [Python-AI-Solutions/websites-management#13](https://github.com/Python-AI-Solutions/websites-management/pull/13) records deployment and no-change OpenTofu evidence at `8f0f8d2e1819ea046b5306f7a49f87ec457be640`.
+
+## GitHub SHACL Vue human-edit profile
+
+Normative profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+
+| Requirement | Required evidence | Status |
+| --- | --- | --- |
+| Neutral editor handoff | Existing download bytes remain unchanged; the browser event exposes the exact same version 2 object and contains no GitHub or curation semantics. | local implementation pass; integration pending |
+| Exact editor state | Existing-PR editing is bound to its exact head and standalone editing to an exact default-branch commit. | pending |
+| Authenticated proposal | A write/admin curator explicitly creates a same-repository draft branch or appends to an existing draft PR through the configurable service. | pending |
+| Temporary handoff | One bounded bundle-only commit has one exact parent and cannot merge; the public-retention warning excludes secrets and non-public data. | pending |
+| Trusted conversion | Default-branch Python applies pinned Orinoco behavior without executing PR code and permits only canonical records and mirrored annotation companions. | pending |
+| Replacement history | Exact force-with-lease replaces only the handoff commit with an attributed human metadata commit sharing its parent; every earlier commit survives and the final branch contains no bundle. | pending |
+| Joined validation | Stored records, annotation companions, and the complete joined graph validate before the replacement ref is published. | pending |
+| Least privilege | Contents write is used only for explicit human handoff branch/commit operations; no approval, merge, deployment, disposition, cache, provenance, or source write occurs. | pending |
+| Statelessness | Neither service nor Action retains the bundle after replacement, and no database, metadata service, manifest, journal, or recovery protocol is introduced. | pending |
 
 ## Cross-layer acceptance
 

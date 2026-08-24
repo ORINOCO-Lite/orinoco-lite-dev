@@ -4,6 +4,7 @@ Status: normative specification
 
 This document defines a host-neutral source-adapter contract.
 The initial hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
+The distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
 Its small stateless authentication and comment service and its expiring GitHub Actions presentation artifact are not a metadata service or durable curation store.
 This document does not define a Python ABI, plugin protocol, or persistent metadata service.
 Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
@@ -40,7 +41,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Machine assertion provenance | `metadata/overlays/annotations/` | Store only PAV annotation companions for assertion objects already present in records; joining the two trees reattaches PAV without supplying assertion content. |
 | Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
 | Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
-| Human modification | Attributed Git commit, host comment, or review bundle | Preserve the human actor and resulting metadata diff. |
+| Human modification | Attributed Git commit or host comment | Preserve the human actor and resulting metadata diff; an editor bundle is only ephemeral transport. |
 | Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
@@ -178,8 +179,8 @@ Supported inputs include:
 - attributed suggestions in review comments that automation applies;
 - one or more metadata commits pushed by authorized humans.
 
-SHACL Vue proposal editing is a distinct human-edit profile, not an input to this decision-review and finalization profile.
-Its existing generated bundle may be handed to a separately reviewed GitHub wrapper, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
+SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), not this decision-review and finalization profile.
+Its existing generated bundle is exposed to a thin Orinoco GitHub wrapper, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
@@ -188,7 +189,8 @@ The PID and record path identifying an initial candidate remain fixed for that r
 A human identity retarget is expressed as rejection or deferral of the source candidate plus a separately attributed human deletion or addition; the cache never silently moves a source decision to another Thing.
 
 A direct human commit is already its own execution and attribution record.
-When automation applies a comment or patch, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
+The SHACL Vue profile's trusted replacement commit is also an ordinary human commit: automation only materializes the exact editor result and removes its temporary transport commit.
+When other automation applies a comment or patch, the project Pixi task MUST support recording that operation with `datalad run --explicit`.
 The Pixi task MUST run through that DataLad recording path.
 The command SHOULD record an input identifier and content hash when available, but the input payload need not remain in the final tree or Git history.
 DataLad is not useful for a decision-cache-only commit.
