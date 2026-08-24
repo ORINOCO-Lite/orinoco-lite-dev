@@ -105,7 +105,8 @@ Normative profile: [`github-curation-review.md`](github-curation-review.md)
 | No local requirement | An authorized reviewer completes the normal workflow through the linked web application and GitHub without a checkout. | pending |
 | Complexity boundary | No tracked inventory, review document, manifest, sidecar, reconciliation report, custom journal, or attestation graph is introduced. | pending |
 
-Application verification at `031c70f83e534d2fb066172330ede52e4c4184fa` used Node 22.23.2 and npm 11.6.0: 45 tests, type checking, the Vite production build, and the Wrangler Functions build passed.
+Application verification at `751156332788c19e9b251214839206554c5e4045` used Node 22.23.2 and npm 11.6.0: all 86 tests, type checking, Prettier, the Vite production build, and the Wrangler Pages Functions build passed.
+At the same coordinate, `pixi run test` passed all 153 engine tests and all 40 engineering-contract tests on macOS ARM64.
 Cloudflare deployment `a69a83f5-4d0c-4512-a608-48836ba8f794` serves both `https://a69a83f5.orinoco-curation-review.pages.dev` and `https://orinoco-curation-review.pages.dev` with HTTP 200 and no persistent-service bindings.
 The public GitHub App `orinoco-lite-curation-review` (App 4704454) is registered for metadata read, contents read, Actions read, and pull-requests write.
 Installation 156254062 remains limited to `con/test-orinoco-downstream-website`; its added Actions permission awaits approval by a `con` organization owner.
@@ -117,15 +118,17 @@ Normative profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
 
 | Requirement | Required evidence | Status |
 | --- | --- | --- |
-| Neutral editor handoff | Existing download bytes remain unchanged; the browser event exposes the exact same version 2 object and contains no GitHub or curation semantics. | local implementation pass; integration pending |
-| Exact editor state | Existing-PR editing is bound to its exact head and standalone editing to an exact default-branch commit. | pending |
-| Authenticated proposal | A write/admin curator explicitly creates a same-repository draft branch or appends to an existing draft PR through the configurable service. | pending |
-| Temporary handoff | One bounded bundle-only commit has one exact parent and cannot merge; the public-retention warning excludes secrets and non-public data. | pending |
-| Trusted conversion | Default-branch Python applies pinned Orinoco behavior without executing PR code and permits only canonical records and mirrored annotation companions. | pending |
-| Replacement history | Exact force-with-lease replaces only the handoff commit with an attributed human metadata commit sharing its parent; every earlier commit survives and the final branch contains no bundle. | pending |
-| Joined validation | Stored records, annotation companions, and the complete joined graph validate before the replacement ref is published. | pending |
-| Least privilege | Contents write is used only for explicit human handoff branch/commit operations; no approval, merge, deployment, disposition, cache, provenance, or source write occurs. | pending |
-| Statelessness | Neither service nor Action retains the bundle after replacement, and no database, metadata service, manifest, journal, or recovery protocol is introduced. | pending |
+| Neutral editor handoff | Existing download bytes remain unchanged; the browser event exposes the exact same version 2 object and contains no GitHub or curation semantics. | engine `afc188b441ad8990273f6fbd9388c569a2c41427`; object-identity and unchanged-download tests pass |
+| Exact editor state | Existing-PR editing is bound to its exact head and standalone editing to an exact default-branch commit. | app `751156332788c19e9b251214839206554c5e4045`; exact artifact, trusted-run, stale-head, endpoint, and runtime-digest tests pass |
+| Authenticated proposal | A write/admin curator explicitly creates a same-repository draft branch or appends to an existing draft PR through the configurable service. | app `70abfbf650562ab8b31fef7294246da5df55c497`; focused service tests pass; live App permission update pending |
+| Temporary handoff | One bounded bundle-only commit has one exact parent and cannot merge; the public-retention warning excludes secrets and non-public data. | app `751156332788c19e9b251214839206554c5e4045` and consumer `4f4633c388ce70f113962b452f88fed3a1141005`; explicit acknowledgment and handoff tests pass |
+| Trusted conversion | Default-branch Python applies pinned Orinoco behavior without executing PR code and permits only canonical records and mirrored annotation companions. | consumer `4f4633c388ce70f113962b452f88fed3a1141005`; local workflow tests pass; two focused audit corrections pending |
+| Replacement history | Exact force-with-lease replaces only the handoff commit with an attributed human metadata commit sharing its parent; every earlier commit survives and the final branch contains no bundle. | consumer `4f4633c388ce70f113962b452f88fed3a1141005`; local tests pass; repeated-standalone-edit correction pending |
+| Joined validation | Stored records, annotation companions, and the complete joined graph validate before the replacement ref is published. | consumer `4f4633c388ce70f113962b452f88fed3a1141005`; local tests pass; release-pinned CI pending |
+| Least privilege | Contents write is used only for explicit human handoff branch/commit operations; no approval, merge, deployment, disposition, cache, provenance, or source write occurs. | implementation tests pass; public App contents-write registration and installation approval pending |
+| Statelessness | Neither service nor Action retains the bundle after replacement, and no database, metadata service, manifest, journal, or recovery protocol is introduced. | application and workflow inspections pass; final deployed binding evidence pending |
+
+The browser-Python feasibility spike was closed without retained code: the pinned conversion stack requires unavailable native/WASM dependencies and Git/subprocess behavior, so conversion remains in trusted default-branch Python rather than a browser or TypeScript replacement.
 
 ## Cross-layer acceptance
 
