@@ -262,7 +262,7 @@ A new `metadata/overlays/<name>/` directory requires a focused specification cha
 
 Each item in `assertions` contains exactly:
 
-- `path`, identifying a scalar slot or collection;
+- `path`, identifying a mapping assertion or collection of mapping assertions;
 - `assertion_sha256`, identifying the canonical assertion with annotations excluded;
 - `pav:importedBy`, identifying the adapter; and
 - `pav:importedFrom`, identifying the logical source record.
