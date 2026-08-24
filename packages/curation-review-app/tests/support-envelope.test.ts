@@ -5,9 +5,12 @@ import type { Env, EventContext } from "../functions/lib/pages";
 import { MAX_REVIEW_CANDIDATES } from "../functions/lib/proposal";
 import { createSessionCookie } from "../functions/lib/session";
 import type { CurationSubmission } from "../shared/contracts";
+import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
 import { BASE_SHA, generatedSummary, HEAD_SHA, PROPOSAL_SHA } from "./fixtures";
 
 const CLOUDFLARE_FREE_SUBREQUEST_LIMIT = 50;
+const FILES_PER_COMMIT_PAGE = 100;
+const BLOBS_PER_GRAPHQL_REQUEST = 20;
 const ORIGIN = "https://review.example";
 const env: Env = {
   GITHUB_CLIENT_ID: "Iv1.example",
@@ -155,16 +158,29 @@ describe("Cloudflare Free support envelope", () => {
       ),
     );
     expect(response.status).toBe(201);
-    expect(fetchMock).toHaveBeenCalledTimes(47);
+    const proposalFiles = MAX_REVIEW_CANDIDATES * 2;
+    const commitPages = Math.ceil(proposalFiles / FILES_PER_COMMIT_PAGE);
+    const graphRequests = Math.ceil(proposalFiles / BLOBS_PER_GRAPHQL_REQUEST);
+    const expectedRequests = 4 + commitPages + graphRequests;
+    expect(fetchMock).toHaveBeenCalledTimes(expectedRequests);
     const urls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(
       urls.filter((url) => url.includes(`/commits/${PROPOSAL_SHA}?`)),
-    ).toHaveLength(8);
+    ).toHaveLength(commitPages);
     expect(
       urls.filter((url) => url === "https://api.github.com/graphql"),
-    ).toHaveLength(35);
+    ).toHaveLength(graphRequests);
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(
       CLOUDFLARE_FREE_SUBREQUEST_LIMIT,
+    );
+    const commentCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/issues/42/comments"),
+    );
+    const commentRequest = JSON.parse(String(commentCall?.[1]?.body)) as {
+      body: string;
+    };
+    expect(commentRequest.body.length).toBeLessThanOrEqual(
+      MAX_GITHUB_TEXT_LENGTH,
     );
   });
 });

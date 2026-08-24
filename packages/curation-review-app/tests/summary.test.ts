@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HttpError } from "../functions/lib/http";
 import { parseProposalSummary } from "../functions/lib/summary";
+import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
 import { CLAIM_ONE, PROPOSAL_SHA, summary } from "./fixtures";
 
 describe("visible proposal summary", () => {
@@ -51,6 +52,12 @@ describe("visible proposal summary", () => {
         summary().replace("## Candidate review", "<!-- Candidate review -->"),
       ),
     ).toThrow("missing the ## Candidate review section");
+  });
+
+  it("rejects a summary beyond GitHub's pull-request text limit", () => {
+    expect(() =>
+      parseProposalSummary(summary() + "x".repeat(MAX_GITHUB_TEXT_LENGTH)),
+    ).toThrow("too large");
   });
 
   it("stops candidate parsing at later pull-request prose", () => {

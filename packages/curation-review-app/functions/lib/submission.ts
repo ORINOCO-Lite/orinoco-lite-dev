@@ -7,6 +7,7 @@ import type {
   ReviewProposal,
   SubmissionDecision,
 } from "../../shared/contracts";
+import { MAX_GITHUB_TEXT_LENGTH } from "../../shared/contracts";
 import { HttpError, requireExactKeys } from "./http";
 import { parseRepository } from "./input";
 
@@ -224,5 +225,13 @@ export function verifySubmission(
 }
 
 export function submissionComment(value: CurationSubmission): string {
-  return `/curation submit\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+  const body = `/curation submit\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+  if (body.length > MAX_GITHUB_TEXT_LENGTH) {
+    throw new HttpError(
+      422,
+      "submission_too_large",
+      "The complete decision comment exceeds GitHub's text limit.",
+    );
+  }
+  return body;
 }

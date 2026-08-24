@@ -4,6 +4,7 @@ import {
   submissionComment,
   verifySubmission,
 } from "../functions/lib/submission";
+import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
 import { proposal, submission } from "./fixtures";
 
 describe("authenticated submission envelope", () => {
@@ -56,5 +57,18 @@ describe("authenticated submission envelope", () => {
     expect(
       JSON.parse(body.slice(body.indexOf("{"), body.lastIndexOf("}") + 1)),
     ).toEqual(payload);
+  });
+
+  it("rejects a decision comment that exceeds GitHub's text limit", () => {
+    const payload = submission();
+    const firstDecision = payload.decisions[0];
+    if (firstDecision === undefined) {
+      throw new Error("submission fixture must include a decision");
+    }
+    payload.decisions[0] = {
+      ...firstDecision,
+      pid: "x".repeat(MAX_GITHUB_TEXT_LENGTH),
+    };
+    expect(() => submissionComment(payload)).toThrow("GitHub's text limit");
   });
 });

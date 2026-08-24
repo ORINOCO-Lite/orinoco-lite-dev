@@ -6,6 +6,8 @@ export type JsonObject = { [key: string]: JsonValue };
 export type CandidateOperation = "add" | "delete" | "modify";
 export type Disposition = "accept" | "defer" | "reject";
 
+export const MAX_GITHUB_TEXT_LENGTH = 65_536;
+
 export interface ReviewCandidate {
   after: string | null;
   before: string | null;

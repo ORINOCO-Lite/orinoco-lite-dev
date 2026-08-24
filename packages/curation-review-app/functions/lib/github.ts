@@ -5,6 +5,7 @@ const GITHUB_API = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const MAX_RECORD_BYTES = 1_048_576;
 const MAX_REVIEW_BYTES = 16_777_216;
+const MAX_PROPOSAL_FILES = 450;
 const BLOBS_PER_QUERY = 20;
 
 export interface ContentRequest {
@@ -169,7 +170,7 @@ export class GitHubClient {
     if (
       !Number.isSafeInteger(maximumFiles) ||
       maximumFiles < 1 ||
-      maximumFiles > 700
+      maximumFiles > MAX_PROPOSAL_FILES
     ) {
       throw new HttpError(
         500,

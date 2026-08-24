@@ -59,8 +59,9 @@ A review link has this form:
 https://review.example/?repository=owner/repository&pull_request=42
 ```
 
-The bounded initial deployment accepts at most 350 candidate records, 700 proposal files (one record and at most one mirrored annotation per candidate), and 16 MiB of record text per review.
-A successful maximum-size submission makes at most 47 outbound GitHub requests: one curator check, one pull-request read, one commit-list read, eight commit-file pages, 35 batched GraphQL record reads, and one comment write.
+The bounded initial deployment accepts at most 225 candidate records, 450 proposal files (one record and at most one mirrored annotation per candidate), and 16 MiB of record text per review.
+The rendered pull-request summary and complete decision comment must also fit GitHub's 65,536-character text limit; the workflow and service reject an oversized rendering before publication.
+A successful maximum-size submission makes at most 32 outbound GitHub requests: one curator check, one pull-request read, one commit-list read, five commit-file pages, 23 batched GraphQL record reads, and one comment write.
 This remains below the Cloudflare Free limit of 50 subrequests per invocation.
 Oversized candidate sets and proposal commits are rejected before record blobs are loaded.
 

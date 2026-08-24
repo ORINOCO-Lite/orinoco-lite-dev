@@ -3,13 +3,14 @@ import type {
   JsonObject,
   ReviewCandidate,
 } from "../../shared/contracts";
+import { MAX_GITHUB_TEXT_LENGTH } from "../../shared/contracts";
 import { HttpError } from "./http";
 
 const COMMIT = /^[0-9a-f]{40}$/;
 const CLAIM = /^sha256:[0-9a-f]{64}$/;
 const RECORD_ROOT = "metadata/records/";
 const RECORD_PATH = /^metadata\/records\/[^\\\r\n]+\.ya?ml$/;
-export const MAX_REVIEW_CANDIDATES = 350;
+export const MAX_REVIEW_CANDIDATES = 225;
 
 export interface ProposalSummary {
   adapter: string;
@@ -177,7 +178,7 @@ function candidate(block: string): Omit<ReviewCandidate, "after" | "before"> {
 }
 
 export function parseProposalSummary(body: string): ProposalSummary {
-  if (typeof body !== "string" || body.length > 1_048_576) {
+  if (typeof body !== "string" || body.length > MAX_GITHUB_TEXT_LENGTH) {
     invalid("The pull-request summary is missing or too large.");
   }
   const proposal = section(body, "## Curation proposal", "## Candidate review");
