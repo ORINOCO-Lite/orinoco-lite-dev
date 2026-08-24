@@ -18,6 +18,7 @@ export interface ReviewCandidate {
   operation: CandidateOperation;
   pid: string;
   record_path: string;
+  source_namespace: string;
   source_record_id: string;
 }
 

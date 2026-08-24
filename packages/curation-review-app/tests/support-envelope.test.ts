@@ -1,12 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequest as submitDecisions } from "../functions/api/submit";
+import type { ReviewBundle } from "../functions/lib/bundle";
+import {
+  MAX_REVIEW_CANDIDATES,
+  MAX_REVIEW_PATHS,
+} from "../functions/lib/bundle";
 import { base64urlEncode } from "../functions/lib/encoding";
 import type { Env, EventContext } from "../functions/lib/pages";
-import { MAX_REVIEW_CANDIDATES } from "../functions/lib/proposal";
 import { createSessionCookie } from "../functions/lib/session";
 import type { CurationSubmission } from "../shared/contracts";
 import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
-import { BASE_SHA, generatedSummary, HEAD_SHA, PROPOSAL_SHA } from "./fixtures";
+import {
+  ARTIFACT_ID,
+  BASE_SHA,
+  CLAIM_ONE,
+  HEAD_SHA,
+  PROPOSAL_SHA,
+  WORKFLOW_RUN_ID,
+  proposalCommitMessage,
+  reviewBundleArchive,
+} from "./fixtures";
 
 const CLOUDFLARE_FREE_SUBREQUEST_LIMIT = 50;
 const FILES_PER_COMMIT_PAGE = 100;
@@ -32,8 +45,12 @@ function context(request: Request): EventContext {
   };
 }
 
+function identity(index: number): string {
+  return String(index + 1).padStart(4, "0");
+}
+
 function recordPath(index: number): string {
-  return `metadata/records/example/record-${String(index + 1).padStart(4, "0")}.yaml`;
+  return `metadata/records/example/record-${identity(index)}.yaml`;
 }
 
 function annotationPath(index: number): string {
@@ -43,13 +60,38 @@ function annotationPath(index: number): string {
   );
 }
 
+function bundle(): ReviewBundle {
+  return {
+    adapter: "zotero",
+    candidates: Array.from({ length: MAX_REVIEW_CANDIDATES }, (_, index) => ({
+      blockers: [],
+      claim_sha256: CLAIM_ONE,
+      friendly_id: `DRI-${identity(index)}`,
+      label: `Record ${identity(index)}`,
+      operation: "modify",
+      paths: [recordPath(index), annotationPath(index)],
+      pid: `example:record-${identity(index)}`,
+      record_path: recordPath(index),
+      source_namespace: "zotero:group:6197458",
+      source_record_id: `item:${identity(index)}`,
+    })),
+    format: "orinoco-lite-curation-review-bundle-v1",
+    metadata_base_sha: BASE_SHA,
+    proposal_sha: PROPOSAL_SHA,
+    pull_request: 42,
+    repository: "example/site",
+    source_coordinate: { group: 6197458, library_version: 451 },
+    workflow_run_id: WORKFLOW_RUN_ID,
+  };
+}
+
 function submission(): CurationSubmission {
   return {
     adapter: "zotero",
     decisions: Array.from({ length: MAX_REVIEW_CANDIDATES }, (_, index) => ({
       disposition: "defer",
-      operation: "add",
-      pid: `example:record-${String(index + 1).padStart(4, "0")}`,
+      operation: "modify",
+      pid: `example:record-${identity(index)}`,
       record_path: recordPath(index),
     })),
     format: "orinoco-lite-curation-submission-v1",
@@ -65,12 +107,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Cloudflare Free support envelope", () => {
-  it("submits the maximum candidate set within 50 outbound subrequests", async () => {
-    const files = Array.from({ length: MAX_REVIEW_CANDIDATES }, (_, index) => [
-      { filename: recordPath(index), status: "added" },
-      { filename: annotationPath(index), status: "added" },
-    ]).flat();
+describe("hosted service-resource envelope", () => {
+  it("submits 225 records and 450 metadata paths within 50 subrequests", async () => {
+    const reviewBundle = bundle();
+    const archive = reviewBundleArchive(reviewBundle);
+    const files = reviewBundle.candidates.flatMap((candidate) =>
+      candidate.paths.map((filename) => ({ filename, status: "modified" })),
+    );
+    const storage =
+      "https://pipelines.actions.githubusercontent.com/results/archive.zip?sig=short-lived";
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -80,7 +125,7 @@ describe("Cloudflare Free support envelope", () => {
         if (url.endsWith("/pulls/42")) {
           return Response.json({
             base: { repo: { full_name: "example/site" } },
-            body: generatedSummary(MAX_REVIEW_CANDIDATES),
+            body: "Accessible fallback text may be edited freely.",
             head: { sha: HEAD_SHA },
             html_url: "https://github.com/example/site/pull/42",
             number: 42,
@@ -89,14 +134,49 @@ describe("Cloudflare Free support envelope", () => {
         }
         if (url.includes("/pulls/42/commits?")) {
           return Response.json([
-            { parents: [{ sha: BASE_SHA }], sha: PROPOSAL_SHA },
+            {
+              commit: { message: proposalCommitMessage() },
+              parents: [{ sha: BASE_SHA }],
+              sha: PROPOSAL_SHA,
+            },
           ]);
+        }
+        if (url.endsWith(`/actions/artifacts/${ARTIFACT_ID}`)) {
+          return Response.json({
+            expired: false,
+            id: ARTIFACT_ID,
+            name: `orinoco-curation-review-${PROPOSAL_SHA}`,
+            size_in_bytes: archive.byteLength,
+            workflow_run: { head_sha: BASE_SHA, id: WORKFLOW_RUN_ID },
+          });
+        }
+        if (url.endsWith(`/actions/runs/${WORKFLOW_RUN_ID}`)) {
+          return Response.json({
+            conclusion: "success",
+            event: "workflow_dispatch",
+            head_sha: BASE_SHA,
+            id: WORKFLOW_RUN_ID,
+            repository: { full_name: "example/site" },
+            run_attempt: 1,
+            status: "completed",
+          });
+        }
+        if (url.endsWith(`/actions/artifacts/${ARTIFACT_ID}/zip`)) {
+          return new Response(null, {
+            headers: { Location: storage },
+            status: 302,
+          });
+        }
+        if (url === storage) {
+          return new Response(new Uint8Array(archive).buffer, {
+            headers: { "Content-Length": String(archive.byteLength) },
+          });
         }
         if (url.includes(`/commits/${PROPOSAL_SHA}?`)) {
           const page = Number(new URL(url).searchParams.get("page"));
-          const start = (page - 1) * 100;
+          const start = (page - 1) * FILES_PER_COMMIT_PAGE;
           return Response.json({
-            files: files.slice(start, start + 100),
+            files: files.slice(start, start + FILES_PER_COMMIT_PAGE),
             sha: PROPOSAL_SHA,
           });
         }
@@ -109,18 +189,18 @@ describe("Cloudflare Free support envelope", () => {
             .filter(([key]) => key.startsWith("expression"))
             .forEach(([key, expression]) => {
               const alias = `blob${key.slice("expression".length)}`;
-              if (expression.startsWith(`${BASE_SHA}:`)) {
-                repository[alias] = null;
-              } else {
-                const text = `pid: ${expression.slice(expression.lastIndexOf("/") + 1, -5)}\n`;
-                repository[alias] = {
-                  __typename: "Blob",
-                  byteSize: new TextEncoder().encode(text).byteLength,
-                  isBinary: false,
-                  isTruncated: false,
-                  text,
-                };
-              }
+              const filename = expression.slice(
+                expression.lastIndexOf("/") + 1,
+              );
+              const pid = filename.replace(/\.ya?ml$/, "");
+              const text = `pid: example:${pid}\ntitle: ${pid}\n`;
+              repository[alias] = {
+                __typename: "Blob",
+                byteSize: new TextEncoder().encode(text).byteLength,
+                isBinary: false,
+                isTruncated: false,
+                text,
+              };
             });
           return Response.json({ data: { repository } });
         }
@@ -145,7 +225,7 @@ describe("Cloudflare Free support envelope", () => {
     );
     const response = await submitDecisions(
       context(
-        new Request(`${ORIGIN}/api/submit`, {
+        new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
           body: JSON.stringify(submission()),
           headers: {
             "Content-Type": "application/json",
@@ -158,18 +238,14 @@ describe("Cloudflare Free support envelope", () => {
       ),
     );
     expect(response.status).toBe(201);
-    const proposalFiles = MAX_REVIEW_CANDIDATES * 2;
-    const commitPages = Math.ceil(proposalFiles / FILES_PER_COMMIT_PAGE);
-    const graphRequests = Math.ceil(proposalFiles / BLOBS_PER_GRAPHQL_REQUEST);
-    const expectedRequests = 4 + commitPages + graphRequests;
+    expect(files).toHaveLength(MAX_REVIEW_PATHS);
+    const commitPages = Math.ceil(MAX_REVIEW_PATHS / FILES_PER_COMMIT_PAGE);
+    const graphRequests = Math.ceil(
+      (MAX_REVIEW_CANDIDATES * 3) / BLOBS_PER_GRAPHQL_REQUEST,
+    );
+    const expectedRequests = 8 + commitPages + graphRequests;
+    expect(expectedRequests).toBe(47);
     expect(fetchMock).toHaveBeenCalledTimes(expectedRequests);
-    const urls = fetchMock.mock.calls.map(([input]) => String(input));
-    expect(
-      urls.filter((url) => url.includes(`/commits/${PROPOSAL_SHA}?`)),
-    ).toHaveLength(commitPages);
-    expect(
-      urls.filter((url) => url === "https://api.github.com/graphql"),
-    ).toHaveLength(graphRequests);
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(
       CLOUDFLARE_FREE_SUBREQUEST_LIMIT,
     );

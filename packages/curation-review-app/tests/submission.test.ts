@@ -8,8 +8,10 @@ import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
 import { proposal, submission } from "./fixtures";
 
 describe("authenticated submission envelope", () => {
-  it("accepts only the complete ordered current candidate set", () => {
-    const parsed = parseSubmission(submission());
+  it("accepts the complete current candidate mapping independent of browser order", () => {
+    const payload = submission();
+    payload.decisions.reverse();
+    const parsed = parseSubmission(payload);
     const verified = verifySubmission(parsed, proposal());
     expect(verified.repository).toBe("example/site");
     expect(verified.decisions.map((item) => item.disposition)).toEqual([

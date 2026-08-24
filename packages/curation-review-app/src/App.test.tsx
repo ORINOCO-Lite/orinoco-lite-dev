@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReviewProposal } from "../shared/contracts";
 import App from "./App";
-import { proposal } from "../tests/fixtures";
+import { ARTIFACT_ID, proposal } from "../tests/fixtures";
 
 function json(value: unknown, status = 200): Response {
   return Response.json(value, { status });
@@ -29,7 +29,7 @@ function installFetch(
         });
       }
       if (url.startsWith("/api/proposal?")) return json(reviewProposal);
-      if (url === "/api/submit") {
+      if (url === `/api/submit?artifact_id=${ARTIFACT_ID}`) {
         expect(init?.headers).toMatchObject({ "X-CSRF-Token": "csrf-token" });
         return json(
           {
@@ -50,7 +50,7 @@ beforeEach(() => {
   window.history.replaceState(
     {},
     "",
-    "/?repository=example%2Fsite&pull_request=42",
+    `/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
   );
 });
 
@@ -180,7 +180,9 @@ describe("curation review interface", () => {
       screen.getByRole("button", { name: "Post decisions to GitHub" }),
     );
     await screen.findByRole("link", { name: "View authenticated comment" });
-    const call = fetchMock.mock.calls.find(([url]) => url === "/api/submit");
+    const call = fetchMock.mock.calls.find(
+      ([url]) => url === `/api/submit?artifact_id=${ARTIFACT_ID}`,
+    );
     expect(call).toBeDefined();
     const body = JSON.parse(String((call?.[1] as RequestInit).body)) as Record<
       string,
@@ -202,7 +204,7 @@ describe("curation review interface", () => {
       await screen.findByRole("link", { name: "Continue with GitHub" }),
     ).toHaveAttribute(
       "href",
-      "/api/auth/start?pull_request=42&repository=example%2Fsite",
+      `/api/auth/start?artifact_id=${ARTIFACT_ID}&pull_request=42&repository=example%2Fsite`,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });

@@ -9,6 +9,7 @@ import {
   requireSameOrigin,
 } from "../lib/http";
 import type { EventContext } from "../lib/pages";
+import { parseArtifactId } from "../lib/input";
 import { loadReviewProposal } from "../lib/proposal";
 import { configuredOrigin, readSessionCookie } from "../lib/session";
 import {
@@ -21,13 +22,18 @@ export async function onRequest(context: EventContext): Promise<Response> {
   requireMethod(context.request, "POST");
   requireJsonContentType(context.request);
   requireSameOrigin(context.request, configuredOrigin(context.env));
-  if (new URL(context.request.url).search) {
+  const url = new URL(context.request.url);
+  if (
+    [...url.searchParams.keys()].some((key) => key !== "artifact_id") ||
+    url.searchParams.getAll("artifact_id").length !== 1
+  ) {
     throw new HttpError(
       400,
       "unexpected_query",
-      "The submission endpoint accepts no query fields.",
+      "The submission endpoint requires one artifact_id query field.",
     );
   }
+  const artifactId = parseArtifactId(url.searchParams.get("artifact_id"));
   const session = await readSessionCookie(context.request, context.env);
   const supplied = context.request.headers.get("x-csrf-token") ?? "";
   if (!equalTokens(supplied, session.csrf_token)) {
@@ -40,6 +46,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
     github,
     submitted.repository,
     submitted.pull_request,
+    artifactId,
   );
   const verified = verifySubmission(submitted, proposal);
   const commentUrl = await github.postComment(

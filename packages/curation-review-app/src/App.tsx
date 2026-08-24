@@ -16,6 +16,7 @@ import {
 } from "./api";
 
 interface Target {
+  artifactId: number;
   pullRequest: number;
   repository: string;
 }
@@ -25,9 +26,12 @@ type DecisionFilter = "all" | "unresolved" | Disposition;
 
 function currentTarget(): Target | null {
   const query = new URLSearchParams(window.location.search);
+  const artifact = query.get("artifact_id");
   const repository = query.get("repository");
   const number = query.get("pull_request");
   if (
+    artifact === null ||
+    !/^[1-9][0-9]{0,15}$/.test(artifact) ||
     repository === null ||
     !/^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/.test(
       repository,
@@ -37,7 +41,9 @@ function currentTarget(): Target | null {
   ) {
     return null;
   }
-  return { pullRequest: Number(number), repository };
+  const artifactId = Number(artifact);
+  if (!Number.isSafeInteger(artifactId)) return null;
+  return { artifactId, pullRequest: Number(number), repository };
 }
 
 function message(error: unknown): string {
@@ -50,6 +56,7 @@ function Landing(): React.JSX.Element {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const query = new URLSearchParams({
+      artifact_id: String(data.get("artifact_id") ?? ""),
       pull_request: String(data.get("pull_request") ?? ""),
       repository: String(data.get("repository") ?? ""),
     });
@@ -61,8 +68,8 @@ function Landing(): React.JSX.Element {
       <p className="eyebrow">Orinoco Lite</p>
       <h1>Review a metadata proposal</h1>
       <p className="lede">
-        Enter the GitHub repository and pull request created by the trusted
-        source-adapter workflow.
+        Enter the GitHub repository, pull request, and review artifact created
+        by the trusted source-adapter workflow.
       </p>
       <form className="target-form" onSubmit={open}>
         <label>
@@ -86,6 +93,17 @@ function Landing(): React.JSX.Element {
             type="number"
           />
         </label>
+        <label>
+          Artifact ID
+          <input
+            inputMode="numeric"
+            min="1"
+            name="artifact_id"
+            placeholder="123456789"
+            required
+            type="number"
+          />
+        </label>
         <button type="submit">Open review</button>
       </form>
       <p className="quiet">
@@ -102,12 +120,16 @@ function SignIn({ target }: { target: Target }): React.JSX.Element {
       <h1>Sign in to review pull request #{target.pullRequest}</h1>
       <p className="lede">
         GitHub limits access to collaborators with write or admin permission.
-        The short-lived session is used only to read this proposal and post your
-        decision comment.
+        The short-lived session is used only to read this proposal and its
+        presentation artifact, then post your decision comment.
       </p>
       <a
         className="button-link"
-        href={authenticationUrl(target.repository, target.pullRequest)}
+        href={authenticationUrl(
+          target.repository,
+          target.pullRequest,
+          target.artifactId,
+        )}
       >
         Continue with GitHub
       </a>
@@ -183,6 +205,8 @@ function CandidateCard({
           <dd>{candidate.pid}</dd>
           <dt>Source record</dt>
           <dd>{candidate.source_record_id}</dd>
+          <dt>Source namespace</dt>
+          <dd>{candidate.source_namespace}</dd>
           <dt>Path</dt>
           <dd>{candidate.record_path}</dd>
           <dt>Claim hash</dt>
@@ -223,11 +247,16 @@ function CandidateCard({
 }
 
 interface ReviewProps {
+  artifactId: number;
   proposal: ReviewProposal;
   session: Extract<SessionStatus, { authenticated: true }>;
 }
 
-function Review({ proposal, session }: ReviewProps): React.JSX.Element {
+function Review({
+  artifactId,
+  proposal,
+  session,
+}: ReviewProps): React.JSX.Element {
   const [decisions, setDecisions] = useState<DecisionState>({});
   const [filter, setFilter] = useState<DecisionFilter>("all");
   const [query, setQuery] = useState("");
@@ -255,6 +284,7 @@ function Review({ proposal, session }: ReviewProps): React.JSX.Element {
         candidate.label,
         candidate.pid,
         candidate.record_path,
+        candidate.source_namespace,
         candidate.source_record_id,
       ].some((value) => value.toLocaleLowerCase().includes(needle));
     });
@@ -370,7 +400,11 @@ function Review({ proposal, session }: ReviewProps): React.JSX.Element {
     setSubmitting(true);
     setFeedback(null);
     try {
-      const result = await submitDecisions(submission, session.csrf_token);
+      const result = await submitDecisions(
+        submission,
+        session.csrf_token,
+        artifactId,
+      );
       setCommentUrl(result.comment_url);
       setFeedback(
         "The complete decision state was posted to GitHub. The trusted workflow will revalidate it before committing.",
@@ -547,6 +581,7 @@ export default function App(): React.JSX.Element {
           const loaded = await loadProposal(
             target.repository,
             target.pullRequest,
+            target.artifactId,
           );
           if (active) setProposal(loaded);
         }
@@ -557,7 +592,7 @@ export default function App(): React.JSX.Element {
     return () => {
       active = false;
     };
-  }, [target?.pullRequest, target?.repository]);
+  }, [target?.artifactId, target?.pullRequest, target?.repository]);
 
   if (target === null) return <Landing />;
   if (failure !== null) {
@@ -583,5 +618,11 @@ export default function App(): React.JSX.Element {
         <p>Loading proposal from GitHub…</p>
       </main>
     );
-  return <Review proposal={proposal} session={session} />;
+  return (
+    <Review
+      artifactId={target.artifactId}
+      proposal={proposal}
+      session={session}
+    />
+  );
 }

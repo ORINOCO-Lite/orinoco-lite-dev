@@ -57,6 +57,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
   );
   const user = await new GitHubClient(token.accessToken).currentUser();
   const destination = new URL("/", origin);
+  destination.searchParams.set("artifact_id", String(oauth.artifact_id));
   destination.searchParams.set("repository", oauth.repository);
   destination.searchParams.set("pull_request", String(oauth.pull_request));
   const headers = new Headers({

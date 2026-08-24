@@ -196,18 +196,27 @@ export function verifySubmission(
       "The submission no longer matches the current proposal.",
     );
   }
-  const decisions = submitted.decisions.map((item, index) => {
-    const candidate = proposal.candidates[index];
+  const byPath = new Map(
+    submitted.decisions.map((item) => [item.record_path, item]),
+  );
+  if (byPath.size !== submitted.decisions.length) {
+    throw new HttpError(
+      409,
+      "stale_submission",
+      "The submission does not cover the complete candidate set.",
+    );
+  }
+  const decisions = proposal.candidates.map((candidate) => {
+    const item = byPath.get(candidate.record_path);
     if (
-      candidate === undefined ||
+      item === undefined ||
       item.pid !== candidate.pid ||
-      item.record_path !== candidate.record_path ||
       item.operation !== candidate.operation
     ) {
       throw new HttpError(
         409,
         "stale_submission",
-        "The submission does not cover the exact ordered candidate set.",
+        "The submission does not cover the complete candidate set.",
       );
     }
     return { ...item };

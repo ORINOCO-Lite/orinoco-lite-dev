@@ -12,6 +12,11 @@ export async function onRequest(context: EventContext): Promise<Response> {
   const github = new GitHubClient(session.access_token);
   await github.requireCurator(target.repository, session.login);
   return jsonResponse(
-    await loadReviewProposal(github, target.repository, target.pullRequest),
+    await loadReviewProposal(
+      github,
+      target.repository,
+      target.pullRequest,
+      target.artifactId,
+    ),
   );
 }

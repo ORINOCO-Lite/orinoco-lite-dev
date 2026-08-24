@@ -1,7 +1,7 @@
 # Curation review application
 
 This package implements the stateless browser and authentication surface in [`docs/github-curation-review.md`](../../docs/github-curation-review.md).
-It reads a workflow-generated metadata proposal from GitHub, presents one complete set of record decisions, and posts that set as the authenticated user's pull- request comment.
+It reads a workflow-generated metadata proposal and ephemeral presentation artifact from GitHub, presents one complete set of record decisions, and posts that set as the authenticated user's pull-request comment.
 It does not run adapters, apply decisions, or retain metadata or curation state.
 
 ## Local verification
@@ -30,6 +30,7 @@ Configure its callback URL as `PUBLIC_ORIGIN/api/auth/callback`, install it only
 
 - Metadata: read (the GitHub-required baseline permission)
 - Contents: read
+- Actions: read
 - Pull requests: write
 
 The write permission is used only to create the authenticated pull-request comment.
@@ -55,17 +56,28 @@ Pages Functions are under `functions/`; `npm run pages:functions:build` verifies
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
 Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
 
+The central `https://orinoco-curation-review.pages.dev/` deployment is the default hosted option, but `PUBLIC_ORIGIN` is configurable and downstreams select their review-application origin independently.
+The origin is not embedded in a submission or PR-body machine protocol.
+
 A review link has this form:
 
 ```text
-https://review.example/?repository=owner/repository&pull_request=42
+https://review.example/?repository=owner/repository&pull_request=42&artifact_id=123456789
 ```
 
-The bounded initial deployment accepts at most 225 candidate records, 450 proposal files (one record and at most one mirrored annotation per candidate), and 16 MiB of record text per review.
-The rendered pull-request summary and complete decision comment must also fit GitHub's 65,536-character text limit; the workflow and service reject an oversized rendering before publication.
-A successful maximum-size submission makes at most 32 outbound GitHub requests: one curator check, one pull-request read, one commit-list read, five commit-file pages, 23 batched GraphQL record reads, and one comment write.
+The link selects one artifact by immutable GitHub artifact ID.
+Its required name is `orinoco-curation-review-<proposal_sha>` and its ZIP contains exactly one regular top-level `review-bundle.json` using format `orinoco-lite-curation-review-bundle-v1`.
+The service permits at most 8 MiB compressed, 16 MiB uncompressed, 225 candidate records, 450 changed metadata paths, and 16 MiB of loaded Git record text per review.
+These are service-resource bounds, not pull-request Markdown or native-diff limits.
+The complete authenticated decision comment remains subject to GitHub's comment-size constraint.
+
+A successful maximum-size submission makes at most 47 outbound requests: one curator check, one pull-request read, one commit-list read, one artifact metadata read, one workflow-run read, one authenticated artifact redirect, one credential-free archive download, five commit-file pages, 34 batched GraphQL record reads, and one comment write.
 This remains below the Cloudflare Free limit of 50 subrequests per invocation.
-Oversized candidate sets and proposal commits are rejected before record blobs are loaded.
+Oversized artifacts, candidate sets, and proposal paths are rejected before record blobs are loaded.
+
+The pull-request body is only an accessible fallback and review link.
+The application never parses it for candidate identity, ordering, source coordinates, or completeness.
+It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for presentation facts.
 
 Provisioning the Pages project, registering the GitHub App, setting secrets, and deploying are separately reviewed external operations.
 This package does not perform them.

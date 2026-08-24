@@ -48,8 +48,13 @@ async function responseJson<T>(response: Response): Promise<T> {
   return value as T;
 }
 
-function targetQuery(repository: string, pullRequest: number): string {
+function targetQuery(
+  repository: string,
+  pullRequest: number,
+  artifactId: number,
+): string {
   const query = new URLSearchParams({
+    artifact_id: String(artifactId),
     pull_request: String(pullRequest),
     repository,
   });
@@ -59,8 +64,9 @@ function targetQuery(repository: string, pullRequest: number): string {
 export function authenticationUrl(
   repository: string,
   pullRequest: number,
+  artifactId: number,
 ): string {
-  return `/api/auth/start?${targetQuery(repository, pullRequest)}`;
+  return `/api/auth/start?${targetQuery(repository, pullRequest, artifactId)}`;
 }
 
 export async function loadSession(): Promise<SessionStatus> {
@@ -72,28 +78,36 @@ export async function loadSession(): Promise<SessionStatus> {
 export async function loadProposal(
   repository: string,
   pullRequest: number,
+  artifactId: number,
 ): Promise<ReviewProposal> {
   return responseJson<ReviewProposal>(
-    await fetch(`/api/proposal?${targetQuery(repository, pullRequest)}`, {
-      headers: { Accept: "application/json" },
-    }),
+    await fetch(
+      `/api/proposal?${targetQuery(repository, pullRequest, artifactId)}`,
+      {
+        headers: { Accept: "application/json" },
+      },
+    ),
   );
 }
 
 export async function submitDecisions(
   submission: CurationSubmission,
   csrfToken: string,
+  artifactId: number,
 ): Promise<SubmitResult> {
   return responseJson<SubmitResult>(
-    await fetch("/api/submit", {
-      body: JSON.stringify(submission),
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
+    await fetch(
+      `/api/submit?artifact_id=${encodeURIComponent(String(artifactId))}`,
+      {
+        body: JSON.stringify(submission),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
+        method: "POST",
       },
-      method: "POST",
-    }),
+    ),
   );
 }
 

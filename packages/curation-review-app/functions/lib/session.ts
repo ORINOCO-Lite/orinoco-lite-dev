@@ -16,6 +16,7 @@ const OAUTH_TTL_SECONDS = 600;
 const MAX_SESSION_TTL_SECONDS = 28_800;
 
 export interface OAuthCookieState {
+  artifact_id: number;
   code_verifier: string;
   expires_at: number;
   issued_at: number;
@@ -199,6 +200,7 @@ export async function readOAuthCookie(
   requireExactKeys(
     value,
     [
+      "artifact_id",
       "code_verifier",
       "expires_at",
       "issued_at",
@@ -218,6 +220,8 @@ export async function readOAuthCookie(
     !validOneLine(value.origin, 256) ||
     !validOneLine(value.repository, 200) ||
     !validOneLine(value.state, 128) ||
+    !Number.isSafeInteger(value.artifact_id) ||
+    Number(value.artifact_id) < 1 ||
     !Number.isSafeInteger(value.pull_request) ||
     Number(value.pull_request) < 1
   ) {
@@ -228,6 +232,7 @@ export async function readOAuthCookie(
     );
   }
   return {
+    artifact_id: Number(value.artifact_id),
     code_verifier: value.code_verifier,
     expires_at: expiresAt,
     issued_at: issuedAt,

@@ -4,8 +4,28 @@ const REPOSITORY =
   /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
 
 export interface ReviewTarget {
+  artifactId: number;
   pullRequest: number;
   repository: string;
+}
+
+export function parseArtifactId(value: string | null): number {
+  if (value === null || !/^[1-9][0-9]{0,15}$/.test(value)) {
+    throw new HttpError(
+      400,
+      "invalid_artifact_id",
+      "Artifact ID must be a positive integer.",
+    );
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new HttpError(
+      400,
+      "invalid_artifact_id",
+      "Artifact ID must be a positive integer.",
+    );
+  }
+  return parsed;
 }
 
 export function parseRepository(value: string | null): string {
@@ -39,7 +59,7 @@ export function parsePullRequest(value: string | null): number {
 }
 
 export function reviewTarget(url: URL): ReviewTarget {
-  const allowed = new Set(["repository", "pull_request"]);
+  const allowed = new Set(["artifact_id", "repository", "pull_request"]);
   for (const key of url.searchParams.keys()) {
     if (!allowed.has(key)) {
       throw new HttpError(
@@ -50,16 +70,18 @@ export function reviewTarget(url: URL): ReviewTarget {
     }
   }
   if (
+    url.searchParams.getAll("artifact_id").length !== 1 ||
     url.searchParams.getAll("repository").length !== 1 ||
     url.searchParams.getAll("pull_request").length !== 1
   ) {
     throw new HttpError(
       400,
       "invalid_query",
-      "Repository and pull request are required once.",
+      "Artifact ID, repository, and pull request are required once.",
     );
   }
   return {
+    artifactId: parseArtifactId(url.searchParams.get("artifact_id")),
     repository: parseRepository(url.searchParams.get("repository")),
     pullRequest: parsePullRequest(url.searchParams.get("pull_request")),
   };

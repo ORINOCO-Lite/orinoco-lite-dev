@@ -34,6 +34,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
       "Cache-Control": "no-store",
       Location: authorize.toString(),
       "Set-Cookie": await createOAuthCookie(context.env, {
+        artifact_id: target.artifactId,
         code_verifier: codeVerifier,
         origin,
         pull_request: target.pullRequest,

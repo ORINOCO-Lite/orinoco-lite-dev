@@ -13,14 +13,20 @@ import {
   SESSION_COOKIE,
 } from "../functions/lib/session";
 import {
+  ARTIFACT_ID,
   BASE_SHA,
   HEAD_SHA,
   PROPOSAL_SHA,
+  WORKFLOW_RUN_ID,
+  proposalCommitMessage,
+  reviewBundleArchive,
   submission,
-  summary,
 } from "./fixtures";
 
 const ORIGIN = "https://review.example";
+const ARTIFACT_STORAGE =
+  "https://pipelines.actions.githubusercontent.com/results/archive.zip?sig=short-lived";
+const artifactArchive = reviewBundleArchive();
 const env: Env = {
   GITHUB_CLIENT_ID: "Iv1.example",
   GITHUB_CLIENT_SECRET: "client-secret",
@@ -81,7 +87,7 @@ function proposalApi(
   if (url.endsWith("/pulls/42")) {
     return Response.json({
       base: { repo: { full_name: "example/site" } },
-      body: summary(),
+      body: "Accessible fallback text may be edited freely.",
       head: { sha: HEAD_SHA },
       html_url: "https://github.com/example/site/pull/42",
       number: 42,
@@ -89,7 +95,44 @@ function proposalApi(
     });
   }
   if (url.includes("/pulls/42/commits?")) {
-    return Response.json([{ parents: [{ sha: BASE_SHA }], sha: PROPOSAL_SHA }]);
+    return Response.json([
+      {
+        commit: { message: proposalCommitMessage() },
+        parents: [{ sha: BASE_SHA }],
+        sha: PROPOSAL_SHA,
+      },
+    ]);
+  }
+  if (url.endsWith(`/actions/artifacts/${ARTIFACT_ID}`)) {
+    return Response.json({
+      expired: false,
+      id: ARTIFACT_ID,
+      name: `orinoco-curation-review-${PROPOSAL_SHA}`,
+      size_in_bytes: artifactArchive.byteLength,
+      workflow_run: { head_sha: BASE_SHA, id: WORKFLOW_RUN_ID },
+    });
+  }
+  if (url.endsWith(`/actions/runs/${WORKFLOW_RUN_ID}`)) {
+    return Response.json({
+      conclusion: "success",
+      event: "workflow_dispatch",
+      head_sha: BASE_SHA,
+      id: WORKFLOW_RUN_ID,
+      repository: { full_name: "example/site" },
+      run_attempt: 1,
+      status: "completed",
+    });
+  }
+  if (url.endsWith(`/actions/artifacts/${ARTIFACT_ID}/zip`)) {
+    return new Response(null, {
+      headers: { Location: ARTIFACT_STORAGE },
+      status: 302,
+    });
+  }
+  if (url === ARTIFACT_STORAGE) {
+    return new Response(new Uint8Array(artifactArchive).buffer, {
+      headers: { "Content-Length": String(artifactArchive.byteLength) },
+    });
   }
   if (url.includes(`/commits/${PROPOSAL_SHA}?`)) {
     return Response.json({
@@ -98,7 +141,15 @@ function proposalApi(
           filename: "metadata/records/example/first.yaml",
           status: "modified",
         },
+        {
+          filename: "metadata/overlays/annotations/example/first.yaml",
+          status: "modified",
+        },
         { filename: "metadata/records/example/second.yaml", status: "added" },
+        {
+          filename: "metadata/overlays/annotations/example/second.yaml",
+          status: "added",
+        },
       ],
       sha: PROPOSAL_SHA,
     });
@@ -115,6 +166,18 @@ function proposalApi(
         if (expression === `${BASE_SHA}:metadata/records/example/first.yaml`) {
           repository[`blob${index}`] = blob(
             "pid: example:first\ntitle: Original first\n",
+          );
+        } else if (
+          expression === `${PROPOSAL_SHA}:metadata/records/example/first.yaml`
+        ) {
+          repository[`blob${index}`] = blob(
+            "pid: example:first\ntitle: Proposed first\n",
+          );
+        } else if (
+          expression === `${PROPOSAL_SHA}:metadata/records/example/second.yaml`
+        ) {
+          repository[`blob${index}`] = blob(
+            "pid: example:second\ntitle: Proposed second\n",
           );
         } else if (
           expression === `${HEAD_SHA}:metadata/records/example/first.yaml`
@@ -146,7 +209,7 @@ describe("GitHub App user-to-server handlers", () => {
     const start = await authorizationStart(
       context(
         new Request(
-          `${ORIGIN}/api/auth/start?repository=example%2Fsite&pull_request=42`,
+          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
         ),
       ),
     );
@@ -167,6 +230,7 @@ describe("GitHub App user-to-server handlers", () => {
       env,
     );
     expect(oauth).toMatchObject({
+      artifact_id: ARTIFACT_ID,
       origin: ORIGIN,
       pull_request: 42,
       repository: "example/site",
@@ -204,7 +268,7 @@ describe("GitHub App user-to-server handlers", () => {
     );
     expect(callback.status).toBe(302);
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/?repository=example%2Fsite&pull_request=42`,
+      `${ORIGIN}/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
     );
     const setCookie = callback.headers.get("set-cookie") as string;
     expect(setCookie).toContain(`${OAUTH_COOKIE}=;`);
@@ -227,7 +291,7 @@ describe("GitHub App user-to-server handlers", () => {
     const start = await authorizationStart(
       context(
         new Request(
-          `${ORIGIN}/api/auth/start?repository=example%2Fsite&pull_request=42`,
+          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
         ),
       ),
     );
@@ -261,7 +325,7 @@ describe("curator authorization and exact-head submission handlers", () => {
       loadProposal(
         context(
           new Request(
-            `${ORIGIN}/api/proposal?repository=example%2Fsite&pull_request=42`,
+            `${ORIGIN}/api/proposal?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
             { headers: { Cookie: await sessionCookie() } },
           ),
         ),
@@ -297,7 +361,7 @@ describe("curator authorization and exact-head submission handlers", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await submitDecisions(
       context(
-        new Request(`${ORIGIN}/api/submit`, {
+        new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
           body: JSON.stringify(submission()),
           headers: {
             "Content-Type": "application/json",
@@ -340,7 +404,7 @@ describe("curator authorization and exact-head submission handlers", () => {
     await expect(
       submitDecisions(
         context(
-          new Request(`${ORIGIN}/api/submit`, {
+          new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
             body: JSON.stringify({
               ...submission(),
               head_sha: "d".repeat(40),

@@ -15,7 +15,8 @@ The initial supported profile MUST:
 - start from a default-branch `workflow_dispatch` and open one draft pull request;
 - create the proposal with one inline `datalad run --explicit` commit;
 - put the actual reviewable metadata changes under `metadata/records/` in the pull request's **Files changed** view, with machine PAV confined to mirrored companions under `metadata/overlays/annotations/`;
-- render an accessible pull-request summary headed by friendly labels and canonical PIDs, with source-native identifiers, paths, blockers, and hashes as secondary details and a link to the review application;
+- render an accessible pull-request fallback and a review-application link containing the repository, pull-request number, and exact Actions artifact ID;
+- publish exactly one untracked, expiring, reproducible Actions presentation artifact for that proposal;
 - support normal GitHub collaboration on the same branch, including attributed comment suggestions and direct metadata commits;
 - support SHACL Vue bundle application through the project-locked Pixi/DataLad task;
 - accept a complete structured decision state through an exact `/curation submit` comment posted on behalf of the authenticated reviewer;
@@ -30,19 +31,22 @@ The initial supported profile MUST:
 - dispatch normal validation without approving, merging, deploying, or writing to an external source.
 
 The trusted proposal workflow performs all adapter and source execution.
-It produces the actual Git diff and the accessible summary from the ephemeral candidate plan.
-The summary is a human-facing fallback and navigation aid, not a tracked proposal, hidden candidate descriptor, or separate authority.
+It produces the actual Git diff, an accessible Markdown fallback, and the ephemeral presentation artifact from the candidate plan.
+Pull-request Markdown MAY be edited using normal GitHub collaboration and is never parsed as a machine protocol or candidate authority.
+GitHub's native fallback-rendering limits are not curation conformance limits.
 
-The summary uses one visible `## Curation proposal` section containing `Adapter`, `Proposal commit`, and `Source coordinate` fields, followed by one visible `## Candidate review` section.
-The source coordinate is the canonical single-line JSON object rendered in a fenced `json` block.
-Each candidate is a level-three heading using its friendly ID and label, followed by visible `PID`, `Source record`, `Record path`, `Operation`, `Claim SHA-256`, and `Blockers` fields.
-`Blockers` is either `None` or an indented list.
-The workflow renders candidate sections in deterministic candidate-plan order.
+The artifact MUST be named `orinoco-curation-review-<proposal_sha>`.
+Its ZIP is at most 8 MiB compressed and contains exactly one regular top-level `review-bundle.json` entry of at most 16 MiB uncompressed.
+The JSON object has format `orinoco-lite-curation-review-bundle-v1` and exactly these top-level fields: `format`, `repository`, `pull_request`, `workflow_run_id`, `adapter`, `metadata_base_sha`, `proposal_sha`, `source_coordinate`, and `candidates`.
+Each candidate has exactly `pid`, `friendly_id`, `label`, `source_namespace`, `source_record_id`, `record_path`, `paths`, `operation`, `blockers`, and `claim_sha256`.
+`record_path` is the full repository record path and `paths` contains the exact changed record path and optional mirrored annotation path for that candidate.
 
-The application MUST derive the candidate set and add, modify, or delete operations from the proposal commit's actual record changes.
-It cross-checks the visible summary fields against those paths and operations and refuses an incomplete or inconsistent rendering.
-Source-native identifiers, labels, claim hashes, and blockers remain display facts that the trusted Action regenerates before finalization.
-The summary therefore adds no hidden candidate block, aggregate attestation, or durable authority beyond the pull request and its actual diff.
+The application MUST derive candidate membership and add, modify, or delete operations from the proposal commit's actual metadata diff.
+It verifies the artifact repository, workflow run, proposal, source, paths, operations, and record PIDs against the selected pull request and Git objects before displaying the bundle's presentation facts.
+It loads baseline record blobs at `metadata_base_sha`, initial proposed blobs at `proposal_sha`, and current branch data at the pull-request head.
+The initial blobs verify the bundle PID and operation; later authorized deletion, restoration, or PID edits remain visible current-head data and do not retarget the reviewed candidate.
+The artifact's friendly IDs, labels, source identifiers, hashes, and blockers remain presentation facts that the trusted Action regenerates before finalization.
+Artifact expiry or absence makes the hosted presentation unavailable but cannot change metadata, a decision, or review history.
 
 Reviewers MAY inspect and edit the metadata diff through GitHub's browser tools or a local checkout.
 Neither path changes the candidate, provenance, validation, or finalization rules in the source-adapter specification.
@@ -54,18 +58,21 @@ Native pull-request Markdown is an accessible summary and fallback, not a substi
 
 The application MUST:
 
-- accept or link directly to a repository and pull-request number;
-- use the authenticated GitHub API to load the current pull request, trusted workflow summary, proposal commit, and metadata diff;
+- accept or link directly to a repository, pull-request number, and artifact ID;
+- use the authenticated GitHub API to load the current pull request, proposal commit, metadata diff, workflow run, and exact Actions artifact;
 - display responsive before-and-after record diffs and identify records primarily by friendly IDs and labels;
 - expose source identifiers, paths, blockers, and hashes as secondary details;
 - provide exactly one mutually exclusive `accept`, `reject`, or `defer` control for every current candidate;
 - support filtering, a changed-only view, keyboard navigation, and complete submission validation;
-- bind submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete ordered candidate set; and
+- bind submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete candidate mapping; and
 - post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
 
-The application reads GitHub proposal objects produced by the trusted workflow.
+The application reads GitHub proposal and Actions objects produced by the trusted workflow.
 It MUST NOT run an adapter, reacquire an external source, execute pull-request code, or infer candidate facts that the trusted Action must regenerate.
 It is a review surface and authenticated comment transport, not another execution boundary.
+
+The initial service accepts at most 225 candidates, 450 changed metadata paths, and 16 MiB of loaded record text per review.
+These are application resource-safety bounds, not pull-request Markdown or native-diff conformance limits.
 
 ## Authenticated submission
 
@@ -73,11 +80,12 @@ The structured comment MUST begin with the exact line `/curation submit` and con
 That object contains exactly `format`, `repository`, `pull_request`, `proposal_sha`, `head_sha`, `adapter`, `source_coordinate`, and `decisions`.
 
 Each decision contains exactly the initial proposal's canonical `pid`, `record_path`, `operation`, and the human's `disposition`.
-Decisions MUST use deterministic candidate-plan order and cover the complete candidate set.
+The browser serializes decisions in deterministic record-path order, but ordering is not authority.
+The Action compares the complete PID, path, and operation mapping independent of browser order.
 The browser MUST NOT supply reviewer identity.
 The Action derives identity, time, repository, pull request, and comment URL from the authenticated GitHub event.
 
-The GitHub App requests only repository metadata read, contents read, and pull requests write access for selected repositories.
+The GitHub App requests only repository metadata read, contents read, Actions read, and pull requests write access for selected repositories.
 It uses a short-lived user access token so the comment is attributed to the authenticated user and the App.
 Signed or encrypted OAuth state and a short-lived authentication session are operational state.
 
@@ -91,8 +99,8 @@ For every submitted comment it MUST:
 
 1. re-read the pull request, proposal commit, current head, and source coordinate;
 2. regenerate the adapter candidate plan with trusted code and the exact source revision;
-3. verify the proposal diff and the complete ordered candidate set;
-4. verify source-native identifiers and claim digests represented in the workflow-generated summary;
+3. verify the proposal diff and the complete candidate mapping;
+4. regenerate source-native identifiers and claim digests independently of the ephemeral presentation bundle;
 5. reject stale, incomplete, unauthorized, or inconsistent submissions;
 6. apply the decisions while preserving conforming human edits;
 7. validate the complete joined graph; and
@@ -116,7 +124,9 @@ Local execution MAY expose the same deterministic operations for development and
 
 ## Hosting boundary
 
-The profile does not require a particular hosting provider.
+The central `https://orinoco-curation-review.pages.dev/` deployment is the default hosted option.
+A downstream selects its review-application origin independently, and that origin is not part of the PR-body or submission machine protocol.
+The same application code MAY be deployed elsewhere by setting `PUBLIC_ORIGIN`; the profile does not require a particular hosting provider.
 A conforming deployment MAY serve the static application and stateless authorization routes from one Cloudflare Pages or Workers deployment.
 It MUST NOT require a durable database, object store, metadata service, candidate store, or decision store.
 

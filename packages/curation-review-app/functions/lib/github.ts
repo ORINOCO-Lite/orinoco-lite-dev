@@ -1,11 +1,11 @@
 import { HttpError } from "./http";
 import { splitRepository } from "./input";
+import { MAX_ARTIFACT_ARCHIVE_BYTES, MAX_REVIEW_PATHS } from "./bundle";
 
 const GITHUB_API = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const MAX_RECORD_BYTES = 1_048_576;
 const MAX_REVIEW_BYTES = 16_777_216;
-const MAX_PROPOSAL_FILES = 450;
 const BLOBS_PER_QUERY = 20;
 
 export interface ContentRequest {
@@ -62,6 +62,38 @@ function githubError(status: number): HttpError {
     "github_error",
     "GitHub could not complete the request.",
   );
+}
+
+function artifactStorageUrl(value: string | null): URL {
+  let result: URL;
+  try {
+    result = new URL(value ?? "");
+  } catch {
+    throw new HttpError(
+      502,
+      "github_error",
+      "GitHub returned an invalid artifact download URL.",
+    );
+  }
+  const allowedHost =
+    result.hostname.endsWith(".actions.githubusercontent.com") ||
+    result.hostname.endsWith(".blob.core.windows.net") ||
+    result.hostname.endsWith(".githubusercontent.com");
+  if (
+    result.protocol !== "https:" ||
+    !allowedHost ||
+    result.username !== "" ||
+    result.password !== "" ||
+    result.port !== "" ||
+    result.hash !== ""
+  ) {
+    throw new HttpError(
+      502,
+      "github_error",
+      "GitHub returned an invalid artifact download URL.",
+    );
+  }
+  return result;
 }
 
 export class GitHubClient {
@@ -162,20 +194,102 @@ export class GitHubClient {
     return value[0];
   }
 
+  async artifactMetadata(
+    repository: string,
+    artifactId: number,
+  ): Promise<unknown> {
+    return this.json(endpoint(repository, `/actions/artifacts/${artifactId}`));
+  }
+
+  async workflowRun(repository: string, runId: number): Promise<unknown> {
+    return this.json(endpoint(repository, `/actions/runs/${runId}`));
+  }
+
+  async artifactArchive(
+    repository: string,
+    artifactId: number,
+  ): Promise<Uint8Array> {
+    const headers = new Headers({
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${this.#token}`,
+      "X-GitHub-Api-Version": API_VERSION,
+    });
+    const redirect = await this.#fetch(
+      apiUrl(endpoint(repository, `/actions/artifacts/${artifactId}/zip`)),
+      { headers, redirect: "manual" },
+    );
+    if (redirect.status !== 302) {
+      if (!redirect.ok) throw githubError(redirect.status);
+      throw new HttpError(
+        502,
+        "github_error",
+        "GitHub did not return an artifact download redirect.",
+      );
+    }
+    const download = await this.#fetch(
+      artifactStorageUrl(redirect.headers.get("location")),
+      { redirect: "error" },
+    );
+    if (!download.ok) throw githubError(download.status);
+    const contentLength = download.headers.get("content-length");
+    if (
+      contentLength !== null &&
+      (!/^(?:0|[1-9][0-9]*)$/.test(contentLength) ||
+        Number(contentLength) > MAX_ARTIFACT_ARCHIVE_BYTES)
+    ) {
+      throw new HttpError(
+        422,
+        "artifact_too_large",
+        "The review artifact ZIP exceeds the compressed size limit.",
+      );
+    }
+    if (download.body === null) {
+      throw new HttpError(
+        502,
+        "github_error",
+        "GitHub returned an empty artifact response.",
+      );
+    }
+    const reader = download.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_ARTIFACT_ARCHIVE_BYTES) {
+        await reader.cancel();
+        throw new HttpError(
+          422,
+          "artifact_too_large",
+          "The review artifact ZIP exceeds the compressed size limit.",
+        );
+      }
+      chunks.push(value);
+    }
+    const result = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return result;
+  }
+
   async commit(
     repository: string,
     sha: string,
-    maximumFiles: number,
+    maximumFiles: number = MAX_REVIEW_PATHS,
   ): Promise<Record<string, unknown>> {
     if (
       !Number.isSafeInteger(maximumFiles) ||
       maximumFiles < 1 ||
-      maximumFiles > MAX_PROPOSAL_FILES
+      maximumFiles > MAX_REVIEW_PATHS
     ) {
       throw new HttpError(
         500,
         "invalid_commit_limit",
-        "The proposal file limit is invalid.",
+        "The proposal path limit is invalid.",
       );
     }
     let first: Record<string, unknown> | null = null;
@@ -193,8 +307,7 @@ export class GitHubClient {
         );
       }
       const record = value as Record<string, unknown>;
-      const pageFiles = record.files;
-      if (!Array.isArray(pageFiles)) {
+      if (!Array.isArray(record.files)) {
         throw new HttpError(
           502,
           "github_error",
@@ -202,20 +315,20 @@ export class GitHubClient {
         );
       }
       if (first === null) first = record;
-      files.push(...pageFiles);
+      files.push(...record.files);
       if (files.length > maximumFiles) {
         throw new HttpError(
           422,
           "proposal_too_large",
-          "The proposal changes too many files.",
+          "The proposal changes too many metadata paths for this service.",
         );
       }
-      if (pageFiles.length < 100) break;
+      if (record.files.length < 100) break;
       if (page === pages) {
         throw new HttpError(
           422,
           "proposal_too_large",
-          "The proposal changes too many files.",
+          "The proposal changes too many metadata paths for this service.",
         );
       }
     }
