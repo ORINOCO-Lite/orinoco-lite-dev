@@ -158,6 +158,29 @@ describe("curation review interface", () => {
     ).toBeInTheDocument();
   });
 
+  it("applies a bulk default only to unresolved records", async () => {
+    installFetch();
+    const user = userEvent.setup();
+    render(<App />);
+    const first = await screen.findByRole("article", { name: "First record" });
+    const second = screen.getByRole("article", { name: "Second record" });
+
+    await user.click(within(first).getByRole("radio", { name: "Reject" }));
+    await user.click(
+      screen.getByRole("button", { name: "Accept all unresolved" }),
+    );
+
+    expect(within(first).getByRole("radio", { name: "Reject" })).toBeChecked();
+    expect(within(second).getByRole("radio", { name: "Accept" })).toBeChecked();
+    expect(screen.getByText("2/2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Defer all unresolved" }),
+    ).toBeDisabled();
+
+    await user.click(within(second).getByRole("radio", { name: "Defer" }));
+    expect(within(second).getByRole("radio", { name: "Defer" })).toBeChecked();
+  });
+
   it("moves between visible records when a filter hides an intermediate card", async () => {
     const reviewProposal = proposal();
     const firstCandidate = reviewProposal.candidates[0];

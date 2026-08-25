@@ -701,6 +701,25 @@ The bounded records preserve interoperable global identifiers and the minimum hu
 
 **Follow-up:** Complete and review [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then exercise the real downstream proposal from its immutable source coordinate.
 
+### HR-217 — Initialize unresolved review decisions in bulk
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** How should a curator efficiently review a proposal whose records will mostly receive the same disposition?
+
+**Outcome:** Provide one bulk initializer for each supported disposition.
+It applies the selected disposition only to currently unresolved records, preserves existing per-record choices, and leaves every initialized choice editable before submission.
+The curator may therefore initialize the common case and review only the exceptions without risking that a later bulk action erases choices already considered individually.
+
+The initializer changes only transient browser state.
+No disposition becomes durable until the authenticated curator submits the complete decision comment, and the trusted Action performs the existing exact-head, completeness, authorization, and candidate-regeneration checks.
+
+**Rationale:** This reduces repetitive clicking without changing human authority, durable review semantics, the submission protocol, or the trusted commit boundary.
+
+**Decided by/date:** John Lee, 2026-08-25.
+
+**Follow-up:** Add accessible application controls and focused interaction tests, deploy the reviewed central application revision, and record immutable evidence in Milestone 5 acceptance.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.

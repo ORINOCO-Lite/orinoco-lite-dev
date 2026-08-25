@@ -83,7 +83,7 @@ Implement the separately reviewed normative [`GitHub source-adapter curation pro
 
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
 - Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible fallback and review-application link in the pull-request body.
-- Provide responsive before-and-after record diffs, mutually exclusive per-record controls, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
+- Provide responsive before-and-after record diffs, mutually exclusive per-record controls, a non-destructive bulk default for unresolved records, filtering, keyboard navigation, changed-only views, and complete-submission validation in the stateless hosted review application.
 - Have the trusted workflow generate the actual diff and exactly one untracked, expiring, reproducible Actions presentation bundle containing source and proposal coordinates plus per-record UI facts.
 - Have the application use GitHub Actions read access to load that bundle, derive candidate membership and operations from the proposal commit's metadata diff, and run no adapter or source logic.
 - Keep that proposal-review artifact distinct from the SHACL Vue editor-input artifact; the latter never changes this exactly-one proposal artifact contract or enters decision finalization.
