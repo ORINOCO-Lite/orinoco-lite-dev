@@ -17,6 +17,8 @@ The event detail is the same object supplied to the download operation and adds 
 The Orinoco wrapper MAY offer **Propose via GitHub** when it receives that event.
 It MUST bind the editor input and resulting bundle to an exact repository and Git commit and MUST NOT modify the bundle, choose metadata values, or retain a copy after the request completes.
 The central service origin is configurable; a downstream may use the central deployment or host the same code.
+The canonical authenticated wrapper route is `/edit/` on that origin.
+A downstream site's own `/edit/` route MAY continue serving the credential-free editor and **Download bundle** fallback; identical path names on different origins do not make that static page the GitHub wrapper.
 
 ## Exact-head editor input
 

@@ -4,6 +4,7 @@
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-08-20",
   "vars": {
+    "EDITOR_RUNTIME_MANIFEST_SHA256": "839f82029ae0b4805a6d8c53afd88eb18a53023daf13fa5fd09c217dc8f101fd",
     "GITHUB_CLIENT_ID": "Iv23limCfUnRPCFcXx3H",
     "PUBLIC_ORIGIN": "https://orinoco-curation-review.pages.dev",
   },

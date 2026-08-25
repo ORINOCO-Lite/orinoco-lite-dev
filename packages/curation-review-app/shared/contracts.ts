@@ -67,6 +67,27 @@ export interface SubmitResult {
   comment_url: string;
 }
 
+export interface DiscoveryArtifact {
+  created_at: string;
+  expires_at: string;
+  id: number;
+  name: string;
+}
+
+export interface DiscoveryPullRequest {
+  artifacts: DiscoveryArtifact[];
+  draft: boolean;
+  head_sha: string;
+  number: number;
+  proposal_sha: string;
+  title: string;
+}
+
+export interface ReviewDiscovery {
+  pull_requests: DiscoveryPullRequest[];
+  repository: string;
+}
+
 export interface ShaclReviewRecord {
   pid: string;
   rdf_turtle: string;

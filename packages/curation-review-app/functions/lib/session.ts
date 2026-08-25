@@ -30,15 +30,21 @@ export interface ReviewOAuthCookieState extends OAuthCookieCommon {
   pull_request: number;
 }
 
+export interface DiscoveryOAuthCookieState extends OAuthCookieCommon {
+  kind: "discovery";
+}
+
 export interface ShaclOAuthCookieState extends OAuthCookieCommon {
   expected_head_sha: string | null;
   kind: "shacl";
   pull_request: number | null;
 }
 
-export type OAuthCookieState = ReviewOAuthCookieState | ShaclOAuthCookieState;
+export type OAuthCookieState =
+  DiscoveryOAuthCookieState | ReviewOAuthCookieState | ShaclOAuthCookieState;
 
 type OAuthCookieInput =
+  | Omit<DiscoveryOAuthCookieState, "expires_at" | "issued_at">
   | Omit<ReviewOAuthCookieState, "expires_at" | "issued_at">
   | Omit<ShaclOAuthCookieState, "expires_at" | "issued_at">;
 
@@ -223,29 +229,39 @@ export async function readOAuthCookie(
   const kind = (value as Record<string, unknown>).kind;
   requireExactKeys(
     value,
-    kind === "review"
+    kind === "discovery"
       ? [
-          "artifact_id",
           "code_verifier",
           "expires_at",
           "issued_at",
           "kind",
           "origin",
-          "pull_request",
           "repository",
           "state",
         ]
-      : [
-          "code_verifier",
-          "expected_head_sha",
-          "expires_at",
-          "issued_at",
-          "kind",
-          "origin",
-          "pull_request",
-          "repository",
-          "state",
-        ],
+      : kind === "review"
+        ? [
+            "artifact_id",
+            "code_verifier",
+            "expires_at",
+            "issued_at",
+            "kind",
+            "origin",
+            "pull_request",
+            "repository",
+            "state",
+          ]
+        : [
+            "code_verifier",
+            "expected_head_sha",
+            "expires_at",
+            "issued_at",
+            "kind",
+            "origin",
+            "pull_request",
+            "repository",
+            "state",
+          ],
     "OAuth state",
   );
   const issuedAt = requireTimestamp(value.issued_at, "OAuth issued_at");
@@ -257,7 +273,9 @@ export async function readOAuthCookie(
     !validOneLine(value.origin, 256) ||
     !validOneLine(value.repository, 200) ||
     !validOneLine(value.state, 128) ||
-    (value.kind !== "review" && value.kind !== "shacl")
+    (value.kind !== "discovery" &&
+      value.kind !== "review" &&
+      value.kind !== "shacl")
   ) {
     throw new HttpError(
       401,
@@ -273,6 +291,9 @@ export async function readOAuthCookie(
     repository: value.repository,
     state: value.state,
   };
+  if (value.kind === "discovery") {
+    return { ...common, kind: "discovery" };
+  }
   if (value.kind === "shacl") {
     const standalone =
       value.expected_head_sha === null && value.pull_request === null;

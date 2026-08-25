@@ -27,12 +27,29 @@ export async function onRequest(context: EventContext): Promise<Response> {
   requireMethod(context.request, "GET");
   const url = new URL(context.request.url);
   const origin = configuredOrigin(context.env);
-  if (
-    url.origin !== origin ||
-    [...url.searchParams.keys()].some(
-      (key) => key !== "code" && key !== "state",
-    )
-  ) {
+  if (url.origin !== origin || url.pathname !== "/api/auth/callback") {
+    throw new HttpError(
+      400,
+      "invalid_oauth_callback",
+      "The OAuth callback is invalid.",
+    );
+  }
+  const keys = [...url.searchParams.keys()];
+  if (keys.some((key) => key.startsWith("error"))) {
+    throw new HttpError(
+      400,
+      "github_oauth_not_authorized",
+      "GitHub did not authorize this sign-in. Return to the review link and try again.",
+    );
+  }
+  if (keys.some((key) => key === "installation_id" || key === "setup_action")) {
+    throw new HttpError(
+      400,
+      "github_app_setup_misdirected",
+      "GitHub App installation was sent to the OAuth callback. Configure a separate setup URL and start sign-in from the review link.",
+    );
+  }
+  if (keys.some((key) => key !== "code" && key !== "state")) {
     throw new HttpError(
       400,
       "invalid_oauth_callback",
@@ -58,11 +75,12 @@ export async function onRequest(context: EventContext): Promise<Response> {
   const user = await new GitHubClient(token.accessToken).currentUser();
   const destination = new URL("/", origin);
   if (oauth.kind === "review") {
+    destination.pathname = "/review/";
     destination.searchParams.set("artifact_id", String(oauth.artifact_id));
     destination.searchParams.set("repository", oauth.repository);
     destination.searchParams.set("pull_request", String(oauth.pull_request));
-  } else {
-    destination.pathname = "/edit";
+  } else if (oauth.kind === "shacl") {
+    destination.pathname = "/edit/";
     destination.searchParams.set("repository", oauth.repository);
     if (oauth.pull_request !== null && oauth.expected_head_sha !== null) {
       destination.searchParams.set(
@@ -71,6 +89,8 @@ export async function onRequest(context: EventContext): Promise<Response> {
       );
       destination.searchParams.set("pull_request", String(oauth.pull_request));
     }
+  } else {
+    destination.searchParams.set("repository", oauth.repository);
   }
   const headers = new Headers({
     "Cache-Control": "no-store",

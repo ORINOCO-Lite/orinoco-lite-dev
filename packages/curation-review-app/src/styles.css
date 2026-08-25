@@ -146,7 +146,7 @@ h1 {
   align-items: end;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(14rem, 1fr) minmax(8rem, 0.35fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   margin-top: 2rem;
 }
 

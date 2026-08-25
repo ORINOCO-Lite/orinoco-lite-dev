@@ -69,12 +69,18 @@ The origin is not embedded in a submission or PR-body machine protocol.
 
 The SHACL Vue path reuses this same application deployment.
 It does not add a separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service.
+Its canonical wrapper route is `/edit/`.
+The downstream site's own `/edit/` route remains the credential-free SHACL Vue page with its normal **Download bundle** behavior; it is not the authenticated GitHub proposal wrapper.
 
-A review link has this form:
+A canonical review link has this form:
 
 ```text
-https://review.example/?repository=owner/repository&pull_request=42&artifact_id=123456789
+https://review.example/review/?repository=owner/repository&pull_request=42&artifact_id=123456789
 ```
+
+An exact link opens that proposal directly.
+A repository-only entry link such as `https://review.example/?repository=owner/repository` preserves the site identity through authentication and then lists only that repository's relevant open curation pull requests and unexpired matching artifacts.
+Discovery is a live, stateless convenience; opening a choice performs the complete authoritative proposal verification again.
 
 The link selects one artifact by immutable GitHub artifact ID.
 Its required name is `orinoco-curation-review-<proposal_sha>` and its ZIP contains exactly one regular top-level `review-bundle.json` using format `orinoco-lite-curation-review-bundle-v1`.

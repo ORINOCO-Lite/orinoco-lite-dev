@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CurationSubmission,
+  DiscoveryPullRequest,
   Disposition,
   ReviewCandidate,
+  ReviewDiscovery,
   ReviewProposal,
   SessionStatus,
   ShaclBundleMessage,
@@ -13,6 +15,8 @@ import type {
 import {
   ApiError,
   authenticationUrl,
+  discoveryAuthenticationUrl,
+  loadDiscovery,
   loadProposal,
   loadSession,
   logout,
@@ -37,7 +41,13 @@ type DecisionState = Record<string, Disposition | undefined>;
 type DecisionFilter = "all" | "unresolved" | Disposition;
 
 function currentTarget(): Target | null {
-  if (window.location.pathname !== "/") return null;
+  if (
+    window.location.pathname !== "/" &&
+    window.location.pathname !== "/review" &&
+    window.location.pathname !== "/review/"
+  ) {
+    return null;
+  }
   const query = new URLSearchParams(window.location.search);
   const artifact = query.get("artifact_id");
   const repository = query.get("repository");
@@ -70,7 +80,12 @@ function validRepository(value: string | null): value is string {
 }
 
 function currentShaclTarget(): ShaclTarget | null {
-  if (window.location.pathname !== "/edit") return null;
+  if (
+    window.location.pathname !== "/edit" &&
+    window.location.pathname !== "/edit/"
+  ) {
+    return null;
+  }
   const query = new URLSearchParams(window.location.search);
   const allowed = new Set(["expected_head_sha", "pull_request", "repository"]);
   if ([...query.keys()].some((key) => !allowed.has(key))) return null;
@@ -98,82 +113,129 @@ function currentShaclTarget(): ShaclTarget | null {
   };
 }
 
+function contextualRepository(): string | null {
+  if (
+    window.location.pathname !== "/" &&
+    window.location.pathname !== "/review" &&
+    window.location.pathname !== "/review/"
+  ) {
+    return null;
+  }
+  const query = new URLSearchParams(window.location.search);
+  const values = query.getAll("repository");
+  const value = values[0] ?? null;
+  return values.length === 1 && validRepository(value) ? value : null;
+}
+
 function message(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return "The review could not be loaded.";
 }
 
-function Landing(): React.JSX.Element {
-  function open(event: React.FormEvent<HTMLFormElement>): void {
+interface LandingProps {
+  discovery: ReviewDiscovery | null;
+  failure: string | null;
+  repository: string | null;
+  session: SessionStatus | null;
+}
+
+function Landing({
+  discovery,
+  failure,
+  repository,
+  session,
+}: LandingProps): React.JSX.Element {
+  const requested = useMemo(
+    () => new URLSearchParams(window.location.search),
+    [],
+  );
+  const [selectedPull, setSelectedPull] = useState("");
+  const [selectedArtifact, setSelectedArtifact] = useState("");
+  const selectedProposal = discovery?.pull_requests.find(
+    (pull) => String(pull.number) === selectedPull,
+  );
+  const artifacts = selectedProposal?.artifacts ?? [];
+  const editablePulls =
+    discovery?.pull_requests.filter((pull) => pull.draft) ?? [];
+
+  useEffect(() => {
+    if (discovery === null) return;
+    const requestedPull = requested.get("pull_request");
+    const requestedExists = discovery.pull_requests.some(
+      (pull) => String(pull.number) === requestedPull,
+    );
+    if (requestedExists) {
+      setSelectedPull(requestedPull ?? "");
+    } else if (discovery.pull_requests.length === 1) {
+      setSelectedPull(String(discovery.pull_requests[0]?.number ?? ""));
+    } else {
+      setSelectedPull("");
+    }
+  }, [discovery, requested]);
+
+  useEffect(() => {
+    const requestedArtifact = requested.get("artifact_id");
+    const requestedExists = artifacts.some(
+      (artifact) => String(artifact.id) === requestedArtifact,
+    );
+    if (requestedExists) {
+      setSelectedArtifact(requestedArtifact ?? "");
+    } else if (artifacts.length === 1) {
+      setSelectedArtifact(String(artifacts[0]?.id ?? ""));
+    } else {
+      setSelectedArtifact("");
+    }
+  }, [artifacts, requested]);
+
+  function selectRepository(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const query = new URLSearchParams({
-      artifact_id: String(data.get("artifact_id") ?? ""),
-      pull_request: String(data.get("pull_request") ?? ""),
       repository: String(data.get("repository") ?? ""),
     });
     window.location.assign(`/?${query.toString()}`);
   }
 
-  function openEdit(event: React.FormEvent<HTMLFormElement>): void {
+  function openReview(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    if (repository === null || selectedPull === "" || selectedArtifact === "") {
+      return;
+    }
     const query = new URLSearchParams({
-      repository: String(data.get("repository") ?? ""),
+      artifact_id: selectedArtifact,
+      pull_request: selectedPull,
+      repository,
     });
-    window.location.assign(`/edit?${query.toString()}`);
+    window.location.assign(`/review/?${query.toString()}`);
   }
 
-  return (
-    <main className="landing" id="main-content">
-      <p className="eyebrow">Orinoco Lite</p>
-      <h1>Review a metadata proposal</h1>
-      <p className="lede">
-        Enter the GitHub repository, pull request, and review artifact created
-        by the trusted source-adapter workflow.
-      </p>
-      <form className="target-form" onSubmit={open}>
-        <label>
-          Repository
-          <input
-            autoComplete="off"
-            name="repository"
-            pattern="[^/]+/[^/]+"
-            placeholder="owner/repository"
-            required
-          />
-        </label>
-        <label>
-          Pull request
-          <input
-            inputMode="numeric"
-            min="1"
-            name="pull_request"
-            placeholder="42"
-            required
-            type="number"
-          />
-        </label>
-        <label>
-          Artifact ID
-          <input
-            inputMode="numeric"
-            min="1"
-            name="artifact_id"
-            placeholder="123456789"
-            required
-            type="number"
-          />
-        </label>
-        <button type="submit">Open review</button>
-      </form>
-      <section className="edit-entry" aria-labelledby="edit-entry-title">
-        <h2 id="edit-entry-title">Propose a SHACL Vue edit</h2>
-        <p>
-          Open the browser-memory handoff for a normal SHACL Vue v2 bundle. The
-          service does not retain the bundle.
+  function openEdit(event: React.FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (repository === null) return;
+    const data = new FormData(event.currentTarget);
+    const selected = String(data.get("edit_target") ?? "default");
+    const query = new URLSearchParams({ repository });
+    if (selected !== "default") {
+      const pull = editablePulls.find(
+        (candidate) => String(candidate.number) === selected,
+      );
+      if (pull === undefined) return;
+      query.set("expected_head_sha", pull.head_sha);
+      query.set("pull_request", String(pull.number));
+    }
+    window.location.assign(`/edit/?${query.toString()}`);
+  }
+
+  if (repository === null) {
+    return (
+      <main className="landing" id="main-content">
+        <p className="eyebrow">Orinoco Lite</p>
+        <h1>Review or edit repository metadata</h1>
+        <p className="lede">
+          Start from a repository or pull-request link. The repository remains
+          explicit because one GitHub identity can curate more than one site.
         </p>
-        <form className="edit-target-form" onSubmit={openEdit}>
+        <form className="target-form" onSubmit={selectRepository}>
           <label>
             Repository
             <input
@@ -184,11 +246,144 @@ function Landing(): React.JSX.Element {
               required
             />
           </label>
-          <button type="submit">Open edit handoff</button>
+          <button type="submit">Continue</button>
         </form>
-      </section>
+        <p className="quiet">
+          The application stores no metadata or review decisions.
+        </p>
+      </main>
+    );
+  }
+
+  if (session === null) {
+    return (
+      <main className="landing" id="main-content">
+        <p>Checking the GitHub session…</p>
+      </main>
+    );
+  }
+
+  if (!session.authenticated) {
+    return (
+      <main className="landing" id="main-content">
+        <p className="eyebrow">Authenticated curation</p>
+        <h1>Continue with {repository}</h1>
+        <p className="lede">
+          Sign in to list only this repository&apos;s open curation proposals
+          and available review artifacts, or to start an attributed SHACL Vue
+          edit.
+        </p>
+        <a
+          className="button-link"
+          href={discoveryAuthenticationUrl(repository)}
+        >
+          Continue with GitHub
+        </a>
+        <p className="quiet">
+          GitHub limits access to collaborators with write or admin permission.
+        </p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="landing" id="main-content">
+      <p className="eyebrow">Signed in as {session.login}</p>
+      <h1>Curate {repository}</h1>
+      <p className="lede">
+        Choose from the open proposals and expiring artifacts verified directly
+        from GitHub. A fully populated pull-request link opens its exact review
+        immediately.
+      </p>
+      {failure !== null && <p className="feedback">{failure}</p>}
+      {discovery === null && failure === null ? (
+        <p>Loading open proposals from GitHub…</p>
+      ) : (
+        <>
+          <form className="target-form" onSubmit={openReview}>
+            <label>
+              Repository
+              <input readOnly value={repository} />
+            </label>
+            <label>
+              Open curation pull request
+              <select
+                aria-label="Open curation pull request"
+                onChange={(event) => setSelectedPull(event.target.value)}
+                required
+                value={selectedPull}
+              >
+                <option value="">Choose a pull request</option>
+                {discovery?.pull_requests.map((pull) => (
+                  <option key={pull.number} value={pull.number}>
+                    #{pull.number} — {pull.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Review artifact
+              <select
+                aria-label="Review artifact"
+                disabled={selectedProposal === undefined}
+                onChange={(event) => setSelectedArtifact(event.target.value)}
+                required
+                value={selectedArtifact}
+              >
+                <option value="">Choose an artifact</option>
+                {artifacts.map((artifact) => (
+                  <option key={artifact.id} value={artifact.id}>
+                    {artifact.id} — expires {artifact.expires_at}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              disabled={selectedPull === "" || selectedArtifact === ""}
+              type="submit"
+            >
+              Open review
+            </button>
+          </form>
+          {discovery?.pull_requests.length === 0 && (
+            <p className="quiet">
+              No open source-adapter curation pull requests are available.
+            </p>
+          )}
+          {selectedProposal !== undefined && artifacts.length === 0 && (
+            <p className="quiet">
+              This proposal has no unexpired matching review artifact. Rerun its
+              trusted proposal workflow to reproduce one.
+            </p>
+          )}
+          <section className="edit-entry" aria-labelledby="edit-entry-title">
+            <h2 id="edit-entry-title">Propose a SHACL Vue edit</h2>
+            <p>
+              Preserve Download bundle in the editor, or send that same
+              browser-memory result through an explicit attributed GitHub
+              proposal.
+            </p>
+            <form className="edit-target-form" onSubmit={openEdit}>
+              <label>
+                Edit target
+                <select defaultValue="default" name="edit_target">
+                  <option value="default">
+                    Current default branch — create a draft pull request
+                  </option>
+                  {editablePulls.map((pull: DiscoveryPullRequest) => (
+                    <option key={pull.number} value={pull.number}>
+                      Draft PR #{pull.number} — {pull.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit">Open SHACL Vue proposal</button>
+            </form>
+          </section>
+        </>
+      )}
       <p className="quiet">
-        The application stores no metadata or review decisions.
+        The application stores no metadata, bundles, or review decisions.
       </p>
     </main>
   );
@@ -962,7 +1157,7 @@ function Review({
           </label>
           <div className="review-actions">
             <a
-              href={`/edit?${new URLSearchParams({
+              href={`/edit/?${new URLSearchParams({
                 expected_head_sha: proposal.head_sha,
                 pull_request: String(proposal.pull_request),
                 repository: proposal.repository,
@@ -1044,12 +1239,14 @@ function Review({
 export default function App(): React.JSX.Element {
   const target = currentTarget();
   const shaclTarget = currentShaclTarget();
+  const repository = contextualRepository();
   const [session, setSession] = useState<SessionStatus | null>(null);
+  const [discovery, setDiscovery] = useState<ReviewDiscovery | null>(null);
   const [proposal, setProposal] = useState<ReviewProposal | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
-    if (target === null && shaclTarget === null) return;
+    if (target === null && shaclTarget === null && repository === null) return;
     let active = true;
     void (async () => {
       try {
@@ -1063,6 +1260,14 @@ export default function App(): React.JSX.Element {
             target.artifactId,
           );
           if (active) setProposal(loaded);
+        } else if (
+          current.authenticated &&
+          target === null &&
+          shaclTarget === null &&
+          repository !== null
+        ) {
+          const loaded = await loadDiscovery(repository);
+          if (active) setDiscovery(loaded);
         }
       } catch (error) {
         if (active) setFailure(message(error));
@@ -1072,6 +1277,7 @@ export default function App(): React.JSX.Element {
       active = false;
     };
   }, [
+    repository,
     shaclTarget?.expectedHeadSha,
     shaclTarget?.pullRequest,
     shaclTarget?.repository,
@@ -1080,7 +1286,16 @@ export default function App(): React.JSX.Element {
     target?.repository,
   ]);
 
-  if (target === null && shaclTarget === null) return <Landing />;
+  if (target === null && shaclTarget === null) {
+    return (
+      <Landing
+        discovery={discovery}
+        failure={failure}
+        repository={repository}
+        session={session}
+      />
+    );
+  }
   if (failure !== null) {
     return (
       <main className="landing" id="main-content">
@@ -1101,7 +1316,16 @@ export default function App(): React.JSX.Element {
     if (!session.authenticated) return <ShaclSignIn target={shaclTarget} />;
     return <ShaclHandoff session={session} target={shaclTarget} />;
   }
-  if (target === null) return <Landing />;
+  if (target === null) {
+    return (
+      <Landing
+        discovery={discovery}
+        failure={failure}
+        repository={repository}
+        session={session}
+      />
+    );
+  }
   if (!session.authenticated) return <SignIn target={target} />;
   if (proposal === null)
     return (
