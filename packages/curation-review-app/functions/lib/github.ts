@@ -9,6 +9,7 @@ import type {
 
 const GITHUB_API = "https://api.github.com";
 const API_VERSION = "2022-11-28";
+const USER_AGENT = "orinoco-lite-curation-review";
 const MAX_RECORD_BYTES = 1_048_576;
 const MAX_REVIEW_BYTES = 16_777_216;
 const BLOBS_PER_QUERY = 20;
@@ -196,6 +197,7 @@ export class GitHubClient {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/vnd.github+json");
     headers.set("Authorization", `Bearer ${this.#token}`);
+    headers.set("User-Agent", USER_AGENT);
     headers.set("X-GitHub-Api-Version", API_VERSION);
     const response = await this.#fetch(apiUrl(path), {
       ...init,
@@ -651,6 +653,7 @@ export class GitHubClient {
     const headers = new Headers({
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${this.#token}`,
+      "User-Agent": USER_AGENT,
       "X-GitHub-Api-Version": API_VERSION,
     });
     const redirect = await this.#fetch(

@@ -36,6 +36,9 @@ describe("GitHub fetch invocation", () => {
       receivers.push(this);
       if (this !== undefined) throw new TypeError("Illegal invocation");
       expect(init?.redirect).toBe("manual");
+      expect(new Headers(init?.headers).get("user-agent")).toBe(
+        "orinoco-lite-curation-review",
+      );
       return Promise.resolve(Response.json({ id: 1, login: "octocat" }));
     });
 
@@ -170,6 +173,9 @@ describe("GitHub Actions artifact download", () => {
         if (url.startsWith("https://api.github.com/")) {
           expect(new Headers(init?.headers).get("authorization")).toBe(
             "Bearer ghu_test",
+          );
+          expect(new Headers(init?.headers).get("user-agent")).toBe(
+            "orinoco-lite-curation-review",
           );
           return new Response(null, {
             headers: {

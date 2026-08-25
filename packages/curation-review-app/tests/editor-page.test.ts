@@ -75,8 +75,9 @@ describe("exact-head SHACL Vue page rendering", () => {
     const request = assets?.mock.calls[0]?.[0];
     expect(request).toBeInstanceOf(Request);
     expect((request as Request).url).toBe(
-      `https://review.example/editor-runtime/${DIGEST}/index.html`,
+      `https://review.example/editor-runtime/${DIGEST}/`,
     );
+    expect((request as Request).redirect).toBe("manual");
     expect((request as Request).headers.get("cookie")).toBeNull();
     expect((request as Request).headers.get("authorization")).toBeNull();
 

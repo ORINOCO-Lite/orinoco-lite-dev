@@ -77,7 +77,7 @@ describe("short-lived GitHub authentication", () => {
     });
   });
 
-  it("rejects a non-expiring token response", async () => {
+  it("reports a non-expiring token response without exposing response data", async () => {
     const fetchMock = async (): Promise<Response> =>
       Response.json({
         access_token: "ghu_long_lived",
@@ -92,6 +92,100 @@ describe("short-lived GitHub authentication", () => {
         "https://review.example/api/auth/callback",
         fetchMock,
       ),
-    ).rejects.toThrow("invalid expiring user token");
+    ).rejects.toThrow("valid user token expiration");
   });
+
+  it("classifies OAuth exchange errors without reflecting GitHub details", async () => {
+    const knownError = async (): Promise<Response> =>
+      Response.json({
+        error: "bad_verification_code",
+        error_description: "sensitive upstream diagnostic",
+      });
+    await expect(
+      exchangeCode(
+        env,
+        "code",
+        "verifier",
+        "https://review.example/api/auth/callback",
+        knownError,
+      ),
+    ).rejects.toThrow("expired or already-used authorization code");
+    await expect(
+      exchangeCode(
+        env,
+        "code",
+        "verifier",
+        "https://review.example/api/auth/callback",
+        knownError,
+      ),
+    ).rejects.not.toThrow("sensitive upstream diagnostic");
+
+    const unknownError = async (): Promise<Response> =>
+      Response.json({
+        error: "unrecognized_error",
+        error_description: "sensitive upstream diagnostic",
+      });
+    await expect(
+      exchangeCode(
+        env,
+        "code",
+        "verifier",
+        "https://review.example/api/auth/callback",
+        unknownError,
+      ),
+    ).rejects.toThrow("rejected the authorization exchange");
+  });
+
+  it.each([
+    {
+      expected: "invalid user access token",
+      response: {
+        access_token: " ",
+        expires_in: 28_800,
+        scope: "",
+        token_type: "bearer",
+      },
+    },
+    {
+      expected: "valid user token expiration",
+      response: {
+        access_token: "ghu_short_lived",
+        expires_in: "28800",
+        scope: "",
+        token_type: "bearer",
+      },
+    },
+    {
+      expected: "unexpected user token type",
+      response: {
+        access_token: "ghu_short_lived",
+        expires_in: 28_800,
+        scope: "",
+        token_type: "mac",
+      },
+    },
+    {
+      expected: "unexpected user-token scopes",
+      response: {
+        access_token: "ghu_short_lived",
+        expires_in: 28_800,
+        scope: "repo",
+        token_type: "bearer",
+      },
+    },
+  ])(
+    "reports a fixed diagnostic for $expected",
+    async ({ expected, response }) => {
+      const fetchMock = async (): Promise<Response> => Response.json(response);
+      await expect(
+        exchangeCode(
+          env,
+          "code",
+          "verifier",
+          "https://review.example/api/auth/callback",
+          fetchMock,
+        ),
+      ).rejects.toThrow(expected);
+    },
+  );
 });
