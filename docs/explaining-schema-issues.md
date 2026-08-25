@@ -15,6 +15,36 @@ With that combination, native `Association`, `Attribution`, `Generation`, `DOI`,
 Equivalent full-URI spellings are not supported by this contract.
 Records must retain the CURIE spelling expected by the source schema and the downstream qri and template code.
 
+## What the schema pin means
+
+Orinoco Lite does not validate against whatever schema happens to be described by the latest upstream documentation.
+It validates against one exact checkout of the schema sources together with one exact, tested set of conversion, validation, query, and presentation tools.
+That complete selection is the **schema and runtime contract**.
+
+“Things v1” alone is not a sufficient name for this contract because several independent versioning layers appear in the working system:
+
+| Layer | Pinned selection | Meaning |
+| --- | --- | --- |
+| Schema source | Things Schemas commit `cb6c791aec4c5309775437df4bd58e94e1bfcc3c` | The exact schema files available to the build. Later upstream additions are absent until this Git pin is deliberately advanced. |
+| Root composite | `src/demo-research-information/unreleased.yaml` | The application schema loaded by Dump Things. Its `unreleased` label is distinct from the versions of the modules it imports. |
+| Imported modules | Components such as `things-prov/v1` and `things-publications/v1` | Version labels for individual schema modules, not a version of the complete ORINOCO stack. |
+| Identifier namespace | `dlthings:` expands under `https://concepts.datalad.org/s/things/v2/` | The identity assigned to schema terms. It does not say that the build follows a moving “Things v2” release. |
+| Runtime tuple | Dump Things, LinkML, LinkML Runtime, Pydantic, RDFLib, qri, graph, and template pins | The tools that must agree on validation, conversion, class selection, relationships, and presentation. |
+
+This means that a new class, slot, mapping, constraint, or generated representation appearing upstream—or on the current documentation website—does not enter Orinoco Lite automatically.
+The existing records continue to use the pinned source files, exact `dlthings:*` CURIE spellings, and tested runtime behavior.
+
+Adopting an upstream change requires a deliberate compatibility update:
+
+1. select an exact candidate schema commit and all affected tool versions;
+2. review any metadata or semantic migration implied by that selection;
+3. run the complete positive and negative conversion, validation, qri, graph, and template fixtures;
+4. record the new immutable coordinates and evidence; and
+5. advance the release pin only after that combination is reviewed as the next known-good contract.
+
+This guide establishes that contract for Orinoco Lite.
+It does not establish which exact schema/runtime tuple is deployed by every other ORINOCO installation.
+
 ## Verified runtime
 
 The verified environment is:
