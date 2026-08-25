@@ -244,7 +244,7 @@ export async function renderEditorPage(
     new Request(indexUrl, {
       headers: { Accept: "text/html" },
       method: "GET",
-      redirect: "error",
+      redirect: "manual",
     }),
   );
   const index = await boundedRuntimeIndex(indexResponse);

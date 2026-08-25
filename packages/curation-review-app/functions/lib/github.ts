@@ -200,7 +200,7 @@ export class GitHubClient {
     const response = await this.#fetch(apiUrl(path), {
       ...init,
       headers,
-      redirect: "error",
+      redirect: "manual",
     });
     if (!response.ok) throw githubError(response.status);
     return response;
@@ -667,7 +667,7 @@ export class GitHubClient {
     }
     const download = await this.#fetch(
       artifactStorageUrl(redirect.headers.get("location")),
-      { redirect: "error" },
+      { redirect: "manual" },
     );
     if (!download.ok) throw githubError(download.status);
     const contentLength = download.headers.get("content-length");

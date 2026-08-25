@@ -28,7 +28,7 @@ export async function exchangeCode(
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     },
     method: "POST",
-    redirect: "error",
+    redirect: "manual",
   });
   if (!response.ok) {
     throw new HttpError(

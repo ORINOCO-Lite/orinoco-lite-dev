@@ -143,6 +143,11 @@ describe("authenticated exact-head SHACL editor handler", () => {
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain(
       "https://api.github.com/repos/example/site/collaborators/fresh-user/permission",
     );
+    const assets = env.ASSETS;
+    if (assets === undefined) throw new Error("missing asset fixture");
+    const runtimeRequest = vi.mocked(assets.fetch).mock.calls[0]?.[0];
+    expect(runtimeRequest).toBeInstanceOf(Request);
+    expect((runtimeRequest as Request).redirect).toBe("manual");
     expect(await response.text()).toContain("orinoco:review-bundle");
   });
 
