@@ -678,6 +678,29 @@ Correcting the upstream records preserves the established qualified homepage rep
 
 **Follow-up:** Review and merge [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then dispatch the downstream adapter from its immutable merge coordinate.
 
+### HR-216 — Keep external relationship identities bounded and local
+
+**Status:** accepted for the Milestone 5 `dump-research-info` correction
+
+**Question:** Should provider and role relationship targets be unresolved external references, complete local copies of provider records, or bounded local Things?
+
+**Outcome:** Use bounded ordinary Things containing only the externally verified stable identity facts required by the locked schema and relationship validation.
+For GitHub, ORCID, and the first-, senior-, and co-author roles, use the exact PID, schema type, and name or display label observed in the German public Things pool during the correction.
+For the ISSN International Centre, which is absent from that pool, use its authoritative ROR PID and current ROR display name.
+Reuse the existing `ISSN:1532-4435` JMLR venue Thing as the identifier creator instead of representing the JMLR website URL as an agent.
+
+Do not copy the providers' annotations, descriptions, locations, or relationships, require network resolution during validation, or silently drop source fields.
+These are reviewed canonical downstream records, not cached external graphs.
+A later identity change is a new metadata proposal; tracking the providers' wider graphs requires a separate reviewed policy decision.
+
+**Rationale:** A bare external link cannot satisfy the locked self-contained relationship validation.
+Copying complete provider records would make their graph and metadata lifecycle a downstream maintenance responsibility.
+The bounded records preserve interoperable global identifiers and the minimum human-readable identity needed for review without inventing a synchronization authority.
+
+**Decided by/date:** John Lee, 2026-08-25.
+
+**Follow-up:** Complete and review [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then exercise the real downstream proposal from its immutable source coordinate.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.
