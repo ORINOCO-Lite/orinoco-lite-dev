@@ -5,7 +5,6 @@ import type { Env } from "./pages";
 
 const DIGEST = /^[0-9a-f]{64}$/;
 const MAX_RUNTIME_INDEX_BYTES = 262_144;
-const RUNTIME_INDEX = "index.html";
 const SCHEMA_FILES = [
   "config_default_xyzri.yaml",
   "dlschemas_owl.ttl",
@@ -239,7 +238,7 @@ export async function renderEditorPage(
     configurationError("The staged editor runtime asset binding is missing.");
   }
   const base = runtimeBase(digest);
-  const indexUrl = new URL(`${base}${RUNTIME_INDEX}`, requestUrl);
+  const indexUrl = new URL(base, requestUrl);
   const indexResponse = await env.ASSETS.fetch(
     new Request(indexUrl, {
       headers: { Accept: "text/html" },

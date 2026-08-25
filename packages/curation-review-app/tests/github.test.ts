@@ -174,6 +174,9 @@ describe("GitHub Actions artifact download", () => {
           expect(new Headers(init?.headers).get("authorization")).toBe(
             "Bearer ghu_test",
           );
+          expect(new Headers(init?.headers).get("user-agent")).toBe(
+            "orinoco-lite-curation-review",
+          );
           return new Response(null, {
             headers: {
               Location:
