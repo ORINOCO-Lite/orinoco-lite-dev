@@ -31,9 +31,11 @@ describe("GitHub fetch invocation", () => {
     const fetchMock = vi.fn(function (
       this: unknown,
       _input: string | URL | Request,
+      init?: RequestInit,
     ) {
       receivers.push(this);
       if (this !== undefined) throw new TypeError("Illegal invocation");
+      expect(init?.redirect).toBe("manual");
       return Promise.resolve(Response.json({ id: 1, login: "octocat" }));
     });
 
@@ -164,6 +166,7 @@ describe("GitHub Actions artifact download", () => {
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input);
+        expect(init?.redirect).toBe("manual");
         if (url.startsWith("https://api.github.com/")) {
           expect(new Headers(init?.headers).get("authorization")).toBe(
             "Bearer ghu_test",

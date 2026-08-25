@@ -246,6 +246,7 @@ describe("GitHub App user-to-server handlers", () => {
         if (url === "https://github.com/login/oauth/access_token") {
           const body = init?.body as URLSearchParams;
           expect(body.get("code_verifier")).toBe(oauth.code_verifier);
+          expect(init?.redirect).toBe("manual");
           return Response.json({
             access_token: "ghu_short_lived",
             expires_in: 28_800,
