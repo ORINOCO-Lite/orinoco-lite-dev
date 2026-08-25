@@ -449,12 +449,14 @@ def _candidate_patch(
 
 def _clone_at_head(source: Path, destination: Path, head: str) -> None:
     parent = destination.parent
+    # Local clone copies the live object directory and races background packing.
+    # Normal transport still creates an independent disposable repository.
     completed = _git(
         parent,
         (
             "clone",
             "--quiet",
-            "--no-hardlinks",
+            "--no-local",
             "--no-checkout",
             "--",
             os.fspath(source),
