@@ -358,6 +358,16 @@ The Zotero and `dump-research-info` adapter identities used by this milestone MU
 This follows the pinned upstream enricher pattern of identifying executable software with versioned instrument records.
 The stable protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` do not select a Things schema class.
 
+For the Milestone 5 `dump-research-info` source correction, a relationship target that is not already present in the reviewed downstream graph MUST be a bounded ordinary Thing rather than an unresolved network reference or a local copy of the provider's complete graph.
+GitHub, ORCID, and the first-, senior-, and co-author roles use the exact PID, schema type, and human-readable identity field observed in the German public Things pool during the correction.
+The ISSN International Centre uses its authoritative ROR PID and current ROR display name because that organization is absent from the German pool.
+The JMLR identifier assertion targets the existing `ISSN:1532-4435` venue Thing rather than a website URL represented as a creator.
+
+These bounded records contain only the stable identity facts required by the locked schema and relationship validation: `pid`, `schema_type`, and `name` for an organization, or `pid`, `schema_type`, and `display_label` for an agent role.
+They MUST NOT mirror external annotations, descriptions, locations, or relationships, and validation MUST NOT depend on a network lookup.
+They are ordinary reviewed downstream metadata, not a provider cache or synchronization surface.
+A later change to one of those identity facts is a new metadata proposal; importing or tracking the provider's wider graph requires a separate reviewed policy decision.
+
 W3C PROV is added only when a specific lineage query cannot be answered by Git, DataLad, and PAV.
 SSSOM is used only for a genuine ontology mapping set and never as a decision cache or generic identity ledger.
 
