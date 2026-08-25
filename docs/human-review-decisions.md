@@ -676,11 +676,11 @@ Correcting the upstream records preserves the established qualified homepage rep
 
 **Decided by/date:** John Lee, 2026-08-25.
 
-**Follow-up:** Review and merge [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then dispatch the downstream adapter from its immutable merge coordinate.
+**Follow-up:** Review and merge [`con/dump-research-info` pull request 27](https://github.com/con/dump-research-info/pull/27), then dispatch the downstream adapter from its immutable merge coordinate.
 
 ### HR-216 — Keep external relationship identities bounded and local
 
-**Status:** accepted for the Milestone 5 `dump-research-info` correction
+**Status:** superseded by HR-218 on 2026-08-25
 
 **Question:** Should provider and role relationship targets be unresolved external references, complete local copies of provider records, or bounded local Things?
 
@@ -699,7 +699,10 @@ The bounded records preserve interoperable global identifiers and the minimum hu
 
 **Decided by/date:** John Lee, 2026-08-25.
 
-**Follow-up:** Complete and review [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then exercise the real downstream proposal from its immutable source coordinate.
+**Historical follow-up:** Complete and review [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then exercise the real downstream proposal from its immutable source coordinate.
+
+**Supersession:** The pull-request review found that this outcome conflated identifier agencies with local graph nodes, duplicated authoritative role PIDs across source roots, and selected the JMLR venue in response to a validation gate rather than identifier semantics.
+HR-218 preserves local graph closure but replaces those parts of this decision.
 
 ### HR-217 — Initialize unresolved review decisions in bulk
 
@@ -719,6 +722,37 @@ No disposition becomes durable until the authenticated curator submits the compl
 **Decided by/date:** John Lee, 2026-08-25.
 
 **Follow-up:** Add accessible application controls and focused interaction tests, deploy the reviewed central application revision, and record immutable evidence in Milestone 5 acceptance.
+
+### HR-218 — Separate local graph closure from external identifier agencies
+
+**Status:** accepted for the Milestone 5 `dump-research-info` correction
+
+**Question:** Which references must materialize as local downstream Things, and how should a templated downstream consume controlled roles and identifier agencies from a source repository with multiple authoritative roots?
+
+**Outcome:** Keep declared site-graph relationship objects locally closed.
+Keep controlled roles local when the presentation dereferences their labels, but import those Things from the authoritative `pool_psychoinformatics_de` root instead of duplicating reduced records under `con_site`.
+The adapter may select records from multiple roots at one immutable source commit, must bind each exact tree, must union them by PID, and must stop on unequal duplicates rather than select a record by input order.
+All selected Things still enter the downstream's one ordinary `metadata/records/` pool.
+
+Treat `Identifier.creator` separately.
+Its pinned schema range is `Thing`, but pinned record conversion and upstream query inlining do not require that referenced Thing to occur in the same local collection.
+LinkML serializes the reference as a PID string.
+Lite projection therefore resolves and inlines a matching local Thing when present and otherwise preserves the unresolved PID scalar without a network lookup.
+That scalar fallback matches the result of pinned qri inlining when its upstream collection lookup finds no record; Lite does not perform the lookup.
+This is a deliberate narrow projection exception for `Identifier.creator`, not a schema-range claim or a general open-graph policy; schema conversion may still reject malformed values.
+Do not add provider stubs solely to pass local-target validation.
+Do not substitute the existing JMLR publication venue for an identifier creator merely to close the graph.
+For JMLR source key `17-434`, omit the redundant generic identifier because the canonical official article URL PID already retains that key; do not invent a creator.
+Require evidence about identifier semantics for any other replacement or omission.
+
+**Rationale:** Local closure remains valuable for deterministic site graph, navigation, and role-label rendering.
+Applying the same local-closure rule to every identifier creator is stronger than upstream importer/query operating behavior, creates unnecessary local source claims, and can pressure a metadata change toward the nearest local PID rather than the semantically correct agent.
+The hybrid rule is an explicit Lite projection contract, not an inference from the schema range.
+Selecting the rich authoritative role records once preserves the source repository's established no-duplication boundary and prevents input-order loss from unequal duplicate PIDs.
+
+**Decided by/date:** John Lee / 2026-08-25.
+
+**Follow-up:** Release the narrow engine/runtime change, review and merge [`con/dump-research-info` pull request 27](https://github.com/con/dump-research-info/pull/27) at current head `5149afa03b68f50b3df2da56822d4dd6d8075694`, add authoritative pool roles to the downstream adapter's immutable source selection, and replace the superseded downstream proposal before review continues.
 
 ## P2 — strategic decisions
 

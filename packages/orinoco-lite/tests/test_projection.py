@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.canonical import canonical_yaml
@@ -17,13 +17,18 @@ from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
 from orinoco_lite.errors import DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
+    EXTERNALLY_RESOLVABLE_LINK_FIELDS,
+    _all_links,
+    _apply_inline,
     _machine_pav_fingerprint,
     projection_manifest,
     render_projection,
     update_projection,
+    validate_semantics,
     verify_projection,
 )
 from orinoco_lite.release_schema import localize_schema
+from orinoco_lite.schema_conversion import build_format_converters
 
 
 CON_ROOT = Path(__file__).resolve().parents[4]
@@ -183,6 +188,211 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
                     self.runtime_010,
                     Path(self.temporary.name) / "bad-graph",
                 )
+
+
+class SemanticReferencePolicyTests(unittest.TestCase):
+    """Keep external identifier agencies distinct from local graph closure."""
+
+    @staticmethod
+    def _validate(
+        record: dict[str, object],
+        *,
+        to_ttl: Mock | None = None,
+    ) -> dict[str, object]:
+        contract = Mock(
+            homepage_pid="acme:.",
+            pages={"acme:Thing": Mock()},
+            unrendered_classes=frozenset(),
+            relationship_fields=("about",),
+            graph_node_classes=frozenset({"acme:Thing"}),
+        )
+        schema_view = Mock()
+        schema_view.all_classes.return_value = ["Thing", "Identifier"]
+        class_uris = {
+            "Thing": "acme:Thing",
+            "Identifier": "dlthings:Identifier",
+        }
+        schema_view.get_uri.side_effect = (
+            lambda name, **_kwargs: class_uris.get(name)
+        )
+        if to_ttl is None:
+            to_ttl = Mock()
+            to_ttl.convert.side_effect = lambda value, _class_name: deepcopy(value)
+        to_json = Mock()
+        to_json.convert.side_effect = lambda value, _class_name: deepcopy(value)
+        with (
+            patch("orinoco_lite.projection.load_contract", return_value=contract),
+            patch(
+                "orinoco_lite.projection._records",
+                return_value=([record], {str(record["pid"])}),
+            ),
+            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
+            patch(
+                "orinoco_lite.projection.build_format_converters",
+                return_value=(to_ttl, to_json),
+            ),
+        ):
+            return validate_semantics(Mock(), Path("/unused-runtime"))
+
+    def test_external_identifier_creator_passes_lite_closure_and_stays_scalar(
+        self,
+    ) -> None:
+        creator = "https://identifiers.example/agency"
+        record = {
+            "pid": "acme:.",
+            "schema_type": "acme:Thing",
+            "identifiers": [
+                {
+                    "creator": creator,
+                    "notation": "one",
+                    "schema_type": "dlthings:Identifier",
+                }
+            ],
+        }
+
+        self.assertEqual(
+            self._validate(record),
+            {"records": 1, "graph_nodes": 1, "graph_edges": 0},
+        )
+        projected = deepcopy(record)
+        _apply_inline(projected, "identifiers::creator", {})
+        self.assertEqual(projected["identifiers"][0]["creator"], creator)
+
+    @unittest.skipUnless(
+        (SCHEMA_SOURCE / "demo-research-information/unreleased.yaml").is_file(),
+        "pinned Things Schema fixture is unavailable",
+    )
+    def test_pinned_thing_range_round_trip_preserves_external_creator_pid(
+        self,
+    ) -> None:
+        creator = "https://identifiers.example/agency"
+        record = {
+            "pid": "xyzrins:records/one",
+            "schema_type": "xyzri:XYZPublication",
+            "title": "A title",
+            "identifiers": [
+                {
+                    "creator": creator,
+                    "notation": "one",
+                    "schema_type": "dlthings:Identifier",
+                }
+            ],
+        }
+        schema = SCHEMA_SOURCE / "demo-research-information/unreleased.yaml"
+        to_rdf, to_json = build_format_converters(schema)
+
+        restored = to_json.convert(
+            to_rdf.convert(record, "XYZPublication"),
+            "XYZPublication",
+        )
+
+        self.assertEqual(restored["identifiers"][0]["creator"], creator)
+
+    def test_local_identifier_creator_is_inlined(self) -> None:
+        creator = "acme:agencies/one"
+        agency = {
+            "pid": creator,
+            "schema_type": "acme:Thing",
+            "display_label": "Agency One",
+        }
+        record = {"identifiers": [{"creator": creator}]}
+
+        _apply_inline(record, "identifiers::creator", {creator: agency})
+
+        self.assertEqual(record["identifiers"][0]["creator"], agency)
+
+    def test_external_creator_still_reaches_schema_conversion(self) -> None:
+        record = {
+            "pid": "acme:.",
+            "schema_type": "acme:Thing",
+            "identifiers": [
+                {
+                    "creator": "not a valid Thing PID",
+                    "notation": "one",
+                    "schema_type": "dlthings:Identifier",
+                }
+            ],
+        }
+        to_ttl = Mock()
+        to_ttl.convert.side_effect = ValueError("invalid creator PID")
+
+        with self.assertRaisesRegex(
+            DriverError,
+            "JSON/RDF/JSON schema validation failed: invalid creator PID",
+        ):
+            self._validate(record, to_ttl=to_ttl)
+
+        to_ttl.convert.assert_called_once()
+
+    def test_missing_graph_relationship_target_still_fails(self) -> None:
+        record = {
+            "pid": "acme:.",
+            "schema_type": "acme:Thing",
+            "about": ["https://topics.example/missing"],
+        }
+
+        with self.assertRaisesRegex(
+            DriverError,
+            "dangling about target https://topics.example/missing",
+        ):
+            self._validate(record)
+
+    def test_other_required_local_reference_kinds_still_fail(self) -> None:
+        cases = (
+            (
+                {
+                    "about": [
+                        {
+                            "object": "acme:.",
+                            "roles": ["acme:roles/missing"],
+                        }
+                    ]
+                },
+                "about.roles",
+            ),
+            ({"kind": "acme:kinds/missing"}, "kind"),
+            ({"rules": ["acme:rules/missing"]}, "rules"),
+        )
+        for fields, label in cases:
+            with self.subTest(field=label):
+                record = {
+                    "pid": "acme:.",
+                    "schema_type": "acme:Thing",
+                    **fields,
+                }
+                with self.assertRaisesRegex(
+                    DriverError,
+                    f"dangling {label} target",
+                ):
+                    self._validate(record)
+
+    def test_required_local_links_exclude_identifier_creators(self) -> None:
+        record = {
+            "pid": "acme:.",
+            "about": [
+                {
+                    "object": "acme:topics/one",
+                    "roles": ["acme:roles/one"],
+                }
+            ],
+            "kind": "acme:kinds/one",
+            "rules": ["acme:rules/one"],
+            "identifiers": [{"creator": "https://identifiers.example/agency"}],
+        }
+
+        self.assertEqual(
+            list(_all_links(record, ("about",))),
+            [
+                ("about", "acme:topics/one"),
+                ("about.roles", "acme:roles/one"),
+                ("kind", "acme:kinds/one"),
+                ("rules", "acme:rules/one"),
+            ],
+        )
+        self.assertEqual(
+            EXTERNALLY_RESOLVABLE_LINK_FIELDS,
+            frozenset({"identifiers.creator"}),
+        )
 
 
 class GenericProjectionContractTests(unittest.TestCase):

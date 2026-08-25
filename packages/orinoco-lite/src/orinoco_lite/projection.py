@@ -44,6 +44,8 @@ FORBIDDEN_BRIDGE_PREDICATES = {
     "schema:memberOf",
     "schema:subjectOf",
 }
+# A narrow query/projection exception, not a general open-graph policy.
+EXTERNALLY_RESOLVABLE_LINK_FIELDS = frozenset({"identifiers.creator"})
 
 
 def _is_projection_control_sidecar(output: Path, path: Path) -> bool:
@@ -238,7 +240,11 @@ def _relationship_targets(record: Mapping[str, Any], field: str) -> Iterable[str
         yield from targets
 
 
-def _all_links(record: Mapping[str, Any], fields: Sequence[str]) -> Iterable[tuple[str, str]]:
+def _record_links(
+    record: Mapping[str, Any], fields: Sequence[str]
+) -> Iterable[tuple[str, str]]:
+    """Yield every reference recognized by the Lite projection contract."""
+
     for field in fields:
         yield from ((field, target) for target in _relationship_targets(record, field))
         values = record.get(field, [])
@@ -275,6 +281,25 @@ def _all_links(record: Mapping[str, Any], fields: Sequence[str]) -> Iterable[tup
             if not isinstance(creator, str) or not creator:
                 raise DriverError(f"{record.get('pid')}: malformed identifiers.creator")
             yield "identifiers.creator", creator
+
+
+def _all_links(
+    record: Mapping[str, Any], fields: Sequence[str]
+) -> Iterable[tuple[str, str]]:
+    """Yield references that must resolve within the local record pool.
+
+    ``Identifier.creator`` is the sole deliberate exception.  Its pinned
+    schema range remains ``Thing``, and the converter still validates it.
+    LinkML serializes the reference as a PID string; pinned qri inlining
+    replaces a locally resolvable PID and preserves an unresolved PID scalar.
+    This filter adopts that narrow behavior without opening graph edges.
+    """
+
+    yield from (
+        (field, target)
+        for field, target in _record_links(record, fields)
+        if field not in EXTERNALLY_RESOLVABLE_LINK_FIELDS
+    )
 
 
 def _native_fingerprint(value: Any) -> Counter[tuple[str, str]]:
