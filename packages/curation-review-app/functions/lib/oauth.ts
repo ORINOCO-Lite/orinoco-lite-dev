@@ -54,24 +54,51 @@ export async function exchangeCode(
       "GitHub returned invalid authorization data.",
     );
   }
-  const token = (value as Record<string, unknown>).access_token;
-  const expires = (value as Record<string, unknown>).expires_in;
-  const tokenType = (value as Record<string, unknown>).token_type;
-  const scope = (value as Record<string, unknown>).scope;
+  const fields = value as Record<string, unknown>;
+  if (typeof fields.error === "string") {
+    const message =
+      fields.error === "bad_verification_code"
+        ? "GitHub rejected an expired or already-used authorization code."
+        : fields.error === "incorrect_client_credentials"
+          ? "GitHub rejected the configured OAuth client credentials."
+          : "GitHub rejected the authorization exchange.";
+    throw new HttpError(502, "github_oauth_error", message);
+  }
+  const token = fields.access_token;
+  const expires = fields.expires_in;
+  const tokenType = fields.token_type;
+  const scope = fields.scope;
   if (
     typeof token !== "string" ||
     !token ||
     token.length > 1_024 ||
-    /\s/.test(token) ||
-    !Number.isSafeInteger(expires) ||
-    Number(expires) < 60 ||
-    tokenType !== "bearer" ||
-    scope !== ""
+    /\s/.test(token)
   ) {
     throw new HttpError(
       502,
       "github_oauth_error",
-      "GitHub returned an invalid expiring user token.",
+      "GitHub returned an invalid user access token.",
+    );
+  }
+  if (!Number.isSafeInteger(expires) || Number(expires) < 60) {
+    throw new HttpError(
+      502,
+      "github_oauth_error",
+      "GitHub did not return a valid user token expiration.",
+    );
+  }
+  if (tokenType !== "bearer") {
+    throw new HttpError(
+      502,
+      "github_oauth_error",
+      "GitHub returned an unexpected user token type.",
+    );
+  }
+  if (scope !== "") {
+    throw new HttpError(
+      502,
+      "github_oauth_error",
+      "GitHub returned unexpected user-token scopes.",
     );
   }
   return { accessToken: token, expiresIn: Number(expires) };
