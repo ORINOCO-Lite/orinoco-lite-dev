@@ -194,7 +194,7 @@ Immutable prerelease [`v0.2.0rc6`](https://github.com/con/orinoco-lite-template/
 
 Current cross-layer coordinates are:
 
-- engineering pull requests 16, 17, 19 through 23, and 25 through 27, latest merge `ba686cc3f701035e7153412e93d5833d0bb9063f`, release/tag `v0.2.0rc3` at `7e331a2c61be2a5701c95c7dc48acf61d2ee106d`, and release rollback parent `8bd328b17e359bf9594e83381c3efc1c7ab0ecac`;
+- engineering pull requests 16, 17, and 19 through 27, with pull request 24 integrated at merge head `399870488644a1fa90c1867cecb7a045239a79c5`, latest default-branch merge `ba686cc3f701035e7153412e93d5833d0bb9063f`, release/tag `v0.2.0rc3` at `7e331a2c61be2a5701c95c7dc48acf61d2ee106d`, and release rollback parent `8bd328b17e359bf9594e83381c3efc1c7ab0ecac`;
 - template pull requests 12 through 18 and latest release/tag `v0.2.0rc6`, source rollback parent `4c36fe858132cf761814143ae1b4686e1f0083d5`, and published-branch rollback parent `211abc68cdb5ef0b95554d290d3418c67fe9ee1b`;
 - consumer pull requests 28 and 30 through 35, latest merge `bf683b6da8cad04ae3a62c4e34ad04521353d94a`, route/release-adoption head `43a28b1fbcf10330615c8ff9823f3971008ceb02`, and rollback parent `3f75c7d1395f1d442ba30d15516bd9d8ce8db949`;
 - personal demonstration pull requests 6, 8, 10, and 12, latest merge `5cb8c406bcb02cac5d98aae4a3afae2bd4a9191b`, dump proposal pull request 13 at `9f3b0217410d134a167e67db017b9783fe9fb784`, and rollback parent `68738ed8df375fe14d87da216c6d8a7ee6d7e82c`;
@@ -203,6 +203,7 @@ Current cross-layer coordinates are:
 
 Published `v0.2.0rc3` release and embedded manifest SHA-256 values are: wheel `5224bf90ca441b70012f7297b21b1b8072fe612e9c8984d3682c824118037267`, source distribution `5dac72b1486ddd22b79e8f40ca4bc6220faba2b072e46223d52be24f01632ca2`, runtime `d25be7a05da33b6b91dc7b3bc1c6b83168f9c54f6bca663cb4a4902e1e7b060a`, runtime manifest `839f82029ae0b4805a6d8c53afd88eb18a53023daf13fa5fd09c217dc8f101fd`, provenance bundle `5a326f741360e229497bb4d581a5f5bda81b0d64f91f3b30373b334f57955e96`, and `SHA256SUMS` `2a12d5a20000321e7e9933c0a4333c870e09d38548f95dd3168d4d3f58bb185a`.
 GitHub artifact attestations verified for the wheel, source distribution, and runtime; an unauthenticated public wheel install reported `orinoco-lite 0.2.0rc3`.
+Engineering pull request 24 run [32866853663](https://github.com/con/orinoco-lite-dev/actions/runs/32866853663) passed the complete engineering contract on macOS 14 ARM64 and Ubuntu 24.04 x86-64 at merge head `399870488644a1fa90c1867cecb7a045239a79c5`; the live recorded-upstream job was intentionally skipped.
 
 Still required are merge of the reviewed `dump-research-info` source correction, compact-cache examples from authenticated finalization, the same-source no-op rerun, one real SHACL handoff, and the merge commit that proves proposal and review commits survive.
 The real Zotero and `dump-research-info` proposals supply exact dispatch-time source coordinates, presentation artifacts, and green exact-head consumer validation.
