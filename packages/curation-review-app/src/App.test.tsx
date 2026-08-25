@@ -9,7 +9,11 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewProposal, ShaclReviewBundle } from "../shared/contracts";
+import type {
+  ReviewDiscovery,
+  ReviewProposal,
+  ShaclReviewBundle,
+} from "../shared/contracts";
 import App from "./App";
 import { ARTIFACT_ID, proposal } from "../tests/fixtures";
 
@@ -90,7 +94,7 @@ beforeEach(() => {
   window.history.replaceState(
     {},
     "",
-    `/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+    `/review/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
   );
 });
 
@@ -122,7 +126,7 @@ describe("curation review interface", () => {
       screen.getByRole("link", { name: "Edit in SHACL Vue" }),
     ).toHaveAttribute(
       "href",
-      `/edit?expected_head_sha=${proposal().head_sha}&pull_request=42&repository=example%2Fsite`,
+      `/edit/?expected_head_sha=${proposal().head_sha}&pull_request=42&repository=example%2Fsite`,
     );
   });
 
@@ -256,15 +260,95 @@ describe("curation review interface", () => {
   });
 });
 
+describe("repository-scoped curation discovery", () => {
+  const discovery: ReviewDiscovery = {
+    pull_requests: [
+      {
+        artifacts: [
+          {
+            created_at: "2026-08-25T04:30:00Z",
+            expires_at: "2026-11-23T04:30:00Z",
+            id: ARTIFACT_ID,
+            name: `orinoco-curation-review-${"b".repeat(40)}`,
+          },
+        ],
+        draft: true,
+        head_sha: "a".repeat(40),
+        number: 42,
+        proposal_sha: "b".repeat(40),
+        title: "Review source metadata",
+      },
+    ],
+    repository: "example/site",
+  };
+
+  it("preserves the repository while asking an anonymous curator to sign in", async () => {
+    window.history.replaceState({}, "", "/?repository=example%2Fsite");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json({ authenticated: false })),
+    );
+    render(<App />);
+    expect(
+      await screen.findByRole("link", { name: "Continue with GitHub" }),
+    ).toHaveAttribute(
+      "href",
+      "/api/auth/discovery-start?repository=example%2Fsite",
+    );
+    expect(
+      screen.getByRole("heading", { name: /example\/site/ }),
+    ).toBeVisible();
+  });
+
+  it("prefills the sole relevant pull request and artifact after sign-in", async () => {
+    window.history.replaceState({}, "", "/?repository=example%2Fsite");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/session") {
+        return json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+        });
+      }
+      if (String(input) === "/api/discovery?repository=example%2Fsite") {
+        return json(discovery);
+      }
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    expect(
+      await screen.findByRole("combobox", {
+        name: "Open curation pull request",
+      }),
+    ).toHaveValue("42");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", { name: "Review artifact" }),
+      ).toHaveValue(String(ARTIFACT_ID)),
+    );
+    expect(screen.getByDisplayValue("example/site")).toHaveAttribute(
+      "readonly",
+    );
+    expect(screen.getByRole("button", { name: "Open review" })).toBeEnabled();
+    expect(
+      screen.getByRole("option", { name: /Draft PR #42/ }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("SHACL Vue browser-memory proposal wrapper", () => {
-  it("exposes a standalone /edit entry", () => {
+  it("starts a repository-bound curation journey", () => {
     window.history.replaceState({}, "", "/");
     render(<App />);
     expect(
-      screen.getByRole("heading", { name: "Propose a SHACL Vue edit" }),
+      screen.getByRole("heading", {
+        name: "Review or edit repository metadata",
+      }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Open edit handoff" }),
+      screen.getByRole("textbox", { name: "Repository" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Edit in SHACL Vue" }),
@@ -276,7 +360,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     window.history.replaceState(
       {},
       "",
-      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
     );
     vi.stubGlobal(
       "fetch",
@@ -292,7 +376,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
   });
 
   it("embeds the same-origin editor and performs one acknowledged explicit write", async () => {
-    window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
+    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -380,7 +464,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
   });
 
   it("accepts the typed bundle message only from its same-origin iframe", async () => {
-    window.history.replaceState({}, "", "/edit?repository=example%2Fsite");
+    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -422,7 +506,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     window.history.replaceState(
       {},
       "",
-      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
     );
     vi.stubGlobal(
       "fetch",
@@ -449,7 +533,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     window.history.replaceState(
       {},
       "",
-      `/edit?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
     );
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {

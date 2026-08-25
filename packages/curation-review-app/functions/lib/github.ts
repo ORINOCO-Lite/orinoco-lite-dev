@@ -2,12 +2,22 @@ import { HttpError } from "./http";
 import { parseRepository, splitRepository } from "./input";
 import { MAX_ARTIFACT_ARCHIVE_BYTES, MAX_REVIEW_PATHS } from "./bundle";
 import { base64Encode } from "./encoding";
+import type {
+  DiscoveryArtifact,
+  DiscoveryPullRequest,
+} from "../../shared/contracts";
 
 const GITHUB_API = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const MAX_RECORD_BYTES = 1_048_576;
 const MAX_REVIEW_BYTES = 16_777_216;
 const BLOBS_PER_QUERY = 20;
+const MAX_DISCOVERY_PULL_REQUESTS = 20;
+const MAX_DISCOVERY_ARTIFACTS = 100;
+const CURATION_REVIEW_LABEL = "curation-review";
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const GITHUB_TIMESTAMP =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$/;
 
 export interface ContentRequest {
   key: string;
@@ -80,6 +90,29 @@ function validCommitPath(value: string): boolean {
       .split("/")
       .every((part) => part.length > 0 && part !== "." && part !== "..")
   );
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function nestedRepositoryName(value: unknown): string | null {
+  const container = objectRecord(value);
+  const repository = objectRecord(container?.repo);
+  return typeof repository?.full_name === "string"
+    ? repository.full_name
+    : null;
+}
+
+function githubTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || !GITHUB_TIMESTAMP.test(value)) return null;
+  return Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function invalidDiscoveryResponse(message: string): never {
+  throw new HttpError(502, "github_error", message);
 }
 
 function githubError(status: number): HttpError {
@@ -229,6 +262,150 @@ export class GitHubClient {
 
   async pullRequest(repository: string, number: number): Promise<unknown> {
     return this.json(endpoint(repository, `/pulls/${number}`));
+  }
+
+  async discoverReviewPullRequests(
+    repository: string,
+  ): Promise<DiscoveryPullRequest[]> {
+    parseRepository(repository);
+    const requestedRepository = repository.toLowerCase();
+    const value = await this.json(
+      endpoint(
+        repository,
+        "/pulls?state=open&sort=updated&direction=desc&per_page=100&page=1",
+      ),
+    );
+    if (!Array.isArray(value)) {
+      return invalidDiscoveryResponse(
+        "GitHub returned an invalid pull-request listing.",
+      );
+    }
+
+    const relevant = value
+      .filter((item): item is Record<string, unknown> => {
+        const pullRequest = objectRecord(item);
+        if (pullRequest === null) {
+          return invalidDiscoveryResponse(
+            "GitHub returned an invalid pull request.",
+          );
+        }
+        if (pullRequest.state !== "open") return false;
+        const baseRepository = nestedRepositoryName(pullRequest.base);
+        const headRepository = nestedRepositoryName(pullRequest.head);
+        if (
+          baseRepository?.toLowerCase() !== requestedRepository ||
+          headRepository?.toLowerCase() !== requestedRepository
+        ) {
+          return false;
+        }
+        if (!Array.isArray(pullRequest.labels)) {
+          return invalidDiscoveryResponse(
+            "GitHub returned invalid pull-request labels.",
+          );
+        }
+        return pullRequest.labels.some(
+          (label) => objectRecord(label)?.name === CURATION_REVIEW_LABEL,
+        );
+      })
+      .sort((left, right) => Number(right.number) - Number(left.number))
+      .slice(0, MAX_DISCOVERY_PULL_REQUESTS);
+
+    return Promise.all(
+      relevant.map(async (pullRequest): Promise<DiscoveryPullRequest> => {
+        const head = objectRecord(pullRequest.head);
+        if (
+          !Number.isSafeInteger(pullRequest.number) ||
+          Number(pullRequest.number) < 1 ||
+          typeof pullRequest.draft !== "boolean" ||
+          typeof pullRequest.title !== "string" ||
+          pullRequest.title.length < 1 ||
+          pullRequest.title.length > 256 ||
+          /[\r\n\0]/.test(pullRequest.title) ||
+          typeof head?.sha !== "string" ||
+          !COMMIT_SHA.test(head.sha)
+        ) {
+          return invalidDiscoveryResponse(
+            "GitHub returned invalid pull-request coordinates.",
+          );
+        }
+        const number = Number(pullRequest.number);
+        const firstCommit = objectRecord(
+          await this.firstPullRequestCommit(repository, number),
+        );
+        if (
+          firstCommit === null ||
+          typeof firstCommit.sha !== "string" ||
+          !COMMIT_SHA.test(firstCommit.sha)
+        ) {
+          return invalidDiscoveryResponse(
+            "GitHub returned an invalid proposal commit.",
+          );
+        }
+        const proposalSha = firstCommit.sha;
+        const artifactName = `orinoco-curation-review-${proposalSha}`;
+        const artifactListing = objectRecord(
+          await this.json(
+            endpoint(
+              repository,
+              `/actions/artifacts?name=${encodeURIComponent(artifactName)}&per_page=${MAX_DISCOVERY_ARTIFACTS}&page=1`,
+            ),
+          ),
+        );
+        if (
+          artifactListing === null ||
+          !Number.isSafeInteger(artifactListing.total_count) ||
+          Number(artifactListing.total_count) < 0 ||
+          Number(artifactListing.total_count) > MAX_DISCOVERY_ARTIFACTS ||
+          !Array.isArray(artifactListing.artifacts) ||
+          artifactListing.artifacts.length > MAX_DISCOVERY_ARTIFACTS ||
+          artifactListing.artifacts.length !==
+            Number(artifactListing.total_count)
+        ) {
+          return invalidDiscoveryResponse(
+            "GitHub returned an invalid artifact listing.",
+          );
+        }
+        const artifacts: DiscoveryArtifact[] = [];
+        for (const item of artifactListing.artifacts) {
+          const artifact = objectRecord(item);
+          if (artifact?.name !== artifactName) continue;
+          const createdAt = githubTimestamp(artifact.created_at);
+          const expiresAt = githubTimestamp(artifact.expires_at);
+          if (
+            !Number.isSafeInteger(artifact.id) ||
+            Number(artifact.id) < 1 ||
+            typeof artifact.expired !== "boolean" ||
+            createdAt === null ||
+            expiresAt === null ||
+            Date.parse(createdAt) > Date.parse(expiresAt)
+          ) {
+            return invalidDiscoveryResponse(
+              "GitHub returned invalid artifact coordinates.",
+            );
+          }
+          if (artifact.expired || Date.parse(expiresAt) <= Date.now()) continue;
+          artifacts.push({
+            created_at: createdAt,
+            expires_at: expiresAt,
+            id: Number(artifact.id),
+            name: artifactName,
+          });
+        }
+        artifacts.sort(
+          (left, right) =>
+            Date.parse(right.created_at) - Date.parse(left.created_at) ||
+            right.id - left.id,
+        );
+        return {
+          artifacts,
+          draft: pullRequest.draft,
+          head_sha: head.sha,
+          number,
+          proposal_sha: proposalSha,
+          title: pullRequest.title,
+        };
+      }),
+    );
   }
 
   async repository(repository: string): Promise<RepositoryCoordinates> {

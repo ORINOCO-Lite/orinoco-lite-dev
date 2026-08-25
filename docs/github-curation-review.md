@@ -70,6 +70,11 @@ The application MUST:
 - bind submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete candidate mapping; and
 - post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
 
+The canonical exact-review route is `/review/` on the configured service origin.
+For repository entry points that do not already identify one proposal, the application MAY provide authenticated, repository-scoped discovery of relevant open curation pull requests and their unexpired, exactly named review artifacts.
+The repository remains an explicit link coordinate because one authenticated user or App installation can cover multiple repositories.
+Discovery is only a convenience: it does not parse the pull-request body, retain a catalog, or replace the complete verification performed when the curator opens a selected proposal.
+
 The application reads GitHub proposal and Actions objects produced by the trusted workflow.
 It MUST NOT run an adapter, reacquire an external source, execute pull-request code, or infer candidate facts that the trusted Action must regenerate.
 It is a review surface and authenticated comment transport, not another execution boundary.
@@ -92,6 +97,8 @@ For this profile, the GitHub App uses only repository metadata read, contents re
 The shared App registration also has contents write for the distinct SHACL Vue human-edit profile, but this decision path MUST NOT use it.
 It uses a short-lived user access token so the comment is attributed to the authenticated user and the App.
 Signed or encrypted OAuth state and a short-lived authentication session are operational state.
+The GitHub App callback MUST be the service's exact `/api/auth/callback` URL.
+Post-install setup redirects MUST use a separate setup URL and MUST NOT be sent to that OAuth callback.
 
 The service MUST NOT retain the proposal, candidate plan, decision payload, metadata, source data, user access token, or refresh token after submission or session expiry.
 It MUST NOT become a metadata, decision, candidate, provenance, or credential store.
