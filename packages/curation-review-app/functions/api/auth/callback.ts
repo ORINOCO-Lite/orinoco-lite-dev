@@ -11,6 +11,8 @@ import {
   readOAuthCookie,
 } from "../../lib/session";
 
+const GITHUB_OAUTH_ISSUER = "https://github.com/login/oauth";
+
 function oneParameter(url: URL, name: string): string {
   const values = url.searchParams.getAll(name);
   if (values.length !== 1 || !values[0] || /[\r\n\0]/.test(values[0])) {
@@ -49,7 +51,17 @@ export async function onRequest(context: EventContext): Promise<Response> {
       "GitHub App installation was sent to the OAuth callback. Configure a separate setup URL and start sign-in from the review link.",
     );
   }
-  if (keys.some((key) => key !== "code" && key !== "state")) {
+  if (keys.some((key) => key !== "code" && key !== "state" && key !== "iss")) {
+    throw new HttpError(
+      400,
+      "invalid_oauth_callback",
+      "The OAuth callback is invalid.",
+    );
+  }
+  if (
+    url.searchParams.has("iss") &&
+    oneParameter(url, "iss") !== GITHUB_OAUTH_ISSUER
+  ) {
     throw new HttpError(
       400,
       "invalid_oauth_callback",
