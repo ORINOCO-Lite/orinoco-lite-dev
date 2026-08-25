@@ -25,6 +25,25 @@ function graphqlResponse(request: RequestInit): Response {
   return Response.json({ data: { repository } });
 }
 
+describe("GitHub fetch invocation", () => {
+  it("calls an injected fetch implementation without a receiver", async () => {
+    const receivers: unknown[] = [];
+    const fetchMock = vi.fn(function (
+      this: unknown,
+      _input: string | URL | Request,
+    ) {
+      receivers.push(this);
+      if (this !== undefined) throw new TypeError("Illegal invocation");
+      return Promise.resolve(Response.json({ id: 1, login: "octocat" }));
+    });
+
+    await expect(
+      new GitHubClient("ghu_test", fetchMock).currentUser(),
+    ).resolves.toEqual({ id: 1, login: "octocat" });
+    expect(receivers).toEqual([undefined]);
+  });
+});
+
 describe("GitHub blob batching", () => {
   it("loads a large review in bounded GraphQL requests", async () => {
     const fetchMock = vi.fn(
