@@ -26,6 +26,7 @@ import {
 } from "./fixtures";
 
 const ORIGIN = "https://review.example";
+const GITHUB_OAUTH_ISSUER = "https://github.com/login/oauth";
 const ARTIFACT_STORAGE =
   "https://pipelines.actions.githubusercontent.com/results/archive.zip?sig=short-lived";
 const artifactArchive = reviewBundleArchive();
@@ -263,7 +264,7 @@ describe("GitHub App user-to-server handlers", () => {
     const callback = await authorizationCallback(
       context(
         new Request(
-          `${ORIGIN}/api/auth/callback?code=temporary-code&state=${oauth.state}`,
+          `${ORIGIN}/api/auth/callback?code=temporary-code&state=${oauth.state}&iss=${encodeURIComponent(GITHUB_OAUTH_ISSUER)}`,
           { headers: { Cookie: oauthCookie } },
         ),
       ),
@@ -287,6 +288,34 @@ describe("GitHub App user-to-server handlers", () => {
     });
     expect(setCookie).not.toContain("must-not-be-retained");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [
+      "an untrusted issuer",
+      `iss=${encodeURIComponent("https://example.invalid/login/oauth")}`,
+    ],
+    [
+      "duplicate issuer fields",
+      `iss=${encodeURIComponent(GITHUB_OAUTH_ISSUER)}&iss=${encodeURIComponent(GITHUB_OAUTH_ISSUER)}`,
+    ],
+    [
+      "an unexpected callback field",
+      `iss=${encodeURIComponent(GITHUB_OAUTH_ISSUER)}&unexpected=value`,
+    ],
+  ])("rejects %s", async (_label, query) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      authorizationCallback(
+        context(
+          new Request(
+            `${ORIGIN}/api/auth/callback?code=temporary-code&state=temporary-state&${query}`,
+          ),
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "invalid_oauth_callback", status: 400 });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects an OAuth callback whose state does not match the sealed state", async () => {
