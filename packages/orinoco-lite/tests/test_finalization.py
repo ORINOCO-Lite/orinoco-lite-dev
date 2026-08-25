@@ -12,7 +12,11 @@ from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.candidates import Candidate, CandidatePlan
 from orinoco_lite.canonical import canonical_yaml_bytes
 from orinoco_lite.errors import ConfigurationError
-from orinoco_lite.finalization import _copy_finalized_paths, finalize_candidate_plan
+from orinoco_lite.finalization import (
+    _clone_at_head,
+    _copy_finalized_paths,
+    finalize_candidate_plan,
+)
 
 
 NAMESPACE = "https://source.example/records"
@@ -190,6 +194,25 @@ class FinalizationTests(unittest.TestCase):
             submitted_head=submitted_head or self.repo.head,
             dispositions=dispositions,
         )
+
+    def test_disposable_clone_does_not_copy_transient_object_sidecars(self) -> None:
+        head = self.repo.commit("base")
+        transient = self.repo.path / ".git/objects/pack/.tmp-test.mtimes"
+        transient.parent.mkdir(parents=True, exist_ok=True)
+        transient.write_bytes(b"being packed\n")
+        destination = Path(self.temporary.name) / "rehearsal"
+
+        _clone_at_head(self.repo.path, destination, head)
+
+        cloned_head = subprocess.run(
+            ("git", "-C", str(destination), "rev-parse", "HEAD"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        ).stdout.decode("ascii", "strict").strip()
+        self.assertEqual(head, cloned_head)
+        cloned_transient = destination / ".git/objects/pack/.tmp-test.mtimes"
+        self.assertFalse(cloned_transient.exists())
 
     def test_all_rejected_restores_add_modify_delete_and_preserves_human_edit(
         self,
