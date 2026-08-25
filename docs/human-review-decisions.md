@@ -67,6 +67,7 @@ Priorities mean:
 | HR-210 | P2 | Test fixture | Choose the long-term role of the full-content test consumer |
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
 | HR-213 | P2 | Hosted editing | Turn the normal SHACL Vue bundle into an attributed GitHub metadata proposal |
+| HR-214 | P2 | Provenance identity | Model the two versioned source adapters using the pinned upstream pattern |
 
 ## P0 — close the current engineering review
 
@@ -643,6 +644,22 @@ A public Git host can retain unreachable objects, so the path is limited to data
 **Decided and refined by/date:** John Lee, 2026-08-24.
 
 **Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), including the exact-head editor-input artifact and immutable released shell, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
+
+### HR-214 — Use upstream-style instrument identities for adapters
+
+**Status:** accepted
+
+**Question:** Which canonical Things should identify the Zotero and `dump-research-info` adapters in `pav:importedBy`?
+
+**Outcome:** Store `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v1` as versioned `xyzri:XYZInstrument` records.
+Retain the existing protocol field names for compatibility; their use of “agent” does not require an Agent schema class.
+
+**Rationale:** The pinned enrichment rules require a versioned pool record for every enricher, their examples and executable scrapers use instrument PIDs, and the pinned Things schema treats software as an instrument that enables an action.
+`xyzri:XYZProject` instead models a collective planned activity and is not the upstream-compatible identity.
+
+**Decided by/date:** John Lee, 2026-08-24.
+
+**Follow-up:** Add both canonical records to the reviewed consumer, validate them with the locked schema, and record their immutable commit and hosted evidence in Milestone 5 acceptance.
 
 ## P2 — strategic decisions
 

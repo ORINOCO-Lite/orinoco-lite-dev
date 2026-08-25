@@ -352,7 +352,11 @@ A provenance entry changes only when the metadata assertion it describes changes
 Git retains the earlier assertion and provenance.
 The accepted source claim remains cached, so the unchanged source MUST NOT later propose reverting the human replacement.
 
-`pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice. Changing the adapter incompatibly requires a new versioned agent Thing. The exact source revision belongs in Git/DataLad review provenance; `pav:importedFrom` may remain the stable logical record URI.
+`pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice. Changing the adapter incompatibly requires a new versioned Thing. The exact source revision belongs in Git/DataLad review provenance; `pav:importedFrom` may remain the stable logical record URI.
+
+The Zotero and `dump-research-info` adapter identities used by this milestone MUST be canonical `xyzri:XYZInstrument` records at `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v1`, respectively.
+This follows the pinned upstream enricher pattern of identifying executable software with versioned instrument records.
+The stable protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` do not select a Things schema class.
 
 W3C PROV is added only when a specific lineage query cannot be answered by Git, DataLad, and PAV.
 SSSOM is used only for a genuine ontology mapping set and never as a decision cache or generic identity ledger.
