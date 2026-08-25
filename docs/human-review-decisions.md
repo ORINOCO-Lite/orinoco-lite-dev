@@ -661,6 +661,23 @@ Retain the existing protocol field names for compatibility; their use of “agen
 
 **Follow-up:** Add both canonical records to the reviewed consumer, validate them with the locked schema, and record their immutable commit and hosted evidence in Milestone 5 acceptance.
 
+### HR-215 — Separate source semantics from presentation routing
+
+**Status:** accepted
+
+**Question:** How should the `dump-research-info` source represent legacy CON website-routing values currently stored as semantic `about` relationships?
+
+**Outcome:** Remove the legacy presentation-routing `about` values upstream.
+Retain existing qualified `foaf:homepage` attributes and add the CON organization homepage using the same upstream `AttributeSpecification` pattern.
+Do not add an adapter compatibility rule for presentation routes.
+
+**Rationale:** Website section URLs select presentation routes; they are not Things that can satisfy the stored semantic relationships.
+Correcting the upstream records preserves the established qualified homepage representation and prevents site-navigation policy from becoming canonical metadata.
+
+**Decided by/date:** John Lee, 2026-08-25.
+
+**Follow-up:** Review and merge [`con/dump-research-info` pull request 26](https://github.com/con/dump-research-info/pull/26), then dispatch the downstream adapter from its immutable merge coordinate.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.
