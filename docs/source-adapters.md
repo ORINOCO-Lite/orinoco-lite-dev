@@ -358,15 +358,21 @@ The Zotero and `dump-research-info` adapter identities used by this milestone MU
 This follows the pinned upstream enricher pattern of identifying executable software with versioned instrument records.
 The stable protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` do not select a Things schema class.
 
-For the Milestone 5 `dump-research-info` source correction, a relationship target that is not already present in the reviewed downstream graph MUST be a bounded ordinary Thing rather than an unresolved network reference or a local copy of the provider's complete graph.
-GitHub, ORCID, and the first-, senior-, and co-author roles use the exact PID, schema type, and human-readable identity field observed in the German public Things pool during the correction.
-The ISSN International Centre uses its authoritative ROR PID and current ROR display name because that organization is absent from the German pool.
-The JMLR identifier assertion targets the existing `ISSN:1532-4435` venue Thing rather than a website URL represented as a creator.
+For the Milestone 5 `dump-research-info` source correction, configured site-graph relationships and identifier creators have different resolution contracts.
+A relationship object that contributes to the declared local graph MUST identify a local Thing, and a controlled role that the presentation dereferences MUST likewise be present in the downstream record pool.
+The adapter MUST obtain the first-, senior-, and co-author role Things from their authoritative `pool_psychoinformatics_de` source records rather than duplicate reduced versions under `con_site`.
+It MAY read multiple declared roots from one immutable source repository coordinate, but it MUST bind every root to that commit and exact tree, union selected records by PID, and stop on unequal duplicate PIDs rather than choose an input-order winner.
+The resulting downstream still has one ordinary `metadata/records/` pool; source roots do not create another downstream metadata class.
 
-These bounded records contain only the stable identity facts required by the locked schema and relationship validation: `pid`, `schema_type`, and `name` for an organization, or `pid`, `schema_type`, and `display_label` for an agent role.
-They MUST NOT mirror external annotations, descriptions, locations, or relationships, and validation MUST NOT depend on a network lookup.
-They are ordinary reviewed downstream metadata, not a provider cache or synchronization surface.
-A later change to one of those identity facts is a new metadata proposal; importing or tracking the provider's wider graph requires a separate reviewed policy decision.
+`Identifier.creator` instead has the pinned schema range `Thing`, but neither pinned record conversion nor upstream query inlining requires that referenced Thing to be present in the same local collection.
+Lite validation and projection MUST therefore accept such an external Thing reference without network access.
+LinkML serializes the reference as a PID string.
+When a matching local Thing exists, configured inlining resolves it; otherwise pinned qri behavior preserves the unresolved PID scalar.
+This is a deliberate exception only for `Identifier.creator`, not permission for an open site graph; existing schema conversion may still reject a malformed reference.
+An unresolved identifier creator is therefore not, by itself, a reason to add a GitHub, ORCID, ROR, or other provider identity stub.
+The JMLR publication-venue Thing MUST NOT replace an identifier creator merely to satisfy local-target validation: a venue is not the agent required by the slot semantics.
+For JMLR source key `17-434`, the canonical official article URL PID already retains that key, so the source correction MUST omit the redundant generic identifier rather than invent a creator or substitute the venue.
+Other replacements or omissions require evidence about identifier semantics, not projection closure.
 
 W3C PROV is added only when a specific lineage query cannot be answered by Git, DataLad, and PAV.
 SSSOM is used only for a genuine ontology mapping set and never as a decision cache or generic identity ledger.
@@ -492,6 +498,7 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | The ephemeral update view uses compact PAV, while the joined validation/RDF view uses expanded annotation objects | The pinned helper recognizes compact ownership and the pinned converter requires expanded annotations for lossless round trips. The conversion is transient and parity-tested. |
+| Query inlining preserves an unresolved PID as a scalar | Preserve an unresolved `Identifier.creator` Thing reference, while still rejecting missing targets for declared local graph relationships | Aligns Lite inlining with upstream unresolved-reference behavior while retaining stricter deterministic, offline graph materialization; this is an explicit projection policy, not a schema-range claim. |
 | Service curation API and authorization model | Hosted stateless review application and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
 
 Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).

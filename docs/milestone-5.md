@@ -74,6 +74,8 @@ Gate: the canonical corpus produces stable review diffs, joined records preserve
 - Coalesce same-adapter source rows per PID, keep candidate PID/path fixed during review, and use correction-safe three-way reversal for rejection and deferral.
 - Preserve semantically unchanged qualified assertions and their existing PAV; do not produce provenance-only changes or infer ownership from a topical scalar.
 - Reuse pinned upstream validation, serialization, PAV, and ownership-aware update primitives where compatible, with focused parity tests for local replacements.
+- For a source split across declared roots, select authoritative dependency records by PID, bind every root to an immutable coordinate, and reject unequal duplicates rather than choosing by input order.
+- Preserve an external `Identifier.creator` Thing PID string without network resolution, following pinned qri unresolved-reference behavior; continue to require local targets for declared site-graph relationships and locally dereferenced controlled roles.
 
 Gate: Zotero and `dump-research-info` independently satisfy the same observable contract without sharing source-specific policy.
 
