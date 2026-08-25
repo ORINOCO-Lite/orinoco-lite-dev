@@ -653,6 +653,7 @@ export class GitHubClient {
     const headers = new Headers({
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${this.#token}`,
+      "User-Agent": USER_AGENT,
       "X-GitHub-Api-Version": API_VERSION,
     });
     const redirect = await this.#fetch(
