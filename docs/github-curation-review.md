@@ -66,6 +66,7 @@ The application MUST:
 - display responsive before-and-after record diffs and identify records primarily by friendly IDs and labels;
 - expose source identifiers, paths, blockers, and hashes as secondary details;
 - provide exactly one mutually exclusive `accept`, `reject`, or `defer` control for every current candidate;
+- provide a bulk initializer that applies one selected disposition to every currently unresolved candidate while preserving existing per-record choices and allowing every initialized choice to be overridden before submission;
 - support filtering, a changed-only view, keyboard navigation, and complete submission validation;
 - bind submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete candidate mapping; and
 - post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
@@ -78,6 +79,8 @@ Discovery is only a convenience: it does not parse the pull-request body, retain
 The application reads GitHub proposal and Actions objects produced by the trusted workflow.
 It MUST NOT run an adapter, reacquire an external source, execute pull-request code, or infer candidate facts that the trusted Action must regenerate.
 It is a review surface and authenticated comment transport, not another execution boundary.
+The bulk initializer changes only in-browser decision state.
+It is not a disposition until the reviewer submits the complete authenticated decision comment, and it does not weaken exact-head, completeness, or trusted regeneration checks.
 
 The initial service accepts at most 225 candidates, 450 changed metadata paths, and 16 MiB of loaded record text per review.
 These are application resource-safety bounds, not pull-request Markdown or native-diff conformance limits.

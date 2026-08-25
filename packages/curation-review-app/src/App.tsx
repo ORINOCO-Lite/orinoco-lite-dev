@@ -1025,6 +1025,19 @@ function Review({
     setFeedback(null);
   }
 
+  function chooseUnresolved(value: Disposition): void {
+    setDecisions((existing) => {
+      const next = { ...existing };
+      for (const candidate of proposal.candidates) {
+        if (next[candidate.record_path] === undefined) {
+          next[candidate.record_path] = value;
+        }
+      }
+      return next;
+    });
+    setFeedback(null);
+  }
+
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     if (unresolved > 0) {
@@ -1119,6 +1132,31 @@ function Review({
               {proposal.candidates.length}
             </strong>
             <span>decisions complete</span>
+          </div>
+        </section>
+
+        <section className="bulk-decisions" aria-labelledby="bulk-title">
+          <div>
+            <h3 id="bulk-title">Set a default decision</h3>
+            <p>
+              Apply one decision to every unresolved record, then change any
+              exceptions in the record cards below. Existing choices are
+              preserved.
+            </p>
+          </div>
+          <div className="bulk-decision-actions">
+            {(["accept", "reject", "defer"] as const).map((value) => (
+              <button
+                className={`bulk-decision bulk-decision-${value}`}
+                disabled={unresolved === 0}
+                key={value}
+                onClick={() => chooseUnresolved(value)}
+                type="button"
+              >
+                {value[0]?.toUpperCase()}
+                {value.slice(1)} all unresolved
+              </button>
+            ))}
           </div>
         </section>
 

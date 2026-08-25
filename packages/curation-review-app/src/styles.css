@@ -233,6 +233,40 @@ main:not(.landing) {
   font-size: 0.8rem;
 }
 
+.bulk-decisions {
+  align-items: center;
+  background: var(--warm);
+  border-radius: 0.65rem;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin-top: 1.6rem;
+  padding: 1rem 1.2rem;
+}
+.bulk-decisions h3 {
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+}
+.bulk-decisions p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 48rem;
+}
+.bulk-decision-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: end;
+}
+.bulk-decision {
+  background: var(--surface);
+  color: var(--accent-dark);
+}
+.bulk-decision:hover {
+  color: white;
+}
+
 .filters {
   align-items: end;
   border-bottom: 1px solid var(--line);
@@ -623,9 +657,14 @@ pre {
   }
   .topbar,
   .review-summary,
+  .bulk-decisions,
   .submission-panel {
     align-items: stretch;
     flex-direction: column;
+  }
+  .bulk-decision-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
   .account {
     justify-content: space-between;

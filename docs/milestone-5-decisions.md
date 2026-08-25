@@ -31,6 +31,7 @@ This register summarizes reviewed engineering outcomes without duplicating the n
 | M5-D015 | The versioned canonical identities for the Zotero and `dump-research-info` adapters are `xyzri:XYZInstrument` records at `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v1`. | Pinned upstream enrichment documentation and executable scrapers identify enrichers with versioned instrument records, and the pinned Things schema expressly includes software as an instrument. Stable protocol fields containing “agent” remain transport names rather than schema-class requirements. |
 | M5-D016 | Legacy website-routing URLs in `dump-research-info` are not semantic `about` relationships. Remove those values upstream, preserve existing qualified `foaf:homepage` assertions, and represent the CON organization homepage with the same upstream `AttributeSpecification` pattern. | The adapter consumes corrected upstream Things without a local routing compatibility rule. Page routing remains presentation policy, while homepage assertions retain their established RDF predicate and qualified-object form. |
 | M5-D017 | Relationship targets required by the corrected `dump-research-info` graph use bounded local Things containing only externally verified stable identity facts. Prefer exact PID, type, and label or name observed in the German public Things pool; use authoritative ROR identity for the ISSN International Centre, which that pool lacks; and reuse the existing JMLR venue Thing instead of modeling its website as a creator. | The downstream graph remains self-contained and schema-valid without unresolved network references, silently discarded fields, or copied provider graphs. These ordinary reviewed records create no provider-cache or synchronization obligation; broader imported provider metadata requires a separate policy decision. |
+| M5-D018 | The hosted review application provides a bulk default that fills every currently unresolved candidate with `accept`, `reject`, or `defer`, preserves existing per-record choices, and leaves every choice editable before submission. | Bulk initialization is only transient browser state. The authenticated complete submission remains the first durable decision, and the trusted Action retains the same exact-head, completeness, regeneration, and authorization checks. |
 
 ## Resolved compatibility question
 
@@ -40,7 +41,7 @@ This register summarizes reviewed engineering outcomes without duplicating the n
 
 ## Refined inherited defaults
 
-M5-D001 through M5-D017 refine M4-I003, M4-I008, M4-I014, and M4-I015 and implement HR-201, HR-207, HR-208, HR-209, HR-212, HR-213, HR-214, HR-215, and HR-216 for source-adapter operation and its separate human-edit path.
+M5-D001 through M5-D018 refine M4-I003, M4-I008, M4-I014, and M4-I015 and implement HR-201, HR-207, HR-208, HR-209, HR-212, HR-213, HR-214, HR-215, HR-216, and HR-217 for source-adapter operation and its separate human-edit path.
 All other accepted Milestone 4 boundaries remain in force, including the ordinary-repository topology, no-persistent-service requirement, human review authority, site-owned adapter policy, and read-only real-site boundary.
 
 ## Superseded exploration
