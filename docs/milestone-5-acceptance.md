@@ -150,6 +150,7 @@ The deployment accepts GitHub's unique exact `iss=https://github.com/login/oauth
 An exact-issuer production probe returns HTTP 401 with error code `missing_oauth_state`, rather than `invalid_oauth_callback`.
 GitHub App user-to-server token expiration remains enabled.
 Real Safari GitHub App sign-in succeeded as `leej3`; repository-only discovery selected the sole open proposal and exact review artifact, the pull-request link loaded all 126 candidates, and exact-head SHACL Vue editing painted the released editor plus separate guarded proposal control.
+The GitHub App client secret was rotated before that proof; after the successful flow, the superseded never-used credential was permanently deleted, leaving only the working rotated credential.
 No bundle, commit, pull request, decision, proposal comment, handoff, approval, merge, deployment from proposal code, or external-source write was created by those live checks.
 The public GitHub App [`orinoco-lite-curation-review`](https://github.com/apps/orinoco-lite-curation-review) (App 4704454) has metadata read, Contents write, Actions read, and pull-requests write; personal-account installation `156354646` selects only `leej3/orinoco-lite-demo`.
 Infrastructure pull request [Python-AI-Solutions/websites-management#14](https://github.com/Python-AI-Solutions/websites-management/pull/14), head `21b52400c0883a057a17374893e4ea19456b7031`, merged as `27f68e085fd28068f848330d68de8d6afccea7dc` after its validation check passed.
