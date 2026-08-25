@@ -189,7 +189,7 @@ export class GitHubClient {
 
   constructor(token: string, fetchImplementation: FetchImplementation = fetch) {
     this.#token = token;
-    this.#fetch = fetchImplementation;
+    this.#fetch = (input, init) => fetchImplementation(input, init);
   }
 
   async #request(path: string, init: RequestInit = {}): Promise<Response> {
