@@ -1,6 +1,6 @@
 # Milestone 5 completion handoff
 
-Status: implementation released and integrated; live authenticated review pending
+Status: implementation released and integrated; authenticated application access verified
 
 Milestone 5 no longer needs a separate implementation-start prompt.
 The shared source-adapter runtime, both adapter profiles, annotation-overlay join, GitHub review application, and SHACL Vue human-edit handoff have been implemented, released, and integrated into the reviewed downstream.
@@ -36,7 +36,7 @@ The implementation intentionally does not add a persistent metadata service, tra
 ## Remaining operational evidence
 
 The current real Zotero proposal and its exact-head review artifacts are green.
-Authenticated human disposition submission and finalization remain pending.
+Authenticated application access has been verified against all 126 candidates; human disposition submission and finalization remain pending.
 The real `dump-research-info` dispatch correctly stopped on an unresolved source assertion rather than inventing metadata; resolving that assertion requires an explicit semantic decision.
 The separate existing-corpus normalization pull request also remains subject to human review and merge.
 
