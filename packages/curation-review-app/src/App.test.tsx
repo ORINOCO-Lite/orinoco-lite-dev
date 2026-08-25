@@ -317,11 +317,13 @@ describe("repository-scoped curation discovery", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
-    expect(
-      await screen.findByRole("combobox", {
-        name: "Open curation pull request",
-      }),
-    ).toHaveValue("42");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", {
+          name: "Open curation pull request",
+        }),
+      ).toHaveValue("42"),
+    );
     await waitFor(() =>
       expect(
         screen.getByRole("combobox", { name: "Review artifact" }),
