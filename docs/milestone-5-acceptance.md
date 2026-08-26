@@ -98,6 +98,11 @@ Hosted runs [32851007143](https://github.com/con/test-orinoco-downstream-website
 Personal-demo default-branch SHACL run [32851789476](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851789476) produced exact-merge artifact `9564597774`, name `orinoco-shacl-vue-input-868046a9a5a3b557c00805d34f8f2cbef986b605`, digest `sha256:bf409ae987fed8e35ee9841b583d86f5e849053ffd10edad0aca61ac486abc37`, and expiry `2026-11-23T13:10:49Z`.
 Default-branch Pages run [32851789469](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851789469) built and deployed the same merge successfully; Pages artifact `9564618790` has digest `sha256:9a36c27953d0afb9b247bb73512d505848279eb89244890ed02fe0e719756675`.
 
+Pages-publication run [32929112416](https://github.com/leej3/orinoco-lite-demo/actions/runs/32929112416) exercised reusable-workflow revision `6bd31daa17293fe7d52966bc1599f66b2ea3420b` from personal-demo pull request [20](https://github.com/leej3/orinoco-lite-demo/pull/20) while building default-branch source `8759af1e36c943d8b19c982cc4d6376d037a98ea`.
+The successful deployment recorded projection commit `a07da5a319835d231ec6488937bfa8ae7763c9ca`, with 191 generated files and parent `8759af1e36c943d8b19c982cc4d6376d037a98ea`, then site commit `f85bb92cfe8f34562677d88f647c8b341c424fef`, with 566 files and parent `a07da5a319835d231ec6488937bfa8ae7763c9ca`, as `latest-hugo-projection` and `gh-pages`.
+Transfer artifact `9592595886`, `orinoco-pages-publication-32929112416`, retained the two-commit bundle through `2026-08-27T04:10:41Z`; the deployed site returned HTTP 200.
+The temporary review-branch deployment policy used for this proof was removed, restoring the Pages environment to its `main`-only branch policy.
+
 ## Live demonstration evidence
 
 | Surface | Immutable coordinates | Result |
