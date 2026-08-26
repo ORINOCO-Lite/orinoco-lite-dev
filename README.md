@@ -101,6 +101,13 @@ pixi install --locked
 pixi run test
 ```
 
+Project-owned agent skills are canonical under `.apm/skills/`, locked by APM, and deployed as ordinary files under `.agents/skills/`.
+Verify the frozen installation and its deployment ledger without changing the engine environment:
+
+```console
+pixi run -e skills apm-check
+```
+
 That bootstrap suite reports source-compatibility checks as skipped when their recorded component fixtures are absent.
 Ordinary engineering CI initializes only the schema and editor components used by a release, checks out one exact accepted-consumer fixture, runs `pixi run test-ci`, and fails if any test skips.
 The frozen consumer check generates its projection from tracked metadata and projection inputs; it never depends on a sibling checkout or ignored output.

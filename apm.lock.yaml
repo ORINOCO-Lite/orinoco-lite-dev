@@ -1,0 +1,49 @@
+lockfile_version: '1'
+generated_at: '2026-08-26T22:22:43.403921+00:00'
+dependencies: []
+deployments:
+- kind: project-relative
+  target: agents
+  value: .agents/skills/upstream-convergence
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/upstream-convergence/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:95b5722413fde58f504f0e02948606a79656ab26f541f2e8ed813d098ec29598
+- kind: project-relative
+  target: agents
+  value: .agents/skills/upstream-convergence/agents/openai.yaml
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:02f0f683979c83e34a93e978020fdc599407560ad9ff8bc51be7729cc922d201
+- kind: project-relative
+  target: agents
+  value: .agents/skills/upstream-convergence/references/git-and-evidence.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:d785bd0a0caf520e333ecd2a04dd1185011ac33fb0bd0c2a367305207bcca526
+local_deployed_files:
+- .agents/skills/upstream-convergence
+- .agents/skills/upstream-convergence/SKILL.md
+- .agents/skills/upstream-convergence/agents/openai.yaml
+- .agents/skills/upstream-convergence/references/git-and-evidence.md
+local_deployed_file_hashes:
+  .agents/skills/upstream-convergence/SKILL.md: sha256:95b5722413fde58f504f0e02948606a79656ab26f541f2e8ed813d098ec29598
+  .agents/skills/upstream-convergence/agents/openai.yaml: sha256:02f0f683979c83e34a93e978020fdc599407560ad9ff8bc51be7729cc922d201
+  .agents/skills/upstream-convergence/references/git-and-evidence.md: sha256:d785bd0a0caf520e333ecd2a04dd1185011ac33fb0bd0c2a367305207bcca526
