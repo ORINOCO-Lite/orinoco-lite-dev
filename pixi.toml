@@ -9,7 +9,7 @@ python = ">=3.12,<3.13"
 
 [tasks]
 test-engine = "python -m unittest discover -s packages/orinoco-lite/tests -v"
-test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_restore_annex_status tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_adapt_upstream_pages -v"
+test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_pages_publication tests.test_restore_annex_status tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_adapt_upstream_pages -v"
 test = { depends-on = ["test-engine", "test-development"] }
 checkout-submodules = "python tools/checkout_submodules.py"
 build-upstream-static = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build'

@@ -12,6 +12,14 @@ on:
         type: string
         required: false
         default: v0.73.0
+      workflow-repository:
+        description: Repository containing this workflow and publication tool
+        type: string
+        required: true
+      workflow-sha:
+        description: Exact commit containing this workflow and publication tool
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -65,9 +73,20 @@ jobs:
           pixi run validate
           pixi run build-pages
 
+      - name: Check out the exact publication tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs['workflow-repository'] }}
+          ref: ${{ inputs['workflow-sha'] }}
+          path: build/orinoco-pages-workflow
+          persist-credentials: false
+
       - name: Prepare the generated branch commits
         run: |
-          python .orinoco-lite/tools/prepare_pages_publication.py \
+          tool_sha=$(git -C build/orinoco-pages-workflow rev-parse HEAD)
+          test "$tool_sha" = "${{ inputs['workflow-sha'] }}"
+          python build/orinoco-pages-workflow/tools/prepare_pages_publication.py \
+            --repository "$GITHUB_WORKSPACE" \
             --bundle build/pages-publication.bundle \
             --metadata build/pages-publication.json
 
