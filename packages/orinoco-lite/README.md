@@ -59,6 +59,9 @@ The semantic metadata interface comprises reviewed Things under `metadata/record
 `paths.records` defaults to `metadata/records`; the companion tree mirrors that fixed record path below its overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.
 Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
+Projection references and graph closure fail closed by default.
+A site that intentionally models an open graph may explicitly preserve missing record references and drop only nonmaterialized graph-view edges; projection reports count those choices by field.
+Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
 Site-owned source adapters use `paths.source_adapters` (default `source-adapters`), while framework provenance defaults to `.orinoco-lite/provenance`.
 There are no legacy `canonical`, `reference`, or `integrations` path aliases.
 `orinoco.lock` binds:

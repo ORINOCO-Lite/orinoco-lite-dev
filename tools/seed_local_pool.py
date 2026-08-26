@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
+
+if __package__:
+    from . import upstream_snapshot
+else:  # Direct ``python tools/seed_local_pool.py`` use.
+    import upstream_snapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +23,6 @@ UPSTREAM_SNAPSHOT = STACK / "pool" / "public-thing.jsonl"
 CON_RECORDS = ROOT / "build" / "con-projection" / "records.jsonl"
 SEED_TOKEN = STACK / "seed-token"
 SERVICE_URL = "http://127.0.0.1:8111"
-CLASS_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 UPSTREAM_COLLECTIONS = ("upstream-public", "upstream-protected")
 CON_COLLECTIONS = ("con-public", "con-protected")
 
@@ -76,49 +80,13 @@ def put_record(collection: str, class_name: str, record: dict, token: str) -> st
 
 
 def load_manifest(path: Path) -> list[tuple[str, dict]]:
-    """Load the stack JSONL envelope and reject ambiguous records."""
-    records: list[tuple[str, dict]] = []
-    seen: set[str] = set()
-    with path.open(encoding="utf-8") as stream:
-        for line_number, line in enumerate(stream, start=1):
-            if not line.strip():
-                raise RuntimeError(f"{path}:{line_number}: blank JSONL line")
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise RuntimeError(
-                    f"{path}:{line_number}: invalid JSON: {error.msg}"
-                ) from error
-            if not isinstance(item, dict):
-                raise RuntimeError(
-                    f"{path}:{line_number}: expected a JSON object"
-                )
-            class_name = item.get("class_name")
-            record = item.get("record")
-            if not isinstance(class_name, str) or not CLASS_NAME.fullmatch(
-                class_name
-            ):
-                raise RuntimeError(
-                    f"{path}:{line_number}: invalid class_name {class_name!r}"
-                )
-            if not isinstance(record, dict):
-                raise RuntimeError(
-                    f"{path}:{line_number}: record must be a JSON object"
-                )
-            pid = record.get("pid")
-            if not isinstance(pid, str) or not pid:
-                raise RuntimeError(
-                    f"{path}:{line_number}: record must have a string pid"
-                )
-            if pid in seen:
-                raise RuntimeError(
-                    f"{path}:{line_number}: duplicate record pid {pid!r}"
-                )
-            seen.add(pid)
-            records.append((class_name, record))
-    if not records:
-        raise RuntimeError(f"{path}: manifest has no records")
-    return records
+    """Load the shared, lossless stack JSONL envelope contract."""
+
+    try:
+        records = upstream_snapshot.load_jsonl(path)
+    except upstream_snapshot.SnapshotError as error:
+        raise RuntimeError(str(error)) from error
+    return [(item.class_name, item.record) for item in records]
 
 
 def curated_pids(collection: str, token: str) -> set[str]:
@@ -162,7 +130,7 @@ def prune_collection(
 
 def seed_manifest(
     path: Path,
-    collections: tuple[str, str],
+    collections: Sequence[str],
     token: str,
     label: str,
 ) -> dict[str, int]:

@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 
 from orinoco_lite.annotations import (
+    annotation_semantic_view,
     annotation_companion,
     assertion_sha256,
     compact_enrichment_view,
@@ -109,6 +110,22 @@ class CompanionTests(unittest.TestCase):
 
 
 class JoinTests(unittest.TestCase):
+    def test_compact_and_expanded_human_annotations_have_one_semantic_view(self):
+        compact = record()
+        compact["identifiers"][0]["annotations"] = {"ex:reviewed": "yes"}
+        expanded = deepcopy(compact)
+        expanded["identifiers"][0]["annotations"] = {
+            "ex:reviewed": {
+                "annotation_tag": "ex:reviewed",
+                "annotation_value": "yes",
+            }
+        }
+
+        self.assertEqual(
+            annotation_semantic_view(compact),
+            annotation_semantic_view(expanded),
+        )
+
     def test_stored_object_and_qualified_assertions_join_as_expanded_pav(self):
         stored = record()
         stored["attributes"] = [
@@ -288,6 +305,77 @@ class JoinTests(unittest.TestCase):
         self.assertEqual(
             working["identifiers"][0]["annotations"]["pav:importedBy"], AGENT
         )
+
+    def test_compact_split_accepts_uri_aliases_and_normalizes_the_companion(self):
+        working = record()
+        working["identifiers"][0]["annotations"] = {
+            "http://purl.org/pav/importedBy": AGENT,
+            "http://purl.org/pav/importedFrom": SOURCE,
+            "ex:reviewed": "yes",
+        }
+
+        stored, companion = split_enrichment_view(working)
+        reconstructed = compact_enrichment_view(stored, companion)
+
+        self.assertEqual(
+            stored["identifiers"][0]["annotations"], {"ex:reviewed": "yes"}
+        )
+        self.assertEqual(companion["assertions"][0]["pav:importedBy"], AGENT)
+        self.assertEqual(companion["assertions"][0]["pav:importedFrom"], SOURCE)
+        self.assertEqual(
+            reconstructed["identifiers"][0]["annotations"],
+            {
+                "ex:reviewed": "yes",
+                "pav:importedBy": AGENT,
+                "pav:importedFrom": SOURCE,
+            },
+        )
+
+    def test_split_accepts_expanded_machine_annotations(self):
+        working = record()
+        working["identifiers"][0]["annotations"] = {
+            "pav:importedBy": {
+                "annotation_tag": "pav:importedBy",
+                "annotation_value": AGENT,
+            },
+            "pav:importedFrom": {
+                "annotation_tag": "http://purl.org/pav/importedFrom",
+                "annotation_value": SOURCE,
+            },
+        }
+
+        stored, companion = split_enrichment_view(working)
+        reconstructed = compact_enrichment_view(stored, companion)
+
+        self.assertNotIn("annotations", stored["identifiers"][0])
+        self.assertEqual(
+            reconstructed["identifiers"][0]["annotations"],
+            {"pav:importedBy": AGENT, "pav:importedFrom": SOURCE},
+        )
+
+    def test_split_rejects_malformed_expanded_machine_annotation(self):
+        working = record()
+        working["identifiers"][0]["annotations"] = {
+            "pav:importedBy": {
+                "annotation_tag": "ex:not-imported-by",
+                "annotation_value": AGENT,
+            },
+            "pav:importedFrom": SOURCE,
+        }
+
+        with self.assertRaisesRegex(ConfigurationError, "tag is malformed"):
+            split_enrichment_view(working)
+
+    def test_compact_split_rejects_duplicate_curie_and_uri_aliases(self):
+        working = record()
+        working["identifiers"][0]["annotations"] = {
+            "pav:importedBy": AGENT,
+            "http://purl.org/pav/importedBy": AGENT,
+            "pav:importedFrom": SOURCE,
+        }
+
+        with self.assertRaisesRegex(ConfigurationError, "both CURIE and URI"):
+            split_enrichment_view(working)
 
     def test_existing_machine_annotation_is_never_overwritten(self):
         stored = record()

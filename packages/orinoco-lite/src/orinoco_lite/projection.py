@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
@@ -22,6 +22,7 @@ import yaml
 from .annotations import (
     PAV_IMPORTED_BY,
     PAV_IMPORTED_FROM,
+    annotation_semantic_view,
     annotation_root,
     assertion_sha256,
 )
@@ -46,6 +47,36 @@ FORBIDDEN_BRIDGE_PREDICATES = {
 }
 # A narrow query/projection exception, not a general open-graph policy.
 EXTERNALLY_RESOLVABLE_LINK_FIELDS = frozenset({"identifiers.creator"})
+SEMANTIC_IDENTIFIER_FIELDS = {
+    "about",
+    "alternate_of",
+    "annotation_tag",
+    "associated_with",
+    "attributed_to",
+    "broad_mappings",
+    "creator",
+    "defined_by",
+    "delegated_by",
+    "depends_on",
+    "derived_from",
+    "exact_mappings",
+    "generated_by",
+    "influenced_by",
+    "kind",
+    "narrow_mappings",
+    "object",
+    "part_of",
+    "pid",
+    "predicate",
+    "quoted_from",
+    "related_mappings",
+    "revision_of",
+    "roles",
+    "rules",
+    "schema_type",
+    "specialization_of",
+    "unit",
+}
 
 
 def _is_projection_control_sidecar(output: Path, path: Path) -> bool:
@@ -56,6 +87,13 @@ def _is_projection_control_sidecar(output: Path, path: Path) -> bool:
         and path.is_file()
         and path.relative_to(output).as_posix() == PROJECTION_CONTROL_SIDECAR
     )
+
+
+def _is_historical_provenance(output: Path, path: Path) -> bool:
+    """Identify only the preserved top-level projection evidence directory."""
+
+    relative = path.relative_to(output)
+    return bool(relative.parts) and relative.parts[0] == "provenance"
 
 
 @dataclass(frozen=True)
@@ -77,6 +115,9 @@ class ProjectionContract:
     graph_producer: Path
     graph_node_classes: frozenset[str]
     relationship_fields: tuple[str, ...]
+    missing_reference_targets: str
+    missing_graph_targets: str
+    editor_record_scope: str
 
 
 def _relative(workspace: WorkspaceConfig, value: object, label: str) -> Path:
@@ -106,6 +147,8 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     unrendered = value.get("unrendered_classes")
     graph = value.get("graph")
     routing = value.get("routing")
+    references = value.get("references", {"missing_targets": "reject"})
+    editor = value.get("editor", {"record_scope": "all"})
     if (
         not isinstance(homepage, dict)
         or not isinstance(pages, dict)
@@ -113,7 +156,11 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         or not isinstance(unrendered, list)
         or not isinstance(graph, dict)
         or not isinstance(routing, dict)
+        or not isinstance(references, dict)
+        or not isinstance(editor, dict)
         or set(routing) != {"strip_prefix"}
+        or set(references) != {"missing_targets"}
+        or set(editor) != {"record_scope"}
     ):
         raise ConfigurationError("Projection contract sections are malformed")
     route_prefix = routing.get("strip_prefix")
@@ -126,7 +173,9 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         or not route_prefix
         or not isinstance(node_classes, list)
         or not isinstance(relationships, list)
-        or graph.get("missing_external_targets") != "reject"
+        or references.get("missing_targets") not in {"preserve", "reject"}
+        or graph.get("missing_external_targets") not in {"drop", "reject"}
+        or editor.get("record_scope") not in {"all", "editable"}
         or not all(isinstance(item, str) and item for item in node_classes)
         or not all(isinstance(item, str) and item for item in relationships)
         or not all(isinstance(item, str) and item for item in unrendered)
@@ -203,6 +252,9 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         graph_producer=_relative(workspace, graph.get("producer"), "graph.producer"),
         graph_node_classes=frozenset(node_classes),
         relationship_fields=tuple(relationships),
+        missing_reference_targets=references["missing_targets"],
+        missing_graph_targets=graph["missing_external_targets"],
+        editor_record_scope=editor["record_scope"],
     )
     for required in [
         contract.homepage.template,
@@ -233,11 +285,32 @@ def _relationship_targets(record: Mapping[str, Any], field: str) -> Iterable[str
     if not isinstance(values, list):
         values = [values]
     for value in values:
+        if isinstance(value, dict) and value.get("object") is None:
+            # LinkML permits a qualified relationship object to carry context
+            # (for example, a role) without asserting its optional target.
+            continue
         target = value.get("object") if isinstance(value, dict) else value
         targets = target if isinstance(target, list) else [target]
-        if not targets or not all(isinstance(item, str) and item for item in targets):
+        if not all(isinstance(item, str) and item for item in targets):
             raise DriverError(f"{record.get('pid')}: malformed {field} target")
         yield from targets
+
+
+def _targetless_relationship_contexts(
+    record: Mapping[str, Any],
+    field: str,
+) -> int:
+    """Count qualified relationship contexts with no optional object target."""
+
+    values = record.get(field, [])
+    if values is None:
+        return 0
+    if not isinstance(values, list):
+        values = [values]
+    return sum(
+        isinstance(value, Mapping) and value.get("object") is None
+        for value in values
+    )
 
 
 def _record_links(
@@ -302,21 +375,108 @@ def _all_links(
     )
 
 
-def _native_fingerprint(value: Any) -> Counter[tuple[str, str]]:
+def _semantic_identifier_view(
+    value: Any,
+    namespaces: Any | None,
+    *,
+    identifier_value: bool = False,
+) -> Any:
+    """Expand recognized CURIE values while retaining ordinary literals."""
+
+    if namespaces is None:
+        return deepcopy(value)
+    if isinstance(value, Mapping):
+        return {
+            key: _semantic_identifier_view(
+                item,
+                namespaces,
+                identifier_value=key in SEMANTIC_IDENTIFIER_FIELDS,
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _semantic_identifier_view(
+                item,
+                namespaces,
+                identifier_value=identifier_value,
+            )
+            for item in value
+        ]
+    if isinstance(value, str) and identifier_value:
+        try:
+            expanded = namespaces.uri_for(value)
+        except (KeyError, ValueError):
+            return value
+        return str(expanded) if expanded is not None else value
+    return deepcopy(value)
+
+
+def _native_fingerprint(
+    value: Any,
+    *,
+    exclude_root_pid: bool = False,
+    namespaces: Any | None = None,
+) -> Counter[tuple[str, str]]:
+    def unordered(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {key: unordered(item) for key, item in value.items()}
+        if isinstance(value, list):
+            items = [unordered(item) for item in value]
+            return sorted(
+                items,
+                key=lambda item: json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+            )
+        return value
+
     result: Counter[tuple[str, str]] = Counter()
     if isinstance(value, dict):
         schema_type = value.get("schema_type")
         if isinstance(schema_type, str) and schema_type.startswith("dlthings:"):
-            result[(schema_type, json.dumps(value, sort_keys=True, separators=(",", ":")))] += 1
+            semantic = annotation_semantic_view(value)
+            if exclude_root_pid:
+                semantic.pop("pid", None)
+            semantic = _semantic_identifier_view(semantic, namespaces)
+            semantic = unordered(semantic)
+            result[
+                (
+                    schema_type,
+                    json.dumps(semantic, sort_keys=True, separators=(",", ":")),
+                )
+            ] += 1
         for child in value.values():
-            result.update(_native_fingerprint(child))
+            result.update(_native_fingerprint(child, namespaces=namespaces))
     elif isinstance(value, list):
         for child in value:
-            result.update(_native_fingerprint(child))
+            result.update(_native_fingerprint(child, namespaces=namespaces))
     return result
 
 
-def _machine_pav_fingerprint(value: Any) -> Counter[tuple[str, str]]:
+def _same_identifier(namespaces: Any, left: Any, right: Any) -> bool:
+    """Compare CURIE/full-URI spellings without weakening raw storage checks."""
+
+    if not isinstance(left, str) or not isinstance(right, str):
+        return False
+
+    def expand(value: str) -> str:
+        try:
+            expanded = namespaces.uri_for(value)
+        except (KeyError, ValueError):
+            return value
+        return str(expanded) if expanded is not None else value
+
+    return expand(left) == expand(right)
+
+
+def _machine_pav_fingerprint(
+    value: Any,
+    namespaces: Any | None = None,
+) -> Counter[tuple[str, str]]:
     """Bind every joined machine PAV pair to its annotation-free assertion."""
 
     result: Counter[tuple[str, str]] = Counter()
@@ -332,15 +492,21 @@ def _machine_pav_fingerprint(value: Any) -> Counter[tuple[str, str]]:
             }
             result[
                 (
-                    assertion_sha256(value),
-                    json.dumps(machine, sort_keys=True, separators=(",", ":")),
+                    assertion_sha256(
+                        _semantic_identifier_view(value, namespaces)
+                    ),
+                    json.dumps(
+                        _semantic_identifier_view(machine, namespaces),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
                 )
             ] += 1
         for child in value.values():
-            result.update(_machine_pav_fingerprint(child))
+            result.update(_machine_pav_fingerprint(child, namespaces))
     elif isinstance(value, list):
         for child in value:
-            result.update(_machine_pav_fingerprint(child))
+            result.update(_machine_pav_fingerprint(child, namespaces))
     return result
 
 
@@ -385,6 +551,11 @@ def validate_semantics(
         to_ttl, to_json = build_format_converters(schema)
     except Exception as error:
         raise DriverError("Could not initialize semantic schema conversion") from error
+    namespaces = schema_view.namespaces()
+    rdf_identifier_normalizations = 0
+    missing_references: Counter[str] = Counter()
+    missing_reference_targets: set[str] = set()
+    targetless_relationships: Counter[str] = Counter()
     for record in records:
         pid = record["pid"]
         for schema_type in _nested_schema_types(record):
@@ -393,9 +564,21 @@ def validate_semantics(
         for attribute in record.get("attributes", []):
             if isinstance(attribute, dict) and attribute.get("predicate") in FORBIDDEN_BRIDGE_PREDICATES:
                 raise DriverError(f"{pid}: relationship encoded as AttributeSpecification")
-        for field, target in _all_links(record, contract.relationship_fields):
+        links = (
+            _record_links(record, contract.relationship_fields)
+            if contract.missing_reference_targets == "preserve"
+            else _all_links(record, contract.relationship_fields)
+        )
+        for field, target in links:
             if target not in by_pid:
-                raise DriverError(f"{pid}: dangling {field} target {target}")
+                if contract.missing_reference_targets == "reject":
+                    raise DriverError(f"{pid}: dangling {field} target {target}")
+                missing_references[field] += 1
+                missing_reference_targets.add(target)
+        for field in contract.relationship_fields:
+            targetless_relationships[field] += _targetless_relationship_contexts(
+                record, field
+            )
         try:
             class_name = record["schema_type"].rsplit(":", 1)[-1]
             restored = to_json.convert(to_ttl.convert(record, class_name), class_name)
@@ -403,11 +586,25 @@ def validate_semantics(
             raise DriverError(f"{pid}: JSON/RDF/JSON schema validation failed: {error}") from error
         before = Counter(_nested_schema_types(record))
         after = Counter(_nested_schema_types(restored))
+        restored_pid = restored.get("pid")
+        if not _same_identifier(namespaces, pid, restored_pid):
+            raise DriverError(f"{pid}: schema round trip changed record identity")
+        if restored_pid != pid:
+            rdf_identifier_normalizations += 1
         if (
             any(after[item] < count for item, count in before.items())
-            or _native_fingerprint(restored) != _native_fingerprint(record)
-            or _machine_pav_fingerprint(restored)
-            != _machine_pav_fingerprint(record)
+            or _native_fingerprint(
+                restored,
+                exclude_root_pid=True,
+                namespaces=namespaces,
+            )
+            != _native_fingerprint(
+                record,
+                exclude_root_pid=True,
+                namespaces=namespaces,
+            )
+            or _machine_pav_fingerprint(restored, namespaces)
+            != _machine_pav_fingerprint(record, namespaces)
         ):
             raise DriverError(f"{pid}: schema round trip changed native semantics")
     graph_nodes = {
@@ -416,17 +613,51 @@ def validate_semantics(
         if by_pid[pid]["schema_type"] in contract.graph_node_classes
     }
     graph_edges: set[tuple[str, str]] = set()
+    dropped_graph_edges: set[tuple[str, str]] = set()
+    dropped_graph_edges_by_field: dict[str, set[tuple[str, str]]] = defaultdict(set)
     for pid in graph_nodes:
         for field in contract.relationship_fields:
             for target in _relationship_targets(by_pid[pid], field):
                 if target not in graph_nodes:
-                    raise DriverError(f"{pid}: graph target does not materialize: {target}")
+                    if contract.missing_graph_targets == "reject":
+                        raise DriverError(
+                            f"{pid}: graph target does not materialize: {target}"
+                        )
+                    dropped_graph_edges.add((pid, target))
+                    dropped_graph_edges_by_field[field].add((pid, target))
+                    continue
                 graph_edges.add((pid, target))
-    return {
+    report = {
         "records": len(records),
         "graph_nodes": len(graph_nodes),
         "graph_edges": len(graph_edges),
     }
+    if contract.missing_reference_targets == "preserve":
+        report["preserved_reference_targets"] = sum(missing_references.values())
+        report["preserved_reference_unique_targets"] = len(
+            missing_reference_targets
+        )
+        report["preserved_references_by_field"] = dict(
+            sorted(missing_references.items())
+        )
+    if contract.missing_graph_targets == "drop":
+        report["dropped_graph_edges"] = len(dropped_graph_edges)
+        report["dropped_graph_edges_by_field"] = {
+            field: len(edges)
+            for field, edges in sorted(dropped_graph_edges_by_field.items())
+        }
+    if any(targetless_relationships.values()):
+        report["targetless_relationship_contexts"] = sum(
+            targetless_relationships.values()
+        )
+        report["targetless_relationship_contexts_by_field"] = {
+            field: count
+            for field, count in sorted(targetless_relationships.items())
+            if count
+        }
+    if rdf_identifier_normalizations:
+        report["rdf_identifier_normalizations"] = rdf_identifier_normalizations
+    return report
 
 
 def _toyaml(value: Any) -> str:
@@ -649,7 +880,7 @@ def projection_manifest(
         if (
             path.is_file()
             and path.name != "SHA256SUMS"
-            and "provenance" not in path.parts
+            and not _is_historical_provenance(output, path)
             and not _is_projection_control_sidecar(output, path)
         ):
             lines.append(
@@ -713,7 +944,9 @@ def render_projection(
         text=True,
         check=False,
     )
-    if graph_result.returncode or graph_result.stderr.strip():
+    if graph_result.returncode or (
+        graph_result.stderr.strip() and contract.missing_graph_targets == "reject"
+    ):
         raise DriverError(f"Projection graph failed: {graph_result.stderr.strip()}")
     try:
         graph = json.loads(graph_result.stdout)
@@ -733,6 +966,7 @@ def render_projection(
         for pid in expected_nodes
         for field in contract.relationship_fields
         for target in _relationship_targets(by_pid[pid], field)
+        if target in expected_nodes
     }
     actual_nodes = {node.get("id") for node in nodes if isinstance(node, dict)}
     actual_edges = {
@@ -775,7 +1009,7 @@ def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
             path.relative_to(output).as_posix(): path
             for path in output.rglob("*")
             if path.is_file()
-            and "provenance" not in path.parts
+            and not _is_historical_provenance(output, path)
             and not _is_projection_control_sidecar(output, path)
         }
         candidate_files = {
