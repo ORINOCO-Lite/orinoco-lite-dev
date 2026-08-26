@@ -181,6 +181,8 @@ See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
 - Every record under `metadata/records/` and companion under `metadata/overlays/annotations/` is canonical semantic input; their joined Thing is the validation, RDF, and projection boundary.
 Declarative site policy determines pages and editor exposure.
 Projection output is regenerated during validation and build, remains ignored, and never obscures a source-metadata review diff.
+- After a successful Pages deployment, the reusable publication workflow records the complete projection as the sole commit on `latest-hugo-projection` beyond the exact default-branch source, then records the complete deployed website as its child on `gh-pages`.
+The two generated refs are force-updated atomically and are debugging evidence, not metadata authority.
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 See [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md).
