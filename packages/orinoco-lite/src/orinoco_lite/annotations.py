@@ -34,6 +34,10 @@ _MACHINE_PAV_TAGS = frozenset(
         PAV_IMPORTED_FROM_URI,
     }
 )
+_MACHINE_PAV_ALIASES = {
+    PAV_IMPORTED_BY: (PAV_IMPORTED_BY, PAV_IMPORTED_BY_URI),
+    PAV_IMPORTED_FROM: (PAV_IMPORTED_FROM, PAV_IMPORTED_FROM_URI),
+}
 _ASSERTION_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 ANNOTATION_ROOT = Path("metadata/overlays/annotations")
 
@@ -298,6 +302,22 @@ def _expanded_annotations(value: object) -> dict[str, dict[str, object]]:
     return expanded
 
 
+def annotation_semantic_view(value: Any) -> Any:
+    """Normalize compact and expanded annotation syntax without dropping data."""
+
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            if key == "annotations":
+                result[key] = _expanded_annotations(item)
+            else:
+                result[key] = annotation_semantic_view(item)
+        return result
+    if isinstance(value, list):
+        return [annotation_semantic_view(item) for item in value]
+    return deepcopy(value)
+
+
 def _machine_annotations(entry: Mapping[str, str]) -> dict[str, dict[str, str]]:
     return {
         tag: {"annotation_tag": tag, "annotation_value": entry[tag]}
@@ -479,10 +499,29 @@ def _pointer_token(value: str) -> str:
     return value.replace("~", "~0").replace("/", "~1")
 
 
+def _compact_machine_value(
+    value: object,
+    *,
+    canonical: str,
+) -> str:
+    if not isinstance(value, Mapping):
+        return _line(value, canonical)
+    if set(value) != {"annotation_tag", "annotation_value"}:
+        raise ConfigurationError(
+            f"Expanded enrichment-view {canonical} annotation is malformed"
+        )
+    annotation_tag = value.get("annotation_tag")
+    if annotation_tag not in _MACHINE_PAV_ALIASES[canonical]:
+        raise ConfigurationError(
+            f"Expanded enrichment-view {canonical} annotation tag is malformed"
+        )
+    return _line(value.get("annotation_value"), canonical)
+
+
 def split_enrichment_view(
     working: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, object] | None]:
-    """Split compact machine PAV from a detached enrichment-helper result.
+    """Split compact or expanded machine PAV from a detached record.
 
     The returned record contains all semantic assertion objects and no machine
     PAV.  The optional companion contains only PAV selectors for those stored
@@ -505,25 +544,38 @@ def split_enrichment_view(
                 )
             annotations = deepcopy(dict(raw_annotations))
             present = {
-                tag
-                for tag in (PAV_IMPORTED_BY, PAV_IMPORTED_FROM)
-                if tag in annotations
+                canonical: [alias for alias in aliases if alias in annotations]
+                for canonical, aliases in _MACHINE_PAV_ALIASES.items()
             }
-            if present and present != {PAV_IMPORTED_BY, PAV_IMPORTED_FROM}:
+            machine_present = any(present.values())
+            if any(len(aliases) > 1 for aliases in present.values()):
+                raise ConfigurationError(
+                    "Enrichment-view machine provenance repeats a PAV term "
+                    "as both CURIE and URI"
+                )
+            if machine_present and not all(len(aliases) == 1 for aliases in present.values()):
                 raise ConfigurationError(
                     "Enrichment-view machine provenance requires both "
                     "pav:importedBy and pav:importedFrom"
                 )
-            if present:
+            if machine_present:
                 if not path:
                     raise ConfigurationError(
                         "The top-level Thing cannot be an imported assertion"
                     )
                 imported_by = _line(
-                    annotations.pop(PAV_IMPORTED_BY), PAV_IMPORTED_BY
+                    _compact_machine_value(
+                        annotations.pop(present[PAV_IMPORTED_BY][0]),
+                        canonical=PAV_IMPORTED_BY,
+                    ),
+                    PAV_IMPORTED_BY,
                 )
                 imported_from = _line(
-                    annotations.pop(PAV_IMPORTED_FROM), PAV_IMPORTED_FROM
+                    _compact_machine_value(
+                        annotations.pop(present[PAV_IMPORTED_FROM][0]),
+                        canonical=PAV_IMPORTED_FROM,
+                    ),
+                    PAV_IMPORTED_FROM,
                 )
                 if annotations:
                     value["annotations"] = annotations

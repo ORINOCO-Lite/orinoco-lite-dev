@@ -54,6 +54,15 @@ def _git_commit(root: Path) -> str:
         check=False,
     )
     value = result.stdout.strip()
+    if result.returncode:
+        unborn = subprocess.run(
+            ["git", "-C", str(root), "symbolic-ref", "--quiet", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if unborn.returncode == 0 and unborn.stdout.strip().startswith("refs/heads/"):
+            return "0" * 40
     if result.returncode or len(value) != 40 or any(
         character not in "0123456789abcdef" for character in value
     ):
@@ -136,14 +145,29 @@ def _converters(schema: Path):
         raise DriverError("Could not load the pinned editor schema") from error
 
 
-def _canonical_rdf(value: str) -> str:
+def _canonical_rdf(value: str, *, record_pid: str) -> str:
     try:
-        from rdflib import Graph
+        from rdflib import BNode, Graph
         from rdflib.compare import to_canonical_graph
 
         graph = Graph()
         graph.parse(data=value, format="turtle")
-        serialized = to_canonical_graph(graph).serialize(format="nt")
+        canonical = to_canonical_graph(graph)
+        namespace = "r" + hashlib.sha256(record_pid.encode("utf-8")).hexdigest()[:24]
+        relabeled = Graph()
+        blank_nodes: dict[BNode, BNode] = {}
+
+        def scoped(term):
+            if not isinstance(term, BNode):
+                return term
+            return blank_nodes.setdefault(
+                term,
+                BNode(f"{namespace}_{term}"),
+            )
+
+        for subject, predicate, object_ in canonical:
+            relabeled.add((scoped(subject), predicate, scoped(object_)))
+        serialized = relabeled.serialize(format="nt")
     except Exception as error:
         raise DriverError("Could not canonicalize record RDF") from error
     return "\n".join(sorted(line for line in serialized.splitlines() if line.strip())) + "\n"
@@ -153,13 +177,8 @@ def _render_rdf_sources(
     sources: Sequence[Mapping[str, str]],
     converter: Any,
 ) -> tuple[dict[str, str], str]:
-    try:
-        from rdflib import Graph
-        from rdflib.compare import to_canonical_graph
-    except ImportError as error:
-        raise DriverError("The editor requires the locked RDF dependency") from error
     per_record: dict[str, str] = {}
-    graph = Graph()
+    combined_lines: set[str] = set()
     for source in sources:
         record = yaml.safe_load(source["content"])
         class_name = source["schema_type"].rsplit(":", 1)[-1]
@@ -167,16 +186,14 @@ def _render_rdf_sources(
             rendered = converter.convert(record, class_name)
             if not isinstance(rendered, str):
                 raise TypeError("converter did not return Turtle")
-            graph.parse(data=rendered, format="turtle")
-            per_record[source["pid"]] = _canonical_rdf(rendered)
+            canonical = _canonical_rdf(rendered, record_pid=source["pid"])
+            per_record[source["pid"]] = canonical
+            combined_lines.update(canonical.splitlines())
         except Exception as error:
             raise DriverError(
                 f"Could not bind editor RDF for {source['pid']}: {error}"
             ) from error
-    serialized = to_canonical_graph(graph).serialize(format="nt")
-    combined = "\n".join(
-        sorted(line for line in serialized.splitlines() if line.strip())
-    ) + "\n"
+    combined = "\n".join(sorted(line for line in combined_lines if line.strip())) + "\n"
     return per_record, combined
 
 
@@ -185,6 +202,8 @@ def bind_editor(
     runtime_root: Path,
     destination: Path,
 ) -> dict[str, Any]:
+    from .projection import load_contract
+
     shell = runtime_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
         raise DriverError("Runtime does not contain the generic static editor shell")
@@ -201,12 +220,18 @@ def bind_editor(
             raise DriverError(f"Runtime editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    sources = record_sources(workspace)
+    contract = load_contract(workspace)
+    all_sources = record_sources(workspace)
+    catalog = record_catalog(workspace)
+    if contract.editor_record_scope == "editable":
+        editable_pids = {entry["pid"] for entry in catalog["records"]}
+        sources = [source for source in all_sources if source["pid"] in editable_pids]
+    else:
+        sources = all_sources
     json_to_rdf, _ = _converters(
         runtime_root / "schema/demo-research-information/unreleased.yaml"
     )
     record_rdf, combined_rdf = _render_rdf_sources(sources, json_to_rdf)
-    catalog = record_catalog(workspace)
     for entry in catalog["records"]:
         entry["rdf_turtle"] = record_rdf[entry["pid"]]
     (destination / "data").mkdir(exist_ok=True)
@@ -217,7 +242,9 @@ def bind_editor(
         "catalog_format": CATALOG_FORMAT,
         "editable_records": len(catalog["records"]),
         "loaded_records": len(sources),
+        "record_scope": contract.editor_record_scope,
         "source_commit": catalog["source_commit"],
+        "source_records": len(all_sources),
         "version": VERSION,
     }
 
@@ -337,7 +364,7 @@ def validate_bundle(
         try:
             # Parsing before schema conversion rejects malformed RDF without
             # permitting network retrieval or filesystem references.
-            _canonical_rdf(rdf_turtle)
+            _canonical_rdf(rdf_turtle, record_pid=pid)
             class_name = source["schema_type"].rsplit(":", 1)[-1]
             record = rdf_to_json.convert(rdf_turtle, class_name)
         except Exception as error:

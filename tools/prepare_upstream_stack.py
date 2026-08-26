@@ -7,10 +7,18 @@ import shutil
 from pathlib import Path
 
 import prepare_local_stack as shared
+if __package__:
+    from . import upstream_snapshot
+else:  # Direct ``python tools/prepare_upstream_stack.py`` use.
+    import upstream_snapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]
 STACK = ROOT / "build" / "upstream-stack"
+SNAPSHOT_ROOT = STACK / "snapshot"
+SNAPSHOT_RECORDS = SNAPSHOT_ROOT / "metadata" / "records"
+SNAPSHOT_JSONL = SNAPSHOT_ROOT / "records.jsonl"
+SNAPSHOT_MANIFEST = SNAPSHOT_ROOT / "manifest.json"
 POOL_UI_SOURCE = (
     ROOT / "submodules" / "pool.psychoinformatics.de-ui" / "dist" / "ui"
 )
@@ -108,6 +116,17 @@ def main() -> int:
     shared.remove_legacy_collection_stores = lambda: []
     result = shared.main()
     if result == 0:
+        manifest = upstream_snapshot.materialize(
+            shared.SNAPSHOT,
+            SNAPSHOT_RECORDS,
+            manifest_path=SNAPSHOT_MANIFEST,
+            replace=True,
+        )
+        upstream_snapshot.export_records(SNAPSHOT_RECORDS, SNAPSHOT_JSONL)
+        print(
+            "Lossless upstream YAML snapshot: "
+            f"{manifest['record_count']} records in {SNAPSHOT_RECORDS}"
+        )
         print(f"Upstream editor UI: {shared.POOL_UI}")
     return result
 

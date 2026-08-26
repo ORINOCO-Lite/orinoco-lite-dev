@@ -147,6 +147,10 @@ The task compares semantic JSON records by PID, prints added, removed, and chang
 Differences are informational because the public pool is live.
 Run `pixi run diff-upstream-pool -- --check` when a nonzero exit on any difference is explicitly required.
 
+The [upstream snapshot workflows](docs/upstream-snapshot-workflows.md) turn one identified public-pool capture into exact canonical YAML, prove the reverse JSONL conversion, seed the full upstream stack from both representations, and compose an ordinary Orinoco Lite Git repository from the same records.
+Use `pixi run refresh-upstream-records` when a new live capture is intentional; use `pixi run snapshot-upstream-records` to reuse the digest-checked cache.
+`pixi run check-upstream-orinoco` builds and compares the Orinoco and upstream deployment strategies without changing tracked content or the real site.
+
 To advance upstream dependencies safely:
 
 1. create a review branch and initialize the required repositories;

@@ -16,8 +16,11 @@ from orinoco_lite.editor import (
     BUNDLE_FORMAT,
     VERSION,
     _atomic_apply,
+    _git_commit,
+    _render_rdf_sources,
     apply_bundle,
     apply_bundle_report,
+    bind_editor,
     record_catalog,
 )
 from orinoco_lite.errors import ConfigurationError, DriverError
@@ -190,6 +193,110 @@ class EditorBundleTests(unittest.TestCase):
             [record["pid"] for record in catalog["records"]],
             ["xyzrins:persons/first", "xyzrins:persons/second"],
         )
+
+    def test_unborn_repository_uses_zero_source_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+
+            self.assertEqual(_git_commit(root), "0" * 40)
+
+    def test_combined_editor_rdf_scopes_blank_nodes_per_record(self) -> None:
+        from rdflib import BNode, Graph
+
+        sources = [
+            {
+                "content": (
+                    f"pid: xyzrins:persons/{slug}\n"
+                    "schema_type: xyzri:XYZPerson\n"
+                ),
+                "pid": f"xyzrins:persons/{slug}",
+                "schema_type": "xyzri:XYZPerson",
+            }
+            for slug in ("first", "second")
+        ]
+
+        class BlankNodeConverter:
+            @staticmethod
+            def convert(value, class_name):
+                slug = value["pid"].rsplit("/", 1)[-1]
+                return (
+                    "@prefix ex: <https://example.invalid/> .\n"
+                    f"ex:{slug} ex:detail [ ex:label \"{slug}\" ] .\n"
+                )
+
+        first_records, first_union = _render_rdf_sources(
+            sources,
+            BlankNodeConverter(),
+        )
+        second_records, second_union = _render_rdf_sources(
+            list(reversed(sources)),
+            BlankNodeConverter(),
+        )
+
+        self.assertEqual(first_records, second_records)
+        self.assertEqual(first_union, second_union)
+        graph = Graph()
+        graph.parse(data=first_union, format="nt")
+        self.assertEqual(
+            len(
+                {
+                    term
+                    for triple in graph
+                    for term in triple
+                    if isinstance(term, BNode)
+                }
+            ),
+            2,
+        )
+
+    def test_editor_can_limit_rdf_data_to_declared_editable_records(self) -> None:
+        projection = self.root / "site/projection.yaml"
+        projection.write_text(
+            projection.read_text(encoding="utf-8").replace(
+                "homepage:\n",
+                "editor:\n  record_scope: editable\nhomepage:\n",
+            ),
+            encoding="utf-8",
+        )
+        shell = self.runtime / "editor-shell"
+        schema = self.runtime / "editor-schema"
+        shell.mkdir()
+        schema.mkdir()
+        (shell / "index.html").write_text("editor\n", encoding="utf-8")
+        for name in (
+            "dlschemas_owl.ttl",
+            "dlschemas_shacl.ttl",
+            "config_default_xyzri.yaml",
+        ):
+            (schema / name).write_text("fixture\n", encoding="utf-8")
+
+        def render(sources, converter):
+            del converter
+            pids = [source["pid"] for source in sources]
+            return (
+                {pid: f"<{pid}> <https://example.invalid/p> \"value\" .\n" for pid in pids},
+                "<https://example.invalid/s> <https://example.invalid/p> \"value\" .\n",
+            )
+
+        with patch(
+            "orinoco_lite.editor._render_rdf_sources",
+            side_effect=render,
+        ) as rendered:
+            report = bind_editor(
+                self.workspace,
+                self.runtime,
+                self.root / "bound-editor",
+            )
+
+        sources = rendered.call_args.args[0]
+        self.assertEqual(
+            [source["pid"] for source in sources],
+            ["xyzrins:persons/first", "xyzrins:persons/second"],
+        )
+        self.assertEqual(report["record_scope"], "editable")
+        self.assertEqual(report["loaded_records"], 2)
+        self.assertEqual(report["source_records"], 3)
 
     def test_bundle_dry_run_and_write(self) -> None:
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
