@@ -2,15 +2,18 @@
 
 ## Current work
 
-- The active effort is Milestone 5 source-adapter implementation.
-- Read `README.md`, `docs/source-adapters.md`, `docs/milestone-5.md`, `docs/milestone-5-decisions.md`, `docs/milestone-5-acceptance.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
-- Read Milestone 1–4 plans and acceptance records only when their derivation or preserved evidence is relevant.
+- The active effort is Milestone 6 upstream convergence and maintenance hardening.
+- Read `README.md`, `docs/milestone-6.md`, `docs/source-adapters.md`, `docs/github-curation-review.md`, `docs/github-shacl-vue-edit.md`, `docs/milestone-5-decisions.md`, `docs/milestone-5-acceptance.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
+- Read Milestone 1–5 plans and historical acceptance records only when their derivation or preserved evidence is relevant.
 Their old operating commands and branch descriptions are not the downstream interface.
 - Do not silently infer an answer to an open human decision.
 Record resolutions in `docs/human-review-decisions.md` and the corresponding source decision register in the same reviewed change.
 - Stop and request clarification when ambiguity would change metadata semantics, provenance, review behavior, repository history, authority, or durable state.
 Do not resolve ambiguity by broadening the threat model or inventing another artifact or authority.
-- Do not begin a Milestone 5 non-goal or deferred human decision unless the user expands scope.
+- Do not begin a Milestone 6 non-goal or deferred human decision unless the user expands scope.
+- Do not create a tracked upstream-head inventory or compatibility ledger.
+Compare authoritative heads only during a deliberate update, then record the accepted result in gitlinks, direct pins, locks, and the reviewed pull request.
+- Repository and GitHub App transfers wait until current pull requests merge and M6-Q002 records their exact scope.
 
 ## Repository boundaries
 
@@ -39,6 +42,8 @@ Do not apply it to unrelated branches.
 
 - Reviewed YAML under `metadata/records/` and `metadata/overlays/annotations/` is the canonical semantic metadata source; the joined Things graph is the validation and RDF boundary.
 Zotero ingestion remains repeatable, read-only source evidence and never a normal production runtime dependency.
+- Preserve well-formed unresolved Things references by default without network lookup.
+Report references and graph edges that cannot be materialized locally; stricter local closure is site policy, not the engine's definition of valid upstream-compatible metadata.
 - Keep source capture, transformation, human review, and site promotion distinct.
 Do not write to Zotero or invent identities, publication semantics, venues, topics, licensing, asset custody, or cutover policy.
 - Use the pinned source Things Schema and exact `dlthings:*` CURIE contract in `docs/explaining-schema-issues.md`.
@@ -52,7 +57,8 @@ Do not substitute the vendored resolved schema, an unreviewed LinkML trial, or a
 Do not use the real site as a worktree target.
 - Framework updates may create a branch and pull request but never approve or merge themselves or deploy pull-request code to the shared Pages environment.
 - Preserve exact immutable release coordinates, ownership classifications, site-owned before/after hashes, and rollback evidence.
-- Update the Milestone 5 acceptance record and pull-request summary when hosted state changes materially; do not leave superseded review coordinates as the current entry point.
+- Keep the Milestone 6 acceptance section and pull-request summary current without duplicating Git ancestry or transient artifact inventories.
+Do not leave a superseded proposal as the current review entry point.
 
 ## User preferences
 

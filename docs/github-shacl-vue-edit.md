@@ -19,6 +19,12 @@ It MUST bind the editor input and resulting bundle to an exact repository and Gi
 The central service origin is configurable; a downstream may use the central deployment or host the same code.
 The canonical authenticated wrapper route is `/edit/` on that origin.
 A downstream site's own `/edit/` route MAY continue serving the credential-free editor and **Download bundle** fallback; identical path names on different origins do not make that static page the GitHub wrapper.
+Signing in to GitHub does not add proposal controls to the downstream's static page: that page has no GitHub session.
+A curator who enters the central wrapper without a session is shown **Continue with GitHub** before the exact-coordinate editor loads.
+
+Milestone 6 will make the two destinations visible from the site before editing.
+It will not add cross-origin storage or an OAuth recovery store to transfer an already completed static-editor session.
+The choice of whether the site shows two explicit actions or makes the authenticated wrapper the primary edit action remains M6-Q001 in [`milestone-6.md`](milestone-6.md).
 
 ## Exact-head editor input
 

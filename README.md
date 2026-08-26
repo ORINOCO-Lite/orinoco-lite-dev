@@ -53,21 +53,21 @@ The engineering workspace may remain multi-repository; the template and every su
 
 | Layer | Repository | Owns | Start here |
 | --- | --- | --- | --- |
-| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-5.md`](docs/milestone-5.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-6.md`](docs/milestone-6.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
 | Distribution | [`con/orinoco-lite-template`](https://github.com/con/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/con/orinoco-lite-template#readme) |
-| Integration consumer | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and end-to-end tests | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
+| Acceptance fixture | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and point-in-time end-to-end release evidence | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
 
 The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
 It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.
 
 ## Review now
 
-The current human-review entry point is [`docs/human-review-decisions.md`](docs/human-review-decisions.md).
-It prioritizes every open human choice, separates those choices from mechanical implementation follow-ups, and links back to the detailed milestone evidence.
+The current engineering entry point is [`docs/milestone-6.md`](docs/milestone-6.md).
+The separate [`human-review decision queue`](docs/human-review-decisions.md) records the bounded Milestone 6 planning outcomes and unresolved production and strategic choices.
 
 Supporting records are:
 
-- [`docs/milestone-5.md`](docs/milestone-5.md), its [decision register](docs/milestone-5-decisions.md), and its [acceptance record](docs/milestone-5-acceptance.md) for the active source-adapter implementation;
+- [`docs/milestone-5.md`](docs/milestone-5.md), its [decision register](docs/milestone-5-decisions.md), and its [acceptance record](docs/milestone-5-acceptance.md) for the accepted source-adapter implementation;
 - [`docs/source-adapters.md`](docs/source-adapters.md) for the normative source-adapter contract;
 - [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) and [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for the accepted distribution baseline;
 - [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
@@ -162,10 +162,11 @@ To advance upstream dependencies safely:
 7. manually dispatch `Engineering environment` on the candidate parent ref for a hosted live `check-upstream`, then merge only the parent commit whose recorded tasks and CI establish the next known-good stack.
 
 This keeps checkout automation in the task without letting a validation command silently discard work in progress.
-The capability audit in [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md) explains what Milestones 1–3 contributed to the current Milestone 4 product and what remains engineering-only.
-The active [`Milestone 5 plan`](docs/milestone-5.md) sequences source-adapter implementation, with exact evidence separated into its [acceptance record](docs/milestone-5-acceptance.md).
+The historical [Milestone 1–4 capability map](docs/archived/milestone-1-4-capability-map.md) explains what the early milestones contributed to the accepted distribution.
+The accepted [`Milestone 5 plan`](docs/milestone-5.md) and its concise [acceptance record](docs/milestone-5-acceptance.md) describe the delivered source-adapter system.
 The [`source-adapter specification`](docs/source-adapters.md) defines reviewable metadata changes, DataLad execution evidence, PAV annotation overlays, and durable human dispositions.
-The broader [`lightweight architecture roadmap`](docs/lightweight-architecture-roadmap.md) records the upstream-reuse and parity policy, the gradual PAV convergence, the contract 2 release sequence, and the evidence required before a general projection interface is designed.
+The current [`Milestone 6 specification`](docs/milestone-6.md) owns upstream convergence, open-reference projection, dependable compatibility tests, current Zotero and SHACL operation, and organization-migration planning.
+The superseded [lightweight architecture roadmap](docs/archived/lightweight-architecture-roadmap-through-m5.md) remains available as historical reasoning.
 
 The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
 They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
@@ -181,7 +182,7 @@ See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
 - Every record under `metadata/records/` and companion under `metadata/overlays/annotations/` is canonical semantic input; their joined Thing is the validation, RDF, and projection boundary.
 Declarative site policy determines pages and editor exposure.
 Projection output is regenerated during validation and build, remains ignored, and never obscures a source-metadata review diff.
-- After a successful Pages deployment, the reusable publication workflow records the complete projection as the sole commit on `latest-hugo-projection` beyond the exact default-branch source, then records the complete deployed website as its child on `gh-pages`.
+- When a downstream uses the current reusable publication workflow, a successful Pages deployment records the complete projection as the sole commit on `latest-hugo-projection` beyond the exact default-branch source, then records the complete deployed website as its child on `gh-pages`.
 The two generated refs are force-updated atomically and are debugging evidence, not metadata authority.
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
@@ -200,7 +201,7 @@ They are preserved as evidence, not as current operating instructions:
 - [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
 - [`docs/milestone-3.md`](docs/milestone-3.md)
 - [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
-- [`docs/milestone-capability-map.md`](docs/milestone-capability-map.md)
+- [`docs/archived/milestone-1-4-capability-map.md`](docs/archived/milestone-1-4-capability-map.md)
 
 Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
-The supported distribution follows accepted Milestone 4 releases and the versioned template; active engineering work follows Milestone 5 and the normative source-adapter specification.
+The supported distribution follows immutable engine/runtime releases and the versioned template; active engineering work follows Milestone 6 and the normative source-adapter specification.
