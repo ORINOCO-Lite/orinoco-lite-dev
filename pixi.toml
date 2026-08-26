@@ -39,3 +39,15 @@ check-format = { cmd = "pre-commit run --all-files" }
 orinoco-lite = { path = "packages/orinoco-lite", editable = true }
 snapper-fmt = "==0.8.1"
 pre-commit = "==4.3.0"
+
+[feature.skills.dependencies]
+apm-cli = "==0.28.0"
+
+[feature.skills.tasks]
+apm-install = "apm install"
+apm-install-frozen = "apm install --frozen"
+apm-audit = "apm audit"
+apm-check = "apm install --frozen && apm audit --ci"
+
+[environments]
+skills = { features = ["skills"], no-default-feature = true }
