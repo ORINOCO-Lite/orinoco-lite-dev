@@ -103,4 +103,6 @@ PYTHONPATH=packages/orinoco-lite/src \
 ```
 
 The release workflow additionally proves independent package, editor, and runtime builds and verifies the installed wheel.
-Full site-content and browser parity remain consumer-owned so package tests stay content-neutral.
+Package discovery stays content-neutral; pinned schema and editor checks activate when their recorded sources are available.
+Ordinary engineering and release CI initialize those sources and reject every skipped package test.
+Engineering CI separately projects one exact consumer revision from tracked inputs, while complete site-content and browser acceptance remain consumer-owned.
