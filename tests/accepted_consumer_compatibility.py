@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import yaml
 
 from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
 from orinoco_lite.errors import DriverError
@@ -33,6 +35,86 @@ TRACKED_INPUTS = (
     "site/projection-templates",
     "site/projection-tools",
 )
+
+
+def _fixture_records(root: Path) -> dict[str, dict[str, object]]:
+    records: dict[str, dict[str, object]] = {}
+    for path in sorted((root / "metadata/records").rglob("*.yaml")):
+        relative = path.relative_to(root / "metadata/records")
+        if any(part.startswith(".") for part in relative.parts):
+            continue
+        record = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(record, dict):
+            raise AssertionError(f"fixture record is not a mapping: {relative}")
+        pid = record.get("pid")
+        if not isinstance(pid, str) or not pid:
+            raise AssertionError(f"fixture record has no PID: {relative}")
+        if pid in records:
+            raise AssertionError(f"fixture contains duplicate PID: {pid}")
+        records[pid] = record
+    return records
+
+
+def _relationship_targets(record: Mapping[str, object], field: str) -> set[str]:
+    raw_values = record.get(field, [])
+    values = raw_values if isinstance(raw_values, list) else [raw_values]
+    targets: set[str] = set()
+    for value in values:
+        target = value.get("object") if isinstance(value, dict) else value
+        candidates = target if isinstance(target, list) else [target]
+        targets.update(item for item in candidates if isinstance(item, str))
+    return targets
+
+
+def _selected_by_fixture_policy(
+    record: Mapping[str, object],
+    policy: Mapping[str, object],
+    by_pid: Mapping[str, Mapping[str, object]],
+) -> bool:
+    select = policy.get("select")
+    if select is None:
+        return True
+    if not isinstance(select, dict) or len(select) != 1:
+        raise AssertionError("fixture page selector has an unsupported shape")
+    if "linked_from" in select:
+        arguments = select["linked_from"]
+        if not isinstance(arguments, dict):
+            raise AssertionError("fixture linked_from selector is malformed")
+        source_pid = arguments.get("pid")
+        field = arguments.get("field")
+        if not isinstance(source_pid, str) or not isinstance(field, str):
+            raise AssertionError("fixture linked_from selector is malformed")
+        source = by_pid.get(source_pid)
+        if source is None:
+            raise AssertionError(f"fixture selector source is missing: {source_pid}")
+        return record["pid"] in _relationship_targets(source, field)
+    if "links_to" not in select:
+        raise AssertionError("fixture page selector uses an unsupported operator")
+    arguments = select["links_to"]
+    if not isinstance(arguments, dict):
+        raise AssertionError("fixture links_to selector is malformed")
+    target = arguments.get("pid")
+    field = arguments.get("field")
+    recursive = arguments.get("recursive", False)
+    if (
+        not isinstance(target, str)
+        or not isinstance(field, str)
+        or not isinstance(recursive, bool)
+    ):
+        raise AssertionError("fixture links_to selector is malformed")
+
+    def links(candidate: Mapping[str, object], visited: set[str]) -> bool:
+        for linked_pid in _relationship_targets(candidate, field):
+            if linked_pid == target:
+                return True
+            linked = by_pid.get(linked_pid)
+            if recursive and linked is not None and linked_pid not in visited:
+                if links(linked, {*visited, linked_pid}):
+                    return True
+        return False
+
+    pid = record["pid"]
+    return links(record, {pid})
 
 
 class AcceptedConsumerCompatibilityTests(unittest.TestCase):
@@ -158,17 +240,106 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
             self.assertEqual(sys.getrecursionlimit(), 1000)
         finally:
             sys.setrecursionlimit(previous_limit)
-        expected = {
-            "records": 202,
-            "pages": 188,
-            "graph_nodes": 189,
-            "graph_edges": 467,
-        }
-        self.assertEqual(report, expected)
-        self.assertEqual(repeated_report, expected)
+        self.assertEqual(repeated_report, report)
         self.assertEqual(
             self._active_files(candidate),
             self._active_files(repeated),
+        )
+
+        records = _fixture_records(self.root)
+        projected_records = [
+            json.loads(line)
+            for line in (candidate / "records.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+            if line
+        ]
+        projected_by_pid = {record["pid"]: record for record in projected_records}
+        self.assertEqual(len(projected_records), len(projected_by_pid))
+        self.assertEqual(set(projected_by_pid), set(records))
+        self.assertEqual(
+            {
+                pid: record["schema_type"]
+                for pid, record in projected_by_pid.items()
+            },
+            {pid: record["schema_type"] for pid, record in records.items()},
+        )
+
+        configuration = yaml.safe_load(
+            (self.root / "site/projection.yaml").read_text(encoding="utf-8")
+        )
+        homepage_pid = configuration["homepage"]["pid"]
+        page_policies = configuration["pages"]
+        expected_page_pids = {homepage_pid}
+        expected_page_pids.update(
+            pid
+            for pid, record in records.items()
+            if record["schema_type"] in page_policies
+            and _selected_by_fixture_policy(
+                record,
+                page_policies[record["schema_type"]],
+                records,
+            )
+        )
+        route_prefix = configuration["routing"]["strip_prefix"]
+        expected_pages = {
+            "content/_index.md": homepage_pid,
+            **{
+                (
+                    "content/"
+                    + pid.removeprefix(route_prefix).strip("/")
+                    + "/_index.md"
+                ): pid
+                for pid in expected_page_pids - {homepage_pid}
+            },
+        }
+        self.assertEqual(len(expected_pages), len(expected_page_pids))
+        actual_page_paths = [
+            path.relative_to(candidate).as_posix()
+            for path in (candidate / "content").rglob("*.md")
+        ]
+        self.assertEqual(len(actual_page_paths), len(set(actual_page_paths)))
+        self.assertEqual(set(actual_page_paths), set(expected_pages))
+        for relative, pid in expected_pages.items():
+            source = (candidate / relative).read_text(encoding="utf-8")
+            self.assertTrue(source.startswith("---\n"), relative)
+            frontmatter = yaml.safe_load(source.split("---", 2)[1])
+            self.assertEqual(frontmatter["params"]["graphRootNodePID"], pid)
+
+        graph_node_classes = set(configuration["graph"]["node_classes"])
+        expected_nodes = {
+            pid
+            for pid, record in records.items()
+            if record["schema_type"] in graph_node_classes
+        }
+        expected_edges = {
+            (pid, target)
+            for pid in expected_nodes
+            for field in configuration["graph"]["relationship_fields"]
+            for target in _relationship_targets(records[pid], field)
+            if target in expected_nodes
+        }
+        graph = json.loads(
+            (candidate / "static/graph.json").read_text(encoding="utf-8")
+        )
+        actual_nodes = [node["id"] for node in graph["nodes"]]
+        actual_edges = [
+            (edge["source"], edge["target"]) for edge in graph["edges"]
+        ]
+        self.assertEqual(len(actual_nodes), len(set(actual_nodes)))
+        self.assertEqual(set(actual_nodes), expected_nodes)
+        self.assertEqual(len(actual_edges), len(set(actual_edges)))
+        self.assertEqual(set(actual_edges), expected_edges)
+
+        expected_report = {
+            "records": len(records),
+            "pages": len(expected_pages),
+            "graph_nodes": len(expected_nodes),
+            "graph_edges": len(expected_edges),
+        }
+        self.assertEqual(
+            {key: report[key] for key in expected_report},
+            expected_report,
         )
         self.assertNotIn(
             "xyzri:XYZ",
