@@ -100,7 +100,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         document = tomllib.loads(metadata)
         self.assertEqual(document["requires-python"], ">=3.12,<3.13")
         pixi = document["tool"]["pixi"]
-        self.assertEqual(pixi["dependencies"]["hugo"], "==0.154.5")
+        self.assertEqual(pixi["dependencies"]["hugo"], "==0.161.1")
         self.assertEqual(
             pixi["target"]["linux-64"]["dependencies"]["git-annex"],
             "==10.20260601",

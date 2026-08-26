@@ -12,7 +12,7 @@
 #
 # [tool.pixi.dependencies]
 # python = ">=3.12,<3.13"
-# hugo = "==0.154.5"
+# hugo = "==0.161.1"
 #
 # [tool.pixi.target.linux-64.dependencies]
 # git-annex = "==10.20260601"

@@ -12,7 +12,7 @@
 #
 # [tool.pixi.dependencies]
 # python = ">=3.12,<3.13"
-# hugo = "==0.154.5"
+# hugo = "==0.161.1"
 #
 # [tool.pixi.pypi-dependencies]
 # orinoco-lite = { path = "../packages/orinoco-lite", editable = true }

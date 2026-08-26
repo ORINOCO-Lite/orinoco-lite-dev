@@ -12,7 +12,7 @@
 #
 # [tool.pixi.dependencies]
 # python = ">=3.12,<3.13"
-# hugo = "==0.154.5"
+# hugo = "==0.161.1"
 # nodejs = ">=22,<23"
 # make = "==4.4.1"
 #
