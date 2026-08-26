@@ -5,8 +5,8 @@ It discovers the site through `orinoco.yaml`, enforces the exact release coordin
 
 This package is one layer of the larger system:
 
-- the [engineering repository](https://github.com/con/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
-- the [template repository](https://github.com/con/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
+- the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
+- the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
 - each downstream repository owns its metadata, editorial content, assets, policy, and extensions; projection output is ignored and regenerated.
 
 The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.

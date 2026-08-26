@@ -1,6 +1,6 @@
 # Orinoco Lite human-review decision queue
 
-Status: Milestone 5 accepted; pre-Milestone 6 convergence is active and the exact custody-transfer scope remains open
+Status: Milestone 5 accepted; pre-Milestone 6 convergence is active and the GitHub App custody transfer remains
 
 Review snapshot: 2026-08-26
 
@@ -25,6 +25,7 @@ Release coordinates, CI results, documentation repairs, and other mechanical wor
 | HR-223 | Accept Milestone 5 on its implemented and focused evidence. Use a fresh current Zotero transition and the first live SHACL handoff as Milestone 6 operational proof instead of repairing stale proposal history. | M6-D003 | John Lee | 2026-08-26 |
 | HR-224 | Wait for active pull requests to merge before moving repositories or the GitHub App. Keep the personal demonstration downstream under `leej3`; resolve the remaining transfer scope through Pre-M6-Q001. | M6-D004 | John Lee | 2026-08-26 |
 | HR-225 | Treat deliberate upstream repinning, resulting compatibility fixes, aligned releases, and the approved custody transfer as a bounded maintenance batch before Milestone 6. Start it without a separate exhaustive milestone specification and keep exact evidence in the implementing pull requests, commits, locks, and releases. | Before Milestone 6 | John Lee | 2026-08-26 |
+| HR-226 | Transfer the core product repositories, integration fixture, GitHub App, and all actively used mirrors to `ORINOCO-Lite`. Keep the personal demonstration downstream, real CON site, unused historical mirrors, and CON-owned source repositories outside the move. Broader ecosystem visibility may be reconsidered later. | M6-D004 | John Lee | 2026-08-26 |
 
 ## Before production graduation
 

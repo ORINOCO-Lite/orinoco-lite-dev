@@ -86,6 +86,10 @@ They occur only after the current implementation and documentation pull requests
 The personal demonstration downstream remains under `leej3`.
 The real CON site and its remotes remain read-only and outside this transfer unless separately authorized.
 
+The approved scope is the three core repositories, the GitHub App, and the nine mirrors still used by the retained static, service, runtime, editor, query, enrichment, snapshot, or consumer paths: `congo`, `dump-things-pyclient`, `dump-things-service`, `pool.psychoinformatics.de-ui`, `query-things`, `shacl-vue`, `things-enrichment-tools`, `things-schemas`, and `www-from-model`.
+Unused historical mirrors, including `dump-things-service-mirror`, remain with their existing owners.
+The repository transfer completed on 2026-08-26; the GitHub App transfer remains a separately authenticated operation.
+
 ## Workstream 1: reference and projection alignment
 
 Replace the special `Identifier.creator` filtering path with the general policy in M6-D001.
@@ -172,10 +176,10 @@ Should a record show two explicit actions—**Edit or download** and **Propose t
 The recommended default is two clearly named actions.
 It preserves the credential-free editor while making the proposal path visible before editing.
 
-### Pre-M6-Q001 — What moves to the new organization?
+### Resolved Pre-M6-Q001 — What moves to the new organization?
 
 Should the new organization receive only the core product repositories, integration-test repository, and GitHub App, or also every actively used upstream mirror currently under `leej3`?
 May top-level gitlinks with no retained build, test, release, or preservation role be removed instead of transferred?
 
-The recommended scope is the core product, integration fixture, GitHub App, and actively used mirrors.
+The accepted scope is the core product, integration fixture, GitHub App, and actively used mirrors.
 Keep the personal demo, CON-owned source and real-site repositories, and unrelated historical mirrors where they are; remove unused gitlinks only in a reviewed parent-repository change.

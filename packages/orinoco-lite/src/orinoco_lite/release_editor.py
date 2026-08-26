@@ -23,7 +23,7 @@ GIT_IDENTITY = {
 }
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
 REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
-POOL_UI_COMMIT = "c353e0b631d0110d5a36a7ee3cec9cd5606720ca"
+POOL_UI_COMMIT = "668175a11e10f6f8f6eb1a9c9df25aaac58c5b83"
 SHACL_VUE_COMMIT = "2d3673e0a3bd1054f41c303bc7faa4111277c2d0"
 
 
