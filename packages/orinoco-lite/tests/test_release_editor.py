@@ -44,7 +44,7 @@ class DeterministicEditorGitTests(unittest.TestCase):
                         "git",
                         "show",
                         "-s",
-                        "--format=%aI%x00%cI%x00%an%x00%ae%x00%cn%x00%ce",
+                        "--format=%at%x00%ct%x00%an%x00%ae%x00%cn%x00%ce",
                         "HEAD",
                     ],
                     cwd=repository,
@@ -55,8 +55,8 @@ class DeterministicEditorGitTests(unittest.TestCase):
                 self.assertEqual(
                     result.stdout.strip().split("\0"),
                     [
-                        "2000-01-01T00:00:00Z",
-                        "2000-01-01T00:00:00Z",
+                        "946684800",
+                        "946684800",
                         GIT_IDENTITY["GIT_AUTHOR_NAME"],
                         GIT_IDENTITY["GIT_AUTHOR_EMAIL"],
                         GIT_IDENTITY["GIT_COMMITTER_NAME"],
