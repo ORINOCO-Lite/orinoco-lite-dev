@@ -29,6 +29,35 @@ jobs:
           persist-credentials: false
           submodules: false
 
+      - name: Check out the frozen accepted-consumer inputs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: con/test-orinoco-downstream-website
+          ref: 32c8df154fa11693efe9d20d298f553943b89096
+          path: build/accepted-consumer
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /metadata/
+            /site/projection.yaml
+            /site/projection-templates/
+            /site/projection-tools/
+
+      - name: Initialize only release-authorized compatibility components
+        shell: bash
+        run: |
+          git submodule sync -- \
+            submodules/pool.psychoinformatics.de-ui \
+            submodules/things-schemas
+          git submodule update --init --depth 1 -- \
+            submodules/pool.psychoinformatics.de-ui \
+            submodules/things-schemas
+          git -C submodules/pool.psychoinformatics.de-ui submodule sync -- \
+            shacl-vue
+          git -C submodules/pool.psychoinformatics.de-ui submodule update \
+            --init --depth 1 -- shacl-vue
+
       - name: Install the locked engine environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
@@ -41,9 +70,13 @@ jobs:
           pixi lock --check
           pixi lock --script tools/upstream_static.py --check
           pixi lock --script tools/upstream_full.py --check
+          pixi lock --script tools/upstream_orinoco.py --check
+          pixi lock --script tools/check_upstream_orinoco.py --check
 
-      - name: Run submodule-independent tests
-        run: pixi run test
+      - name: Run strict engine and frozen-consumer compatibility tests
+        env:
+          ORINOCO_TEST_ACCEPTED_CONSUMER: ${{ github.workspace }}/build/accepted-consumer
+        run: pixi run test-ci
 
       - name: Build the pinned upstream static site from a non-recursive clone
         run: pixi run build-upstream-static

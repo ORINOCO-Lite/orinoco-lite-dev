@@ -101,6 +101,10 @@ pixi install --locked
 pixi run test
 ```
 
+That bootstrap suite reports source-compatibility checks as skipped when their recorded component fixtures are absent.
+Ordinary engineering CI initializes only the schema and editor components used by a release, checks out one exact accepted-consumer fixture, runs `pixi run test-ci`, and fails if any test skips.
+The frozen consumer check generates its projection from tracked metadata and projection inputs; it never depends on a sibling checkout or ignored output.
+
 Submodules remain the source-level dependency and compatibility-fixture pins for engineering integration.
 `checkout-submodules` is the explicit full recursive setup command: it synchronizes URLs, initializes every gitlink recorded by the current parent commit, restores exact detached commits, unshallows development history, and verifies the result.
 Use it when broad cross-component work needs the complete source graph:

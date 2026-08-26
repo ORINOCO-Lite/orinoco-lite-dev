@@ -13,9 +13,13 @@ MANIFEST = ROOT / "pixi.toml"
 SCRIPT = ROOT / "tools" / "upstream_static.py"
 SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
+ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "upstream_orinoco.py.pixi.lock"
+CHECK_ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "check_upstream_orinoco.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
+RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
+ACCEPTED_CONSUMER_COMMIT = "32c8df154fa11693efe9d20d298f553943b89096"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
@@ -65,6 +69,25 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(lock["version"], 7)
         self.assertEqual(set(lock["environments"]), {"default"})
         self.assertTrue(FULL_SCRIPT_LOCK.is_file())
+        self.assertTrue(ORINOCO_SCRIPT_LOCK.is_file())
+        self.assertTrue(CHECK_ORINOCO_SCRIPT_LOCK.is_file())
+
+    def test_ci_tasks_require_every_compatibility_fixture(self) -> None:
+        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
+        self.assertEqual(
+            tasks["test-engine-strict"],
+            "python tools/run_unittests.py --fail-on-skip --discover "
+            "packages/orinoco-lite/tests",
+        )
+        self.assertEqual(
+            tasks["test-accepted-consumer"],
+            "python tools/run_unittests.py --fail-on-skip "
+            "tests.accepted_consumer_compatibility",
+        )
+        self.assertEqual(
+            set(tasks["test-ci"]["depends-on"]),
+            {"test-engine-strict", "test-accepted-consumer", "test-development"},
+        )
 
     def test_script_metadata_is_exact_and_platform_complete(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -109,10 +132,46 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
     def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("submodules: false", workflow)
+        self.assertNotIn("submodules: recursive", workflow)
         self.assertIn("pixi-version: v0.76.2", workflow)
+        self.assertIn("repository: con/test-orinoco-downstream-website", workflow)
+        self.assertIn(f"ref: {ACCEPTED_CONSUMER_COMMIT}", workflow)
+        self.assertIn("path: build/accepted-consumer", workflow)
+        self.assertIn("sparse-checkout-cone-mode: false", workflow)
+        for relative in (
+            "/metadata/",
+            "/site/projection.yaml",
+            "/site/projection-templates/",
+            "/site/projection-tools/",
+        ):
+            self.assertIn(relative, workflow)
+        self.assertIn(
+            "ORINOCO_TEST_ACCEPTED_CONSUMER: "
+            "${{ github.workspace }}/build/accepted-consumer",
+            workflow,
+        )
+        self.assertIn(
+            "submodules/pool.psychoinformatics.de-ui",
+            workflow,
+        )
+        self.assertIn("submodules/things-schemas", workflow)
+        self.assertIn("--init --depth 1 -- shacl-vue", workflow)
+        for script in (
+            "tools/upstream_static.py",
+            "tools/upstream_full.py",
+            "tools/upstream_orinoco.py",
+            "tools/check_upstream_orinoco.py",
+        ):
+            self.assertIn(f"pixi lock --script {script} --check", workflow)
+        fixture = workflow.index("Check out the frozen accepted-consumer inputs")
+        components = workflow.index(
+            "Initialize only release-authorized compatibility components"
+        )
         install = workflow.index("frozen: true")
-        tests = workflow.index("run: pixi run test")
+        tests = workflow.index("run: pixi run test-ci")
         build = workflow.index("run: pixi run build-upstream-static")
+        self.assertLess(fixture, tests)
+        self.assertLess(components, tests)
         self.assertLess(install, tests)
         self.assertLess(tests, build)
         self.assertIn("workflow_dispatch:", workflow)
@@ -120,6 +179,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("run: pixi run test-upstream-full", workflow)
         self.assertIn("run: pixi run check-upstream", workflow)
         self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+
+        release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("tools/run_unittests.py", release)
+        self.assertIn("--fail-on-skip --discover packages/orinoco-lite/tests", release)
+        self.assertNotIn("may report an intentional skip", release)
 
     def test_pages_workflow_records_only_successful_default_branch_deployments(
         self,

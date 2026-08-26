@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 import unittest
@@ -31,167 +30,11 @@ from orinoco_lite.projection import (
     validate_semantics,
     verify_projection,
 )
-from orinoco_lite.release_schema import localize_schema
 from orinoco_lite.schema_conversion import build_format_converters
 
 
-CON_ROOT = Path(__file__).resolve().parents[4]
 ENGINE_ROOT = Path(__file__).resolve().parents[3]
-ACCEPTED_CONSUMER = CON_ROOT / "test-orinoco-downstream-website"
 SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
-
-
-@unittest.skipUnless(
-    (ACCEPTED_CONSUMER / "site/projection.yaml").is_file()
-    and (ACCEPTED_CONSUMER / "generated/projection").is_dir()
-    and (SCHEMA_SOURCE / "demo-research-information/unreleased.yaml").is_file(),
-    "full-fidelity sibling fixture is not available",
-)
-class FullProjectionAcceptanceTests(unittest.TestCase):
-    """Exercise the accepted full consumer without an engineering-tree runtime."""
-
-    def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name) / "consumer"
-        self.runtime_010 = Path(self.temporary.name) / "runtime-0.1.0"
-        self.runtime_011 = Path(self.temporary.name) / "runtime-0.1.1"
-        self.root.mkdir()
-        for relative in (
-            "metadata",
-            "site/projection.yaml",
-            "site/projection-templates",
-            "site/projection-tools",
-            "generated/projection",
-        ):
-            source = ACCEPTED_CONSUMER / relative
-            destination = self.root / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if source.is_dir():
-                shutil.copytree(source, destination)
-            else:
-                shutil.copyfile(source, destination)
-        localize_schema(
-            SCHEMA_SOURCE,
-            SCHEMA_SOURCE / "demo-research-information/unreleased.yaml",
-            self.runtime_010 / "schema",
-        )
-        shutil.copytree(self.runtime_010 / "schema", self.runtime_011 / "schema")
-        for runtime, release in ((self.runtime_010, "0.1.0"), (self.runtime_011, "0.1.1")):
-            (runtime / "runtime-manifest.json").write_text(
-                json.dumps({"release": release}) + "\n", encoding="utf-8"
-            )
-        self.workspace = WorkspaceConfig(
-            root=self.root,
-            config_path=self.root / "orinoco.yaml",
-            lock_path=self.root / "orinoco.lock",
-            site_name="Full fixture",
-            base_url="https://example.invalid/",
-            paths=DEFAULT_PATHS,
-            command_aliases={},
-            raw={},
-        )
-
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
-
-    @staticmethod
-    def _active_files(root: Path) -> dict[str, bytes]:
-        return {
-            path.relative_to(root).as_posix(): path.read_bytes()
-            for path in root.rglob("*")
-            if path.is_file()
-            and path.name not in {".gitattributes", "SHA256SUMS"}
-            and not _is_historical_provenance(root, path)
-        }
-
-    def test_full_parity_stale_recovery_atomicity_and_patch_compatibility(self) -> None:
-        candidate = Path(self.temporary.name) / "candidate"
-        previous_limit = sys.getrecursionlimit()
-        try:
-            sys.setrecursionlimit(1000)
-            with self.assertNoLogs("dump_things_service", level="WARNING"):
-                report = render_projection(self.workspace, self.runtime_010, candidate)
-            self.assertEqual(sys.getrecursionlimit(), 1000)
-        finally:
-            sys.setrecursionlimit(previous_limit)
-        self.assertEqual(
-            report,
-            {
-                "records": 199,
-                "pages": 185,
-                "graph_nodes": 186,
-                "graph_edges": 467,
-            },
-        )
-        self.assertEqual(
-            self._active_files(ACCEPTED_CONSUMER / "generated/projection"),
-            self._active_files(candidate),
-        )
-        self.assertNotIn(
-            "xyzri:XYZ",
-            (Path(__file__).parents[1] / "src/orinoco_lite/projection.py").read_text(),
-        )
-
-        committed = self.root / "generated/projection"
-        provenance = committed / "provenance"
-        preserved = Path(self.temporary.name) / "preserved-provenance"
-        if provenance.is_dir():
-            shutil.copytree(provenance, preserved)
-        shutil.rmtree(committed)
-        shutil.copytree(candidate, committed)
-        if preserved.is_dir():
-            shutil.copytree(preserved, committed / "provenance")
-
-        semantic = {key: report[key] for key in report if key != "pages"}
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            verified = verify_projection(self.workspace, self.runtime_010)
-        self.assertTrue(verified["deterministic"])
-        self.assertEqual(
-            projection_manifest(self.workspace, self.runtime_010, committed),
-            projection_manifest(self.workspace, self.runtime_011, committed),
-        )
-
-        record = next(
-            path
-            for path in (self.root / "metadata/records").rglob("*.yaml")
-            if not path.name.startswith(".")
-        )
-        record.write_text(record.read_text() + "# stale edit\n", encoding="utf-8")
-        with self.assertRaisesRegex(DriverError, "stale"):
-            verify_projection(self.workspace, self.runtime_010)
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            update_projection(self.workspace, self.runtime_010)
-            verify_projection(self.workspace, self.runtime_011)
-
-        before = tree_sha256(committed)
-        real_replace = os.replace
-        replacements = 0
-
-        def fail_install(source, destination):
-            nonlocal replacements
-            replacements += 1
-            if replacements == 2:
-                raise OSError("injected projection install failure")
-            return real_replace(source, destination)
-
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            with patch("orinoco_lite.projection.os.replace", side_effect=fail_install):
-                with self.assertRaisesRegex(OSError, "injected"):
-                    update_projection(self.workspace, self.runtime_010)
-        self.assertEqual(tree_sha256(committed), before)
-
-        producer = self.root / "site/projection-tools/pool2graph.py"
-        producer.write_text(
-            producer.read_text() + "\nprint('missing node', file=sys.stderr)\n",
-            encoding="utf-8",
-        )
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            with self.assertRaisesRegex(DriverError, "missing node"):
-                render_projection(
-                    self.workspace,
-                    self.runtime_010,
-                    Path(self.temporary.name) / "bad-graph",
-                )
 
 
 class SemanticReferencePolicyTests(unittest.TestCase):
