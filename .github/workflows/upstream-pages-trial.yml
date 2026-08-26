@@ -46,12 +46,12 @@ jobs:
         run: |
           git -C submodules/www-from-model fetch --depth 1 \
             origin \
-            +010ca44f751d2ab60b9d4ad58c5931d1804e3c9e:refs/remotes/origin/git-annex
+            +d18f512d1cd722a8300b656c330020739da05be6:refs/remotes/origin/git-annex
           git -C submodules/www-from-model remote add upstream \
             https://hub.psychoinformatics.de/www/www-from-model.git
           git -C submodules/www-from-model fetch --depth 1 \
             upstream \
-            +010ca44f751d2ab60b9d4ad58c5931d1804e3c9e:refs/remotes/upstream/git-annex
+            +d18f512d1cd722a8300b656c330020739da05be6:refs/remotes/upstream/git-annex
           git -C submodules/www-from-model config --add annex.private true
           git -C submodules/www-from-model annex init
           git -C submodules/www-from-model annex get .

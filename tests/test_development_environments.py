@@ -16,6 +16,9 @@ FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "upstream_orinoco.py.pixi.lock"
 CHECK_ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "check_upstream_orinoco.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
+UPSTREAM_PAGES_WORKFLOW = (
+    ROOT / ".github" / "workflows" / "upstream-pages-trial.yml"
+)
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
@@ -128,6 +131,15 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn('mode == "recorded"', checkout)
         self.assertIn("restore_local_state", builder)
         self.assertIn("--no-write-fetch-head", builder)
+
+    def test_static_builds_share_one_annex_metadata_pin(self) -> None:
+        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(r"^annex_commit=([0-9a-f]{40})$", builder, re.M)
+        self.assertIsNotNone(match)
+        workflow = UPSTREAM_PAGES_WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(workflow.count(match.group(1)), 2)
 
     def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
