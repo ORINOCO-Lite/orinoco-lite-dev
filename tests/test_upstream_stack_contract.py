@@ -93,6 +93,22 @@ class UpstreamStackContractTests(unittest.TestCase):
             tasks["diff-upstream-pool"],
             "python tools/upstream_pool_diff.py",
         )
+        self.assertEqual(
+            tasks["snapshot-upstream-records"],
+            "python tools/prepare_upstream_snapshot.py",
+        )
+        self.assertEqual(
+            tasks["refresh-upstream-records"],
+            "python tools/prepare_upstream_snapshot.py --refresh",
+        )
+        self.assertEqual(
+            tasks["instantiate-upstream-orinoco"]["depends-on"],
+            ["prepare-upstream-orinoco-presentation"],
+        )
+        self.assertEqual(
+            tasks["check-upstream-orinoco"]["depends-on"],
+            ["instantiate-upstream-orinoco"],
+        )
         source = (ROOT / "tools" / "upstream_full.py").read_text()
         self.assertIn("[tool.pixi.pypi-dependencies]", source)
         self.assertIn(
@@ -118,7 +134,32 @@ class UpstreamStackContractTests(unittest.TestCase):
             self.assertNotIn("con-public", source)
             self.assertNotIn("con-protected", source)
         self.assertIn('(\"public\", \"protected\")', preparation)
-        self.assertIn('(\"public\", \"protected\")', seed)
+        self.assertIn('(\"public\",)', seed)
+        self.assertIn('(\"protected\",)', seed)
+        self.assertIn("YAML_JSONL", seed)
+        self.assertIn("upstream_snapshot.verify", seed)
+
+    def test_snapshot_is_materialized_once_for_both_runtime_paths(self) -> None:
+        preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()
+        full_stack = (ROOT / "tools" / "prepare_upstream_stack.py").read_text()
+        fixture = (ROOT / "tools" / "upstream_orinoco.py").read_text()
+        for source in (preparation, full_stack):
+            self.assertIn("upstream_snapshot.materialize", source)
+            self.assertIn("upstream_snapshot.export_records", source)
+        self.assertIn("ORINOCO_RECORDS", fixture)
+        self.assertIn("copy_regular_tree(ORINOCO_RECORDS", fixture)
+        self.assertIn('git\", \"init\", \"--initial-branch\", \"main\"', fixture)
+
+    def test_direct_scripts_do_not_depend_on_the_tools_namespace(self) -> None:
+        for relative in (
+            "prepare_upstream_snapshot.py",
+            "prepare_upstream_stack.py",
+            "seed_local_pool.py",
+            "upstream_orinoco_records.py",
+        ):
+            source = (ROOT / "tools" / relative).read_text()
+            self.assertIn("if __package__:", source)
+            self.assertNotIn("from tools import upstream_snapshot", source)
 
     def test_live_check_retains_upstream_ui_and_schema_contracts(self) -> None:
         check = (ROOT / "tools" / "check_upstream_stack.py").read_text()

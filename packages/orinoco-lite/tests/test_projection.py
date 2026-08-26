@@ -20,7 +20,11 @@ from orinoco_lite.projection import (
     EXTERNALLY_RESOLVABLE_LINK_FIELDS,
     _all_links,
     _apply_inline,
+    _is_historical_provenance,
     _machine_pav_fingerprint,
+    _native_fingerprint,
+    _relationship_targets,
+    load_contract,
     projection_manifest,
     render_projection,
     update_projection,
@@ -97,7 +101,7 @@ class FullProjectionAcceptanceTests(unittest.TestCase):
             for path in root.rglob("*")
             if path.is_file()
             and path.name not in {".gitattributes", "SHA256SUMS"}
-            and "provenance" not in path.parts
+            and not _is_historical_provenance(root, path)
         }
 
     def test_full_parity_stale_recovery_atomicity_and_patch_compatibility(self) -> None:
@@ -205,6 +209,8 @@ class SemanticReferencePolicyTests(unittest.TestCase):
             unrendered_classes=frozenset(),
             relationship_fields=("about",),
             graph_node_classes=frozenset({"acme:Thing"}),
+            missing_reference_targets="reject",
+            missing_graph_targets="reject",
         )
         schema_view = Mock()
         schema_view.all_classes.return_value = ["Thing", "Identifier"]
@@ -494,6 +500,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
+        self.assertEqual(load_contract(self.workspace).editor_record_scope, "all")
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
         ) as semantic:
@@ -575,6 +582,110 @@ class GenericProjectionContractTests(unittest.TestCase):
             manifest,
         )
 
+    def test_open_reference_policy_preserves_links_and_drops_graph_edges(self) -> None:
+        projection = self.root / "site/projection.yaml"
+        projection.write_text(
+            projection.read_text(encoding="utf-8")
+            .replace(
+                "homepage:\n",
+                "references:\n  missing_targets: preserve\n"
+                "editor:\n  record_scope: editable\nhomepage:\n",
+            )
+            .replace(
+                "relationship_fields: []",
+                "relationship_fields: [about]",
+            )
+            .replace(
+                "missing_external_targets: reject",
+                "missing_external_targets: drop",
+            ),
+            encoding="utf-8",
+        )
+        records = [
+            {
+                "pid": "acme:.",
+                "schema_type": "acme:Person",
+                "display_label": "Home",
+                "about": [{"roles": ["ext:role"]}],
+            },
+            {
+                "pid": "acme:people/one",
+                "schema_type": "acme:Person",
+                "display_label": "One",
+                "about": ["ext:topic"],
+                "identifiers": [{"creator": "https://registry.example/"}],
+            },
+        ]
+
+        class IdentityConverter:
+            @staticmethod
+            def convert(value, class_name):
+                return deepcopy(value)
+
+        schema_view = Mock()
+        schema_view.all_classes.return_value = ["Person"]
+        schema_view.get_uri.return_value = "acme:Person"
+        with (
+            patch(
+                "orinoco_lite.projection._records",
+                return_value=(records, {item["pid"] for item in records}),
+            ),
+            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
+            patch(
+                "orinoco_lite.projection.build_format_converters",
+                return_value=(IdentityConverter(), IdentityConverter()),
+            ),
+        ):
+            report = validate_semantics(self.workspace, self.runtime)
+
+        self.assertEqual(
+            report,
+            {
+                "records": 2,
+                "graph_nodes": 2,
+                "graph_edges": 0,
+                "preserved_reference_targets": 3,
+                "preserved_reference_unique_targets": 3,
+                "preserved_references_by_field": {
+                    "about": 1,
+                    "about.roles": 1,
+                    "identifiers.creator": 1,
+                },
+                "dropped_graph_edges": 1,
+                "dropped_graph_edges_by_field": {"about": 1},
+                "targetless_relationship_contexts": 1,
+                "targetless_relationship_contexts_by_field": {"about": 1},
+            },
+        )
+        self.assertEqual(
+            load_contract(self.workspace).editor_record_scope,
+            "editable",
+        )
+        self.assertEqual(
+            list(_relationship_targets(records[0], "about")),
+            [],
+        )
+
+        graph = self.root / "site/projection-tools/graph.py"
+        graph.write_text(
+            graph.read_text(encoding="utf-8")
+            + "print('Dropped non-materialized graph targets', file=sys.stderr)\n",
+            encoding="utf-8",
+        )
+        output = Path(self.temporary.name) / "open-projection"
+        with patch(
+            "orinoco_lite.projection.validate_semantics",
+            return_value=report,
+        ):
+            rendered = render_projection(self.workspace, self.runtime, output)
+        self.assertEqual(rendered["dropped_graph_edges"], 1)
+        self.assertEqual(
+            json.loads((output / "static/graph.json").read_text(encoding="utf-8"))[
+                "edges"
+            ],
+            [],
+        )
+
     def test_machine_pav_fingerprint_binds_provenance_to_assertion(self) -> None:
         annotation = {
             "pav:importedBy": {
@@ -605,6 +716,30 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.assertNotEqual(
             _machine_pav_fingerprint(original),
             _machine_pav_fingerprint(changed_source),
+        )
+
+    def test_native_fingerprint_treats_rdf_multivalues_as_unordered(self) -> None:
+        first = {
+            "schema_type": "dlthings:Rule",
+            "attributes": [
+                {
+                    "schema_type": "dlthings:AttributeSpecification",
+                    "predicate": "acme:first",
+                    "value": "one",
+                },
+                {
+                    "schema_type": "dlthings:AttributeSpecification",
+                    "predicate": "acme:second",
+                    "value": "two",
+                },
+            ],
+        }
+        second = deepcopy(first)
+        second["attributes"].reverse()
+
+        self.assertEqual(
+            _native_fingerprint(first),
+            _native_fingerprint(second),
         )
 
     def test_update_preserves_projection_control_sidecar_and_active_ledger(self) -> None:
@@ -644,6 +779,14 @@ class GenericProjectionContractTests(unittest.TestCase):
                 r"deterministic regeneration: \.undeclared-sidecar",
             ):
                 verify_projection(self.workspace, self.runtime)
+
+    def test_provenance_named_content_remains_in_projection_scope(self) -> None:
+        output = self.root / "generated/projection"
+        historical = output / "provenance/source.json"
+        page = output / "content/topics/provenance/_index.md"
+
+        self.assertTrue(_is_historical_provenance(output, historical))
+        self.assertFalse(_is_historical_provenance(output, page))
 
     def test_double_failure_preserves_recovery_backup(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
