@@ -99,6 +99,7 @@ Repository-owned commits were rebased onto authoritative upstream heads, and the
 The accepted parent gitlinks are query-things `2383c51a81d1f0f623231c1e52fc8ea0fa747fb1`, things-enrichment-tools `9f036a4cdfb53f87346152f9cd4620aaef38bce2`, pool UI `c353e0b631d0110d5a36a7ee3cec9cd5606720ca`, and www-from-model `aa297506916373755e05ffd33ccf78624dccd2dd`.
 The nested accepted heads are SHACL Vue `2d3673e0a3bd1054f41c303bc7faa4111277c2d0` and Congo `574506bb48a48740219183177fa77edfd699f035`.
 Dump Things client `1e79391195ad4412286344189dc5f81a06accb90`, Dump Things service `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`, and Things Schema `cb6c791aec4c5309775437df4bd58e94e1bfcc3c` were already at their authoritative current heads and remain unchanged.
+The website's Annex metadata is pinned independently at `d18f512d1cd722a8300b656c330020739da05be6`, which makes the regenerated graph object available to a fresh clone.
 
 Current Congo requires Hugo 0.158 or newer, so the exact engineering, trial, and release-source runtime moved together to Hugo Extended 0.161.1.
 The static build produced 3,501 pages with no URL-audit violations, and the full service-backed acceptance round-tripped 5,014 records exactly through both isolated collections before proving the Dump Things, Git Annex, SHACL Vue, and site endpoints healthy.
