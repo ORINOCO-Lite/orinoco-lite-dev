@@ -45,7 +45,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026c-h151e31d_0.conda
       - pypi: ../packages/orinoco-lite
-      - pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
+      - pypi: git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
       - pypi: https://files.pythonhosted.org/packages/00/cc/7fbd75d3362e939eb98bcf9bd22f3f7df8c237a85148899ed3d38e5614e5/json_flattener-0.1.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/01/f9/575c8d760eae1fc99651b7cc5efd96ad5379ca4d6b53750b0fb4fe983f34/imagesize-2.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl
@@ -193,7 +193,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/readline-8.3-h8b90a29_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tk-8.6.13-hbeba79b_4.conda
       - pypi: ../packages/orinoco-lite
-      - pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
+      - pypi: git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
       - pypi: https://files.pythonhosted.org/packages/00/cc/7fbd75d3362e939eb98bcf9bd22f3f7df8c237a85148899ed3d38e5614e5/json_flattener-0.1.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/01/f9/575c8d760eae1fc99651b7cc5efd96ad5379ca4d6b53750b0fb4fe983f34/imagesize-2.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl
@@ -883,9 +883,9 @@ packages:
   - pydantic==2.13.4
   - pyyaml==6.0.2
   - rdflib==7.6.0
-  - things-enrichment-tools @ git+https://github.com/leej3/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2
+  - things-enrichment-tools @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2
   requires_python: '>=3.12'
-- pypi: git+https://github.com/leej3/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
+- pypi: git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git?rev=9f036a4cdfb53f87346152f9cd4620aaef38bce2#9f036a4cdfb53f87346152f9cd4620aaef38bce2
   name: things-enrichment-tools
   version: 0.1.dev72+g9f036a4cd
   requires_python: '>=3.12'

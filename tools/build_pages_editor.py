@@ -68,7 +68,7 @@ TEXT_CONFIG = {
     "review_bundle_catalog": "record-sources.json",
     "review_bundle_mode": "patch-download",
     "shapes_url": "dlschemas_shacl.ttl",
-    "source_code_url": "https://github.com/con/orinoco-lite-dev",
+    "source_code_url": "https://github.com/ORINOCO-Lite/orinoco-lite-dev",
     "use_default_classes": False,
     "use_default_data": False,
     "use_default_shapes": False,

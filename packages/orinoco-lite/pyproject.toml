@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orinoco-lite"
-version = "0.2.0rc5"
+version = "0.2.0rc6"
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
 license = "MIT"
@@ -20,7 +20,7 @@ dependencies = [
   "pydantic==2.13.4",
   "PyYAML==6.0.2",
   "rdflib==7.6.0",
-  "things-enrichment-tools @ git+https://github.com/leej3/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
+  "things-enrichment-tools @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

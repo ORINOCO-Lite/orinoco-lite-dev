@@ -53,9 +53,9 @@ The engineering workspace may remain multi-repository; the template and every su
 
 | Layer | Repository | Owns | Start here |
 | --- | --- | --- | --- |
-| Engineering and release | this repository, [`con/orinoco-lite-dev`](https://github.com/con/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-6.md`](docs/milestone-6.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
-| Distribution | [`con/orinoco-lite-template`](https://github.com/con/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/con/orinoco-lite-template#readme) |
-| Acceptance fixture | [`con/test-orinoco-downstream-website`](https://github.com/con/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and point-in-time end-to-end release evidence | [Consumer README](https://github.com/con/test-orinoco-downstream-website#readme) |
+| Engineering and release | this repository, [`ORINOCO-Lite/orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-6.md`](docs/milestone-6.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Distribution | [`ORINOCO-Lite/orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/ORINOCO-Lite/orinoco-lite-template#readme) |
+| Acceptance fixture | [`ORINOCO-Lite/test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and point-in-time end-to-end release evidence | [Consumer README](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website#readme) |
 
 The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
 It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.

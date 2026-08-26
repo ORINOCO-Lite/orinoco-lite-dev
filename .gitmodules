@@ -20,11 +20,11 @@
 	branch = agent/git-native-con-metadata
 [submodule "submodules/dump-things-pyclient"]
 	path = submodules/dump-things-pyclient
-	url = https://github.com/leej3/dump-things-pyclient.git
+	url = https://github.com/ORINOCO-Lite/dump-things-pyclient.git
 	branch = master
 [submodule "submodules/dump-things-service"]
 	path = submodules/dump-things-service
-	url = https://github.com/leej3/dump-things-service.git
+	url = https://github.com/ORINOCO-Lite/dump-things-service.git
 	branch = master
 [submodule "submodules/dump-things-service-mirror"]
 	path = submodules/dump-things-service-mirror
@@ -56,7 +56,7 @@
 	branch = main
 [submodule "submodules/query-things"]
 	path = submodules/query-things
-	url = https://github.com/leej3/query-things.git
+	url = https://github.com/ORINOCO-Lite/query-things.git
 	branch = main
 [submodule "submodules/research-information-ui-assets"]
 	path = submodules/research-information-ui-assets
@@ -72,7 +72,7 @@
 	branch = main
 [submodule "submodules/things-enrichment-tools"]
 	path = submodules/things-enrichment-tools
-	url = https://github.com/leej3/things-enrichment-tools.git
+	url = https://github.com/ORINOCO-Lite/things-enrichment-tools.git
 	branch = main
 [submodule "submodules/things-graph-renderer"]
 	path = submodules/things-graph-renderer
@@ -80,7 +80,7 @@
 	branch = main
 [submodule "submodules/things-schemas"]
 	path = submodules/things-schemas
-	url = https://github.com/leej3/things-schemas.git
+	url = https://github.com/ORINOCO-Lite/things-schemas.git
 	branch = main
 [submodule "submodules/tools"]
 	path = submodules/tools
@@ -88,9 +88,9 @@
 	branch = main
 [submodule "submodules/www-from-model"]
 	path = submodules/www-from-model
-	url = https://github.com/leej3/www-from-model.git
+	url = https://github.com/ORINOCO-Lite/www-from-model.git
 	branch = main
 [submodule "submodules/pool.psychoinformatics.de-ui"]
 	path = submodules/pool.psychoinformatics.de-ui
-	url = https://github.com/leej3/pool.psychoinformatics.de-ui.git
+	url = https://github.com/ORINOCO-Lite/pool.psychoinformatics.de-ui.git
 	branch = codex/local-deployment
