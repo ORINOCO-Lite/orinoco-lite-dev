@@ -137,6 +137,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("git push --atomic --force origin", workflow)
         self.assertIn("refs/heads/latest-hugo-projection", workflow)
         self.assertIn("refs/heads/gh-pages", workflow)
+        self.assertIn("orinoco-pages-publication-${{ github.run_id }}", workflow)
+        self.assertIn("overwrite: true", workflow)
         deploy = workflow.index("name: Deploy the built site")
         record = workflow.index("name: Record the successful deployment")
         push = workflow.index("git push --atomic --force origin")
