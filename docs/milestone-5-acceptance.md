@@ -89,3 +89,16 @@ Being signed in does not add a GitHub button to the static page.
 The pre-Milestone 6 boundary in [`milestone-6.md`](milestone-6.md) owns upstream repinning, resulting compatibility fixes, the aligned release, and the separately authorized organization migration.
 Milestone 6 begins afterward with general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, and SHACL proposal discoverability and live use.
 The corpus-normalization proposal remains site-owned content review and is not an engineering milestone or downstream-adoption gate here.
+
+### First convergence batch
+
+[Engineering pull request 44](https://github.com/con/orinoco-lite-dev/pull/44) records the first deliberate pre-Milestone 6 upstream update.
+The accepted component reviews are [query-things pull request 1](https://github.com/leej3/query-things/pull/1), [things-enrichment-tools pull request 1](https://github.com/leej3/things-enrichment-tools/pull/1), [SHACL Vue pull request 1](https://github.com/leej3/shacl-vue/pull/1), [pool UI pull request 1](https://github.com/leej3/pool.psychoinformatics.de-ui/pull/1), [www-from-model pull request 1](https://github.com/leej3/www-from-model/pull/1), and [Congo pull request 11](https://github.com/leej3/congo/pull/11).
+
+Repository-owned commits were rebased onto authoritative upstream heads, and the mirror default branches were advanced directly to the resulting linear histories.
+The accepted parent gitlinks are query-things `2383c51a81d1f0f623231c1e52fc8ea0fa747fb1`, things-enrichment-tools `9f036a4cdfb53f87346152f9cd4620aaef38bce2`, pool UI `c353e0b631d0110d5a36a7ee3cec9cd5606720ca`, and www-from-model `aa297506916373755e05ffd33ccf78624dccd2dd`.
+The nested accepted heads are SHACL Vue `2d3673e0a3bd1054f41c303bc7faa4111277c2d0` and Congo `574506bb48a48740219183177fa77edfd699f035`.
+Dump Things client `1e79391195ad4412286344189dc5f81a06accb90`, Dump Things service `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`, and Things Schema `cb6c791aec4c5309775437df4bd58e94e1bfcc3c` were already at their authoritative current heads and remain unchanged.
+
+Current Congo requires Hugo 0.158 or newer, so the exact engineering, trial, and release-source runtime moved together to Hugo Extended 0.161.1.
+The static build produced 3,501 pages with no URL-audit violations, and the full service-backed acceptance round-tripped 5,014 records exactly through both isolated collections before proving the Dump Things, Git Annex, SHACL Vue, and site endpoints healthy.
