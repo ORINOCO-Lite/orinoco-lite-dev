@@ -1,6 +1,6 @@
-# Milestone 6: upstream convergence and maintenance hardening
+# Milestone 6: metadata-path hardening
 
-Status: planned; two bounded human choices remain open
+Status: planned; begins after the bounded convergence and custody-transition work below
 
 Predecessor: [`milestone-5.md`](milestone-5.md)
 
@@ -8,20 +8,35 @@ Normative source-adapter contract: [`source-adapters.md`](source-adapters.md)
 
 Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
 
+## Before Milestone 6
+
+Upstream repinning, the compatibility fixes caused by that repinning, aligned Orinoco Lite releases, and the approved repository-custody move are ordinary maintenance prerequisites rather than a separate milestone.
+They may proceed now without an exhaustive milestone specification.
+
+The implementing pull requests must:
+
+1. compare every component used by the retained static, service, runtime, editor, query, enrichment, snapshot, or consumer paths with its authoritative upstream head;
+2. merge the focused compatibility corrections needed to make those current components pass together;
+3. record accepted commits through the existing gitlinks, direct pins, locks, releases, and pull-request summaries;
+4. pass the combined recorded static, service, snapshot, release, and consumer checks; and
+5. transfer only the repositories and GitHub App in an exact scope approved by John after active pull requests have merged.
+
+This work does not add a tracked upstream inventory or a second acceptance authority.
+Exact coordinates and evidence belong in the implementing pull requests, commits, locks, and releases.
+The real CON site, its remotes, its deployment, and its production domain remain read-only and outside the transfer.
+
 ## Outcome
 
-Milestone 6 brings the engineering stack to a newly reviewed set of current upstream commits, removes avoidable local divergence, makes compatibility tests explicit and dependable, and proves that the two human-facing metadata paths work from current state.
+Milestone 6 begins from the reviewed current stack produced by the prerequisite work above.
+It aligns open-reference behavior, makes compatibility tests explicit and dependable, and proves that the two human-facing metadata paths work from current state.
 
 The milestone will:
 
-- advance the upstream components used by supported engineering, release, and compatibility workflows;
-- fix regressions caused by those advances and contribute generally useful corrections upstream where practical;
 - preserve well-formed unresolved Things references by default while reporting references and graph edges that cannot be materialized locally;
 - remove environment-dependent compatibility tests and unexpected CI skips;
 - make the GitHub proposal route discoverable from the SHACL Vue editing experience and exercise one real proposal;
 - regenerate and complete a current Zotero proposal rather than repair the obsolete Milestone 5 proposal;
-- publish aligned immutable engine, runtime, and template releases; and
-- prepare a reviewed move of the appropriate repositories and GitHub App into an `orinoco-lite` organization after open pull requests have merged.
+- and publish any follow-up immutable engine, runtime, and template release required by those Milestone 6 changes.
 
 The exact upstream commits and release coordinates belong in the implementing pull requests, gitlinks, locks, and releases.
 Milestone 6 does not add a tracked compatibility ledger or a file that attempts to describe mutable upstream head state.
@@ -43,9 +58,9 @@ A site may choose stricter local-reference validation as site policy, but strict
 This supersedes Milestone 5's field-specific `Identifier.creator` exception and general local-closure default.
 It retains the reviewed semantic rule that an identifier venue must not be substituted for its creator.
 
-### M6-D002 — Update upstream deliberately without an inventory
+### M6-D002 — Update upstream deliberately before the milestone
 
-An upstream update compares authoritative heads when the work begins, tests the candidate commits together, and records the accepted result through ordinary gitlinks, direct dependency pins, generated locks, and the pull-request summary.
+The pre-Milestone 6 upstream update compares authoritative heads when the work begins, tests the candidate commits together, and records the accepted result through ordinary gitlinks, direct dependency pins, generated locks, and the pull-request summary.
 No scheduled updater, tracked head inventory, or automatic pin advance is introduced.
 
 Every local compatibility layer affected by the update must either:
@@ -63,31 +78,15 @@ Milestone 6 creates a fresh proposal from the current default branch and current
 Milestone 6 also exercises the first live SHACL Vue GitHub proposal and trusted replacement.
 These operational proofs do not reopen the accepted Milestone 5 adapter, provenance, or stateless-service architecture.
 
-### M6-D004 — Move repository custody after active work is merged
+### M6-D004 — Move repository custody before the milestone and after active work is merged
 
 Creating the organization, transferring repositories or the GitHub App, and changing application installation or deployment configuration are external operations.
 They occur only after the current implementation and documentation pull requests have merged and the exact transfer scope is approved.
 
 The personal demonstration downstream remains under `leej3`.
-The real CON site and its remotes remain read-only and outside this milestone unless separately authorized.
+The real CON site and its remotes remain read-only and outside this transfer unless separately authorized.
 
-## Workstream 1: upstream update
-
-Start from the authoritative remote for each component used by the recorded static site, full service stack, runtime release, editor release, query parity, or enrichment parity.
-Advance candidates in isolated component worktrees, then record parent gitlinks only after the combined stack passes.
-
-The update must cover at least the components actually exercised by those paths, including the website and Congo theme, query-things, Dump Things client and service, Things Schema, enrichment tools, pool UI, and SHACL Vue.
-A gitlink that supports no retained build, test, release, or preservation purpose should not be perpetually updated merely because it is present; its removal is part of the open scope question below.
-
-Run the static reproduction, service-backed checks, exact snapshot conversion, ordinary Orinoco composition, editor/runtime assembly, and source-adapter parity tests.
-A changed upstream semantic result must be explained and reviewed; it must not be normalized away only to retain an old fixture.
-
-The current 609-line generated-site project-path adapter in [`adapt_upstream_pages.py`](../tools/adapt_upstream_pages.py) remains isolated engineering glue.
-It currently repairs root-absolute HTML, graph, manifest, and editor links in generated upstream output and then audits for remaining path escapes.
-Prefer upstream Hugo `relURL` or permalink handling, an explicit base-aware graph-data URL, and base-aware graph node routes.
-Remove each local rewrite after its released upstream successor passes the same idempotence and browser tests; retain the audit as long as it finds meaningful regressions.
-
-## Workstream 2: reference and projection alignment
+## Workstream 1: reference and projection alignment
 
 Replace the special `Identifier.creator` filtering path with the general policy in M6-D001.
 Configuration and diagnostics must distinguish:
@@ -103,7 +102,7 @@ Site policy may still require particular records for a page, label, role display
 The default configuration supplied by the next template release must preserve missing references and omit nonmaterialized graph edges with diagnostics.
 Existing strict sites receive an explicit, tested migration path and may retain strict site policy.
 
-## Workstream 3: dependable compatibility tests
+## Workstream 2: dependable compatibility tests
 
 The normal package test command must not discover a consumer from an arbitrary sibling directory.
 Unit tests use repository-owned fixtures.
@@ -115,7 +114,7 @@ It covers the schema/RDF round trips, upstream enrichment behavior, released edi
 Caching may reduce network transfer, especially for repositories in one organization, but it is never authority.
 Cache keys include the runner platform and required commit IDs; every job verifies the checked-out commits and succeeds from an empty cache.
 
-## Workstream 4: SHACL Vue proposal entry
+## Workstream 3: SHACL Vue proposal entry
 
 The credential-free downstream editor retains its normal **Download review bundle** behavior.
 The separate central wrapper remains the GitHub-authenticated proposal surface and already requests GitHub sign-in when needed.
@@ -127,7 +126,7 @@ The wrapper owns the editing session from its beginning; Milestone 6 does not ad
 Acceptance exercises one public-data edit through sign-in, bundle generation, the temporary handoff, trusted canonical replacement, validation, and a final branch with no handoff bundle.
 Automation still does not approve or merge the proposal.
 
-## Workstream 5: current Zotero operation
+## Workstream 4: current Zotero operation
 
 The obsolete demonstration pull request 7 was closed without merge as superseded rather than rebasing its source- and base-bound proposal.
 Acquire current Zotero data read-only, record its exact library/content coordinate, and generate a new proposal from the current demonstration default branch.
@@ -135,16 +134,6 @@ Acquire current Zotero data read-only, record its exact library/content coordina
 Human review may use the existing bulk initializer, but every candidate still receives an explicit disposition before finalization.
 The accepted result must validate on both supported platforms.
 An identical rerun must create no branch or pull request, and a focused test must continue to prove that a later material source change reopens review.
-
-## Workstream 6: release and organization transition
-
-Publish a new engine/runtime release only after the upstream, projection, and compatibility changes pass reproducible release assembly.
-Align the template to that immutable release and prove a fresh generated consumer.
-This repository records that release proof; it does not maintain ongoing adoption status for independent downstreams.
-
-After active pull requests merge and the scope question is answered, John creates the `orinoco-lite` organization and grants the required ownership.
-The reviewed transfer then updates repository remotes, `.gitmodules`, direct package URLs, generated locks, reusable-workflow coordinates, GitHub App ownership and installation, and deployment configuration.
-Redirects are migration aids, not the permanent release contract.
 
 ## Non-goals
 
@@ -166,14 +155,10 @@ GitHub does not provide a path-conditional repository merge-method setting, so M
 
 Milestone 6 is complete when:
 
-1. the deliberately selected upstream pins and direct dependencies pass all retained static, service, snapshot, release, query, and enrichment checks;
-2. every resulting material upstream difference is fixed, accepted explicitly, or deferred outside the supported paths with a clear issue;
-3. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
-4. well-formed unresolved references survive validation and projection by default, omitted graph edges are reported, and strict site policy remains available;
-5. one current SHACL Vue edit completes the GitHub handoff and trusted replacement path;
-6. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal;
-7. new immutable engine/runtime and template releases pass clean generated-consumer acceptance on macOS ARM64 and Linux x86-64; and
-8. the approved organization transfer is complete, or is recorded as a named external follow-up if organization creation is unavailable.
+1. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
+2. well-formed unresolved references survive validation and projection by default, omitted graph edges are reported, and strict site policy remains available;
+3. one current SHACL Vue edit completes the GitHub handoff and trusted replacement path; and
+4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 
 Acceptance records representative commands, releases, pull requests, and runs.
 It does not duplicate commit ancestry already enforced by Git and the workflow or reproduce every transient artifact coordinate.
@@ -187,7 +172,7 @@ Should a record show two explicit actions—**Edit or download** and **Propose t
 The recommended default is two clearly named actions.
 It preserves the credential-free editor while making the proposal path visible before editing.
 
-### M6-Q002 — What moves to the new organization?
+### Pre-M6-Q001 — What moves to the new organization?
 
 Should the new organization receive only the core product repositories, integration-test repository, and GitHub App, or also every actively used upstream mirror currently under `leej3`?
 May top-level gitlinks with no retained build, test, release, or preservation role be removed instead of transferred?

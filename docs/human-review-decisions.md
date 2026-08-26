@@ -1,11 +1,11 @@
 # Orinoco Lite human-review decision queue
 
-Status: Milestone 5 accepted; production graduation and named strategic choices remain open
+Status: Milestone 5 accepted; pre-Milestone 6 convergence is active and the exact custody-transfer scope remains open
 
 Review snapshot: 2026-08-26
 
 This file is the current human-decision entry point.
-It keeps the bounded outcomes that opened Milestone 6 beside the unresolved choices that still require human judgment.
+It keeps the bounded outcomes that opened the pre-Milestone 6 convergence work beside the unresolved choices that still require human judgment.
 Accepted Milestone 5 outcomes are in [`milestone-5-decisions.md`](milestone-5-decisions.md), and the detailed decision history through that milestone is archived in [`human-review-decisions-through-m5.md`](archived/human-review-decisions-through-m5.md).
 Release coordinates, CI results, documentation repairs, and other mechanical work do not belong in this queue.
 
@@ -14,16 +14,17 @@ Release coordinates, CI results, documentation repairs, and other mechanical wor
 - Resolve one ID at a time with an outcome, short rationale, reviewer, and date.
 - Update the applicable milestone decision or specification in the same reviewed change.
 - A policy decision does not by itself authorize a real-site, deployment, repository-transfer, or other external mutation.
-- Questions activated by current Milestone 6 work are kept in [`milestone-6.md`](milestone-6.md) until answered.
+- Questions activated by the pre-Milestone 6 convergence work or Milestone 6 planning are kept in [`milestone-6.md`](milestone-6.md) until answered.
 
-## Resolved for Milestone 6 planning
+## Resolved for current planning
 
 | ID | Outcome | Source decision | Reviewer | Date |
 | --- | --- | --- | --- | --- |
 | HR-221 | Preserve well-formed unresolved Things references by default and report locally unmaterialized references and graph edges. Treat stricter closure as optional site policy rather than general upstream validity. | M6-D001 | John Lee | 2026-08-26 |
 | HR-222 | Update upstream deliberately when requested. Record accepted commits in Git, locks, and the implementing pull request; do not maintain a tracked compatibility inventory or advance pins automatically. | M6-D002 | John Lee | 2026-08-26 |
 | HR-223 | Accept Milestone 5 on its implemented and focused evidence. Use a fresh current Zotero transition and the first live SHACL handoff as Milestone 6 operational proof instead of repairing stale proposal history. | M6-D003 | John Lee | 2026-08-26 |
-| HR-224 | Wait for active pull requests to merge before moving repositories or the GitHub App. Keep the personal demonstration downstream under `leej3`; resolve the remaining transfer scope through M6-Q002. | M6-D004 | John Lee | 2026-08-26 |
+| HR-224 | Wait for active pull requests to merge before moving repositories or the GitHub App. Keep the personal demonstration downstream under `leej3`; resolve the remaining transfer scope through Pre-M6-Q001. | M6-D004 | John Lee | 2026-08-26 |
+| HR-225 | Treat deliberate upstream repinning, resulting compatibility fixes, aligned releases, and the approved custody transfer as a bounded maintenance batch before Milestone 6. Start it without a separate exhaustive milestone specification and keep exact evidence in the implementing pull requests, commits, locks, and releases. | Before Milestone 6 | John Lee | 2026-08-26 |
 
 ## Before production graduation
 

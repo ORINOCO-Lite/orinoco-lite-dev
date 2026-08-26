@@ -2,7 +2,7 @@
 
 ## Current work
 
-- The active effort is Milestone 6 upstream convergence and maintenance hardening.
+- The active effort is the bounded pre-Milestone 6 upstream convergence, release, and custody-transition batch in `docs/milestone-6.md`.
 - Read `README.md`, `docs/milestone-6.md`, `docs/source-adapters.md`, `docs/github-curation-review.md`, `docs/github-shacl-vue-edit.md`, `docs/milestone-5-decisions.md`, `docs/milestone-5-acceptance.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
 - Read Milestone 1–5 plans and historical acceptance records only when their derivation or preserved evidence is relevant.
 Their old operating commands and branch descriptions are not the downstream interface.
@@ -10,10 +10,10 @@ Their old operating commands and branch descriptions are not the downstream inte
 Record resolutions in `docs/human-review-decisions.md` and the corresponding source decision register in the same reviewed change.
 - Stop and request clarification when ambiguity would change metadata semantics, provenance, review behavior, repository history, authority, or durable state.
 Do not resolve ambiguity by broadening the threat model or inventing another artifact or authority.
-- Do not begin a Milestone 6 non-goal or deferred human decision unless the user expands scope.
+- Do not begin Milestone 6 implementation or a deferred human decision unless the user expands scope.
 - Do not create a tracked upstream-head inventory or compatibility ledger.
 Compare authoritative heads only during a deliberate update, then record the accepted result in gitlinks, direct pins, locks, and the reviewed pull request.
-- Repository and GitHub App transfers wait until current pull requests merge and M6-Q002 records their exact scope.
+- Repository and GitHub App transfers wait until current pull requests merge and Pre-M6-Q001 records their exact scope.
 
 ## Repository boundaries
 
@@ -57,7 +57,7 @@ Do not substitute the vendored resolved schema, an unreviewed LinkML trial, or a
 Do not use the real site as a worktree target.
 - Framework updates may create a branch and pull request but never approve or merge themselves or deploy pull-request code to the shared Pages environment.
 - Preserve exact immutable release coordinates, ownership classifications, site-owned before/after hashes, and rollback evidence.
-- Keep the Milestone 6 acceptance section and pull-request summary current without duplicating Git ancestry or transient artifact inventories.
+- Keep the implementing pull-request summaries current without duplicating Git ancestry or transient artifact inventories.
 Do not leave a superseded proposal as the current review entry point.
 
 ## User preferences

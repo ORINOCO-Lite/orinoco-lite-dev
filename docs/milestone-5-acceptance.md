@@ -86,5 +86,6 @@ Being signed in does not add a GitHub button to the static page.
 
 ## Follow-on work
 
-[`milestone-6.md`](milestone-6.md) owns upstream repinning, general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, SHACL proposal discoverability and live use, the next release, and the separately authorized organization migration.
+The pre-Milestone 6 boundary in [`milestone-6.md`](milestone-6.md) owns upstream repinning, resulting compatibility fixes, the aligned release, and the separately authorized organization migration.
+Milestone 6 begins afterward with general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, and SHACL proposal discoverability and live use.
 The corpus-normalization proposal remains site-owned content review and is not an engineering milestone or downstream-adoption gate here.
