@@ -87,7 +87,28 @@ These are application resource-safety bounds, not pull-request Markdown or nativ
 
 ## Authenticated submission
 
-The structured comment MUST begin with the exact line `/curation submit` and contain one JSON object whose `format` is `orinoco-lite-curation-submission-v1`.
+The structured comment MUST begin with the exact line `/curation submit`.
+The application emits the following exact Markdown envelope, with the details element closed by default so that the complete payload does not dominate the pull-request conversation:
+
+````markdown
+/curation submit
+
+<details>
+
+<summary>Complete curation submission JSON</summary>
+
+```json
+{
+  "format": "orinoco-lite-curation-submission-v1"
+}
+```
+
+</details>
+````
+
+The fenced block contains one JSON object whose `format` is `orinoco-lite-curation-submission-v1`.
+The trusted host accepts this exact envelope and the former exact unwrapped fenced-JSON envelope so historical comments and event replays remain valid; it MUST NOT accept other wrapper variations.
+Collapsing the payload changes only its GitHub presentation: the raw comment remains the authenticated durable decision record, and `/curation submit` remains visible as the workflow trigger.
 That object contains exactly `format`, `repository`, `pull_request`, `proposal_sha`, `head_sha`, `adapter`, `source_coordinate`, and `decisions`.
 
 Each decision contains exactly the initial proposal's canonical `pid`, `record_path`, `operation`, and the human's `disposition`.

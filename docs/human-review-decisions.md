@@ -754,6 +754,23 @@ Selecting the rich authoritative role records once preserves the source reposito
 
 **Follow-up:** Release the narrow engine/runtime change, review and merge [`con/dump-research-info` pull request 27](https://github.com/con/dump-research-info/pull/27) at current head `5149afa03b68f50b3df2da56822d4dd6d8075694`, add authoritative pool roles to the downstream adapter's immutable source selection, and replace the superseded downstream proposal before review continues.
 
+### HR-219 — Collapse the authenticated submission payload by default
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** Should the complete `/curation submit` JSON remain expanded in the pull-request conversation?
+
+**Outcome:** Keep `/curation submit` as the exact visible first line, but place the fenced JSON payload inside one exact Markdown `details` element that is closed by default.
+Keep accepting the former exact unwrapped envelope so historical comments and event replays remain valid.
+Reject other wrapper variations at the trusted parser boundary.
+
+**Rationale:** The complete payload is intentionally durable in the authenticated GitHub comment, while the resulting decision is retained in subsequent commit history, but its length makes the pull-request conversation difficult to scan.
+Collapsing it changes presentation only and preserves the payload format, reviewer authority, workflow trigger, and trusted finalization checks.
+
+**Decided by/date:** John Lee, 2026-08-25.
+
+**Follow-up:** Land backward-compatible downstream parsers before deploying the central application renderer.
+
 ## P2 — strategic decisions
 
 These remain deferred until a later milestone activates their scope.

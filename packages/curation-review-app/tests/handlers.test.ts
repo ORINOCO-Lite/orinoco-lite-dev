@@ -515,6 +515,11 @@ describe("curator authorization and exact-head submission handlers", () => {
         if (response !== null) return response;
         if (url.endsWith("/issues/42/comments")) {
           expect(init?.method).toBe("POST");
+          const posted = JSON.parse(String(init?.body)) as { body: string };
+          expect(posted.body).toMatch(
+            /^\/curation submit\n\n<details>\n\n<summary>Complete curation submission JSON<\/summary>\n\n```json\n/,
+          );
+          expect(posted.body.endsWith("\n```\n\n</details>")).toBe(true);
           return Response.json({
             html_url:
               "https://github.com/example/site/pull/42#issuecomment-123",

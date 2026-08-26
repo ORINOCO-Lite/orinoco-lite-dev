@@ -50,11 +50,17 @@ describe("authenticated submission envelope", () => {
     ).toThrow("positive integer");
   });
 
-  it("renders one exact command and JSON object without reviewer identity", () => {
+  it("renders one exact command with collapsed JSON and no reviewer identity", () => {
     const payload = submission();
     const body = submissionComment(payload);
-    expect(body.startsWith("/curation submit\n\n```json\n{")).toBe(true);
-    expect(body.endsWith("\n```")).toBe(true);
+    expect(body).toBe(
+      "/curation submit\n\n" +
+        "<details>\n\n" +
+        "<summary>Complete curation submission JSON</summary>\n\n" +
+        `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\n` +
+        "</details>",
+    );
+    expect(body).not.toContain("<details open");
     expect(body).not.toContain("reviewer");
     expect(
       JSON.parse(body.slice(body.indexOf("{"), body.lastIndexOf("}") + 1)),
