@@ -57,7 +57,7 @@ Every local compatibility layer affected by the update must either:
 ### M6-D003 — Exercise current Zotero and SHACL flows
 
 Milestone 5 closes on its implemented and focused acceptance evidence.
-Its old Zotero pull request is historical proposal evidence, not a current review entry point.
+Its closed Zotero pull request is historical proposal evidence, not a current review entry point.
 Milestone 6 creates a fresh proposal from the current default branch and current read-only Zotero coordinate, completes review and finalization, and reruns the identical source to obtain an empty proposal.
 
 Milestone 6 also exercises the first live SHACL Vue GitHub proposal and trusted replacement.
@@ -129,7 +129,7 @@ Automation still does not approve or merge the proposal.
 
 ## Workstream 5: current Zotero operation
 
-Close the obsolete demonstration pull request 7 as superseded rather than rebasing its source- and base-bound proposal.
+The obsolete demonstration pull request 7 was closed without merge as superseded rather than rebasing its source- and base-bound proposal.
 Acquire current Zotero data read-only, record its exact library/content coordinate, and generate a new proposal from the current demonstration default branch.
 
 Human review may use the existing bulk initializer, but every candidate still receives an explicit disposition before finalization.

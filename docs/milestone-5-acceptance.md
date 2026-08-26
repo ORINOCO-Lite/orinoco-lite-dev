@@ -59,8 +59,8 @@ This acceptance record does not duplicate the complete ancestry or every transie
 Focused tests prove Zotero acquisition, transformation, PAV ownership, candidate review, finalization, suppression, reopening, and idempotence against the shared contract.
 Historical [demonstration pull request 7](https://github.com/leej3/orinoco-lite-demo/pull/7) also produced a real 126-record proposal, an exact-head review artifact, and a cross-platform-valid proposal tree from Zotero library version 451.
 
-That pull request is now based on obsolete site and adapter state and is not a current review entry point.
-It should be closed as superseded, not rebased: the proposal is intentionally bound to its original metadata base and source coordinate.
+That pull request was closed without merge as superseded on 2026-08-26; none of its proposed metadata was accepted.
+It was not rebased because the proposal is intentionally bound to its original metadata base and source coordinate.
 Milestone 6 regenerates from the current default branch and current read-only Zotero coordinate, completes review and finalization, and verifies a same-source no-op.
 
 ## SHACL Vue evidence and disposition
