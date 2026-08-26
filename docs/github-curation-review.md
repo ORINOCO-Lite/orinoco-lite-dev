@@ -2,7 +2,7 @@
 
 Status: normative profile incorporated by [`source-adapters.md`](source-adapters.md)
 
-This document defines the initial hosted implementation of the host-neutral review contract in [`source-adapters.md`](source-adapters.md).
+This document defines the supported GitHub review implementation of the shared metadata and finalization behavior in [`source-adapters.md`](source-adapters.md).
 The source-adapter specification remains authoritative for metadata semantics, candidate identity, decisions, provenance, finalization, and repository history.
 This profile owns only the GitHub workflow, authenticated review transport, and user interface.
 

@@ -47,7 +47,7 @@ No upstream website source or generated content was edited.
 The phrase "German patches" is interpreted here as the LinkML patches and runtime monkeypatches carried by the upstream Psychoinformatics/Orinoco repositories.
 That interpretation did not block the work; the exact patch inventory is below.
 
-## Git and mirror state
+## Git and mirror state during the trial
 
 The parent had pinned `www-from-model` at `6945272e5f3fcf353627b8e1c3e68bcaf76cc2ce`.
 Current upstream is three commits later:
@@ -72,8 +72,9 @@ The parent `.gitmodules` entry now uses the `leej3` mirror.
 Local site checkouts use `origin` for that mirror and `upstream` for the Psychoinformatics source.
 The Hugo theme remains the exact nested gitlink `3623fa505ee42fee899844d94a4ff7f5a1ae9096` from the upstream site.
 
-A live comparison of all 24 parent gitlinks found 20 exactly at their configured/default remote heads. Besides `www-from-model`, the exceptions are the deliberately unpublished CON site pin, the deleted/divergent `dump-research-info` branch, and a six-commit-stale `things-enrichment-tools` pin that is not used by the website workflows.
-The complete table is in `provenance/upstream-psychoinformatics/submodule-inventory.tsv`.
+A live comparison during the 2026-08-10 trial found 20 of 24 parent gitlinks at their then-configured remote heads.
+That observation was a dated diagnostic, not a durable upstream inventory.
+The repository's gitlinks and implementing update pull request are the authority for an accepted stack.
 The only intentional `con` URL remaining in the parent is the migration-input `dump-research-info` repository.
 
 ## Account-owned recursive mirrors
@@ -84,7 +85,7 @@ The account mirrors preserve the pinned commits and the fetched upstream branche
 Nested dependencies are covered as well: the pool UI points to `leej3/shacl-vue`, the website and CON site themes point to `leej3/congo`, and `tools` points to `leej3/datalad-concepts`.
 
 The account mirror set is deliberately separate from the parent repository: `orinoco-lite-dev` remains the only repository in this workflow that is not under `leej3`.
-A fresh recursive checkout therefore needs only public GitHub URLs, while `dump-research-info` remains visibly attributable to CON in the parent `.gitmodules` file and inventory.
+A fresh recursive checkout therefore needed only public GitHub URLs, while `dump-research-info` remained visibly attributable to CON in the parent `.gitmodules` file.
 
 ## What is actually required
 
@@ -414,6 +415,5 @@ It also shows precisely what that success does not reproduce—the canonical poo
 - `tests/test_adapt_upstream_pages.py`: focused rewrite, validation, and idempotence tests
 - `provenance/upstream-psychoinformatics/baseline.yaml`: exact commits, versions, counts, hashes, and Annex availability
 - `provenance/upstream-psychoinformatics/missing-targets.tsv`: exact upstream dead-link evidence
-- `provenance/upstream-psychoinformatics/submodule-inventory.tsv`: all parent pins, live upstream heads, workflow roles, and `con` mirror state
 
 No GitHub Pages site was enabled, no workflow was dispatched, and no production deployment or DNS record was changed.

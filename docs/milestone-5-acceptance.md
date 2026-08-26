@@ -1,8 +1,6 @@
-# Milestone 5 acceptance record
+# Milestone 5 acceptance
 
-Status: active; implementation released and integrated, real proposal green, authenticated application access verified
-
-Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
+Status: accepted on 2026-08-26
 
 Plan: [`milestone-5.md`](milestone-5.md)
 
@@ -10,222 +8,84 @@ Normative contract: [`source-adapters.md`](source-adapters.md)
 
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
-This record receives exact implementation evidence.
-The old prototype inventories, transaction reports, sidecars, and custom attestation results are historical exploration and do not satisfy the current contract by themselves.
+## Result
 
-## Baseline evidence
+Milestone 5 delivered the source-adapter and human-review architecture described by the normative contract:
 
-Record these coordinates when each implementation workstream begins:
+- canonical human-facing Things records plus PAV-only annotation companions;
+- a reversible joined schema/RDF/projection view;
+- deterministic source candidates and compact current-state decisions;
+- Zotero and `dump-research-info` adapters with distinct source policy and one shared review/finalization contract;
+- one GitHub pull request containing the proposal, human decisions, attributed changes, and mechanical finalization;
+- a stateless hosted decision interface with GitHub as the durable review authority;
+- a separate SHACL Vue GitHub handoff and trusted Python replacement path; and
+- immutable engine/runtime and template distribution exercised on macOS ARM64 and Linux x86-64.
 
-| Surface | Required evidence | Status |
-| --- | --- | --- |
-| Specification | reviewed pull request head and merge commit establishing the normative contract and accepted M5 decisions | engineering pull request [16](https://github.com/con/orinoco-lite-dev/pull/16), head `eeb41ac1d1bf04291e5316cb1e91f457a8aadaa4`, merge `91b1658135e4a21b8d103e43c70db58cbabc58e1` |
-| Engineering | exact base, released engine/runtime inputs, upstream pins, clean worktree, and baseline tests | pull requests [16](https://github.com/con/orinoco-lite-dev/pull/16), [17](https://github.com/con/orinoco-lite-dev/pull/17), [19](https://github.com/con/orinoco-lite-dev/pull/19) through [23](https://github.com/con/orinoco-lite-dev/pull/23), [25](https://github.com/con/orinoco-lite-dev/pull/25) through [27](https://github.com/con/orinoco-lite-dev/pull/27), and [30](https://github.com/con/orinoco-lite-dev/pull/30); latest merge `30c766d028c3d1f304b584a282490bdc13d101d0`, tree `231b9685c40c8d6410fbe9b6df33266d3fa30d6c`; release/tag `v0.2.0rc3` at merge `7e331a2c61be2a5701c95c7dc48acf61d2ee106d`; Dump Things `9f101d97c7f15d491f602db5a9c33ad9a19ad8bf`; Things Schema `cb6c791aec4c5309775437df4bd58e94e1bfcc3c`; enrichment-tools `2e6a5ddc92928a6165b81fdae24a52c447967c7d` |
-| Zotero | exact library version, adapter revision, policy revision, and baseline behavior | library version `451`; snapshot blob `6d287b0f6d5edbdb36a5308b3605bb86ab3d55a7`; adapter tree `cc45d86b97ee0ad5f7c84ea60fa483e0cd88b733`; policy tree `3606bad690c41a9f120d113ca7d7e21062017ec7` |
-| `dump-research-info` | exact source revision, adapter revision, policy revision, and baseline behavior | adapter tree `8598768bae80e3eff55191876d8e20c57a8a5365`; candidate builder blob `5e6eb317b41076eb6a131620534b7a743e456ccf`; adapter blob `4897dfa97128d68bcdf76881993d2c9a7b1a4afa`; external source revision remains an explicit dispatch input |
-| Consumer | exact base, lock, template release, corpus counts, branch policy, and baseline CI | implementation pull request [28](https://github.com/con/test-orinoco-downstream-website/pull/28), framework pull requests [30](https://github.com/con/test-orinoco-downstream-website/pull/30) and [31](https://github.com/con/test-orinoco-downstream-website/pull/31), release-adoption pull request [33](https://github.com/con/test-orinoco-downstream-website/pull/33), fixture-isolation pull request [34](https://github.com/con/test-orinoco-downstream-website/pull/34), and route/release adoption pull request [35](https://github.com/con/test-orinoco-downstream-website/pull/35), head `43a28b1fbcf10330615c8ff9823f3971008ceb02`, merge `bf683b6da8cad04ae3a62c4e34ad04521353d94a`; engine/runtime `v0.2.0rc3`, template `v0.2.0rc6`; `required_linear_history=false` |
-| Template | exact source release and generated-template commit if generic support changes | pull requests [12](https://github.com/con/orinoco-lite-template/pull/12) through [18](https://github.com/con/orinoco-lite-template/pull/18); latest merge/tag `92fa8f3b25462f9a8b7c5418eb76920732b00ae6`, immutable `v0.2.0rc6`; generated `github-template` commit `ac2d05d189a04d74288c78675d31a719ced76558`, tree `28800a4740b69e905fcd04b1b1704de92a1b8723` |
-| Platforms | macOS ARM64 and Linux x86-64 clean-clone commands and results | engine pull-request run [32804725258](https://github.com/con/orinoco-lite-dev/actions/runs/32804725258), template `v0.2.0rc6` run [32850028092](https://github.com/con/orinoco-lite-template/actions/runs/32850028092), consumer run [32851007143](https://github.com/con/test-orinoco-downstream-website/actions/runs/32851007143), and personal-demo run [32851013501](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851013501) passed on macOS 14 ARM64 and Ubuntu 24.04 x86-64 |
+Milestone 5 is accepted on implemented, focused, cross-layer, and one complete live source-adapter transition.
+A fresh current Zotero transition, the first live SHACL handoff, and improved SHACL proposal discoverability are operational Milestone 6 work, not missing Milestone 5 architecture.
 
-Live-source or authoritative-head drift is advisory and must not silently replace a reviewed input.
+## Accepted coordinates
 
-## Shared metadata foundation
+| Surface | Accepted evidence |
+| --- | --- |
+| Specification | [Engineering pull request 16](https://github.com/con/orinoco-lite-dev/pull/16), merged as `91b1658135e4a21b8d103e43c70db58cbabc58e1`. |
+| Engine and runtime | [`orinoco-lite` `v0.2.0rc4`](https://github.com/con/orinoco-lite-dev/releases/tag/v0.2.0rc4), commit `abdf5623ce7b0b16146940ba6dafc7290124e9cc`. |
+| Template | [`v0.2.0rc7`](https://github.com/con/orinoco-lite-template/releases/tag/v0.2.0rc7), source commit `f46f717fddb452440ad0ba091b1af145a2769eef`. |
+| Current engineering integration | [Engineering pull request 39](https://github.com/con/orinoco-lite-dev/pull/39), merged as `6e64072ec535149cc0652da64c51b15e4d586fec`; [hosted engineering run 32998589027](https://github.com/con/orinoco-lite-dev/actions/runs/32998589027) passed. |
+| Hosted review application | The stateless application and trusted functions passed the focused application suite, type checks, formatting, and production builds in [run 32962736080](https://github.com/con/orinoco-lite-dev/actions/runs/32962736080). |
 
-| Requirement | Evidence | Status |
-| --- | --- | --- |
-| Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | merged in pull request 16; cross-platform release run `32786292302` passed |
-| Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | draft consumer pull request [29](https://github.com/con/test-orinoco-downstream-website/pull/29), current base `f19692f8fa2eee2202b419fe91ed7274eee70c94`, DataLad proposal `0305fe8b19536f81318de10022b9bd77ab58fd21`, merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`; current cross-platform run [32794979684](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794979684/attempts/2) passed; current review and merge remain pending |
-| Annotation selectors | Exact path/hash matching rejects missing or ambiguous mapping assertions; scalar targets are rejected | merged in pull request 16; release run `32786292302` passed |
-| Joined validation | Stored semantic assertion objects plus annotation companions validate as one Thing with the locked schema | object, typed data, and class-range cases merged in pull request 16; release run passed |
-| RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | merged parity and round-trip tests passed in release run `32786292302` |
-| Projection | Stored qualified assertions reach normal semantic projections, joined PAV reaches the machine projection, and actual public rendering behavior is explicit | engine projection tests and complete consumer build passed in runs `32786292302` and `32788660797` |
-| Identifier-creator resolution | An external `Identifier.creator` Thing PID string passes Lite closure and remains scalar without network access, a matching local Thing inlines, and a missing declared graph target still fails; normal schema conversion remains in force | focused engine tests pass on the HR-218 implementation branch; immutable engine/runtime release and downstream adoption pending |
-| Human-facing storage | Record YAML contains no machine-only PAV and the overlay contains no copied record or decision history | merged storage-boundary tests passed in release run `32786292302` |
-| Upstream scalar updates | Missing, equal, differing, same-owner, human-owned, and differently owned values match pinned `update_data_property()` after reversible compact-PAV split/join and typed normalization; the missing-topical/equivalent-unowned case copies the topical value without new PAV | merged upstream-parity matrix passed in release run `32786292302` |
+These coordinates identify the released interface and final Milestone 5 integration.
+Independent consumers select their own immutable release coordinates; this record does not track ongoing downstream adoption.
 
-Release run `32786292302` at `8bd328b17e359bf9594e83381c3efc1c7ab0ecac` passed 155 engine tests with 11 fixture skips, all 40 engineering-contract tests, and 21 isolated service-stack tests on both supported platforms.
-It covers scalar-target rejection; absent, equal, changed, same-owner, human-owned, and differently owned upstream paths; the approved missing-topical convenience copy; multivalue order; compact/expanded PAV; typed values; class-range `Statement` storage; joined RDF; projection fingerprints; and candidate/cache behavior.
-At normalization commit `0305fe8b19536f81318de10022b9bd77ab58fd21`, type-sensitive comparison proved all 199 parsed values equal, all outputs canonical and idempotent, and `.dumpthings.yaml` byte-identical.
-The exact diff is 199 files, 3,191 insertions, and 3,215 deletions; it removes only five identical legacy source-coordinate comments, whose prior bytes remain in Git history.
-`pixi run test-all` passed locally with 129 Python tests, Chromium 2/2, WebKit 2/2, deterministic 561-file build tree `0d85b80f71a1b001316dbb099186170664231d03892bc5fc03ed6adccb764a41`, and no tracked output.
-At current merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, hosted run [32794979684](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794979684/attempts/2) passed 134 site-owned Python tests, the deterministic 561-file build with tree `b3dfa91ee1ff60e2a441ab0900eda30b3283e90417ef4af3d59ed39264e796cf`, Chromium 2/2, and WebKit 2/2 on both supported platforms.
-The first Linux attempt encountered a transient loose-object copy race; rerunning only the failed job passed without a source change.
+## Source-adapter evidence
 
-## Shared review core
+Focused engine and integration tests cover additions, modifications, deletions, accept, reject, defer, material-change reopening, all-rejected review, human correction, exact-head failure, three-way reversal, overlap failure, compact cache pruning, provenance splitting and joining, and identical-source idempotence for both adapters.
 
-| Requirement | Evidence | Status |
-| --- | --- | --- |
-| Ephemeral candidates | Deterministic immutable add/modify/delete plans, canonical record/companion bytes, source-claim hashes independent of curated baselines, fixed PIDs/paths, no provenance-only candidates, and adapter provenance checks | merged in pull request 16; focused engine and both-adapter consumer tests passed in runs `32786292302` and `32788660797` |
-| Adapter provenance identity | Workflow dispatch derives the current reviewed `xyzri:XYZInstrument` identity through the validated trusted-site manifest; provider, version, type, and record must agree; no operator identity or old-version fallback exists | local consumer and demo source-adapter suites passed 149 tests each; consumer validation passed 202 records and demo validation passed 224 records with 420 retained annotation assertions; deterministic builds and ownership checks passed; reviewed merges and hosted execution remain pending |
-| Compact decisions | Exact v1 canonical YAML, complete current-candidate decisions, authenticated GitHub review coordinates, accept/reject suppression, defer and material-change reopening, human-correction suppression, source remap, and referenced-review pruning | merged in pull request 16; focused engine and consumer tests passed |
-| Git finalization | Exact base/proposal/head verification; add, modify, delete, all-rejected, accepted correction, cache-only accept, clean three-way reversal, overlap failure, hostile Git environment, and path-escape prevention | merged in pull request 16; focused temporary-repository and consumer interaction tests passed on both platforms |
+The real `dump-research-info` path completed the whole transition:
 
-The released shared core is in [`orinoco-lite==0.2.0rc3`](https://github.com/con/orinoco-lite-dev/releases/tag/v0.2.0rc3).
-Pull-request run [32804725258](https://github.com/con/orinoco-lite-dev/actions/runs/32804725258) passed 217 tests on each supported platform after finalization switched temporary repository cloning to Git `--no-local`.
-Release run [32805667553](https://github.com/con/orinoco-lite-dev/actions/runs/32805667553) published reproducible artifacts and attestations; a credential-free public wheel install reported `orinoco-lite 0.2.0rc3`.
+1. [source pull request 27](https://github.com/con/dump-research-info/pull/27) corrected source semantics and merged as `d498f20b494529d8a082dd3e8221fac2e818716e`;
+2. the multi-root adapter and released interface were integrated through [consumer pull requests 36](https://github.com/con/test-orinoco-downstream-website/pull/36) and [37](https://github.com/con/test-orinoco-downstream-website/pull/37);
+3. [demonstration pull request 19](https://github.com/leej3/orinoco-lite-demo/pull/19) received a complete authenticated 82-record decision submission, finalized with the human reviewer as author, and merged through an ordinary merge commit as `8cb24b6c29065ed63d081d4c33a2da0d961fe484`; and
+4. [same-source run 33002386512](https://github.com/leej3/orinoco-lite-demo/actions/runs/33002386512) passed its explicit empty-proposal step and skipped branch, commit, artifact, and pull-request creation.
 
-## Adapter behavior matrix
+The later adapter-provenance identity correction was reviewed in engineering pull request 39, consumer pull request 39, and [demonstration pull request 22](https://github.com/leej3/orinoco-lite-demo/pull/22).
+The successful no-op run used that corrected current default-branch behavior.
 
-Each row requires focused tests for both adapters and at least one reviewed GitHub execution across the combined evidence.
+Git and the trusted workflow enforce the required proposal/review/finalization history.
+This acceptance record does not duplicate the complete ancestry or every transient artifact digest in prose.
 
-| Case | Required result | Zotero | `dump-research-info` |
-| --- | --- | --- | --- |
-| New claim | A friendly record entry and actual metadata diff are presented for explicit review. | focused pass; real 126-record proposal in [personal-demo pull request 7](https://github.com/leej3/orinoco-lite-demo/pull/7) | focused pass; real 85-record proposal in [personal-demo pull request 13](https://github.com/leej3/orinoco-lite-demo/pull/13) |
-| Accept | The reviewed proposal remains, the compact cache records acceptance, and an identical rerun is a no-op. | focused pass; live review pending | focused pass; live review pending |
-| Reject | The candidate patch is reversed with three-way semantics, non-overlapping human edits survive, the compact cache records rejection, and the unchanged claim stays suppressed. | focused pass; live review pending | focused pass; live review pending |
-| Defer | The candidate patch is reversed with three-way semantics, non-overlapping human edits survive, and the claim returns on the next adapter proposal. | focused pass; live review pending | focused pass; live review pending |
-| Material source change | A changed metadata-affecting source claim returns for review. | focused pass; live review pending | focused pass; live review pending |
-| Unused source change | A source change that cannot affect generated metadata produces no candidate or metadata diff. | focused pass | focused pass |
-| Human correction | An accepted human edit is attributed, removes only untouched stale proposal PAV, deletes an emptied companion, and is not reverted by an unchanged source claim; overlap or ambiguous companion state fails. | focused pass; live review pending | focused pass; live review pending |
-| Deletion | The record and matching annotation companion are visibly proposed for deletion and accept/reject behave normally. | focused pass; live review pending | focused pass; live review pending |
-| All rejected | Final metadata matches the base while the compact decisions and reviewed proposal lineage survive the merge. | focused pass; live review pending | focused pass; live review pending |
-| Existing PAV | A semantically identical assertion retains its current PAV and produces no provenance-only diff. | focused pass | focused pass |
-| Adapter rerun | Generation cannot overwrite an explicit human disposition or unrelated human metadata. | focused pass; live rerun pending | focused pass; live rerun pending |
-| Missing or malformed decision | Finalization stops with a focused diagnostic and does not infer a disposition. | focused pass | focused pass |
-| Adapter overlap | Independent claims remain visible, preserve their own identities/PAV, and neither cache suppresses the other. | combined pass | combined pass |
+## Zotero evidence and disposition
 
-Consumer pull request run `32788660797` used only released interfaces and passed 129 site-owned Python tests, deterministic projection/build checks, and two Chromium plus two WebKit checks on macOS ARM64 and Linux x86-64. It covers both adapters, the trusted host and workflows, idempotence, all-rejected review, material-change reopening, human correction, deletion, exact-head behavior, conflict regeneration, and non-overlapping merges in both Git-allowed orders. Framework integration run [32794385122](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794385122) passed 134 site-owned Python tests, the deterministic 561-file build, Chromium 2/2, and WebKit 2/2 on both supported platforms.
-Release-adoption pull request [33](https://github.com/con/test-orinoco-downstream-website/pull/33), head `9c6aeeb622de45a2ca94f827d3daa0e12e4f8629`, merged as `77aa43fe4cb140bd7a92c5218f0dbd94dd686787`; its Linux job passed all 135 site-owned Python tests and browser checks, and the code-equivalent personal-demo run [32806388070](https://github.com/leej3/orinoco-lite-demo/actions/runs/32806388070) passed the same contract on both supported platforms.
-[Consumer pull request 34](https://github.com/con/test-orinoco-downstream-website/pull/34), head `eb6930ebbf0d73128516bd658786e92107be5f9e`, isolates adapter tests from assertions already materialized on a proposal head by deriving bounded fixtures that remove only the two adapters' PAV and compact caches.
-It merged as `3f75c7d1395f1d442ba30d15516bd9d8ce8db949` after Linux run [32808851917](https://github.com/con/test-orinoco-downstream-website/actions/runs/32808851917) passed 136 Python tests, Chromium 2/2, WebKit 2/2, and deterministic 561-file tree `ae81a3a29a53df7c01b505b401ac787c22a3c760e4871f187bfe2f702bc6843`.
-The GitHub-hosted macOS job remained unassigned with older organization jobs; a clean local macOS ARM64 `pixi run test-all` passed the same contract with tree `80f0652ad538f909ce9348eaf77b4a5fb6856e83fbda7920aa545221be0f728c`, and code-equivalent personal-demo run [32808871679](https://github.com/leej3/orinoco-lite-demo/actions/runs/32808871679) passed on GitHub-hosted macOS and Linux.
-A real Zotero proposal is now open; authenticated disposition submission and finalization remain pending, and no synthetic proposal was opened.
+Focused tests prove Zotero acquisition, transformation, PAV ownership, candidate review, finalization, suppression, reopening, and idempotence against the shared contract.
+Historical [demonstration pull request 7](https://github.com/leej3/orinoco-lite-demo/pull/7) also produced a real 126-record proposal, an exact-head review artifact, and a cross-platform-valid proposal tree from Zotero library version 451.
 
-The canonical-route and template `v0.2.0rc6` adoption is merged through consumer pull request [35](https://github.com/con/test-orinoco-downstream-website/pull/35), head `43a28b1fbcf10330615c8ff9823f3971008ceb02`, merge `bf683b6da8cad04ae3a62c4e34ad04521353d94a`, and personal-demo pull request [8](https://github.com/leej3/orinoco-lite-demo/pull/8), head `74733be2b8f17e42e5cf852f9828b59ee5d15ebd`, merge `868046a9a5a3b557c00805d34f8f2cbef986b605`.
-Both update ledgers record `pixi run test-all` as passed, ownership verification and `git diff --check` passed, and site-owned content was unchanged.
-The consumer run passed 136 Python tests, joined validation of 199 records, Chromium 2/2, WebKit 2/2, and deterministic 561-file tree `250215a83e2083956565d2c826496310ece3fc6dd43dcd58e6a1d06df220355a`.
-The personal-demo run passed 136 Python tests, joined validation of 201 records, Chromium 2/2, WebKit 2/2, and deterministic 565-file tree `bb53b887cb77e1d337d293efdf4c843a67aa94d2217bcb914273108b1323e32b`.
-Hosted runs [32851007143](https://github.com/con/test-orinoco-downstream-website/actions/runs/32851007143) and [32851013501](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851013501) passed the same contract on both supported platforms.
-Personal-demo default-branch SHACL run [32851789476](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851789476) produced exact-merge artifact `9564597774`, name `orinoco-shacl-vue-input-868046a9a5a3b557c00805d34f8f2cbef986b605`, digest `sha256:bf409ae987fed8e35ee9841b583d86f5e849053ffd10edad0aca61ac486abc37`, and expiry `2026-11-23T13:10:49Z`.
-Default-branch Pages run [32851789469](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851789469) built and deployed the same merge successfully; Pages artifact `9564618790` has digest `sha256:9a36c27953d0afb9b247bb73512d505848279eb89244890ed02fe0e719756675`.
+That pull request was closed without merge as superseded on 2026-08-26; none of its proposed metadata was accepted.
+It was not rebased because the proposal is intentionally bound to its original metadata base and source coordinate.
+Milestone 6 regenerates from the current default branch and current read-only Zotero coordinate, completes review and finalization, and verifies a same-source no-op.
 
-Pages-publication run [32929112416](https://github.com/leej3/orinoco-lite-demo/actions/runs/32929112416) exercised reusable-workflow revision `6bd31daa17293fe7d52966bc1599f66b2ea3420b` from personal-demo pull request [20](https://github.com/leej3/orinoco-lite-demo/pull/20) while building default-branch source `8759af1e36c943d8b19c982cc4d6376d037a98ea`.
-The successful deployment recorded projection commit `a07da5a319835d231ec6488937bfa8ae7763c9ca`, with 191 generated files and parent `8759af1e36c943d8b19c982cc4d6376d037a98ea`, then site commit `f85bb92cfe8f34562677d88f647c8b341c424fef`, with 566 files and parent `a07da5a319835d231ec6488937bfa8ae7763c9ca`, as `latest-hugo-projection` and `gh-pages`.
-Transfer artifact `9592595886`, `orinoco-pages-publication-32929112416`, retained the two-commit bundle through `2026-08-27T04:10:41Z`; the deployed site returned HTTP 200.
-The temporary review-branch deployment policy used for this proof was removed, restoring the Pages environment to its `main`-only branch policy.
+## SHACL Vue evidence and disposition
 
-## Live demonstration evidence
+The released editor continues to download the normal version 2 review bundle.
+Focused engine, application, workflow, and consumer tests cover exact-head input, immutable released editor assets, explicit public-data acknowledgment, bounded temporary handoff, trusted canonical conversion, exact replacement, joined validation, stale-head failure, and a final branch without the bundle.
 
-| Surface | Immutable coordinates | Result |
-| --- | --- | --- |
-| Personal downstream | public repository [`leej3/orinoco-lite-demo`](https://github.com/leej3/orinoco-lite-demo); fixture pull requests [6](https://github.com/leej3/orinoco-lite-demo/pull/6), [10](https://github.com/leej3/orinoco-lite-demo/pull/10), and [12](https://github.com/leej3/orinoco-lite-demo/pull/12), latest head `4423cb9cde2cc187f86ec836d294523666f3a645`, merge `5cb8c406bcb02cac5d98aae4a3afae2bd4a9191b`; route/release pull request [8](https://github.com/leej3/orinoco-lite-demo/pull/8), merge `868046a9a5a3b557c00805d34f8f2cbef986b605` | Run [32851013501](https://github.com/leej3/orinoco-lite-demo/actions/runs/32851013501) passed the rc6 contract and exact-merge SHACL/Pages runs passed. Latest fixture run [32864326029](https://github.com/leej3/orinoco-lite-demo/actions/runs/32864326029) passed 136 Python tests, Chromium 2/2, WebKit 2/2, and deterministic 565-file tree `892b88f2d9cd837bb3d0f6f81c2ab772f5f07f61fa723a727f7a5800e149f7bd` on both platforms; artifact `9569718553` has digest `sha256:5b09098263780bf097617b0cea0be18e9fb1dc68277fd81ce611f3e9a49be93f`. [The public site](https://leej3.github.io/orinoco-lite-demo/) is live. |
-| Zotero proposal | workflow run [32809444741](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809444741), draft pull request [7](https://github.com/leej3/orinoco-lite-demo/pull/7), base `68738ed8df375fe14d87da216c6d8a7ee6d7e82c`, DataLad proposal `f087cd3884a5b54885553d0d5e89b57c21d564b3`, tree `33bb4e5bd49806ed305b94a7f0238ecb9664d4cb` | Exact source coordinate is `{"content_sha256":"sha256:5e0f5fe1d68c18214110a37c24a8e9177dc484f64a1d9d832f322b477bfef20d","group_id":6197458,"kind":"zotero-public-library","library_version":451}`. The one-parent proposal has 126 unblocked modifications and an actual 252-file metadata diff: 126 publication records plus 126 PAV-only companions, 3,624 additions, and no deletions. |
-| Decision-review artifact | [artifact 9549289607](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809444741/artifacts/9549289607), `orinoco-curation-review-f087cd3884a5b54885553d0d5e89b57c21d564b3`, 16,253 bytes, ZIP digest `sha256:e023c25915041c06d1a4791ebec3c62ac7fa8d0195050cbed521065979258dc9`, extracted JSON SHA-256 `e7adac240a1e259ba4c94b15be7a9686dc98f1dc51287d8b14098ebc7a22e88f`, expiry `2026-11-23T04:33:52Z` | The concise pull-request body links the [central review application](https://orinoco-curation-review.pages.dev/?repository=leej3%2Forinoco-lite-demo&pull_request=7&artifact_id=9549289607) and records source, retention, and merge-history requirements. Authenticated Safari loaded all 126 candidates directly from that link at exact head `f087cd3884a5b54885553d0d5e89b57c21d564b3`, with friendly labels, before/after diffs, filters, keyboard instructions, one Accept/Reject/Defer set per record, and `0 / 126 decisions complete`. No decision or comment was submitted. |
-| Exact-head SHACL input | run [32809501669](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809501669), [artifact 9549337148](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809501669/artifacts/9549337148), `orinoco-shacl-vue-input-f087cd3884a5b54885553d0d5e89b57c21d564b3`, 331,924 bytes, digest `sha256:85da1df4cafc0329c24a077a8bdf2038cbdb6530fd2066b6b9b41114fdb521a0`, expiry `2026-11-23T04:34:48Z` | Trusted default-branch code validated 201 records, 126 companions, and 408 annotation assertions, then posted the [attributed exact-head edit link](https://github.com/leej3/orinoco-lite-demo/pull/7#issuecomment-5405293563). Authenticated Safari painted the released SHACL Vue controls at the exact PR head, preserved Download bundle, and showed a separate Propose via GitHub control disabled until a version 2 bundle and explicit public-retention confirmation exist. No bundle, commit, pull request, handoff, or submission was created. |
-| Proposal-head consumer CI | run [32809500083](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809500083), static-site artifact [9549410266](https://github.com/leej3/orinoco-lite-demo/actions/runs/32809500083/artifacts/9549410266), digest `sha256:d9127f4f0fd1012329b6deb57524397cc0ea7bbcfe086e272c2db45f66d848e3` | Both supported platforms passed 136 Python tests, Chromium 2/2, WebKit 2/2, 201-record/126-companion joined validation, and deterministic 565-file tree `6303496055bd682a55e3313566084673a5d474fa538fea143bc96b386fba4ceb`. A local `pixi run test-all` with the fixture fix overlaid on the superseded proposal head also passed the complete contract, with tree `84c3570e3f683f1659f76cc9c4fc975f4b411a50d666d41d2a04a84b773777a3`. |
-| Current `dump-research-info` source correction | open pull request [`con/dump-research-info#27`](https://github.com/con/dump-research-info/pull/27), base `397b56080d14aeb94592f308b2f0bf325a298c13`, head `5149afa03b68f50b3df2da56822d4dd6d8075694`, source tree `85bb9c7d2a16cf852a13ceaed1df8bd61ec8c4a6` | Implements HR-215 and the source-owned portion of HR-218: removes legacy navigation targets, adds the qualified CON homepage, and omits the redundant generic JMLR `17-434` identifier because the canonical official article URL PID retains the source key. It adds focused regression tests and invents neither a JMLR creator nor provider/role stubs. Linux, macOS, and Windows tests passed in run [32897098270](https://github.com/con/dump-research-info/actions/runs/32897098270), and mypy passed in run [32897098448](https://github.com/con/dump-research-info/actions/runs/32897098448); merge review remains pending. |
-| Superseded `dump-research-info` source correction | closed pull request [`con/dump-research-info#26`](https://github.com/con/dump-research-info/pull/26), base `397b56080d14aeb94592f308b2f0bf325a298c13`, head `efe603f16875ad9798c6ce04aaf35d0a0d5404a0`, source tree `29f90931d6e42fee0473d751e2e0e89ae5c6872e` | Historical HR-216/M5-D017 implementation. Its 70 presentation-routing removals and homepage correction remain supported, but its bounded provider/role stubs and JMLR venue substitution are superseded by HR-218/M5-D019. Its 29 tests, mypy, and cross-platform CI remain evidence for that exact historical tree, not current merge approval. |
-| Superseded `dump-research-info` proposal | workflow run [32865096194](https://github.com/leej3/orinoco-lite-demo/actions/runs/32865096194), draft pull request [13](https://github.com/leej3/orinoco-lite-demo/pull/13), base `5cb8c406bcb02cac5d98aae4a3afae2bd4a9191b`, DataLad proposal `9f3b0217410d134a167e67db017b9783fe9fb784`, tree `4c1e9269c548b1e5c49ef012ac2e838b3e64d19f` | Historical exact source coordinate is `{"commit":"efe603f16875ad9798c6ce04aaf35d0a0d5404a0","repository":"https://github.com/con/dump-research-info","source_directory":"data/con_site","tree":"29f90931d6e42fee0473d751e2e0e89ae5c6872e"}`. The 85-candidate proposal proves the superseded policy integrated, but it is not the current curation entry point and must not be finalized or merged. |
-| Superseded `dump-research-info` decision-review artifact | [artifact 9569769136](https://github.com/leej3/orinoco-lite-demo/actions/runs/32865096194/artifacts/9569769136), `orinoco-curation-review-9f3b0217410d134a167e67db017b9783fe9fb784`, 8,478 bytes, ZIP digest `sha256:6b9364e3f6898f8be5318f0bad46817bac20264b38ba927db30504503f3ec279`, extracted JSON SHA-256 `deca0b7f03fb76a145f9ed8169cf5ac6f7ed01b95f4b7d522c8e1a8ca37580a3`, expiry `2026-11-23T15:19:43Z` | The authenticated route loaded all 85 records and posted no decision. The artifact is retained only as presentation evidence for the superseded proposal. |
-| Superseded `dump-research-info` exact-head SHACL input | run [32865188384](https://github.com/leej3/orinoco-lite-demo/actions/runs/32865188384), artifact `9569879624`, digest `sha256:514bc611c14cd104a37a7c1895a9cfd924e536e97e7fb0f6aa61f24458cb5724` | Trusted code validated and presented the superseded exact head; no handoff commit was created. This does not approve its metadata policy. |
-| Superseded `dump-research-info` proposal-head CI | run [32865185591](https://github.com/leej3/orinoco-lite-demo/actions/runs/32865185591), static-site artifact `9570103691`, digest `sha256:8eaf88a07b24a99bfbbfb3b50e36542504124356ed15700faf4a58fc8df47e75` | Both platforms passed the exact historical 226-record proposal. Replacement multi-root-source and external-creator acceptance remains pending. |
+Authenticated browser evidence also verified the exact-head wrapper, normal editor controls, and guarded **Propose via GitHub** action.
+A complete live write/replacement was not needed to accept the implemented profile.
+The first live proposal and a visible choice between credential-free download and the authenticated wrapper are Milestone 6 acceptance items.
 
-Pull requests 9 and 11 are retained as superseded real runs that exposed two metadata-dependent fixture assumptions; no decisions were submitted and neither was merged.
-Pull request 7 remains the current Zotero review entry point.
-Pull request 13 is superseded integration evidence and must be replaced after the HR-218 engine, source, and multi-root adapter changes are released and adopted.
+The downstream site's credential-free `/edit/` page and the central application's authenticated `/edit/` wrapper are intentionally different surfaces.
+Being signed in does not add a GitHub button to the static page.
 
-## GitHub profile
+## Boundaries retained
 
-Normative profile: [`github-curation-review.md`](github-curation-review.md)
+- Source acquisition remains read-only and no workflow writes to Zotero or `dump-research-info`.
+- Automation never chooses a disposition, approves, merges, deploys, or changes production content.
+- The hosted application retains no metadata, candidates, decisions, bundles, source payloads, or durable credentials.
+- Pull-request code is treated as data by trusted default-branch workflows.
+- The real CON site, its remotes, Pages configuration, deployment, DNS, and domain were not changed.
+- No persistent metadata service, candidate inventory, event ledger, transaction graph, or extra semantic overlay was introduced.
 
-| Requirement | Required evidence | Status |
-| --- | --- | --- |
-| Proposal | Default-branch dispatch opens one draft pull request whose first commit is an inline `datalad run --explicit` metadata proposal. | pass: runs `32809444741` and `32865096194` opened real draft pull requests 7 and 13 at proposals `f087cd3884a5b54885553d0d5e89b57c21d564b3` and `9f3b0217410d134a167e67db017b9783fe9fb784` |
-| Pull-request summary | Trusted workflow provides a concise service link, source coordinate, retention notice, and merge-history requirement; detailed presentation facts remain in the ephemeral artifact. | pass in real pull requests 7 and 13 |
-| Review application | Deployed application shows responsive before-and-after record diffs, friendly primary identifiers, secondary source/path/hash details, mutually exclusive controls, bulk defaults for unresolved records, filters, changed-only views, keyboard navigation, and completion status. | 105 application tests and production deployment pass; authenticated pull request 13 review filled all 85 unresolved records, preserved an individual override, and reset to 0/85 on reload without submission |
-| Stateless service | The decision path exercises metadata read, Contents read, Actions read, and pull-requests write; the shared App's Contents write is confined to the separate explicit SHACL Vue handoff profile. OAuth state and short-lived sessions are operational state, and no proposal, decision, metadata, provenance, source, refresh token, or durable credential copy is retained. | deployment has no persistent bindings; App permissions and repository-scoped installation `156354646` pass |
-| Complete decision state | Exact structured `/curation submit` binds repository, pull request, proposal commit, head, source, and the complete diff-derived candidate set; the trusted Action regenerates source IDs and claim digests and rejects missing, duplicate, unknown, or stale decisions. | focused app/Action tests pass; authenticated live submission pending |
-| Human modifications | Comments and direct commits can produce attributed, validated metadata changes on the same branch. | focused tests pass; live attributed edit pending |
-| SHACL Vue editing | GitHub proposal editing through SHACL Vue remains a distinct human-edit profile rather than a bundle input to this decision workflow. | exact-head input and attributed links pass at pull requests 7 and 13; authenticated released-editor rendering, preserved download, and the guarded proposal control pass at pull request 7; live handoff remains pending |
-| DataLad boundary | Programmatic metadata changes use the project Pixi/DataLad task; decision-cache-only commits use ordinary Git. | proposal/finalizer tests pass; normalization `0305fe8b19536f81318de10022b9bd77ab58fd21`, Zotero proposal `f087cd3884a5b54885553d0d5e89b57c21d564b3`, and dump proposal `9f3b0217410d134a167e67db017b9783fe9fb784` supply real inline-run evidence |
-| Attribution | The GitHub App posts on the user's behalf; the Action derives the reviewer from authenticated comment context, and each bot commit uses the most recent triggering human as author and automation as committer. | focused identity tests pass; live comment/commit pending |
-| Trusted execution | Write credentials are not exposed to pull-request executable code or source data. | default-branch checkout and credential-isolation tests pass |
-| Exact-head update | Automated writes use the observed pull-request head and fail on a concurrent change. | focused compare-and-swap and stale-head tests pass; live update pending |
-| Correction | A pre-merge correction remains on the same pull request and finalization reruns against the new head. | focused interaction tests pass; live correction pending |
-| Merge preservation | The default branch permits a merge commit and retains the exact proposal and human-review commit objects. | `required_linear_history=false`; real curation merge remains pending |
-| Conflict handling | A conflicting proposal is regenerated from the new base; a clean non-overlapping proposal is not. | both orders and conflict regeneration pass in consumer run `32788660797` |
-| Human authority | Automation never chooses a disposition, marks review ready, approves, merges, deploys, or writes to the source. | workflow permissions and negative-action tests pass |
-| Public retention | The proposal discloses that rejected public metadata remains in Git history and requires acknowledgment before publication. | workflow and handoff tests pass; real pull requests 7 and 13 contain the notice |
-| No local requirement | An authorized reviewer completes the normal workflow through the linked web application and GitHub without a checkout. | authenticated central discovery and record review pass for both proposals, including all 85 pull request 13 records; decision completion remains pending |
-| Complexity boundary | No tracked inventory, review document, manifest, sidecar, reconciliation report, custom journal, or attestation graph is introduced. | merged tree and deployed bindings inspected; pass |
+## Follow-on work
 
-Application routing pull request [20](https://github.com/con/orinoco-lite-dev/pull/20) merged as `00cb9a52a6f10e064ded77b989d25ba84c061767`.
-OAuth issuer fix pull request [21](https://github.com/con/orinoco-lite-dev/pull/21), head `8476f132f27243959d92f11d0388783a11869f34`, merged as `3edb7690db4879f8decc963c0e24f1046ac90326` with tree `9f1f3f2dced4220c3669b9499ebbaf5fc52d6e2a`.
-Workerd invocation pull request [22](https://github.com/con/orinoco-lite-dev/pull/22), head `640e0b591c2869c59d6d5909e54231816f5abfdd`, merged as `bb6573468f0c019553921f3a5c75cf7f972152d5`; redirect handling pull request [23](https://github.com/con/orinoco-lite-dev/pull/23), head `c3ec3ac9dda8e55645b3ab21a5c26070cf0b8352`, merged as `8f5dd9bccd28905921b4b0857d3ac4b382b08711`.
-Safe OAuth-diagnostic pull request [25](https://github.com/con/orinoco-lite-dev/pull/25), head `7b135dc0aa44d744454e0757053c08535ac276c9`, merged as `ab174fa19f02beab42a8fe028d26a8bc55bf9371`; GitHub API identification pull request [26](https://github.com/con/orinoco-lite-dev/pull/26), head `bd7c68161dbe4e27eacb21c5d20abcd09a4c5ca1`, merged as `3a38ef9aec43093906c570c5ee65a5445f4567b4`.
-Artifact-download identification and canonical editor-asset pull request [27](https://github.com/con/orinoco-lite-dev/pull/27), head `2804b61e8f874d6a1a4bd935ce4056bcadbda417`, merged as `ba686cc3f701035e7153412e93d5833d0bb9063f` with tree `4c3a77094d5c20fdaf8056f4144a01127b100a9c`.
-Bulk review-default pull request [30](https://github.com/con/orinoco-lite-dev/pull/30), head `71b81f1798714ceafba12fdba5aa44dcfaa1581d`, merged as `30c766d028c3d1f304b584a282490bdc13d101d0` with tree `231b9685c40c8d6410fbe9b6df33266d3fa30d6c`.
-Application runs [32854294038](https://github.com/con/orinoco-lite-dev/actions/runs/32854294038), [32855045412](https://github.com/con/orinoco-lite-dev/actions/runs/32855045412), [32857747857](https://github.com/con/orinoco-lite-dev/actions/runs/32857747857), [32858625986](https://github.com/con/orinoco-lite-dev/actions/runs/32858625986), and [32859876555](https://github.com/con/orinoco-lite-dev/actions/runs/32859876555) passed; corresponding engineering runs [32854294068](https://github.com/con/orinoco-lite-dev/actions/runs/32854294068), [32855045402](https://github.com/con/orinoco-lite-dev/actions/runs/32855045402), [32857747814](https://github.com/con/orinoco-lite-dev/actions/runs/32857747814), [32858625929](https://github.com/con/orinoco-lite-dev/actions/runs/32858625929), and [32859876536](https://github.com/con/orinoco-lite-dev/actions/runs/32859876536) passed on both supported platforms with the live recorded upstream job intentionally skipped.
-A clean detached Node 22.23.2 `npm ci --ignore-scripts` plus `npm run check` before the bulk-default merge passed all 104 then-current tests, type checking, Prettier, the Vite production build, and the Pages Functions build.
-Pull request 30 application run [32887156832](https://github.com/con/orinoco-lite-dev/actions/runs/32887156832) passed all 105 tests, type checking, formatting, and both production builds; engineering run [32887156848](https://github.com/con/orinoco-lite-dev/actions/runs/32887156848) passed on both supported platforms with the live recorded-upstream job intentionally skipped.
-Cloudflare deployment `e55a8f4d-9f77-4d5d-81be-2cfebf393b9f` is bound to exact clean merge `30c766d028c3d1f304b584a282490bdc13d101d0` with `commit_dirty=false` and serves [its immutable URL](https://e55a8f4d.orinoco-curation-review.pages.dev) and [the production origin](https://orinoco-curation-review.pages.dev).
-Production and immutable `/review/` HTML are byte-identical with SHA-256 `52210905494a03498f10eeb2f6580e8c073333f61aa39019a136fd52c4932560`; anonymous `/api/session` returned HTTP 200 with body SHA-256 `3e58c6fcf10a31770582814c2babfd1ff71bb1a72cae32cdb1c1a428f406d47f`.
-The `/review/` and `/edit/` routes, legacy-root exact review link, and digest-pinned editor runtime return the expected content; the staged runtime directory resolves with HTTP 200 without weakening manual-redirect checks.
-The anonymous session remains stateless, and the deployment has no KV, D1, R2, Durable Object, queue, or Worker product binding.
-The deployed runtime manifest digest is `839f82029ae0b4805a6d8c53afd88eb18a53023daf13fa5fd09c217dc8f101fd`.
-The deployment accepts GitHub's unique exact `iss=https://github.com/login/oauth` callback parameter while rejecting duplicate, untrusted, and unexpected callback fields without weakening state, PKCE, or redirect checks.
-An exact-issuer production probe returns HTTP 401 with error code `missing_oauth_state`, rather than `invalid_oauth_callback`.
-GitHub App user-to-server token expiration remains enabled.
-Real Safari GitHub App sign-in succeeded as `leej3`; repository-only discovery selected the sole open proposal and exact review artifact, the pull-request link loaded all 126 candidates, and exact-head SHACL Vue editing painted the released editor plus separate guarded proposal control.
-On real pull request 13, `Accept all unresolved` produced 85/85 Accept choices; changing one record produced 84 Accept and one Reject while preserving 85/85 completion.
-Reload restored 0/85 and no checked controls, proving that unsubmitted defaults remain transient. The GitHub App client secret was rotated before that proof; after the successful flow, the superseded never-used credential was permanently deleted, leaving only the working rotated credential. No bundle, commit, pull request, decision, proposal comment, handoff, approval, merge, deployment from proposal code, or external-source write was created by those live checks. The public GitHub App [`orinoco-lite-curation-review`](https://github.com/apps/orinoco-lite-curation-review) (App 4704454) has metadata read, Contents write, Actions read, and pull-requests write; personal-account installation `156354646` selects only `leej3/orinoco-lite-demo`. Infrastructure pull request [Python-AI-Solutions/websites-management#14](https://github.com/Python-AI-Solutions/websites-management/pull/14), head `21b52400c0883a057a17374893e4ea19456b7031`, merged as `27f68e085fd28068f848330d68de8d6afccea7dc` after its validation check passed. The exact `0 add, 1 change, 0 destroy` OpenTofu apply changed only the public runtime manifest digest under lineage `85c4e740-c3c3-06b0-7786-0b91fa7fc457`, advanced production-state serial `50` to `51`, and was followed by no-change plans before and after deployment.
-The current application coordinate is engineering pull request 30; infrastructure remains unchanged from the attributed evidence on [infrastructure pull request 14](https://github.com/Python-AI-Solutions/websites-management/pull/14#issuecomment-5412059515).
-
-## GitHub SHACL Vue human-edit profile
-
-Normative profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
-
-| Requirement | Required evidence | Status |
-| --- | --- | --- |
-| Neutral editor handoff | Existing download bytes remain unchanged; the browser event exposes the exact same version 2 object and contains no GitHub or curation semantics. | engine pull request 16; object-identity and unchanged-download tests passed in release run `32786292302` |
-| Exact editor state | Existing-PR editing is bound to its exact head and standalone editing to an exact default-branch commit. | app tree `4c3a77094d5c20fdaf8056f4144a01127b100a9c`; real pull requests 29, 7, and 13 produced exact-head artifacts and attributed links; authenticated canonical `/edit/` rendering passed against pull request 7 head `f087cd3884a5b54885553d0d5e89b57c21d564b3` |
-| Authenticated proposal | A write/admin curator explicitly creates a same-repository draft branch or appends to an existing draft PR through the configurable service. | focused service tests and repository-scoped App Contents-write authorization pass; live handoff pending |
-| Temporary handoff | One bounded bundle-only commit has one exact parent and cannot merge; the public-retention warning excludes secrets and non-public data. | app and consumer pull request 28 tests pass; live handoff pending |
-| Trusted conversion | Default-branch Python applies pinned Orinoco behavior without executing PR code and permits only canonical records and mirrored annotation companions. | consumer default `bf683b6da8cad04ae3a62c4e34ad04521353d94a`; workflow/helper tests and canonical merge-head validation passed |
-| Replacement history | Exact force-with-lease replaces only the handoff commit with an attributed human metadata commit sharing its parent; every earlier commit survives and the final branch contains no bundle. | consumer pull request 28 repeated-edit and exact-lease tests pass; live handoff pending |
-| Joined validation | Stored records, annotation companions, and the complete joined graph validate before the replacement ref is published. | trusted runs `32794977293`, `32809501669`, and `32865188384` validated real exact heads; live bundle replacement pending |
-| Least privilege | Contents write is used only for explicit human handoff branch/commit operations; no approval, merge, deployment, disposition, cache, provenance, or source write occurs. | implementation tests and App installation `156354646` pass; live handoff pending |
-| Statelessness | Neither service nor Action retains the bundle after replacement, and no database, metadata service, manifest, journal, or recovery protocol is introduced. | application/workflow inspection and deployed no-binding evidence pass; live handoff pending |
-
-The browser-Python feasibility spike was closed without retained code: the pinned conversion stack requires unavailable native/WASM dependencies and Git/subprocess behavior, so conversion remains in trusted default-branch Python rather than a browser or TypeScript replacement.
-Default-branch SHACL publication run [32789236694](https://github.com/con/test-orinoco-downstream-website/actions/runs/32789236694) produced artifact `9542562091`, name `orinoco-shacl-vue-input-14414164bcf7f901261be8ecb7364c67b42b62a6`, digest `sha256:0ea26de44d9f723882aa1db8d6a6a45c009f7e33cc955ad9ef2a1bdda8468f27`, 243,200 bytes, expiring 2026-11-22.
-Default-main Pages run [32789236666](https://github.com/con/test-orinoco-downstream-website/actions/runs/32789236666) passed.
-Default-main validation run [32789237197](https://github.com/con/test-orinoco-downstream-website/actions/runs/32789237197) passed on attempt 2 after a transient loose-object checkout failure on the first Linux attempt; no source change was required.
-At real draft pull request 29 head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, trusted run [32794977293](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794977293) classified the three-commit merge history as canonical, validated 199 records and a deterministic 467-edge/186-node graph, and produced [artifact 9544519920](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794977293/artifacts/9544519920), name `orinoco-shacl-vue-input-0bbec9bc2871ddb60dd351e616dda62386ad970b`, digest `sha256:3faba63410653d7295cdc4d6a5c3d784e6f41639d4a03c695bb39e78b9002518`, 243,195 bytes, expiring `2026-11-23T00:46:39Z`.
-The workflow posted the [attributed exact-head service link](https://github.com/con/test-orinoco-downstream-website/pull/29#issuecomment-5403481275) and performed no handoff replacement.
-The preceding failure at run `32792689668` isolated the merge-head classification defect; template pull request 14 and immutable `v0.2.0rc4` corrected it while retaining one-parent bundle heads, approved-path history checks, and rejection of unapproved merge resolutions.
-
-Template pull requests [15](https://github.com/con/orinoco-lite-template/pull/15) through [18](https://github.com/con/orinoco-lite-template/pull/18) merged the canonical service routes, release preparation, and the structured engine-lock regeneration fix as `1b6bc6077898252726215a3ddeb1f4863354b57a`, `61f3521b3008b7608f02d857b57d9ed4dad5a516`, `4c36fe858132cf761814143ae1b4686e1f0083d5`, and `92fa8f3b25462f9a8b7c5418eb76920732b00ae6`, respectively.
-The updater defers only rejection witnesses whose paths are scheduled engine-lock rebuilds and preserves ordinary, mixed, and `--skip-pixi-lock` conflicts; focused run [32849478212](https://github.com/con/orinoco-lite-template/actions/runs/32849478212) passed 96 tests and render parity on both supported platforms.
-Immutable prerelease [`v0.2.0rc6`](https://github.com/con/orinoco-lite-template/releases/tag/v0.2.0rc6), release `376403133`, points to source/tag `92fa8f3b25462f9a8b7c5418eb76920732b00ae6` and published `github-template` commit `ac2d05d189a04d74288c78675d31a719ced76558`, tree `28800a4740b69e905fcd04b1b1704de92a1b8723`. It retains immutable engine/runtime `v0.2.0rc3` and workflow `8bd328b17e359bf9594e83381c3efc1c7ab0ecac`; source run [32850028092](https://github.com/con/orinoco-lite-template/actions/runs/32850028092) passed.
-
-## Cross-layer acceptance
-
-Current cross-layer coordinates are:
-
-- engineering pull requests 16, 17, 19 through 27, and 30, with pull request 24 integrated at merge head `399870488644a1fa90c1867cecb7a045239a79c5`, latest default-branch merge `30c766d028c3d1f304b584a282490bdc13d101d0`, release/tag `v0.2.0rc3` at `7e331a2c61be2a5701c95c7dc48acf61d2ee106d`, and release rollback parent `8bd328b17e359bf9594e83381c3efc1c7ab0ecac`;
-- template pull requests 12 through 18 and latest release/tag `v0.2.0rc6`, source rollback parent `4c36fe858132cf761814143ae1b4686e1f0083d5`, and published-branch rollback parent `211abc68cdb5ef0b95554d290d3418c67fe9ee1b`;
-- consumer pull requests 28 and 30 through 35, latest merge `bf683b6da8cad04ae3a62c4e34ad04521353d94a`, route/release-adoption head `43a28b1fbcf10330615c8ff9823f3971008ceb02`, and rollback parent `3f75c7d1395f1d442ba30d15516bd9d8ce8db949`;
-- personal demonstration pull requests 6, 8, 10, and 12, latest merge `5cb8c406bcb02cac5d98aae4a3afae2bd4a9191b`, superseded dump proposal pull request 13 at `9f3b0217410d134a167e67db017b9783fe9fb784`, and rollback parent `68738ed8df375fe14d87da216c6d8a7ee6d7e82c`;
-- infrastructure pull request 14 and merge `27f68e085fd28068f848330d68de8d6afccea7dc`, rollback base `91cbfbc65de29377d6b1679a4715a47bd24ee95c`; and
-- separate canonicalization pull request 29 at merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, whose review and merge remain pending.
-
-Published `v0.2.0rc3` release and embedded manifest SHA-256 values are: wheel `5224bf90ca441b70012f7297b21b1b8072fe612e9c8984d3682c824118037267`, source distribution `5dac72b1486ddd22b79e8f40ca4bc6220faba2b072e46223d52be24f01632ca2`, runtime `d25be7a05da33b6b91dc7b3bc1c6b83168f9c54f6bca663cb4a4902e1e7b060a`, runtime manifest `839f82029ae0b4805a6d8c53afd88eb18a53023daf13fa5fd09c217dc8f101fd`, provenance bundle `5a326f741360e229497bb4d581a5f5bda81b0d64f91f3b30373b334f57955e96`, and `SHA256SUMS` `2a12d5a20000321e7e9933c0a4333c870e09d38548f95dd3168d4d3f58bb185a`.
-GitHub artifact attestations verified for the wheel, source distribution, and runtime; an unauthenticated public wheel install reported `orinoco-lite 0.2.0rc3`.
-Engineering pull request 24 run [32866853663](https://github.com/con/orinoco-lite-dev/actions/runs/32866853663) passed the complete engineering contract on macOS 14 ARM64 and Ubuntu 24.04 x86-64 at merge head `399870488644a1fa90c1867cecb7a045239a79c5`; the live recorded-upstream job was intentionally skipped.
-
-Still required are an immutable engine/runtime release for HR-218, review and merge of `dump-research-info` pull request 27, multi-root authoritative-role acquisition in the downstream adapter, a replacement dump proposal, compact-cache examples from authenticated finalization, the same-source no-op rerun, one real SHACL handoff, and the merge commit that proves proposal and review commits survive.
-The real Zotero proposal remains current.
-The superseded dump proposal retains exact dispatch-time and presentation evidence but supplies no current merge or finalization coordinate.
-
-## Conditional semantics
-
-Additional W3C PROV and SSSOM are not activated.
-If a later concrete lineage question or ontology-mapping set requires either, amend the normative specification first and add focused round-trip evidence here.
-
-## Exit status
-
-Milestone 5 implementation and distribution are complete through the previously released contract, and the central service remains deployed and authenticated against the isolated public demo.
-The HR-218 identifier-resolution correction is implemented locally but is not yet released or integrated.
-Exit remains pending on review and merge of the separate corpus normalization, an authenticated human decision submission/finalization and same-source rerun, one explicit SHACL handoff, release and downstream adoption of HR-218, merge of `dump-research-info` pull request 27, and a replacement downstream proposal.
-No synthetic metadata proposal was created; the live checks created no decision or handoff, and no curation proposal was approved or merged by automation.
+The pre-Milestone 6 boundary in [`milestone-6.md`](milestone-6.md) owns upstream repinning, resulting compatibility fixes, the aligned release, and the separately authorized organization migration.
+Milestone 6 begins afterward with general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, and SHACL proposal discoverability and live use.
+The corpus-normalization proposal remains site-owned content review and is not an engineering milestone or downstream-adoption gate here.

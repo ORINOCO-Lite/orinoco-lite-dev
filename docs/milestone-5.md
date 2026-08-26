@@ -1,6 +1,6 @@
 # Milestone 5: complete source-adapter support
 
-Status: active implementation milestone
+Status: accepted and complete on 2026-08-26
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
@@ -15,6 +15,11 @@ GitHub human-edit profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
 Acceptance record: [`milestone-5-acceptance.md`](milestone-5-acceptance.md)
+
+Successor: [`milestone-6.md`](milestone-6.md)
+
+The implementation sequence below is retained as the accepted Milestone 5 plan, not as current operating work.
+The acceptance record summarizes the delivered result without reproducing every transient artifact coordinate.
 
 ## Outcome
 

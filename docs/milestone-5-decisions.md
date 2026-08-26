@@ -1,6 +1,6 @@
 # Milestone 5 decision register
 
-Status: architecture accepted; implementation evidence pending
+Status: accepted and implemented
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
@@ -20,7 +20,7 @@ This register summarizes reviewed engineering outcomes without duplicating the n
 | M5-D004 | The authenticated reviewer confirms the complete decision state. The hosted GitHub App posts on the user's behalf, the Action derives identity from the comment event, and the most recent triggering human is the Git author of a bot-applied change; automation is the committer. | The compact cache and Git/host history retain reviewer, time, source coordinate, and review URL without trusting browser-supplied identity or deciding who may approve production content. |
 | M5-D005 | Git and DataLad record execution and review history; PAV records machine assertion provenance. | Additional W3C PROV is not activated without a demonstrated unanswered lineage query. |
 | M5-D006 | No ontology-mapping representation is activated by Milestone 5. | SSSOM is used only if a genuine mapping set later requires it; rejection, identity linkage, and deduplication are not mappings. |
-| M5-D007 | The host-neutral contract, shared canonicalizer, annotation-overlay join, and GitHub profile are common Orinoco Lite behavior. Concrete adapters and policy remain site-owned. | No generic Python ABI, plugin framework, persistent adapter service, or second host implementation is required. |
+| M5-D007 | The shared canonicalizer, annotation-overlay join, candidate model, and finalizer are common Orinoco Lite behavior. The supported hosted review and compact-cache profile are GitHub-specific. Concrete adapters and policy remain site-owned. | No generic Python ABI, plugin framework, persistent adapter service, or second hosting-provider implementation is required. |
 | M5-D008 | Canonical semantic metadata is stored in `metadata/records/` plus `metadata/overlays/annotations/` and joined before validation or RDF export. Records retain semantic assertion content; companions retain only PAV. | Human-facing record diffs remain readable while the resulting graph preserves upstream PAV semantics. Another overlay requires a focused specification change. |
 | M5-D009 | The supported GitHub decision interface is a deployed web application backed by a minimal stateless GitHub App user-authorization service; the proposal commit contains the actual metadata diff, one expiring Actions artifact supplies presentation facts, and pull-request Markdown is an accessible fallback. | The service reads GitHub proposal and Actions objects and posts the complete proposal- and head-bound decision payload as the user; it runs no adapter or source logic, stores no metadata or curation state, and never commits, approves, merges, deploys, or writes to a source. GitHub Actions regenerates candidate facts and remains the trusted commit boundary. |
 | M5-D010 | Annotation joining follows the pinned upstream distinction between object, data, and class-range assertions. Class-range URI assertions use the pinned `Statement` shape; non-string topical data retains its native type and uses a schema-typed lexical value in its `AttributeSpecification`. | The accepted shapes preserve assertion-level PAV without turning URI relationships into literals or coercing topical metadata to strings. |
@@ -48,6 +48,9 @@ M5-D001 through M5-D021 refine M4-I003, M4-I008, M4-I014, and M4-I015 and implem
 HR-218 and M5-D019 supersede HR-216 and M5-D017 without rewriting their historical review record.
 HR-220 and M5-D021 refine the operational part of HR-214 and M5-D015 without deleting the historical v1 provenance record.
 All other accepted Milestone 4 boundaries remain in force, including the ordinary-repository topology, no-persistent-service requirement, human review authority, site-owned adapter policy, and read-only real-site boundary.
+
+Milestone 6 decision M6-D001 supersedes M5-D019's field-specific exception and general local-closure default with upstream-compatible preservation of well-formed unresolved references.
+M5-D019 remains the historical decision for the reviewed `dump-research-info` correction; its prohibition on substituting a venue for an identifier creator remains valid semantic evidence.
 
 ## Superseded exploration
 

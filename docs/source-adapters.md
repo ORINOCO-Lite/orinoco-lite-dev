@@ -2,13 +2,12 @@
 
 Status: normative specification
 
-This document defines a host-neutral source-adapter contract.
-The initial hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
+This document defines the shared metadata behavior and supported GitHub review contract for Orinoco Lite source adapters.
+The hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
 The distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
 The GitHub profiles reuse one small stateless authentication application and keep their two expiring GitHub Actions presentation artifacts distinct: one proposal-review bundle and one exact-head editor input.
 Neither artifact is a metadata service or durable curation store.
-This document does not define a Python ABI, plugin protocol, or persistent metadata service.
-Superseded but potentially useful implementation observations are retained in the non-normative [source-adapter design notes](../reports/source-adapter-design-notes.md).
+This document does not define a Python ABI, plugin protocol, persistent metadata service, or second hosting-provider profile.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
@@ -363,18 +362,23 @@ An incompatible adapter change MUST advance the provider version, reviewed ident
 Historical identity records MAY remain to interpret earlier provenance, but they do not retain an executable compatibility path or make an old identity selectable for a current run.
 The stable internal protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` bind regeneration and finalization to the proposal's exact provenance identity; their use of “agent” neither creates an operator choice nor selects a Things schema class.
 
-For the Milestone 5 `dump-research-info` source correction, configured site-graph relationships and identifier creators have different resolution contracts.
-A relationship object that contributes to the declared local graph MUST identify a local Thing, and a controlled role that the presentation dereferences MUST likewise be present in the downstream record pool.
-The adapter MUST obtain the first-, senior-, and co-author role Things from their authoritative `pool_psychoinformatics_de` source records rather than duplicate reduced versions under `con_site`.
+Canonical Things MAY refer to a Thing that is not stored in the same local record pool.
+Every such value MUST remain well formed and pass the pinned schema and RDF conversion contract.
+Validation and projection MUST preserve the reference without network access and MUST NOT create a local identity record merely to make the graph closed.
+
+When a matching local Thing exists, configured inlining resolves it; otherwise the reference remains a scalar, matching upstream query behavior.
+The local graph materializes only edges whose selected source and target nodes exist.
+Projection MUST report missing reference targets and omitted graph edges deterministically rather than silently discarding them.
+A downstream MAY apply stricter local-reference validation as explicit site policy.
+A presentation feature that actually dereferences a target MAY also require that target locally, but that focused requirement does not make every external reference invalid metadata.
+
+For the Milestone 5 `dump-research-info` source correction, the presentation dereferences the first-, senior-, and co-author role Things.
+The adapter MUST therefore obtain those roles from their authoritative `pool_psychoinformatics_de` source records rather than duplicate reduced versions under `con_site`.
 It MAY read multiple declared roots from one immutable source repository coordinate, but it MUST bind every root to that commit and exact tree, union selected records by PID, and stop on unequal duplicate PIDs rather than choose an input-order winner.
 The resulting downstream still has one ordinary `metadata/records/` pool; source roots do not create another downstream metadata class.
 
-`Identifier.creator` instead has the pinned schema range `Thing`, but neither pinned record conversion nor upstream query inlining requires that referenced Thing to be present in the same local collection.
-Lite validation and projection MUST therefore accept such an external Thing reference without network access.
-LinkML serializes the reference as a PID string.
-When a matching local Thing exists, configured inlining resolves it; otherwise pinned qri behavior preserves the unresolved PID scalar.
-This is a deliberate exception only for `Identifier.creator`, not permission for an open site graph; existing schema conversion may still reject a malformed reference.
-An unresolved identifier creator is therefore not, by itself, a reason to add a GitHub, ORCID, ROR, or other provider identity stub.
+`Identifier.creator` has the pinned schema range `Thing`; an unresolved creator is therefore one ordinary case of the general reference policy above.
+It is not, by itself, a reason to add a GitHub, ORCID, ROR, or other provider identity stub.
 The JMLR publication-venue Thing MUST NOT replace an identifier creator merely to satisfy local-target validation: a venue is not the agent required by the slot semantics.
 For JMLR source key `17-434`, the canonical official article URL PID already retains that key, so the source correction MUST omit the redundant generic identifier rather than invent a creator or substitute the venue.
 Other replacements or omissions require evidence about identifier semantics, not projection closure.
@@ -382,7 +386,7 @@ Other replacements or omissions require evidence about identifier semantics, not
 W3C PROV is added only when a specific lineage query cannot be answered by Git, DataLad, and PAV.
 SSSOM is used only for a genuine ontology mapping set and never as a decision cache or generic identity ledger.
 
-## Host profile
+## Review and merge profile
 
 A conforming host MUST provide:
 
@@ -398,13 +402,9 @@ A conforming host MUST provide:
 A conforming downstream MUST permit merge commits on its curated branch.
 A linear-history-only branch policy is not supported.
 
-The adapter core is host-neutral.
-No second host implementation is required until the GitHub profile is complete, but another host may implement the same contract without adopting GitHub-specific files or APIs.
-
-### GitHub profile
-
-The initial supported host implementation MUST conform to the normative [`GitHub source-adapter curation profile`](github-curation-review.md).
-That profile owns GitHub-specific workflow, authentication, interface, comment, and hosting behavior without changing this document's metadata, provenance, decision, or history contract.
+The supported implementation MUST conform to the normative [`GitHub source-adapter curation profile`](github-curation-review.md).
+That profile owns workflow, authentication, interface, comment, cache-reference, and hosting behavior.
+The canonicalizer, annotation join, candidate model, and finalizer remain shared repository behavior, but the durable v1 review cache and hosted profile are explicitly GitHub-specific.
 
 The trusted proposal workflow MUST publish exactly one untracked, expiring, reproducible GitHub Actions presentation bundle for the hosted application.
 The bundle contains the identified source and proposal coordinates and the per-record facts required to render the review interface.
@@ -503,9 +503,7 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | Enrichment deletion is limited by assertion ownership; generic deletion remains unresolved | An adapter may propose whole-record deletion | The visible Git deletion and human decision replace service-side ownership gating. |
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | The ephemeral update view uses compact PAV, while the joined validation/RDF view uses expanded annotation objects | The pinned helper recognizes compact ownership and the pinned converter requires expanded annotations for lossless round trips. The conversion is transient and parity-tested. |
-| Query inlining preserves an unresolved PID as a scalar | Preserve an unresolved `Identifier.creator` Thing reference, while still rejecting missing targets for declared local graph relationships | Aligns Lite inlining with upstream unresolved-reference behavior while retaining stricter deterministic, offline graph materialization; this is an explicit projection policy, not a schema-range claim. |
+| Query inlining preserves an unresolved PID as a scalar | Preserve every well-formed unresolved Thing reference and report graph edges whose targets cannot be materialized locally | Aligns Lite with upstream open-reference behavior while keeping deterministic, offline projection and permitting stricter site policy. |
 | Service curation API and authorization model | Hosted stateless review application and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
-
-Implementation status is recorded separately in the non-normative [source-adapter implementation report](../reports/source-adapter-implementation-gaps.md).
 
 Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing semantic overlays beyond the defined annotation overlay.
