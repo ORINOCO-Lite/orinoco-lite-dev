@@ -2,7 +2,7 @@
 
 Status: Milestone 4 accepted; Milestone 5 active; production-graduation review remains open
 
-Review snapshot: 2026-08-24
+Review snapshot: 2026-08-26
 
 This is the single working list of unresolved **human choices** accumulated through the clean migration, full migration, complete-content migration, and single-repository distribution work.
 It separates policy from facts with an objectively testable answer.
@@ -68,6 +68,7 @@ Priorities mean:
 | HR-211 | P2 | Presentation | Decide whether the organization record needs a page |
 | HR-213 | P2 | Hosted editing | Turn the normal SHACL Vue bundle into an attributed GitHub metadata proposal |
 | HR-214 | P2 | Provenance identity | Model the two versioned source adapters using the pinned upstream pattern |
+| HR-220 | P2 | Provenance operation | Derive each adapter's current provenance identity from reviewed site policy |
 
 ## P0 — close the current engineering review
 
@@ -647,19 +648,20 @@ A public Git host can retain unreachable objects, so the path is limited to data
 
 ### HR-214 — Use upstream-style instrument identities for adapters
 
-**Status:** accepted
+**Status:** accepted; operational selection refined by HR-220
 
-**Question:** Which canonical Things should identify the Zotero and `dump-research-info` adapters in `pav:importedBy`?
+**Question:** Which versioned Things should identify the Zotero and `dump-research-info` adapters in `pav:importedBy`?
 
 **Outcome:** Store `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v1` as versioned `xyzri:XYZInstrument` records.
-Retain the existing protocol field names for compatibility; their use of “agent” does not require an Agent schema class.
+Treat the existing protocol field names as transport vocabulary; their use of “agent” does not require an Agent schema class.
 
 **Rationale:** The pinned enrichment rules require a versioned pool record for every enricher, their examples and executable scrapers use instrument PIDs, and the pinned Things schema treats software as an instrument that enables an action.
 `xyzri:XYZProject` instead models a collective planned activity and is not the upstream-compatible identity.
 
 **Decided by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Add both canonical records to the reviewed consumer, validate them with the locked schema, and record their immutable commit and hosted evidence in Milestone 5 acceptance.
+**Historical follow-up:** Add both v1 records to the reviewed consumer and validate them with the locked schema.
+HR-220 replaces the later operator-selection behavior after the dump adapter's incompatible v2 change.
 
 ### HR-215 — Separate source semantics from presentation routing
 
@@ -770,6 +772,32 @@ Collapsing it changes presentation only and preserves the payload format, review
 **Decided by/date:** John Lee, 2026-08-25.
 
 **Follow-up:** Land backward-compatible downstream parsers before deploying the central application renderer.
+
+### HR-220 — Derive current adapter provenance identity from site policy
+
+**Status:** accepted for the Milestone 5 GitHub profile
+
+**Question:** Who should select the versioned Thing recorded in `pav:importedBy` when a curator starts a source-adapter proposal?
+
+**Outcome:** The curator selects the source adapter, not its provenance identity.
+Trusted, site-owned configuration maps each current adapter implementation to one reviewed versioned `xyzri:XYZInstrument` record.
+The current mappings are `xyzrins:source-adapters/zotero/v1` for Zotero and `xyzrins:source-adapters/dump-research-info/v2` for `dump-research-info`.
+
+The trusted host derives that identity and stops if the record is absent, is not an `xyzri:XYZInstrument`, or does not match the selected provider and its declared adapter version.
+There is no operator-supplied identity and no fallback to an older identity for a new proposal.
+An incompatible adapter change must update the provider version, reviewed identity record, and site mapping together.
+
+The internal `adapter_agent_pid` plan field and `Curation-Adapter-Agent` commit trailer remain exact provenance bindings used for deterministic regeneration and finalization.
+Their historical “agent” naming is transport vocabulary, not a user choice or a Things schema-class claim.
+The dump v1 record may remain as inert historical provenance; retaining that record does not keep a v1 execution path or promise backward compatibility.
+
+**Rationale:** The workflow always runs the current trusted default-branch provider, so choosing an older identity per run has no valid operational meaning.
+The former free-text field could label v2 behavior as v1, or label it with any unrelated extant Thing, because the providers checked only record-pool membership.
+Derivation removes specialist knowledge from routine operation and makes versioned attribution stricter while retaining the upstream rule that incompatible enrichers receive new identities.
+
+**Decided by/date:** John Lee, 2026-08-26.
+
+**Follow-up:** Remove the workflow-dispatch field, add the trusted mappings and strict provider checks, keep current identity records in the complete integration consumer, and record focused and hosted evidence in Milestone 5 acceptance.
 
 ## P2 — strategic decisions
 

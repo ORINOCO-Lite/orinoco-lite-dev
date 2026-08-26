@@ -354,9 +354,14 @@ The accepted source claim remains cached, so the unchanged source MUST NOT later
 
 `pav:importedBy` MUST reference a versioned Thing/PID describing the adapter or enricher, matching upstream practice. Changing the adapter incompatibly requires a new versioned Thing. The exact source revision belongs in Git/DataLad review provenance; `pav:importedFrom` may remain the stable logical record URI.
 
-The Zotero and `dump-research-info` adapter identities used by this milestone MUST be canonical `xyzri:XYZInstrument` records at `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v1`, respectively.
-This follows the pinned upstream enricher pattern of identifying executable software with versioned instrument records.
-The stable protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` do not select a Things schema class.
+Trusted, site-owned configuration MUST map each current adapter implementation to one reviewed versioned `xyzri:XYZInstrument` provenance identity.
+The Zotero and `dump-research-info` mappings used by this milestone are `xyzrins:source-adapters/zotero/v1` and `xyzrins:source-adapters/dump-research-info/v2`, respectively.
+The trusted host MUST derive this value after adapter selection and MUST NOT accept an operator-supplied identity or fall back to an older adapter identity for a new proposal.
+Before creating a proposal, it MUST verify that the mapped record exists, has schema type `xyzri:XYZInstrument`, identifies the selected adapter, and matches the provider's declared adapter version.
+An incompatible adapter change MUST advance the provider version, reviewed identity record, and trusted mapping together.
+
+Historical identity records MAY remain to interpret earlier provenance, but they do not retain an executable compatibility path or make an old identity selectable for a current run.
+The stable internal protocol names `adapter_agent_pid` and `Curation-Adapter-Agent` bind regeneration and finalization to the proposal's exact provenance identity; their use of “agent” neither creates an operator choice nor selects a Things schema class.
 
 For the Milestone 5 `dump-research-info` source correction, configured site-graph relationships and identifier creators have different resolution contracts.
 A relationship object that contributes to the declared local graph MUST identify a local Thing, and a controlled role that the presentation dereferences MUST likewise be present in the downstream record pool.
