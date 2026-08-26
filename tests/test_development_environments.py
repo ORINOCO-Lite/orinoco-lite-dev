@@ -15,6 +15,7 @@ SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
+PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
@@ -119,6 +120,25 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("run: pixi run test-upstream-full", workflow)
         self.assertIn("run: pixi run check-upstream", workflow)
         self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+
+    def test_pages_workflow_records_only_successful_default_branch_deployments(
+        self,
+    ) -> None:
+        workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("workflow_call:", workflow)
+        self.assertIn("Require the current default-branch commit", workflow)
+        self.assertIn("pixi run validate", workflow)
+        self.assertIn("pixi run build-pages", workflow)
+        self.assertIn("prepare_pages_publication.py", workflow)
+        self.assertIn("needs:\n      - build\n      - deploy", workflow)
+        self.assertIn("git push --atomic --force origin", workflow)
+        self.assertIn("refs/heads/latest-hugo-projection", workflow)
+        self.assertIn("refs/heads/gh-pages", workflow)
+        deploy = workflow.index("name: Deploy the built site")
+        record = workflow.index("name: Record the successful deployment")
+        push = workflow.index("git push --atomic --force origin")
+        self.assertLess(deploy, record)
+        self.assertLess(record, push)
 
     def test_consumer_ci_bounds_and_reuses_exact_browser_downloads(self) -> None:
         workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")

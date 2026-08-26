@@ -1,0 +1,141 @@
+name: Orinoco Pages publication
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Exact default-branch commit or the default branch name
+        type: string
+        required: true
+      pixi-version:
+        description: Exact Pixi release used to run the locked consumer
+        type: string
+        required: false
+        default: v0.73.0
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Pages and publication commits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      source-sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Check out the selected default-branch source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs['source-ref'] }}
+
+      - name: Require the current default-branch commit
+        id: source
+        shell: bash
+        env:
+          ORINOCO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch --no-tags origin \
+            "+refs/heads/$ORINOCO_DEFAULT_BRANCH:refs/remotes/origin/$ORINOCO_DEFAULT_BRANCH"
+          source_sha=$(git rev-parse HEAD)
+          default_sha=$(git rev-parse "refs/remotes/origin/$ORINOCO_DEFAULT_BRANCH")
+          if test "$source_sha" != "$default_sha"; then
+            echo "Pages publication source is not the current default branch" >&2
+            exit 1
+          fi
+          echo "sha=$source_sha" >>"$GITHUB_OUTPUT"
+
+      - name: Install the locked Pixi environment
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          cache: true
+          frozen: true
+          pixi-version: ${{ inputs['pixi-version'] }}
+
+      - name: Configure project Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+
+      - name: Validate and build the project-path site
+        env:
+          ORINOCO_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          pixi run validate
+          pixi run build-pages
+
+      - name: Prepare the generated branch commits
+        run: |
+          python .orinoco-lite/tools/prepare_pages_publication.py \
+            --bundle build/pages-publication.bundle \
+            --metadata build/pages-publication.json
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: build/pages
+
+      - name: Transfer the exact generated commits
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: orinoco-pages-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/pages-publication.bundle
+            build/pages-publication.json
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy Pages
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Deploy the built site
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+  record:
+    name: Record the successful deployment
+    needs:
+      - build
+      - deploy
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the exact deployed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.build.outputs.source-sha }}
+
+      - name: Download the exact generated commits
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: orinoco-pages-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/publication
+
+      - name: Verify and atomically update the generated branches
+        shell: bash
+        env:
+          ORINOCO_SOURCE_SHA: ${{ needs.build.outputs.source-sha }}
+        run: |
+          bundle=build/publication/pages-publication.bundle
+          git bundle verify "$bundle"
+          git fetch "$bundle" \
+            'refs/orinoco-publication/latest-hugo-projection:refs/remotes/orinoco-publication/latest-hugo-projection' \
+            'refs/orinoco-publication/gh-pages:refs/remotes/orinoco-publication/gh-pages'
+          projection_ref=refs/remotes/orinoco-publication/latest-hugo-projection
+          pages_ref=refs/remotes/orinoco-publication/gh-pages
+          test "$(git rev-parse "$projection_ref^")" = "$ORINOCO_SOURCE_SHA"
+          test "$(git rev-parse "$pages_ref^")" = "$(git rev-parse "$projection_ref")"
+          git push --atomic --force origin \
+            "$projection_ref:refs/heads/latest-hugo-projection" \
+            "$pages_ref:refs/heads/gh-pages"
