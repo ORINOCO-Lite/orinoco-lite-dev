@@ -1084,7 +1084,7 @@ def build_site(destination: Path, base_url: str) -> dict[str, Any]:
     environment = os.environ.copy()
     environment["HUGO_ENVIRONMENT"] = "con"
     version = run(["hugo", "version"], action="Inspect Hugo version")
-    if "hugo v0.154.5" not in version or "extended" not in version:
+    if "hugo v0.161.1" not in version or "extended" not in version:
         raise BuildError(f"Unexpected Hugo runtime: {version.strip()}")
     run(
         [
