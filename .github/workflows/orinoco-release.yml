@@ -39,6 +39,8 @@ jobs:
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/things-schemas
+          git -C submodules/pool.psychoinformatics.de-ui submodule sync -- \
+            shacl-vue
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
@@ -167,14 +169,14 @@ jobs:
 
       - name: Verify the installed wheel and hermetic package contracts
         run: |
-          echo "Full 199-record parity is consumer-owned and may report an intentional skip here."
           python -m venv build/release-test
           build/release-test/bin/pip install --disable-pip-version-check \
             release/dist/orinoco_lite-*.whl
           build/release-test/bin/python -c \
             'import orinoco_lite,sys; assert str(orinoco_lite.__file__).startswith(sys.prefix)'
-          build/release-test/bin/python -m unittest discover \
-            -s packages/orinoco-lite/tests -v 2>&1 | tee build/release-tests.log
+          build/release-test/bin/python tools/run_unittests.py \
+            --fail-on-skip --discover packages/orinoco-lite/tests \
+            2>&1 | tee build/release-tests.log
 
       - name: Upload immutable release candidates
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
