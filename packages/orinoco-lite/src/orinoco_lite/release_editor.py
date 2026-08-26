@@ -23,6 +23,8 @@ GIT_IDENTITY = {
 }
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
 REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
+POOL_UI_COMMIT = "c353e0b631d0110d5a36a7ee3cec9cd5606720ca"
+SHACL_VUE_COMMIT = "2d3673e0a3bd1054f41c303bc7faa4111277c2d0"
 
 
 def _run(
@@ -194,8 +196,8 @@ def build_editor(
     # copied component deterministic Git metadata because the reviewed Vite
     # configuration records `git rev-parse` values in the generic shell.
     for repository, commit in (
-        (shacl, "3be33196f0eb7a65817df78b88ea40ecbb5eca11"),
-        (pool_ui, "93961ace8d4ceaea088ccc04526a9bc5428139a6"),
+        (shacl, SHACL_VUE_COMMIT),
+        (pool_ui, POOL_UI_COMMIT),
     ):
         _initialize_repository(repository, commit)
     shutil.copyfile(overlay / "review-bundle.js", module)

@@ -3,9 +3,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 import re
+import subprocess
 import tomllib
 import unittest
 import yaml
+
+from orinoco_lite.release_editor import POOL_UI_COMMIT, SHACL_VUE_COMMIT
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +25,7 @@ UPSTREAM_PAGES_WORKFLOW = (
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
+PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
 ACCEPTED_CONSUMER_COMMIT = "32c8df154fa11693efe9d20d298f553943b89096"
 
 
@@ -140,6 +144,60 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIsNotNone(match)
         workflow = UPSTREAM_PAGES_WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(workflow.count(match.group(1)), 2)
+
+    def test_release_pin_surfaces_match_reviewed_gitlinks(self) -> None:
+        package = tomllib.loads(PACKAGE_MANIFEST.read_text(encoding="utf-8"))
+        version = package["project"]["version"]
+        release_spec = yaml.safe_load(
+            (ROOT / f"release/runtime-source-v{version}.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        pool_gitlink = subprocess.check_output(
+            [
+                "git",
+                "rev-parse",
+                "HEAD:submodules/pool.psychoinformatics.de-ui",
+            ],
+            cwd=ROOT,
+            text=True,
+        ).strip()
+        enrichment_gitlink = subprocess.check_output(
+            ["git", "rev-parse", "HEAD:submodules/things-enrichment-tools"],
+            cwd=ROOT,
+            text=True,
+        ).strip()
+        shacl_gitlink = subprocess.check_output(
+            ["git", "rev-parse", "HEAD:shacl-vue"],
+            cwd=ROOT / "submodules" / "pool.psychoinformatics.de-ui",
+            text=True,
+        ).strip()
+
+        self.assertEqual(release_spec["release"], version)
+        self.assertEqual(
+            release_spec["provenance"]["component_commits"]["pool_ui"],
+            pool_gitlink,
+        )
+        self.assertEqual(
+            release_spec["provenance"]["source_inventory"]["editor_shell"][
+                "shacl_vue_commit"
+            ],
+            shacl_gitlink,
+        )
+        self.assertEqual(POOL_UI_COMMIT, pool_gitlink)
+        self.assertEqual(SHACL_VUE_COMMIT, shacl_gitlink)
+
+        dependency = next(
+            item
+            for item in package["project"]["dependencies"]
+            if item.startswith("things-enrichment-tools @ ")
+        )
+        self.assertTrue(dependency.endswith(f"@{enrichment_gitlink}"))
+        for lock_path in (ROOT / "pixi.lock", CHECK_ORINOCO_SCRIPT_LOCK):
+            self.assertIn(
+                enrichment_gitlink,
+                lock_path.read_text(encoding="utf-8"),
+            )
 
     def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
