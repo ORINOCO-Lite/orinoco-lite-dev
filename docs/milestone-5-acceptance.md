@@ -34,7 +34,7 @@ Live-source or authoritative-head drift is advisory and must not silently replac
 | Requirement | Evidence | Status |
 | --- | --- | --- |
 | Canonical ordering | Focused parity with pinned Dump Things mapping ordering and YAML serialization, including idempotence and preserved list order | merged in pull request 16; cross-platform release run `32786292302` passed |
-| Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | draft consumer pull request [29](https://github.com/con/test-orinoco-downstream-website/pull/29), current base `f19692f8fa2eee2202b419fe91ed7274eee70c94`, DataLad proposal `0305fe8b19536f81318de10022b9bd77ab58fd21`, merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`; current cross-platform run [32794979684](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794979684/attempts/2) passed; current review and merge remain pending |
+| Corpus normalization | Separate reviewed pull request showing the one-time canonicalization-only diff | consumer pull request [29](https://github.com/con/test-orinoco-downstream-website/pull/29), DataLad proposal `0305fe8b19536f81318de10022b9bd77ab58fd21`, merge-preserving proposal head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, and merge `232e15274f49467b66f8f9de69b8fa01165494ef`; GitHub merged the proposal onto current base `a2ddcb246d7393dee8b233726e1cb3354ee9292f`, retaining the exact 199-file normalization while the three newer adapter-identity records remained canonical |
 | Annotation selectors | Exact path/hash matching rejects missing or ambiguous mapping assertions; scalar targets are rejected | merged in pull request 16; release run `32786292302` passed |
 | Joined validation | Stored semantic assertion objects plus annotation companions validate as one Thing with the locked schema | object, typed data, and class-range cases merged in pull request 16; release run passed |
 | RDF round trip | Expanded PAV survives JSON-to-RDF-to-JSON for imported objects, string data, typed non-string data, and class-range Statements without semantic loss or topical type coercion | merged parity and round-trip tests passed in release run `32786292302` |
@@ -50,6 +50,8 @@ The exact diff is 199 files, 3,191 insertions, and 3,215 deletions; it removes o
 `pixi run test-all` passed locally with 129 Python tests, Chromium 2/2, WebKit 2/2, deterministic 561-file build tree `0d85b80f71a1b001316dbb099186170664231d03892bc5fc03ed6adccb764a41`, and no tracked output.
 At current merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, hosted run [32794979684](https://github.com/con/test-orinoco-downstream-website/actions/runs/32794979684/attempts/2) passed 134 site-owned Python tests, the deterministic 561-file build with tree `b3dfa91ee1ff60e2a441ab0900eda30b3283e90417ef4af3d59ed39264e796cf`, Chromium 2/2, and WebKit 2/2 on both supported platforms.
 The first Linux attempt encountered a transient loose-object copy race; rerunning only the failed job passed without a source change.
+Pull request 29 subsequently merged as `232e15274f49467b66f8f9de69b8fa01165494ef` with current consumer main `a2ddcb246d7393dee8b233726e1cb3354ee9292f` as its first parent.
+All 202 record files at the resulting default-branch head are canonical; no revert or reapplication was required.
 
 ## Shared review core
 
@@ -208,7 +210,7 @@ Current cross-layer coordinates are:
 - consumer pull requests 28 and 30 through 35, latest merge `bf683b6da8cad04ae3a62c4e34ad04521353d94a`, route/release-adoption head `43a28b1fbcf10330615c8ff9823f3971008ceb02`, and rollback parent `3f75c7d1395f1d442ba30d15516bd9d8ce8db949`;
 - personal demonstration pull requests 6, 8, 10, and 12, latest merge `5cb8c406bcb02cac5d98aae4a3afae2bd4a9191b`, superseded dump proposal pull request 13 at `9f3b0217410d134a167e67db017b9783fe9fb784`, and rollback parent `68738ed8df375fe14d87da216c6d8a7ee6d7e82c`;
 - infrastructure pull request 14 and merge `27f68e085fd28068f848330d68de8d6afccea7dc`, rollback base `91cbfbc65de29377d6b1679a4715a47bd24ee95c`; and
-- separate canonicalization pull request 29 at merge-preserving head `0bbec9bc2871ddb60dd351e616dda62386ad970b`, whose review and merge remain pending.
+- consumer canonicalization pull request 29, merged as `232e15274f49467b66f8f9de69b8fa01165494ef` with proposal history preserved and all 202 resulting records canonical.
 
 Published `v0.2.0rc3` release and embedded manifest SHA-256 values are: wheel `5224bf90ca441b70012f7297b21b1b8072fe612e9c8984d3682c824118037267`, source distribution `5dac72b1486ddd22b79e8f40ca4bc6220faba2b072e46223d52be24f01632ca2`, runtime `d25be7a05da33b6b91dc7b3bc1c6b83168f9c54f6bca663cb4a4902e1e7b060a`, runtime manifest `839f82029ae0b4805a6d8c53afd88eb18a53023daf13fa5fd09c217dc8f101fd`, provenance bundle `5a326f741360e229497bb4d581a5f5bda81b0d64f91f3b30373b334f57955e96`, and `SHA256SUMS` `2a12d5a20000321e7e9933c0a4333c870e09d38548f95dd3168d4d3f58bb185a`.
 GitHub artifact attestations verified for the wheel, source distribution, and runtime; an unauthenticated public wheel install reported `orinoco-lite 0.2.0rc3`.
@@ -227,5 +229,5 @@ If a later concrete lineage question or ontology-mapping set requires either, am
 
 Milestone 5 implementation and distribution are complete through the previously released contract, and the central service remains deployed and authenticated against the isolated public demo.
 The HR-218 identifier-resolution correction is implemented locally but is not yet released or integrated.
-Exit remains pending on review and merge of the separate corpus normalization, an authenticated human decision submission/finalization and same-source rerun, one explicit SHACL handoff, release and downstream adoption of HR-218, merge of `dump-research-info` pull request 27, and a replacement downstream proposal.
+Exit remains pending on an authenticated human decision submission/finalization and same-source rerun, one explicit SHACL handoff, release and downstream adoption of HR-218, merge of `dump-research-info` pull request 27, and a replacement downstream proposal.
 No synthetic metadata proposal was created; the live checks created no decision or handoff, and no curation proposal was approved or merged by automation.
