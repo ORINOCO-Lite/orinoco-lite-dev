@@ -12,6 +12,7 @@ import { HttpError, requireExactKeys } from "./http";
 import { parseRepository } from "./input";
 
 const COMMIT = /^[0-9a-f]{40}$/;
+const SUBMISSION_DETAILS_SUMMARY = "Complete curation submission JSON";
 
 function line(value: unknown, label: string): string {
   if (
@@ -234,7 +235,12 @@ export function verifySubmission(
 }
 
 export function submissionComment(value: CurationSubmission): string {
-  const body = `/curation submit\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+  const body =
+    "/curation submit\n\n" +
+    "<details>\n\n" +
+    `<summary>${SUBMISSION_DETAILS_SUMMARY}</summary>\n\n` +
+    `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n\n` +
+    "</details>";
   if (body.length > MAX_GITHUB_TEXT_LENGTH) {
     throw new HttpError(
       422,
