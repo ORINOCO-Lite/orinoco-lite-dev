@@ -475,8 +475,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             "    inline: [attributes::annotations::source::creator]\n"
             "unrendered_classes: []\n"
             "graph:\n  producer: site/projection-tools/graph.py\n"
-            "  node_classes: ['acme:Person']\n  relationship_fields: []\n"
-            "  missing_external_targets: reject\n",
+            "  node_classes: ['acme:Person']\n  relationship_fields: []\n",
             encoding="utf-8",
         )
         schema = self.runtime / "schema/demo/main.yaml"
@@ -529,10 +528,36 @@ class GenericProjectionContractTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def _validate_records(
+        self,
+        records: list[dict[str, object]],
+    ) -> dict[str, object]:
+        class IdentityConverter:
+            @staticmethod
+            def convert(value, _class_name):
+                return deepcopy(value)
+
+        schema_view = Mock()
+        schema_view.all_classes.return_value = ["Person"]
+        schema_view.get_uri.return_value = "acme:Person"
+        with (
+            patch(
+                "orinoco_lite.projection._records",
+                return_value=(records, {str(item["pid"]) for item in records}),
+            ),
+            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
+            patch(
+                "orinoco_lite.projection.build_format_converters",
+                return_value=(IdentityConverter(), IdentityConverter()),
+            ),
+        ):
+            return validate_semantics(self.workspace, self.runtime)
+
     def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
         contract = load_contract(self.workspace)
         self.assertEqual(contract.editor_record_scope, "all")
         self.assertEqual(contract.missing_reference_targets, "preserve")
+        self.assertEqual(contract.missing_graph_targets, "drop")
         self.assertEqual(
             contract.pages["acme:Person"].inline,
             ("attributes::annotations::source::creator",),
@@ -629,10 +654,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             .replace(
                 "relationship_fields: []",
                 "relationship_fields: [about]",
-            )
-            .replace(
-                "missing_external_targets: reject",
-                "missing_external_targets: drop",
             ),
             encoding="utf-8",
         )
@@ -657,26 +678,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             },
         ]
 
-        class IdentityConverter:
-            @staticmethod
-            def convert(value, class_name):
-                return deepcopy(value)
-
-        schema_view = Mock()
-        schema_view.all_classes.return_value = ["Person"]
-        schema_view.get_uri.return_value = "acme:Person"
-        with (
-            patch(
-                "orinoco_lite.projection._records",
-                return_value=(records, {item["pid"] for item in records}),
-            ),
-            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
-            patch(
-                "orinoco_lite.projection.build_format_converters",
-                return_value=(IdentityConverter(), IdentityConverter()),
-            ),
-        ):
-            report = validate_semantics(self.workspace, self.runtime)
+        report = self._validate_records(records)
 
         self.assertEqual(
             report,
@@ -702,6 +704,10 @@ class GenericProjectionContractTests(unittest.TestCase):
             "editable",
         )
         self.assertEqual(
+            load_contract(self.workspace).missing_graph_targets,
+            "drop",
+        )
+        self.assertEqual(
             list(_relationship_targets(records[0], "about")),
             [],
         )
@@ -724,6 +730,36 @@ class GenericProjectionContractTests(unittest.TestCase):
                 "edges"
             ],
             [],
+        )
+
+    def test_explicit_graph_reject_policy_remains_strict(self) -> None:
+        projection = self.root / "site/projection.yaml"
+        projection.write_text(
+            projection.read_text(encoding="utf-8").replace(
+                "relationship_fields: []",
+                "relationship_fields: [about]\n"
+                "  missing_external_targets: reject",
+            ),
+            encoding="utf-8",
+        )
+        records = [
+            {
+                "pid": "acme:.",
+                "schema_type": "acme:Person",
+                "display_label": "Home",
+                "about": ["ext:topic"],
+            }
+        ]
+
+        with self.assertRaisesRegex(
+            DriverError,
+            "acme:.: graph target does not materialize: ext:topic",
+        ):
+            self._validate_records(records)
+
+        self.assertEqual(
+            load_contract(self.workspace).missing_graph_targets,
+            "reject",
         )
 
     def test_machine_pav_fingerprint_binds_provenance_to_assertion(self) -> None:
