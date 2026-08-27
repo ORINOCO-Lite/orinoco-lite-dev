@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from typing import Any, Iterable, Mapping, Sequence
 
 from jinja2 import Environment, FileSystemLoader
@@ -33,8 +34,8 @@ from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
 
 
-MANIFEST_HEADER = "# orinoco-lite projection manifest v3"
-PROJECTION_ALGORITHM = "orinoco-projection-v3"
+MANIFEST_HEADER = "# orinoco-lite projection manifest v4"
+PROJECTION_ALGORITHM = "orinoco-projection-v4"
 PROJECTION_CONTROL_SIDECAR = ".gitattributes"
 FORBIDDEN_BRIDGE_PREDICATES = {
     "dcterms:contributor",
@@ -103,9 +104,15 @@ class RenderPolicy:
 
 
 @dataclass(frozen=True)
+class RouteRule:
+    strip_prefix: str
+    route_prefix: str
+
+
+@dataclass(frozen=True)
 class ProjectionContract:
     path: Path
-    route_prefix: str
+    route_rules: tuple[RouteRule, ...]
     homepage_pid: str
     homepage: RenderPolicy
     pages: Mapping[str, RenderPolicy]
@@ -132,6 +139,58 @@ def _relative(workspace: WorkspaceConfig, value: object, label: str) -> Path:
     return path
 
 
+def _route_rules(routing: Mapping[str, Any]) -> tuple[RouteRule, ...]:
+    if set(routing) == {"strip_prefix"}:
+        strip_prefix = routing.get("strip_prefix")
+        if not isinstance(strip_prefix, str) or not strip_prefix:
+            raise ConfigurationError("routing.strip_prefix must be a non-empty string")
+        return (RouteRule(strip_prefix=strip_prefix, route_prefix=""),)
+    if set(routing) != {"namespaces"}:
+        raise ConfigurationError(
+            "routing must contain exactly strip_prefix or namespaces"
+        )
+    namespaces = routing.get("namespaces")
+    if not isinstance(namespaces, list) or not namespaces:
+        raise ConfigurationError(
+            "routing.namespaces must be a non-empty ordered list"
+        )
+    rules: list[RouteRule] = []
+    seen: set[str] = set()
+    for index, item in enumerate(namespaces):
+        label = f"routing.namespaces[{index}]"
+        if not isinstance(item, dict) or set(item) != {
+            "strip_prefix",
+            "route_prefix",
+        }:
+            raise ConfigurationError(
+                f"{label} must contain exactly strip_prefix and route_prefix"
+            )
+        strip_prefix = item.get("strip_prefix")
+        route_prefix = item.get("route_prefix")
+        if not isinstance(strip_prefix, str) or not strip_prefix:
+            raise ConfigurationError(f"{label}.strip_prefix must be non-empty")
+        if strip_prefix in seen:
+            raise ConfigurationError(
+                f"routing.namespaces repeats strip_prefix: {strip_prefix}"
+            )
+        if not isinstance(route_prefix, str) or "\\" in route_prefix:
+            raise ConfigurationError(f"{label}.route_prefix must be a safe route")
+        if route_prefix and (
+            PurePosixPath(route_prefix).is_absolute()
+            or PurePosixPath(route_prefix).as_posix() != route_prefix
+            or any(part in {"", ".", ".."} for part in route_prefix.split("/"))
+        ):
+            raise ConfigurationError(f"{label}.route_prefix must be a safe route")
+        seen.add(strip_prefix)
+        rules.append(
+            RouteRule(
+                strip_prefix=strip_prefix,
+                route_prefix=route_prefix,
+            )
+        )
+    return tuple(rules)
+
+
 def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     path = workspace.path("site") / "projection.yaml"
     try:
@@ -156,20 +215,17 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         or not isinstance(routing, dict)
         or not isinstance(references, dict)
         or not isinstance(editor, dict)
-        or set(routing) != {"strip_prefix"}
         or set(references) != {"missing_targets"}
         or set(editor) != {"record_scope"}
     ):
         raise ConfigurationError("Projection contract sections are malformed")
-    route_prefix = routing.get("strip_prefix")
+    route_rules = _route_rules(routing)
     homepage_pid = homepage.get("pid")
     node_classes = graph.get("node_classes")
     relationships = graph.get("relationship_fields")
     missing_graph_targets = graph.get("missing_external_targets", "drop")
     if (
         not isinstance(homepage_pid, str)
-        or not isinstance(route_prefix, str)
-        or not route_prefix
         or not isinstance(node_classes, list)
         or not isinstance(relationships, list)
         or references.get("missing_targets") not in {"preserve", "reject"}
@@ -245,7 +301,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         page_policies[schema_type] = policy(raw_policy, f"pages.{schema_type}")
     contract = ProjectionContract(
         path=path,
-        route_prefix=route_prefix,
+        route_rules=route_rules,
         homepage_pid=homepage_pid,
         homepage=policy(homepage, "homepage"),
         pages=page_policies,
@@ -837,13 +893,32 @@ def _schema_closure_digest(runtime_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _route_for_pid(pid: str, prefix: str) -> str:
-    if not pid.startswith(prefix):
-        raise DriverError(f"Renderable record PID is outside routing.strip_prefix: {pid}")
-    route = pid.removeprefix(prefix).strip("/")
-    if not route or any(part in {"", ".", ".."} for part in route.split("/")):
-        raise DriverError(f"Renderable record has an unsafe route: {pid}")
-    return route
+def _route_for_pid(pid: str, rules: Sequence[RouteRule] | str) -> str:
+    normalized = (
+        (RouteRule(strip_prefix=rules, route_prefix=""),)
+        if isinstance(rules, str)
+        else rules
+    )
+    for rule in normalized:
+        if not pid.startswith(rule.strip_prefix):
+            continue
+        suffix = pid.removeprefix(rule.strip_prefix).strip("/")
+        route = "/".join(part for part in (rule.route_prefix, suffix) if part)
+        if (
+            not route
+            or "\\" in route
+            or any(part in {"", ".", ".."} for part in route.split("/"))
+        ):
+            raise DriverError(f"Renderable record has an unsafe route: {pid}")
+        return route
+    policy = "routing.strip_prefix" if len(normalized) == 1 else "routing.namespaces"
+    raise DriverError(f"Renderable record PID is outside {policy}: {pid}")
+
+
+def _portable_route_key(route: str) -> str:
+    """Normalize routes that collide on supported consumer filesystems."""
+
+    return unicodedata.normalize("NFC", route).casefold()
 
 
 def projection_manifest(
@@ -906,6 +981,8 @@ def render_projection(
         )
     )
     (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
+    pages: list[tuple[dict[str, Any], RenderPolicy, Path]] = []
+    route_owners: dict[str, tuple[str, str]] = {}
     for pid in sorted(record_pids):
         record = by_pid[pid]
         schema_type = record["schema_type"]
@@ -916,10 +993,21 @@ def render_projection(
             policy = contract.pages[schema_type]
             if not _matches_policy(record, policy, by_pid):
                 continue
-            route = _route_for_pid(pid, contract.route_prefix)
+            route = _route_for_pid(pid, contract.route_rules)
+            route_key = _portable_route_key(route)
+            previous = route_owners.get(route_key)
+            if previous is not None:
+                previous_pid, previous_route = previous
+                raise DriverError(
+                    "Renderable records resolve to the same route: "
+                    f"{previous_pid} -> {previous_route}, {pid} -> {route}"
+                )
+            route_owners[route_key] = (pid, route)
             destination = output / "content" / route / "_index.md"
         else:
             continue
+        pages.append((record, policy, destination))
+    for record, policy, destination in pages:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             _render_record(record, policy, by_pid, records), encoding="utf-8"

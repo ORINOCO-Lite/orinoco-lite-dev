@@ -93,6 +93,33 @@ That setting fails validation when a selected relationship target is not a selec
 It does not alter canonical metadata or invent a local Thing.
 For full local-reference closure, a site must separately set `references.missing_targets: reject`; omitting the `references` section preserves well-formed unresolved references.
 
+### PID routing policy
+
+The original single-namespace policy remains supported and keeps the same routes:
+
+```yaml
+routing:
+  strip_prefix: "xyzrins:"
+```
+
+A site that deliberately renders records from more than one PID namespace can instead declare an ordered list:
+
+```yaml
+routing:
+  namespaces:
+    - strip_prefix: "xyzrins:"
+      route_prefix: ""
+    - strip_prefix: "CiTO:"
+      route_prefix: "vocab/cito"
+    - strip_prefix: "sio:"
+      route_prefix: "vocab/sio"
+```
+
+The first matching rule removes `strip_prefix`, prepends the repository-relative `route_prefix`, and leaves the canonical PID unchanged.
+Every rendered PID must match a rule.
+Empty or traversal segments, absolute or non-normalized route prefixes, duplicate namespace prefixes, and routes that collide on the supported consumer filesystems are rejected before page rendering.
+The ordered policy is a projection input recorded by digest in `SHA256SUMS`; projection algorithm v4 also distinguishes these outputs from older single-namespace releases.
+
 ## Schema conversion boundary
 
 The current runtime is content-neutral within the selected Things Schema profile; it does not claim arbitrary-schema compatibility.

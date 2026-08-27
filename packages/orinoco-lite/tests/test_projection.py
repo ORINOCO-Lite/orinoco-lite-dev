@@ -15,9 +15,12 @@ from unittest.mock import Mock, patch
 from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
-from orinoco_lite.errors import DriverError
+from orinoco_lite.errors import ConfigurationError, DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
+    MANIFEST_HEADER,
+    PROJECTION_ALGORITHM,
+    RouteRule,
     _all_links,
     _apply_inline,
     _is_historical_provenance,
@@ -555,6 +558,10 @@ class GenericProjectionContractTests(unittest.TestCase):
 
     def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
         contract = load_contract(self.workspace)
+        self.assertEqual(
+            contract.route_rules,
+            (RouteRule(strip_prefix="acme:", route_prefix=""),),
+        )
         self.assertEqual(contract.editor_record_scope, "all")
         self.assertEqual(contract.missing_reference_targets, "preserve")
         self.assertEqual(contract.missing_graph_targets, "drop")
@@ -580,6 +587,144 @@ class GenericProjectionContractTests(unittest.TestCase):
         imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
             verify_projection(self.workspace, self.runtime)
+
+    def test_ordered_namespace_routes_render_stably_and_enter_manifest(self) -> None:
+        (self.root / "metadata/records/Person/two.yaml").write_text(
+            "pid: vocab:terms/two\n"
+            "schema_type: acme:Person\n"
+            "display_label: Two\n",
+            encoding="utf-8",
+        )
+        projection = self.root / "site/projection.yaml"
+        projection.write_text(
+            projection.read_text(encoding="utf-8").replace(
+                "routing:\n  strip_prefix: 'acme:'\n",
+                "routing:\n"
+                "  namespaces:\n"
+                "  - strip_prefix: 'acme:people/'\n"
+                "    route_prefix: selected\n"
+                "  - strip_prefix: 'acme:'\n"
+                "    route_prefix: ''\n"
+                "  - strip_prefix: 'vocab:'\n"
+                "    route_prefix: vocab\n",
+            ),
+            encoding="utf-8",
+        )
+        contract = load_contract(self.workspace)
+        self.assertEqual(
+            contract.route_rules,
+            (
+                RouteRule("acme:people/", "selected"),
+                RouteRule("acme:", ""),
+                RouteRule("vocab:", "vocab"),
+            ),
+        )
+        self.assertEqual(
+            _route_for_pid("acme:people/one", contract.route_rules),
+            "selected/one",
+        )
+        with self.assertRaisesRegex(
+            DriverError,
+            "outside routing.namespaces: other:one",
+        ):
+            _route_for_pid("other:one", contract.route_rules)
+
+        first = Path(self.temporary.name) / "mixed-first"
+        second = Path(self.temporary.name) / "mixed-second"
+        semantic = {"records": 3, "graph_nodes": 3, "graph_edges": 0}
+        with patch(
+            "orinoco_lite.projection.validate_semantics",
+            return_value=semantic,
+        ):
+            render_projection(self.workspace, self.runtime, first)
+            render_projection(self.workspace, self.runtime, second)
+
+        self.assertEqual(tree_sha256(first), tree_sha256(second))
+        self.assertTrue((first / "content/selected/one/_index.md").is_file())
+        self.assertTrue((first / "content/vocab/terms/two/_index.md").is_file())
+        manifest = (first / "SHA256SUMS").read_text(encoding="utf-8")
+        projection_digest = hashlib.sha256(projection.read_bytes()).hexdigest()
+        self.assertTrue(manifest.startswith(MANIFEST_HEADER + "\n"))
+        self.assertIn(f"pin:algorithm@{PROJECTION_ALGORITHM}", manifest)
+        self.assertIn(
+            f"{projection_digest}  input:site/projection.yaml",
+            manifest,
+        )
+
+    def test_namespace_routing_rejects_portable_route_collisions(self) -> None:
+        (self.root / "metadata/records/Person/two.yaml").write_text(
+            "pid: vocab:ONE\n"
+            "schema_type: acme:Person\n"
+            "display_label: Two\n",
+            encoding="utf-8",
+        )
+        projection = self.root / "site/projection.yaml"
+        projection.write_text(
+            projection.read_text(encoding="utf-8").replace(
+                "routing:\n  strip_prefix: 'acme:'\n",
+                "routing:\n"
+                "  namespaces:\n"
+                "  - strip_prefix: 'acme:'\n"
+                "    route_prefix: ''\n"
+                "  - strip_prefix: 'vocab:'\n"
+                "    route_prefix: PEOPLE\n",
+            ),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "orinoco_lite.projection.validate_semantics",
+            return_value={"records": 3, "graph_nodes": 3, "graph_edges": 0},
+        ):
+            with self.assertRaisesRegex(
+                DriverError,
+                "acme:people/one -> people/one, vocab:ONE -> PEOPLE/ONE",
+            ):
+                render_projection(
+                    self.workspace,
+                    self.runtime,
+                    Path(self.temporary.name) / "collision",
+                )
+
+    def test_namespace_routing_rejects_unsafe_or_duplicate_rules(self) -> None:
+        projection = self.root / "site/projection.yaml"
+        original = projection.read_text(encoding="utf-8")
+        for route_prefix in ("/absolute", "one/../two", "one//two", "one\\two"):
+            with self.subTest(route_prefix=route_prefix):
+                projection.write_text(
+                    original.replace(
+                        "routing:\n  strip_prefix: 'acme:'\n",
+                        "routing:\n"
+                        "  namespaces:\n"
+                        "  - strip_prefix: 'acme:'\n"
+                        f"    route_prefix: '{route_prefix}'\n",
+                    ),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "route_prefix must be a safe route",
+                ):
+                    load_contract(self.workspace)
+        projection.write_text(
+            original.replace(
+                "routing:\n  strip_prefix: 'acme:'\n",
+                "routing:\n"
+                "  namespaces:\n"
+                "  - strip_prefix: 'acme:'\n"
+                "    route_prefix: ''\n"
+                "  - strip_prefix: 'acme:'\n"
+                "    route_prefix: alternate\n",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            ConfigurationError,
+            "repeats strip_prefix: acme:",
+        ):
+            load_contract(self.workspace)
+        with self.assertRaisesRegex(DriverError, "unsafe route"):
+            _route_for_pid("acme:people/../secret", "acme:")
 
     def test_joined_annotations_reach_machine_projection_only(self) -> None:
         companion = self.root / (
