@@ -32,7 +32,7 @@ jobs:
       - name: Check out the frozen accepted-consumer inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: con/test-orinoco-downstream-website
+          repository: ORINOCO-Lite/test-orinoco-downstream-website
           ref: 32c8df154fa11693efe9d20d298f553943b89096
           path: build/accepted-consumer
           persist-credentials: false

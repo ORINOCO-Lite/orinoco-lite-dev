@@ -10,7 +10,7 @@ A downstream site is one ordinary Git repository with no submodules, no gitlinks
 
 ```mermaid
 flowchart TB
-    subgraph engineering["Engineering and release — con/orinoco-lite-dev"]
+    subgraph engineering["Engineering and release — ORINOCO-Lite/orinoco-lite-dev"]
         components["Pinned component sources<br/>and compatibility fixtures"]
         engine["orinoco-lite wheel<br/>CLI and integrity boundary"]
         runtime["Checksummed runtime<br/>schema, renderer, editor"]
@@ -19,7 +19,7 @@ flowchart TB
         components --> runtime
     end
 
-    subgraph distribution["Distribution — con/orinoco-lite-template"]
+    subgraph distribution["Distribution — ORINOCO-Lite/orinoco-lite-template"]
         copier["Versioned Copier source<br/>framework ownership + updater"]
         snapshot["Generated GitHub-template tree"]
         copier -->|mechanical render| snapshot
@@ -71,7 +71,7 @@ Supporting records are:
 - [`docs/source-adapters.md`](docs/source-adapters.md) for the normative source-adapter contract;
 - [`docs/milestone-4-acceptance.md`](docs/milestone-4-acceptance.md) and [`docs/milestone-4-decisions.md`](docs/milestone-4-decisions.md) for the accepted distribution baseline;
 - [`docs/milestone-3-decisions.md`](docs/milestone-3-decisions.md) for the original content-policy questions; and
-- [engineering pull request 5](https://github.com/con/orinoco-lite-dev/pull/5) for the accepted implementation-review history.
+- [engineering pull request 5](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/5) for the accepted implementation-review history.
 
 ## Stable downstream interface
 

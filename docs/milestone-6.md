@@ -88,7 +88,10 @@ The real CON site and its remotes remain read-only and outside this transfer unl
 
 The approved scope is the three core repositories, the GitHub App, and the nine mirrors still used by the retained static, service, runtime, editor, query, enrichment, snapshot, or consumer paths: `congo`, `dump-things-pyclient`, `dump-things-service`, `pool.psychoinformatics.de-ui`, `query-things`, `shacl-vue`, `things-enrichment-tools`, `things-schemas`, and `www-from-model`.
 Unused historical mirrors, including `dump-things-service-mirror`, remain with their existing owners.
-The repository transfer completed on 2026-08-26; the GitHub App transfer remains a separately authenticated operation.
+The repository and GitHub App ownership transfers completed on 2026-08-26.
+The App installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website`; authenticated discovery and the exact-head SHACL editor passed without creating a review comment, branch, or pull request.
+The custody audit also replaced the accidental query-things and things-enrichment-tools merge tips with the already accepted linear heads by exact lease, and fast-forwarded the Things Schemas mirror default ref to its accepted pin.
+The Congo mirror retains its upstream `stable` history plus two owned commits; its local Dependabot policy disables independent version-update pull requests, and the nine superseded bot pull requests were closed.
 
 ## Workstream 1: reference and projection alignment
 

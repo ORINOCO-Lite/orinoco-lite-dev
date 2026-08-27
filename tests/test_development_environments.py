@@ -219,7 +219,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("submodules: false", workflow)
         self.assertNotIn("submodules: recursive", workflow)
         self.assertIn("pixi-version: v0.76.2", workflow)
-        self.assertIn("repository: con/test-orinoco-downstream-website", workflow)
+        self.assertIn(
+            "repository: ORINOCO-Lite/test-orinoco-downstream-website",
+            workflow,
+        )
         self.assertIn(f"ref: {ACCEPTED_CONSUMER_COMMIT}", workflow)
         self.assertIn("path: build/accepted-consumer", workflow)
         self.assertIn("sparse-checkout-cone-mode: false", workflow)
