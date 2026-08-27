@@ -165,6 +165,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     homepage_pid = homepage.get("pid")
     node_classes = graph.get("node_classes")
     relationships = graph.get("relationship_fields")
+    missing_graph_targets = graph.get("missing_external_targets", "drop")
     if (
         not isinstance(homepage_pid, str)
         or not isinstance(route_prefix, str)
@@ -172,7 +173,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         or not isinstance(node_classes, list)
         or not isinstance(relationships, list)
         or references.get("missing_targets") not in {"preserve", "reject"}
-        or graph.get("missing_external_targets") not in {"drop", "reject"}
+        or missing_graph_targets not in {"drop", "reject"}
         or editor.get("record_scope") not in {"all", "editable"}
         or not all(isinstance(item, str) and item for item in node_classes)
         or not all(isinstance(item, str) and item for item in relationships)
@@ -253,7 +254,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         graph_node_classes=frozenset(node_classes),
         relationship_fields=tuple(relationships),
         missing_reference_targets=references["missing_targets"],
-        missing_graph_targets=graph["missing_external_targets"],
+        missing_graph_targets=missing_graph_targets,
         editor_record_scope=editor["record_scope"],
     )
     for required in [

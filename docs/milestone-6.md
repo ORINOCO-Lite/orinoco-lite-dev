@@ -122,8 +122,8 @@ Configuration and diagnostics must distinguish:
 Update query and projection parity against the new query-things pin, including nested reference traversal, unresolved scalar preservation, multivalued relationships, route generation, and graph selection.
 Site policy may still require particular records for a page, label, role display, or other feature that actually dereferences them.
 
-The default configuration supplied by the next template release must preserve missing references and omit nonmaterialized graph edges with diagnostics.
-Existing strict sites receive an explicit, tested migration path and may retain strict site policy.
+The engine and the default configuration supplied by the next template release must preserve missing references and omit nonmaterialized graph edges with diagnostics.
+Omitting `graph.missing_external_targets` selects `drop`; existing strict sites retain `graph.missing_external_targets: reject` through an explicit, tested migration path.
 
 ## Workstream 2: dependable compatibility tests
 
@@ -180,7 +180,7 @@ GitHub does not provide a path-conditional repository merge-method setting, so M
 Milestone 6 is complete when:
 
 1. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
-2. well-formed unresolved references survive validation and projection by default, omitted graph edges are reported, and strict site policy remains available;
+2. well-formed unresolved references survive validation and projection by default, an omitted graph-target policy drops and reports nonmaterialized edges, and explicit `reject` remains strict;
 3. the deployed downstream static editor exposes both actions, the central service exposes no duplicate editor, and one current SHACL Vue edit completes the GitHub handoff and trusted replacement path; and
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 

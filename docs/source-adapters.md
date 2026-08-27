@@ -371,6 +371,8 @@ Validation and projection MUST preserve the reference without network access and
 When a matching local Thing exists, configured inlining resolves it; otherwise the reference remains a scalar, matching upstream query behavior.
 The local graph materializes only edges whose selected source and target nodes exist.
 Projection MUST report missing reference targets and omitted graph edges deterministically rather than silently discarding them.
+A projection contract that omits `graph.missing_external_targets` selects `drop`.
+A downstream that requires every selected graph edge to materialize locally MUST set `graph.missing_external_targets: reject` explicitly; adopting the new default MUST NOT silently weaken a site that chooses to retain that strict policy.
 A downstream MAY apply stricter local-reference validation as explicit site policy.
 A presentation feature that actually dereferences a target MAY also require that target locally, but that focused requirement does not make every external reference invalid metadata.
 

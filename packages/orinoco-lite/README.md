@@ -61,8 +61,9 @@ The semantic metadata interface comprises reviewed Things under `metadata/record
 `paths.records` defaults to `metadata/records`; the companion tree mirrors that fixed record path below its overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.
 Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
-Projection references and graph closure fail closed by default.
-A site that intentionally models an open graph may explicitly preserve missing record references and drop only nonmaterialized graph-view edges; projection reports count those choices by field.
+Projection preserves well-formed unresolved references by default without network access.
+It also defaults an omitted `graph.missing_external_targets` policy to `drop`, so only graph-view edges whose selected target cannot materialize are omitted; deterministic projection reports count preserved references and dropped edges by field.
+Malformed or schema-invalid values still fail.
 Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
 Site-owned source adapters use `paths.source_adapters` (default `source-adapters`), while framework provenance defaults to `.orinoco-lite/provenance`.
 There are no legacy `canonical`, `reference`, or `integrations` path aliases.
@@ -74,6 +75,20 @@ There are no legacy `canonical`, `reference`, or `integrations` path aliases.
 
 The immutable wheel digest must also match the consumer's frozen `pixi.lock`.
 Placeholder digests, mismatched installed versions, mutable runtime contents, path escapes, and undeclared drivers fail closed.
+
+### Open-reference policy migration
+
+Sites adopting the Milestone 6 open-reference behavior do not need to add a graph policy: omitting `graph.missing_external_targets` selects `drop`.
+An existing site that intentionally requires every selected graph target to materialize locally must retain that stricter policy explicitly:
+
+```yaml
+graph:
+  missing_external_targets: reject
+```
+
+That setting fails validation when a selected relationship target is not a selected local graph node.
+It does not alter canonical metadata or invent a local Thing.
+For full local-reference closure, a site must separately set `references.missing_targets: reject`; omitting the `references` section preserves well-formed unresolved references.
 
 ## Schema conversion boundary
 
