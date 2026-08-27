@@ -22,14 +22,16 @@ The Orinoco static-site integration MUST expose two explicit actions from that s
 
 The static site MUST NOT receive or retain a GitHub token.
 The proposal action MUST bind the editor input and resulting bundle to an exact repository and Git commit and MUST NOT modify the bundle, choose metadata values, or retain another copy after the handoff completes.
-The downstream declares the exact GitHub `owner/repository` coordinate and the credential-free HTTPS origin of the receiver in `site.repository` and `site.curation_service`.
-Both values are required to enable **Propose via GitHub**; a downstream may use the central deployment or host the same service code.
+The trusted downstream build MUST derive the exact GitHub `owner/repository` coordinate from its general project identity and write it into the generated editor configuration.
+It MUST NOT require a curator or maintainer to repeat that value in a separate curation setting.
+When `site.curation_service` is absent, the released integration uses the Orinoco Lite central-service origin.
+That field is an optional credential-free HTTPS-origin override for a compatible independently hosted service.
+Browser-supplied repository and service coordinates remain routing hints; the service MUST verify the repository, installation, curator permission, source commit, and exact head independently before a write.
 
-The service MAY expose `/edit/` as a lightweight sign-in, confirmation, and bundle-receiver route.
-That route MUST NOT assemble, embed, or host SHACL Vue, its schema, its record data, or another editing session.
-A curator who is not signed in MAY complete GitHub authorization there and return to the same lightweight receiver.
-After authorization, the receiver MAY accept either the unchanged bundle transferred from the static editor or a curator-selected copy previously produced by **Download bundle**.
-It MUST keep the bundle only in browser memory until the explicit proposal request completes or the page is closed.
+The service MUST NOT expose `/edit/`, an upload or confirmation page, a landing application, or any static presentation assets.
+The downstream `/edit/` route owns sign-in status, file reselection, warnings, and confirmation and MUST keep the bundle only in browser memory until the explicit proposal request completes or the page is closed.
+The service MAY return only a minimal backend-generated OAuth callback and popup transport document with a restrictive content security policy.
+It MUST NOT assemble, embed, or host SHACL Vue, its schema, its record data, or another editing session.
 
 ## Exact-source static input
 
@@ -51,17 +53,31 @@ The source-adapter decision profile's exactly one `orinoco-curation-review-<prop
 
 ## Browser handoff
 
-The static site MAY open the configured service receiver in a popup or separate page with only the repository, the static site's exact origin, and a cryptographically random one-time handoff nonce.
+The static site MAY open the configured service authorization route in a popup with only the repository, operation, static site's exact origin, and a cryptographically random one-time handoff nonce.
 An existing pull-request link MAY additionally carry its exact pull-request and head coordinates.
 The editor's exact source commit remains inside the unchanged bundle.
 It MUST NOT place the bundle or a credential in the URL.
-When a live browser handoff is used, the editor MUST send the exact bundle only after its receiver window at the configured service origin signals readiness with the same repository and nonce.
-The editor MUST require that exact receiver origin and window, while the receiver MUST require that exact static-site origin, opener window, repository, and nonce.
+When a live browser handoff is used, the editor MUST send the exact bundle only after its popup at the configured service origin signals readiness with the same repository, operation, and nonce.
+The editor MUST require that exact service origin and popup window, while the service transport MUST require that exact static-site origin, opener window, repository, operation, and nonce.
 OAuth state and the short-lived authentication session MAY preserve those non-secret channel coordinates across the sign-in redirect; the bundle MUST NOT be stored as OAuth recovery state or in cross-origin browser storage.
 
-If authorization or browser policy severs the opener relationship, the curator MAY use **Download bundle** and select that unchanged file on the receiver page.
-The service MUST apply the same coordinate, format, size, authorization, acknowledgment, and exact-head checks regardless of which browser transport supplied the bundle.
-The receiver MUST require an explicit confirmation before it submits the proposal request.
+If authorization or browser policy severs the opener relationship, the curator MAY use **Download bundle**, select that unchanged file on the downstream `/edit/` route, and begin a new popup session.
+The service MUST apply the same coordinate, format, size, authorization, acknowledgment, and exact-head checks regardless of whether the unchanged bundle remained in the editor session or was reselected there.
+The downstream MUST display the authenticated login, repository, source and head commits, changed paths, and public-history warnings and require an explicit confirmation before it instructs the popup to submit the proposal.
+The GitHub token, session cookie, and CSRF material MUST remain at the service origin and MUST NOT cross the browser channel.
+
+## Downstream origin policy
+
+A custom domain or other origin dedicated to one downstream receives the normal proposal flow without an additional origin warning.
+The template MUST guide maintainers through adding and verifying that domain before enabling direct GitHub submission.
+
+A project deployed below a shared `github.io` origin shares a browser security principal with every other path on that hostname.
+The integration MUST classify the actual browser origin at runtime; a configured custom-domain value MUST NOT bypass the gate while the page is running on `github.io`.
+The downstream MUST explain that another compromised page on the same origin could impersonate `/edit/`, and it MUST require an explicit in-memory acknowledgment of that limitation before enabling **Propose via GitHub**.
+That acknowledgment is informed consent, not authorization or proof of path identity; all exact-channel and server-side checks still apply.
+It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or used to weaken those checks.
+**Download bundle** MUST remain available without the acknowledgment, a GitHub sign-in, or a reachable curation service.
+The origin acknowledgment is separate from the public-history and no-secrets acknowledgment required immediately before a Git write.
 
 ## Ephemeral Git handoff
 
@@ -84,8 +100,8 @@ The service MUST NOT create a pull request against another repository, write to 
 The handoff is ephemeral transport, not a metadata proposal, review bundle, manifest, provenance record, or durable curation authority.
 It MUST NOT be merged.
 The pull request MUST remain draft while a handoff is present.
-Before creating the handoff, the receiver MUST require the curator to acknowledge explicitly that the bundle contains only data approved for public repository history and contains no secrets.
-Because a public Git host can retain unreachable objects, the receiver MUST also warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement.
+Before creating the handoff, the downstream MUST require the curator to acknowledge explicitly that the bundle contains only data approved for public repository history and contains no secrets.
+Because a public Git host can retain unreachable objects, the downstream MUST also warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement.
 
 ## Trusted replacement
 
@@ -121,6 +137,7 @@ The service and workflow MUST NOT:
 - retain the generated bundle after request processing or after replacement;
 - store metadata, candidates, decisions, provenance, or credentials;
 - assemble, embed, or host a second editor;
+- host a receiver, upload, confirmation, review, or landing interface;
 - execute pull-request or external-source code;
 - infer or choose a source-adapter disposition;
 - add machine PAV or decision-cache entries to a human edit;

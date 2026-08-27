@@ -1,11 +1,11 @@
 # Curation service and authentication options
 
-Status: design note for review; not normative
+Status: accepted design rationale; normative requirements are in [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
 
-This note proposes a correction to the current GitHub curation profiles.
-It does not change [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), or [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md) until the browser trust decision below is reviewed.
+John Lee accepted this architecture and its shared-origin policy on 2026-08-27 as M6-D007 and HR-229.
+This note preserves the authentication options and design rationale without creating a second normative contract.
 
-## Desired outcome
+## Accepted outcome
 
 The downstream deployment owns both user interfaces:
 
@@ -21,16 +21,16 @@ Self-hosting replaces that service without changing the downstream interfaces.
 
 Repository identity is a property of the downstream build, not a curation service preference.
 The normal GitHub build already has a trusted repository coordinate in `GITHUB_REPOSITORY`, and the template knows the repository it is creating.
-The build should write that coordinate into generated `/edit/` and `/review/` configuration.
-A user should not have to repeat it in a special curation setting.
+The build writes that coordinate into generated `/edit/` and `/review/` configuration.
+A user does not repeat it in a special curation setting.
 
-`site.curation_service` should become an optional override.
-When it is absent, the released integration should use the Orinoco Lite central-service origin.
-When it is present, it should name a credential-free HTTPS origin running the same service contract.
-The self-hosting skill should therefore need to change one override and verify the replacement host and GitHub App, rather than teach the editor and reviewer about another repository coordinate.
+`site.curation_service` is an optional override.
+When it is absent, the released integration uses the Orinoco Lite central-service origin.
+When it is present, it names a credential-free HTTPS origin running the same service contract.
+The self-hosting skill changes one override and verifies the replacement host and GitHub App rather than teaching the editor and reviewer another repository coordinate.
 
 For a non-GitHub or locally assembled build, repository identity may still be supplied as a general build input.
-It should not become a second curation-only knob.
+It does not become a second curation-only knob.
 Regardless of how the static build obtained the value, the service must verify it independently against GitHub objects, the App installation, and the trusted repository configuration.
 Browser configuration is a routing hint, not authorization.
 
@@ -41,7 +41,7 @@ Combining them makes Cloudflare deployment permissions look like curator permiss
 
 ### Curator to GitHub
 
-The product-facing **Sign in with GitHub** flow should remain a GitHub App user-to-server authorization.
+The product-facing **Sign in with GitHub** flow remains a GitHub App user-to-server authorization.
 GitHub App user tokens use the App's fine-grained permissions rather than OAuth App scopes.
 Effective access is the intersection of:
 
@@ -51,10 +51,10 @@ Effective access is the intersection of:
 
 The App does not need account-email permission, and the service does not need the curator's email address.
 It needs the authenticated GitHub login and stable GitHub account identifier for display and audit correlation, plus GitHub's authorization decision for the exact repository operation.
-The service should continue to check `write` or `admin` access immediately before a write.
+The service continues to check `write` or `admin` access immediately before a write.
 
 This differs from a GitHub OAuth App: `user:email` is an OAuth scope that grants access to email addresses.
-It should not be requested here.
+It is not requested here.
 See GitHub's [GitHub App user-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app), [permission guidance](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app), and [OAuth App scope reference](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps).
 
 ### Operator to Cloudflare
@@ -79,7 +79,7 @@ Removing the central application is achievable.
 Removing every service-origin browser document is not compatible with all of the desired security properties.
 OAuth must return to a browser context, and that context must retain the service's host-only, `HttpOnly` session cookie without exposing the GitHub token to downstream JavaScript or relying on third-party cookies.
 
-The recommended flow is:
+The accepted flow is:
 
 1. The downstream `/edit/` or `/review/` route creates a random one-time nonce and opens `/api/auth/start` at the configured service origin in a popup.
 2. The service binds the exact downstream origin, repository, operation, popup relationship, and nonce into expiring OAuth state, sets a host-only session cookie, and redirects the popup to GitHub.
@@ -94,21 +94,21 @@ The popup uses its same-origin session to perform the verified GitHub request an
 6. If the live SHACL handoff fails, the user keeps the downloaded bundle and selects it again on the downstream `/edit/` route before retrying.
 The service does not host an upload fallback or retain the bundle.
 
-The root service URL and obsolete presentation routes should return a small `404` or `410` response.
+The root service URL and obsolete presentation routes return a small `404` or `410` response.
 Deployment may use a Cloudflare Worker, Pages Functions, or another suitable runtime; the contract does not require a Pages frontend or any static assets.
 Calling the current deployment “Pages” describes its hosting product, not a product requirement.
 
-## Browser trust decision
+## Accepted browser trust policy
 
-Moving the final confirmation from the central origin to the downstream is the material security tradeoff in this proposal.
+Moving the final confirmation from the central origin to the downstream is the material security tradeoff in this design.
 Browser messaging authenticates an origin, not a path.
 A GitHub Pages project site can share its origin with other pages under the same account hostname, so another compromised page on that origin cannot be distinguished merely because the intended UI is at `/edit/` or `/review/`.
 
-The recommended shared-origin mitigation is defense in depth:
+The accepted shared-origin mitigation is defense in depth:
 
 - exact opener-window, origin, operation, repository, and nonce binding;
 - short-lived, one-shot sealed state and host-only secure cookies;
-- a minimal callback document with a restrictive CSP, no storage, no third- party scripts, and no framing;
+- a minimal callback document with a restrictive CSP, no storage, no third-party scripts, and no framing;
 - selected-repository GitHub App installation and minimum App permissions;
 - server-side revalidation of collaborator access, repository, pull request, commits, artifact or bundle, permitted paths, and exact head immediately before any write; and
 - a complete downstream confirmation summary before the final click.
@@ -117,25 +117,33 @@ These controls substantially constrain an attack, but they do not make two paths
 A unique downstream origin is the stronger option if path-level impersonation is unacceptable.
 A static secret embedded in the site cannot solve this because any script on the same origin can read it.
 
+A custom or otherwise unique downstream origin therefore receives the normal low-friction direct-GitHub flow.
+A shared `github.io` deployment shows a clear origin-wide security explanation and requires a visible, explicit, in-memory acknowledgment before enabling a direct GitHub write.
+The acknowledgment is not stored in local storage, a cookie, service state, or tracked configuration and is not treated as authorization or path proof.
+The SHACL editor keeps **Download bundle** enabled without that acknowledgment, GitHub sign-in, or a reachable service.
+
+The template and deployment skill guide maintainers through GitHub's current [domain verification](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages), [custom-domain configuration](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site), and [HTTPS enablement](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
+They do not freeze mutable DNS targets.
+
 ## Options considered
 
 | Option | Main URL | Token isolation | User-facing central page | Assessment |
 | --- | --- | --- | --- | --- |
-| Downstream UI plus minimal service popup transport | Remains downstream | Yes | No | Recommended, subject to accepting the shared-origin tradeoff or using a unique downstream origin |
+| Downstream UI plus minimal service popup transport | Remains downstream | Yes | No | Accepted, with the shared-origin acknowledgment or a unique downstream origin |
 | Central confirmation or upload page | Remains downstream except for popup | Yes | Yes | Current direction; rejected because it duplicates the product interface |
 | Full-window OAuth redirect and return | Temporarily leaves downstream | Yes | Callback only | Avoids a popup but loses in-page state and violates the requested URL behavior |
 | Give a credential to downstream JavaScript and call GitHub or the service directly | Remains downstream | No | No | Reject: downstream XSS or another same-origin page could obtain the credential |
 | Download and manual GitHub submission only | Remains downstream | Yes | No | Safe fallback, but does not provide the requested direct proposal experience |
 
-## Proposed implementation consequence
+## Implementation consequences
 
-If the recommended option is accepted, the current central React presentation surface should not be deployed as the final service.
-The normative profiles and human-decision register should first be updated together.
-Implementation should then:
+The central React presentation surface is not part of the final service.
+The normative profiles and human-decision register record the accepted policy.
+Implementation:
 
 1. make the central service origin a default with one downstream override;
 2. derive repository identity at trusted build time;
 3. move both confirmation experiences and SHACL file reselection downstream;
-4. replace the central routes with API handlers and the minimal callback/ transport response;
+4. replace the central routes with API handlers and the minimal callback/transport response;
 5. remove root, `/edit/`, review, upload, and final-confirmation presentation routes and assets; and
 6. validate editor proposal creation and source review end to end while the browser's main URL remains on the deployed downstream site.
