@@ -32,7 +32,7 @@ A fresh current Zotero transition, the first live SHACL handoff, and improved SH
 | Engine and runtime | [`orinoco-lite` `v0.2.0rc4`](https://github.com/con/orinoco-lite-dev/releases/tag/v0.2.0rc4), commit `abdf5623ce7b0b16146940ba6dafc7290124e9cc`. |
 | Template | [`v0.2.0rc7`](https://github.com/con/orinoco-lite-template/releases/tag/v0.2.0rc7), source commit `f46f717fddb452440ad0ba091b1af145a2769eef`. |
 | Current engineering integration | [Engineering pull request 39](https://github.com/con/orinoco-lite-dev/pull/39), merged as `6e64072ec535149cc0652da64c51b15e4d586fec`; [hosted engineering run 32998589027](https://github.com/con/orinoco-lite-dev/actions/runs/32998589027) passed. |
-| Hosted review application | The stateless application and trusted functions passed the focused application suite, type checks, formatting, and production builds in [run 32962736080](https://github.com/con/orinoco-lite-dev/actions/runs/32962736080). |
+| Hosted review application | The stateless application and trusted functions passed the focused application suite, type checks, formatting, and production builds in [run 32962736080](https://github.com/con/orinoco-lite-dev/actions/runs/32962736080). The [current post-acceptance deployment and rollback evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) is recorded with its implementing pull request. |
 
 These coordinates identify the released interface and final Milestone 5 integration.
 Independent consumers select their own immutable release coordinates; this record does not track ongoing downstream adoption.
