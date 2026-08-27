@@ -26,8 +26,9 @@ Copy `.dev.vars.example` to the untracked `.dev.vars` file before running the Fu
 
 ## GitHub App configuration
 
-Register a GitHub App with user authorization and expiring user-to-server tokens enabled.
-Configure its callback URL as `PUBLIC_ORIGIN/api/auth/callback`, install it only on selected repositories, and grant these repository permissions:
+Register a GitHub App with expiring user-to-server tokens enabled.
+Leave **Request user authorization (OAuth) during installation** and Device Flow disabled; the application starts its own state- and PKCE-bound browser authorization flow.
+Disable callback-URL wildcard matching and webhooks, configure the exact callback URL as `PUBLIC_ORIGIN/api/auth/callback`, install it only on selected repositories, and grant these repository permissions:
 
 - Metadata: read (the GitHub-required baseline permission)
 - Actions: read
