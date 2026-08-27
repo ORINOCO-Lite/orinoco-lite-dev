@@ -31,8 +31,8 @@ A fresh current Zotero transition, the first live SHACL handoff, and improved SH
 | Specification | [Engineering pull request 16](https://github.com/con/orinoco-lite-dev/pull/16), merged as `91b1658135e4a21b8d103e43c70db58cbabc58e1`. |
 | Engine and runtime | [`orinoco-lite` `v0.2.0rc4`](https://github.com/con/orinoco-lite-dev/releases/tag/v0.2.0rc4), commit `abdf5623ce7b0b16146940ba6dafc7290124e9cc`. |
 | Template | [`v0.2.0rc7`](https://github.com/con/orinoco-lite-template/releases/tag/v0.2.0rc7), source commit `f46f717fddb452440ad0ba091b1af145a2769eef`. |
-| Current engineering integration | [Engineering pull request 39](https://github.com/con/orinoco-lite-dev/pull/39), merged as `6e64072ec535149cc0652da64c51b15e4d586fec`; [hosted engineering run 32998589027](https://github.com/con/orinoco-lite-dev/actions/runs/32998589027) passed. |
-| Hosted review application | The stateless application and trusted functions passed the focused application suite, type checks, formatting, and production builds in [run 32962736080](https://github.com/con/orinoco-lite-dev/actions/runs/32962736080). The [current post-acceptance deployment and rollback evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) is recorded with its implementing pull request. |
+| Final Milestone 5 engineering integration | [Engineering pull request 39](https://github.com/con/orinoco-lite-dev/pull/39), merged as `6e64072ec535149cc0652da64c51b15e4d586fec`; [hosted engineering run 32998589027](https://github.com/con/orinoco-lite-dev/actions/runs/32998589027) passed. |
+| Hosted review application | The stateless application and trusted functions passed the focused application suite, type checks, formatting, and production builds in [run 32962736080](https://github.com/con/orinoco-lite-dev/actions/runs/32962736080). The later [pull request 50 deployment and rollback evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) is historical post-acceptance evidence; current receiver coordinates belong to Milestone 6. |
 
 These coordinates identify the released interface and final Milestone 5 integration.
 Independent consumers select their own immutable release coordinates; this record does not track ongoing downstream adoption.
@@ -72,8 +72,8 @@ Authenticated browser evidence also verified the exact-head wrapper, normal edit
 A complete live write/replacement was not needed to accept the implemented profile.
 The first live proposal and a visible choice between credential-free download and the authenticated wrapper are Milestone 6 acceptance items.
 
-The downstream site's credential-free `/edit/` page and the central application's authenticated `/edit/` wrapper are intentionally different surfaces.
-Being signed in does not add a GitHub button to the static page.
+At Milestone 5 acceptance, the downstream site's credential-free `/edit/` page and the central application's authenticated `/edit/` wrapper were intentionally different surfaces.
+Being signed in did not add a GitHub button to the static page.
 
 Those two sentences preserve the accepted Milestone 5 deployment evidence; they are not the current presentation contract.
 HR-227 and M6-D005 subsequently supersede the duplicate central-editor surface.
@@ -90,8 +90,8 @@ The downstream static site is now the only SHACL Vue editor and exposes both **D
 
 ## Follow-on work
 
-The pre-Milestone 6 boundary in [`milestone-6.md`](milestone-6.md) owns upstream repinning, resulting compatibility fixes, the aligned release, and the separately authorized organization migration.
-Milestone 6 begins afterward with general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, and SHACL proposal discoverability and live use.
+The prerequisite boundary in [`milestone-6.md`](milestone-6.md) owned the upstream repinning, resulting compatibility fixes, aligned releases, and separately authorized organization migration; that batch is complete.
+Milestone 6 is now active with general upstream-compatible open references, hermetic compatibility CI, the current Zotero operation, and SHACL proposal discoverability and live use.
 The corpus-normalization proposal remains site-owned content review and is not an engineering milestone or downstream-adoption gate here.
 
 ### First convergence batch

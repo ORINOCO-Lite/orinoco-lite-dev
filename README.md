@@ -64,8 +64,9 @@ It remains read-only evidence until a separate, explicitly reviewed graduation p
 
 ## Review now
 
-The current engineering entry point is the concise pre-Milestone 6 maintenance boundary in [`docs/milestone-6.md`](docs/milestone-6.md).
-The separate [`human-review decision queue`](docs/human-review-decisions.md) records its bounded planning outcomes and unresolved production and strategic choices.
+[`Milestone 6`](docs/milestone-6.md) is the current engineering entry point.
+Its bounded convergence, aligned-release, and custody-transition prerequisites are complete; the milestone document records their current mechanical coordinates and the remaining metadata-path acceptance work.
+The separate [`human-review decision queue`](docs/human-review-decisions.md) records the reviewed planning outcomes and unresolved production and strategic choices.
 
 Supporting records are:
 
@@ -178,7 +179,7 @@ This keeps checkout automation in the task without letting a validation command 
 The historical [Milestone 1–4 capability map](docs/archived/milestone-1-4-capability-map.md) explains what the early milestones contributed to the accepted distribution.
 The accepted [`Milestone 5 plan`](docs/milestone-5.md) and its concise [acceptance record](docs/milestone-5-acceptance.md) describe the delivered source-adapter system.
 The [`source-adapter specification`](docs/source-adapters.md) defines reviewable metadata changes, DataLad execution evidence, PAV annotation overlays, and durable human dispositions.
-The current [`Milestone 6 specification`](docs/milestone-6.md) separates the active upstream-convergence, release, and custody prerequisites from the later open-reference, compatibility, Zotero, and SHACL milestone work.
+The current [`Milestone 6 specification`](docs/milestone-6.md) records the completed upstream-convergence, aligned-release, and custody prerequisites and the active open-reference, compatibility, Zotero, and SHACL work.
 The superseded [lightweight architecture roadmap](docs/archived/lightweight-architecture-roadmap-through-m5.md) remains available as historical reasoning.
 
 The former unqualified `build`, `serve`, and CON migration tasks belonged to the accepted Milestones 1–3 integration stack.
@@ -217,4 +218,4 @@ They are preserved as evidence, not as current operating instructions:
 - [`docs/archived/milestone-1-4-capability-map.md`](docs/archived/milestone-1-4-capability-map.md)
 
 Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
-The supported distribution follows immutable engine/runtime releases and the versioned template; active engineering work follows the pre-Milestone 6 maintenance boundary and the normative source-adapter specification.
+The supported distribution follows immutable engine/runtime releases and the versioned template; active engineering work follows Milestone 6 and the normative source-adapter specification.
