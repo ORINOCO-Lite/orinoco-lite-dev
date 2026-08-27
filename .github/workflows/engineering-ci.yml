@@ -39,6 +39,7 @@ jobs:
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /.gitignore
             /metadata/
             /site/projection.yaml
             /site/projection-templates/
