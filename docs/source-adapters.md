@@ -48,7 +48,7 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
 | Source decision-review presentation | Proposal commit and metadata diff; one expiring GitHub Actions artifact is non-authoritative presentation input | Reproducibly present source and proposal coordinates plus per-record UI facts without letting the artifact become metadata, candidate, decision, or provenance authority. |
 | SHACL Vue presentation | Downstream static `edit/` output | Serve the exact-commit `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` with an immutable released editor shell and schema. The static site is the only SHACL Vue editor; its generated output is not metadata, a generated review bundle, provenance, or durable curation state. |
-| Hosted SHACL Vue handoff | Stateless GitHub authorization and receiver page | Authenticate, confirm, and transport the editor's unchanged bundle to the fixed-path Git handoff without assembling or hosting another editor or retaining curation state. |
+| Hosted SHACL Vue handoff | Downstream editor plus stateless GitHub authorization and transport | Keep selection, warnings, confirmation, and file reselection on downstream `/edit/`; transport the unchanged bundle to the fixed-path Git handoff without exposing a token, assembling another editor, or retaining curation state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
@@ -186,7 +186,8 @@ SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue hum
 Its existing generated bundle is exposed by the downstream static editor to a thin Orinoco GitHub handoff, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
 The downstream build combines exact-commit static editor data with the generic shell and schema from one immutable, digest-verified runtime release.
 That static site remains the only SHACL Vue editor and provides both **Download bundle** and **Propose via GitHub** for the same unchanged bundle.
-The stateless application supplies only GitHub sign-in, confirmation, and bundle receipt before the profile's fixed-path Git handoff and trusted Python replacement; the browser and hosted service perform no metadata conversion.
+The stateless service supplies only backend GitHub authorization and verified transport before the profile's fixed-path Git handoff and trusted Python replacement.
+The downstream browser owns confirmation and optional file reselection; neither the browser nor hosted service performs metadata conversion.
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
@@ -428,12 +429,18 @@ The generated static input is not canonical metadata, a generated review bundle,
 The shared GitHub App requests metadata read, Actions read, contents write, and pull requests write.
 Contents write is confined to an explicit SHACL Vue handoff at exact Git coordinates; the decision-review path only reads contents and posts the authenticated comment.
 Actions read serves the source-adapter decision-review artifact and is not used to assemble a SHACL Vue editor.
-The receiver MUST require an explicit public-data and no-secrets acknowledgment before it creates the fixed-path bundle handoff.
-No second editor page, separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this path.
+The downstream `/edit/` route MUST require an explicit public-data and no-secrets acknowledgment before it requests the fixed-path bundle handoff.
+No second editor, receiver, upload, confirmation, or landing page, separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this path.
 
-The project MAY publish one central authorization and GitHub-transport origin by default.
-That origin MUST remain configurable, and a downstream MAY self-host the same stateless service without creating another review interface, host profile, or durable authority.
+The project publishes one central backend-only authorization and GitHub-transport origin as the released default.
+`site.curation_service` is an optional override, and a downstream MAY self-host the same stateless service without creating another review interface, host profile, or durable authority.
+Repository identity MUST come from the trusted downstream build or general project identity rather than another curation-specific setting and MUST be verified independently before every write.
 Source-adapter decisions are rendered by the downstream static `/review/` route; SHACL Vue remains at its separate static `/edit/` route.
+
+Custom or otherwise unique downstream origins use the normal direct-GitHub flow.
+A downstream on a shared `github.io` origin MUST explain that origin-wide browser trust and require an explicit in-memory acknowledgment before enabling either direct GitHub write path.
+The acknowledgment is not an authorization proof and does not weaken exact channel or server-side verification.
+The SHACL Vue **Download bundle** action remains credential-free and enabled without that acknowledgment.
 
 ## Security and complexity guardrails
 
@@ -467,7 +474,7 @@ Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter st
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
 A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things or metadata service for validation, review, build, or publication.
-The stateless GitHub authentication service provides verified decision data, authorization, and explicit human-handoff transport; it is not a review destination or metadata runtime dependency.
+The stateless GitHub authentication service provides verified decision data, authorization, and explicit human-handoff transport; it is not a review, confirmation, upload, landing, or metadata-runtime destination.
 
 Prefer released upstream acquisition, matching, serialization, and update helpers.
 In particular, reuse `things-enrichment-tools` ownership-aware update helpers when their data model and pinned runtime are compatible.

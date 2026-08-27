@@ -82,15 +82,16 @@ It is not a disposition until the reviewer submits the complete authenticated de
 The initial service accepts at most 225 candidates, 450 changed metadata paths, and 16 MiB of loaded record text per review.
 These are application resource-safety bounds, not pull-request Markdown or native-diff conformance limits.
 
-The static route generates a fresh 256-bit nonce and opens the service's `/review-transport/` route with exact repository, pull-request, artifact, and origin coordinates.
-OAuth runs in a separate window so navigation does not replace the transport's opener.
+The static route generates a fresh 256-bit nonce and opens the service's authorization route in a popup with exact repository, pull-request, artifact, operation, and origin coordinates.
+OAuth runs in that popup so the main browser remains on downstream `/review/`.
 The sealed, expiring session grant binds those coordinates.
-Before sending proposal data, the service verifies `site.repository`, `site.base_url`, and `site.curation_service` from `orinoco.yaml` at the proposal metadata base, then completes an exact ready/request handshake with the same window, origin, nonce, and coordinates.
+Repository identity MUST be derived from the trusted downstream build or its general project identity rather than a second curation-specific setting.
+Before sending proposal data, the service verifies the repository against the GitHub objects and App installation, verifies `site.base_url` and any explicit `site.curation_service` override from `orinoco.yaml` at the proposal metadata base, resolves an omitted override to the released central-service default, and completes an exact ready/request handshake with the same window, origin, operation, nonce, and coordinates.
 Neither tokens nor CSRF material cross that channel.
 
-The static application sends one complete decision submission back through the same one-shot channel.
-The service MUST display the authenticated login, repository, pull request, proposal and head commits, and every record path and disposition on its own origin.
-Only an explicit user confirmation there may post the comment.
+The static application sends one complete decision submission back through the same one-shot channel, and a successful write consumes the sealed grant so a later transport cannot reuse it.
+The downstream MUST display the authenticated login, repository, pull request, proposal and head commits, and every record path and disposition.
+Only an explicit user confirmation on that downstream route may instruct the popup to post the comment.
 Replayed, mismatched, stale, framed, timed-out, or duplicate messages fail closed.
 
 The service sends a typed `post-started` message before the authenticated request and classifies its result.
@@ -99,6 +100,19 @@ A network failure, server failure, malformed GitHub success response, timeout, o
 
 Legacy central discovery routes return HTTP 410 `review_discovery_retired`.
 They do not start OAuth, inspect a session, or contact GitHub.
+The central root, review, upload, and confirmation routes expose no static application; they return a small `404` or compatibility `410` response.
+
+### Downstream origin policy
+
+A custom domain or another origin dedicated to one downstream receives the normal review and submission flow.
+The template MUST guide maintainers through adding and verifying that domain.
+
+On a shared `github.io` origin, the static application MUST explain that browser messaging authenticates the whole origin rather than its `/review/` path and that another compromised page on that hostname could impersonate the intended route.
+It MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; configured or link coordinates MUST NOT bypass the gate while the page is running on `github.io`.
+It MUST require an explicit in-memory acknowledgment of that limitation before enabling the direct GitHub submission action.
+The acknowledgment is informed consent, not authorization or proof of path identity.
+It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or weaken the exact-channel or server-side checks.
+Native pull-request review and the accessible Markdown summary remain available without using the hosted direct-submission flow.
 
 ## Authenticated submission
 
@@ -174,18 +188,19 @@ Local execution MAY expose the same deterministic operations for development and
 
 ## Hosting boundary
 
-The central `https://orinoco-curation-review.pages.dev/` deployment is the default authorization and verified GitHub-transport option.
+The central `https://orinoco-curation-review.pages.dev/` deployment is the default backend-only authorization and verified GitHub-transport option.
 It is not the canonical review page.
-A downstream selects that service independently in `site.curation_service`, while its own `site.base_url` owns `/review/`.
+An omitted `site.curation_service` selects that default; the field is only an optional override for a compatible independently hosted service.
+The downstream's trusted build supplies repository identity, while its own `site.base_url` owns `/review/`.
 The same service code MAY be deployed elsewhere by setting `PUBLIC_ORIGIN`; the profile does not require a particular hosting provider.
 It MUST NOT require a durable database, object store, metadata service, candidate store, or decision store.
-For the separate SHACL Vue profile, that origin MAY also serve a lightweight sign-in, confirmation, and bundle-receiver page, but it MUST NOT assemble, embed, or host a SHACL Vue editor.
-The downstream static site remains that profile's only editor.
+It MUST NOT deploy static presentation assets or expose a landing, review, confirmation, upload, receiver, or editor application.
+It MAY return a minimal backend-generated, restrictive-CSP OAuth callback and popup transport document that retains host-only cookies while the downstream static site remains the only user interface.
 
 Browser messaging binds an origin, not a URL path.
 A project site on a shared GitHub Pages hostname therefore shares its browser trust boundary with other pages on that hostname.
-The repository-derived route check, exact one-shot channel, and central-origin submission confirmation are required for that deployment shape.
-A custom or otherwise unique origin MAY narrow the boundary.
+The explanation and explicit acknowledgment above are required for that deployment shape in addition to the repository-derived checks, exact one-shot channel, selected-repository App installation, and complete server-side revalidation.
+A custom or otherwise unique origin narrows that boundary and receives the normal low-friction flow.
 
 Cloudflare project provisioning, GitHub App registration, secrets, and a live deployment are external operational changes.
 They require separately reviewed acceptance coordinates and are not implied by implementation of this profile.

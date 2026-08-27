@@ -55,8 +55,11 @@ The template can compose prerequisites and platform compatibility checks that a 
 
 `orinoco.yaml` names the site, public base URL, normalized site-owned roots, and optional released-driver aliases.
 The current configuration contract is version 2; version 1 is intentionally rejected rather than translated implicitly.
-To expose the optional static-editor GitHub proposal action, a site configures `site.repository` as its exact GitHub `owner/repository` coordinate and `site.curation_service` as the credential-free HTTPS origin of the receiver.
-Those two values are accepted only as a pair; omitting both preserves the credential-free **Download bundle** action without a GitHub handoff.
+Hosted builds obtain the exact GitHub `owner/repository` coordinate from the trusted build invocation; `orinoco build --github-repository` defaults to GitHub Actions' `GITHUB_REPOSITORY` value.
+The released central curation service is the default.
+A site may replace only that backend with an optional credential-free HTTPS `site.curation_service` origin.
+Legacy `site.repository` remains a compatibility fallback for nonstandard builds, but normal downstreams do not repeat their repository in site configuration.
+The **Download bundle** action remains credential-free even when no repository coordinate or reachable service is available.
 The semantic metadata interface comprises reviewed Things under `metadata/records/` and their machine-managed PAV companions under `metadata/overlays/annotations/`.
 `paths.records` defaults to `metadata/records`; the companion tree mirrors that fixed record path below its overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.

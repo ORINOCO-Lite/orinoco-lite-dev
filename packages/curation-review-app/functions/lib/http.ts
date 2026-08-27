@@ -55,7 +55,7 @@ export function errorResponse(error: unknown): Response {
 export function withApiHeaders(response: Response): Response {
   const result = new Response(response.body, response);
   for (const [name, value] of Object.entries(API_SECURITY_HEADERS)) {
-    result.headers.set(name, value);
+    if (!result.headers.has(name)) result.headers.set(name, value);
   }
   return result;
 }

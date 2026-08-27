@@ -9,9 +9,14 @@ import {
   SHACL_BUNDLE_PATH,
   serializeShaclReviewBundle,
 } from "../functions/lib/shacl";
+import { ORINOCO_CONFIG } from "./fixtures";
 
 const HEAD = "a".repeat(40);
 const COMMIT = "b".repeat(40);
+const BASE = "c".repeat(40);
+const EDITOR_ORIGIN = "https://site.example";
+const SERVICE_ORIGIN = "https://review.example";
+const HANDOFF_NONCE = "d".repeat(64);
 
 function bundle(): ShaclReviewBundle {
   return {
@@ -39,6 +44,50 @@ function request(target: ShaclProposalRequest["target"]): ShaclProposalRequest {
     repository: "example/site",
     target,
   };
+}
+
+function trustedGrant(
+  target: ShaclProposalRequest["target"],
+  editorOrigin = EDITOR_ORIGIN,
+) {
+  return {
+    editor_origin: editorOrigin,
+    expected_head_sha:
+      target.kind === "pull_request" ? target.expected_head_sha : null,
+    handoff_nonce: HANDOFF_NONCE,
+    pull_request: target.kind === "pull_request" ? target.pull_request : null,
+    repository: "example/site",
+  };
+}
+
+function createProposal(
+  github: GitHubClient,
+  proposal: ShaclProposalRequest,
+  editorOrigin = EDITOR_ORIGIN,
+  serviceOrigin = SERVICE_ORIGIN,
+) {
+  return createShaclProposal(
+    github,
+    proposal,
+    trustedGrant(proposal.target, editorOrigin),
+    serviceOrigin,
+  );
+}
+
+function siteConfigResponse(value = ORINOCO_CONFIG): Response {
+  return Response.json({
+    data: {
+      repository: {
+        blob0: {
+          __typename: "Blob",
+          byteSize: new TextEncoder().encode(value).byteLength,
+          isBinary: false,
+          isTruncated: false,
+          text: value,
+        },
+      },
+    },
+  });
 }
 
 function pathResponse(): Response {
@@ -82,7 +131,11 @@ describe("attributed existing-PR SHACL handoff", () => {
         if (common !== null) return common;
         if (url.endsWith("/pulls/42")) {
           return Response.json({
-            base: { ref: "main", repo: { full_name: "example/site" } },
+            base: {
+              ref: "main",
+              repo: { full_name: "example/site" },
+              sha: BASE,
+            },
             draft: true,
             head: {
               ref: "curation/edit",
@@ -99,6 +152,12 @@ describe("attributed existing-PR SHACL handoff", () => {
             query: string;
             variables: Record<string, unknown>;
           };
+          if (graphql.query.includes("query ReviewRecords")) {
+            expect(graphql.variables).toMatchObject({
+              expression0: `${BASE}:orinoco.yaml`,
+            });
+            return siteConfigResponse();
+          }
           if (graphql.query.includes("query ExactPath")) {
             expect(graphql.variables).toMatchObject({
               expression: `${HEAD}:${SHACL_BUNDLE_PATH}`,
@@ -133,7 +192,7 @@ describe("attributed existing-PR SHACL handoff", () => {
     );
 
     await expect(
-      createShaclProposal(
+      createProposal(
         new GitHubClient("ghu_curator", fetchMock),
         request({
           expected_head_sha: HEAD,
@@ -160,7 +219,11 @@ describe("attributed existing-PR SHACL handoff", () => {
       const common = commonResponse(url);
       if (common !== null) return common;
       return Response.json({
-        base: { ref: "main", repo: { full_name: "example/site" } },
+        base: {
+          ref: "main",
+          repo: { full_name: "example/site" },
+          sha: BASE,
+        },
         draft: true,
         head: {
           ref: "curation/edit",
@@ -173,7 +236,7 @@ describe("attributed existing-PR SHACL handoff", () => {
       });
     });
     await expect(
-      createShaclProposal(
+      createProposal(
         new GitHubClient("ghu_curator", fetchMock),
         request({
           expected_head_sha: HEAD,
@@ -186,30 +249,42 @@ describe("attributed existing-PR SHACL handoff", () => {
   });
 
   it("never replaces an already-pending fixed-path handoff", async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      const common = commonResponse(url);
-      if (common !== null) return common;
-      if (url.endsWith("/pulls/42")) {
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        const common = commonResponse(url);
+        if (common !== null) return common;
+        if (url.endsWith("/pulls/42")) {
+          return Response.json({
+            base: {
+              ref: "main",
+              repo: { full_name: "example/site" },
+              sha: BASE,
+            },
+            draft: true,
+            head: {
+              ref: "curation/edit",
+              repo: { full_name: "example/site" },
+              sha: HEAD,
+            },
+            html_url: "https://github.com/example/site/pull/42",
+            number: 42,
+            state: "open",
+          });
+        }
+        const graphql = JSON.parse(String(init?.body)) as {
+          query: string;
+        };
+        if (graphql.query.includes("query ReviewRecords")) {
+          return siteConfigResponse();
+        }
         return Response.json({
-          base: { ref: "main", repo: { full_name: "example/site" } },
-          draft: true,
-          head: {
-            ref: "curation/edit",
-            repo: { full_name: "example/site" },
-            sha: HEAD,
-          },
-          html_url: "https://github.com/example/site/pull/42",
-          number: 42,
-          state: "open",
+          data: { repository: { object: { __typename: "Blob" } } },
         });
-      }
-      return Response.json({
-        data: { repository: { object: { __typename: "Blob" } } },
-      });
-    });
+      },
+    );
     await expect(
-      createShaclProposal(
+      createProposal(
         new GitHubClient("ghu_curator", fetchMock),
         request({
           expected_head_sha: HEAD,
@@ -218,7 +293,7 @@ describe("attributed existing-PR SHACL handoff", () => {
         }),
       ),
     ).rejects.toMatchObject({ code: "shacl_handoff_pending", status: 409 });
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });
 
@@ -260,6 +335,12 @@ function standaloneFetch(options: StandaloneOptions = {}): {
           query: string;
           variables: Record<string, unknown>;
         };
+        if (graphql.query.includes("query ReviewRecords")) {
+          expect(graphql.variables).toMatchObject({
+            expression0: `${HEAD}:orinoco.yaml`,
+          });
+          return siteConfigResponse();
+        }
         if (graphql.query.includes("query ExactPath")) return pathResponse();
         if (options.commitFails) {
           return Response.json({ errors: [{ type: "UNPROCESSABLE" }] });
@@ -267,6 +348,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
         return commitResponse(branch);
       }
       if (url.endsWith("/git/refs") && init?.method === "POST") {
+        if (branch !== "") return Response.json({}, { status: 422 });
         const reference = body as { ref: string; sha: string };
         branch = reference.ref.slice("refs/heads/".length);
         return Response.json({
@@ -308,13 +390,11 @@ function standaloneFetch(options: StandaloneOptions = {}): {
 describe("standalone SHACL proposal", () => {
   it("branches only from the freshly read default head and opens a draft PR", async () => {
     const mock = standaloneFetch();
-    const result = await createShaclProposal(
+    const result = await createProposal(
       new GitHubClient("ghu_curator", mock.fetchMock),
       request({ kind: "standalone" }),
     );
-    expect(mock.branch()).toMatch(
-      /^curation\/shacl-vue-a{12}-[A-Za-z0-9_-]{12}$/,
-    );
+    expect(mock.branch()).toMatch(/^curation\/shacl-vue-a{12}-d{16}$/);
     expect(result).toMatchObject({
       commit_sha: COMMIT,
       pull_request: 43,
@@ -327,19 +407,68 @@ describe("standalone SHACL proposal", () => {
     expect(mock.requests.some((item) => item.method === "DELETE")).toBe(false);
   });
 
+  it("uses the nonce-bound branch as a stateless replay gate", async () => {
+    const mock = standaloneFetch();
+    const proposal = request({ kind: "standalone" });
+    const github = new GitHubClient("ghu_curator", mock.fetchMock);
+
+    await expect(createProposal(github, proposal)).resolves.toMatchObject({
+      pull_request: 43,
+    });
+    await expect(createProposal(github, proposal)).rejects.toMatchObject({
+      code: "github_rejected",
+      status: 422,
+    });
+
+    expect(
+      mock.requests.filter(
+        (item) => item.url.endsWith("/pulls") && item.method === "POST",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("rejects a stale default head before creating a branch", async () => {
     const mock = standaloneFetch();
     const stale = request({ kind: "standalone" });
     stale.bundle.source_commit = "d".repeat(40);
     await expect(
-      createShaclProposal(
-        new GitHubClient("ghu_curator", mock.fetchMock),
-        stale,
-      ),
+      createProposal(new GitHubClient("ghu_curator", mock.fetchMock), stale),
     ).rejects.toMatchObject({ code: "stale_shacl_proposal", status: 409 });
     expect(mock.requests.some((item) => item.url.endsWith("/git/refs"))).toBe(
       false,
     );
+  });
+
+  it.each([
+    {
+      editorOrigin: "https://phishing.example",
+      label: "unrelated editor origin",
+      serviceOrigin: SERVICE_ORIGIN,
+    },
+    {
+      editorOrigin: EDITOR_ORIGIN,
+      label: "unrelated service origin",
+      serviceOrigin: "https://other-service.example",
+    },
+  ])("rejects an $label before creating a branch", async (coordinates) => {
+    const mock = standaloneFetch();
+    const proposal = request({ kind: "standalone" });
+    await expect(
+      createProposal(
+        new GitHubClient("ghu_curator", mock.fetchMock),
+        proposal,
+        coordinates.editorOrigin,
+        coordinates.serviceOrigin,
+      ),
+    ).rejects.toMatchObject({
+      code: "shacl_transport_mismatch",
+      status: 403,
+    });
+    expect(
+      mock.requests.some(
+        (item) => item.url.endsWith("/git/refs") && item.method === "POST",
+      ),
+    ).toBe(false);
   });
 
   it.each([
@@ -350,7 +479,7 @@ describe("standalone SHACL proposal", () => {
     async (_label, options) => {
       const mock = standaloneFetch(options);
       await expect(
-        createShaclProposal(
+        createProposal(
           new GitHubClient("ghu_curator", mock.fetchMock),
           request({ kind: "standalone" }),
         ),
@@ -368,7 +497,7 @@ describe("standalone SHACL proposal", () => {
   it("returns the stranded ref diagnostic when bounded cleanup also fails", async () => {
     const mock = standaloneFetch({ cleanupFails: true, pullFails: true });
     await expect(
-      createShaclProposal(
+      createProposal(
         new GitHubClient("ghu_curator", mock.fetchMock),
         request({ kind: "standalone" }),
       ),

@@ -11,7 +11,11 @@ import {
 import type { EventContext } from "../lib/pages";
 import { parseArtifactId } from "../lib/input";
 import { loadReviewProposal, requireReviewTransport } from "../lib/proposal";
-import { configuredOrigin, readSessionCookie } from "../lib/session";
+import {
+  configuredOrigin,
+  consumeSessionGrantCookie,
+  readSessionCookie,
+} from "../lib/session";
 import {
   parseSubmission,
   submissionComment,
@@ -69,5 +73,17 @@ export async function onRequest(context: EventContext): Promise<Response> {
     proposal.pull_request,
     submissionComment(verified),
   );
-  return jsonResponse({ comment_url: commentUrl }, { status: 201 });
+  return jsonResponse(
+    { comment_url: commentUrl },
+    {
+      headers: {
+        "Set-Cookie": await consumeSessionGrantCookie(
+          context.env,
+          session,
+          "review",
+        ),
+      },
+      status: 201,
+    },
+  );
 }

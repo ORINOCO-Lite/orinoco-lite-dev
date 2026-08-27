@@ -29,6 +29,7 @@ Release coordinates, CI results, documentation repairs, and other mechanical wor
 | HR-226 | Transfer the core product repositories, integration fixture, GitHub App, and all actively used mirrors to `ORINOCO-Lite`. Keep the personal demonstration downstream, real CON site, unused historical mirrors, and CON-owned source repositories outside the move. Broader ecosystem visibility may be reconsidered later. | M6-D004 | John Lee | 2026-08-26 |
 | HR-227 | Keep the downstream static site as the only SHACL Vue editor and expose both **Download bundle** and **Propose via GitHub** from that editing session. Use the central stateless service only for OAuth, confirmation, unchanged-bundle receipt, and the existing fixed-path Git handoff; it may provide a lightweight upload fallback but must not assemble or host another editor. | M6-D005 | John Lee | 2026-08-26 |
 | HR-228 | Serve source-adapter decision review from the downstream's deployed `/review/` route. Keep `/edit/` as the separate SHACL Vue route and use the central stateless service only for OAuth, verified GitHub reads, explicit submission confirmation, and authenticated GitHub transport. | M6-D006 | John Lee | 2026-08-27 |
+| HR-229 | Keep all editing, review, warning, upload fallback, and confirmation UI on the downstream site while the main browser remains there. Use the central backend-only GitHub App service by default, with one optional self-host override and repository identity derived from the trusted build. Give unique custom-domain origins the normal flow; on shared `github.io` origins explain the origin-wide trust boundary and require an explicit acknowledgment before enabling direct GitHub writes. Keep **Download bundle** credential-free and guide maintainers through adding and verifying a custom domain. | M6-D007 | John Lee | 2026-08-27 |
 
 ## Before production graduation
 
@@ -84,6 +85,8 @@ These remain dormant until a milestone proposes concrete work that needs them.
 - Framework updates create pull requests and never approve or merge themselves.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 - Milestone 5 source-adapter review uses GitHub, merge commits, and human decisions; it does not write to an external source.
+- The downstream `/edit/` and `/review/` routes own all product presentation; the central default or optional self-hosted curation service is backend-only.
+Shared `github.io` origins require an explicit in-memory acknowledgment before direct GitHub writes, while **Download bundle** remains credential-free.
 - No Milestone 5 or 6 decision authorizes changing the real site, its remotes, deployment, DNS, or production domain.
 
 ## Source records

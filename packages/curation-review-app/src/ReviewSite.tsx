@@ -5,7 +5,6 @@ import {
   type CurationSubmission,
   type ReviewCandidate,
   type ReviewCoordinates,
-  type ReviewConfirmationReadyMessage,
   type ReviewProposal,
   type ReviewProposalRequestMessage,
   type ReviewSubmissionMessage,
@@ -39,7 +38,6 @@ interface BoundReviewProposal extends ReviewProposal {
 
 interface HandoffState {
   closedPoll: number | null;
-  confirmationAcknowledged: boolean;
   handshakeTimeout: number | null;
   nonce: string;
   popup: Window;
@@ -214,6 +212,35 @@ function exactPullRequestUrl(value: unknown, target: ReviewTarget): boolean {
   );
 }
 
+function exactCommentUrl(
+  value: unknown,
+  target: ReviewTarget,
+): value is string {
+  if (typeof value !== "string" || value.length > 512) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const parts = url.pathname.split("/");
+  const [owner, repository] = target.repository.split("/");
+  return (
+    url.href === value &&
+    url.origin === "https://github.com" &&
+    url.username === "" &&
+    url.password === "" &&
+    url.search === "" &&
+    /^#issuecomment-[1-9][0-9]*$/.test(url.hash) &&
+    parts.length === 5 &&
+    parts[0] === "" &&
+    parts[1]?.toLowerCase() === owner?.toLowerCase() &&
+    parts[2]?.toLowerCase() === repository?.toLowerCase() &&
+    parts[3] === "pull" &&
+    parts[4] === String(target.pullRequest)
+  );
+}
+
 function proposal(
   value: unknown,
   target: ReviewTarget,
@@ -305,6 +332,15 @@ function framed(): boolean {
   }
 }
 
+export function isSharedGitHubPagesHostname(hostname: string): boolean {
+  hostname = hostname.toLowerCase().replace(/\.+$/, "");
+  return hostname === "github.io" || hostname.endsWith(".github.io");
+}
+
+function sharedGitHubPagesOrigin(): boolean {
+  return isSharedGitHubPagesHostname(window.location.hostname);
+}
+
 function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
   const target = currentTarget();
   const handoff = useRef<HandoffState | null>(null);
@@ -316,6 +352,8 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
     useState<BoundReviewProposal | null>(null);
   const [login, setLogin] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [sharedOriginAcknowledged, setSharedOriginAcknowledged] =
+    useState(false);
 
   function clearHandoffTimers(state: HandoffState): void {
     if (state.handshakeTimeout !== null) {
@@ -441,47 +479,29 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         setFeedback(null);
         return;
       }
-      if (value.format === "orinoco-lite-review-confirmation-pending-v1") {
+      if (value.format === "orinoco-lite-transport-error-v1") {
         if (
-          !state.submissionSent ||
-          state.confirmationAcknowledged ||
-          state.postStarted ||
-          pending.current?.handoff !== state ||
           !exactKeys(value, [
-            "artifact_id",
             "format",
             "handoff_nonce",
-            "pull_request",
+            "kind",
+            "message",
             "repository",
           ]) ||
-          !exactCoordinates(value, target, state.nonce)
+          value.kind !== "review" ||
+          value.handoff_nonce !== state.nonce ||
+          typeof value.repository !== "string" ||
+          value.repository.toLowerCase() !== target.repository.toLowerCase() ||
+          !oneLine(value.message)
         ) {
           return;
         }
-        state.confirmationAcknowledged = true;
-        const waiting = pending.current;
-        if (waiting.timeout !== null) {
-          window.clearTimeout(waiting.timeout);
-          waiting.timeout = null;
-        }
-        setFeedback(
-          "Review and confirm the complete decision summary in the GitHub transport window.",
-        );
-        const ready: ReviewConfirmationReadyMessage = {
-          ...coordinates(target, state.nonce),
-          format: "orinoco-lite-review-confirmation-ready-v1",
-        };
-        state.popup.postMessage(ready, config.service_origin);
-        try {
-          state.popup.focus();
-        } catch {
-          // Focusing is optional; the confirmation remains available.
-        }
+        failHandoff(state, new Error(value.message));
         return;
       }
       if (value.format === "orinoco-lite-review-post-started-v1") {
         if (
-          !state.confirmationAcknowledged ||
+          !state.submissionSent ||
           state.postStarted ||
           pending.current?.handoff !== state ||
           !exactKeys(value, [
@@ -532,12 +552,9 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       if (waiting.timeout !== null) window.clearTimeout(waiting.timeout);
       waiting.timeout = null;
       if (
-        typeof value.comment_url === "string" &&
+        exactCommentUrl(value.comment_url, target) &&
         value.error === null &&
-        value.retry_safe === false &&
-        /^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/[1-9][0-9]*#issuecomment-[1-9][0-9]*$/.test(
-          value.comment_url,
-        )
+        value.retry_safe === false
       ) {
         pending.current = null;
         waiting.resolve({ comment_url: value.comment_url });
@@ -596,6 +613,12 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
 
   function connect(): void {
     if (target === null || !listenerInstalled.current) return;
+    if (sharedGitHubPagesOrigin() && !sharedOriginAcknowledged) {
+      setFeedback(
+        "Acknowledge the shared github.io origin before connecting GitHub.",
+      );
+      return;
+    }
     const previous = handoff.current;
     if (previous !== null) {
       clearHandoffTimers(previous);
@@ -612,7 +635,8 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       setFeedback("The browser could not create a secure review handoff.");
       return;
     }
-    const url = new URL("/review-transport/", config.service_origin);
+    const url = new URL("/api/transport", config.service_origin);
+    url.searchParams.set("kind", "review");
     url.searchParams.set("artifact_id", String(target.artifactId));
     url.searchParams.set("handoff_nonce", nextNonce);
     url.searchParams.set("pull_request", String(target.pullRequest));
@@ -635,7 +659,6 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
     }
     const state: HandoffState = {
       closedPoll: null,
-      confirmationAcknowledged: false,
       handshakeTimeout: null,
       nonce: nextNonce,
       popup: opened,
@@ -779,11 +802,40 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       <h1>Review pull request #{target.pullRequest} here</h1>
       <p className="lede">
         Candidate review remains in this deployed static website. A small GitHub
-        transport window authenticates you and verifies the exact proposal.
-        Posting requires a separate confirmation in that window.
+        transport window authenticates you and verifies the exact proposal. The
+        complete decision summary and final confirmation remain on this page.
       </p>
+      {sharedGitHubPagesOrigin() && (
+        <section
+          className="shared-origin-warning"
+          aria-labelledby="shared-origin-title"
+        >
+          <h2 id="shared-origin-title">Shared github.io security boundary</h2>
+          <p>
+            Every project page under this github.io hostname shares one browser
+            origin. Another page on that hostname could impersonate this path. A
+            verified custom domain gives this site its own origin and enables
+            the normal low-friction GitHub flow.
+          </p>
+          <label>
+            <input
+              checked={sharedOriginAcknowledged}
+              onChange={(event) =>
+                setSharedOriginAcknowledged(event.target.checked)
+              }
+              type="checkbox"
+            />
+            I understand this shared-origin risk and want to enable direct
+            GitHub submission for this page.
+          </label>
+        </section>
+      )}
       {listenerReady && (
-        <button onClick={connect} type="button">
+        <button
+          disabled={sharedGitHubPagesOrigin() && !sharedOriginAcknowledged}
+          onClick={connect}
+          type="button"
+        >
           {nonce === null ? "Connect with GitHub" : "Reopen GitHub transport"}
         </button>
       )}

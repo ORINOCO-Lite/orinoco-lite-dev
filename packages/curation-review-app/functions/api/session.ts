@@ -11,6 +11,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
       csrf_token: session.csrf_token,
       login: session.login,
       review_grant: session.review_grant,
+      shacl_grant: session.shacl_grant,
     });
   } catch (error) {
     if (!(error instanceof HttpError) || error.status !== 401) throw error;

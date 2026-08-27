@@ -18,12 +18,12 @@ npm ci --ignore-scripts
 npm run check
 ```
 
-`npm run check` formats, tests, type-checks, builds `dist/`, and verifies the Pages Functions bundle.
-Deploy `dist/`, `functions/`, the tracked route and header files, and public configuration together from the same clean revision.
-Uploading `dist/` without the Functions adapter is not a backend deployment.
+`npm run check` formats, tests, type-checks, and verifies the checked backend and provider adapter.
+Deploy its API handlers, generated protocol response, route and header policy, and public configuration together from the same clean revision.
+Do not deploy `dist/`, a review shell, a landing page, or other static presentation assets with the service.
 
-Also run `npm run build:review` and verify the unconfigured `dist-review/` shell.
-That shell belongs in the immutable Orinoco runtime and downstream static build; do not deploy it as a second central review page.
+The released source-review shell belongs in the immutable Orinoco runtime and downstream static build.
+Verify it through the release and downstream checks, not by deploying it as a second central review page.
 
 The service does not consume an Orinoco Lite runtime archive.
 Do not stage SHACL Vue, a Things schema, downstream record input, an editor-input Actions artifact, `/editor-runtime/` assets, or a runtime-manifest digest.
@@ -42,22 +42,22 @@ Generate `SESSION_SEAL_KEY` with a cryptographically secure random source.
 Avoid commands that print it into captured logs; send it directly to the provider's secret input.
 No App private key, webhook secret, installation token, runtime digest, database credential, or storage binding is required.
 
-Each downstream that enables the SHACL proposal handoff separately declares:
+The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.
+Repository identity is not a separate curation setting.
 
-- `site.repository`, the exact GitHub `owner/repository`; and
-- `site.curation_service`, the credential-free HTTPS receiver origin.
-
-Both are required for **Propose via GitHub**.
-They are downstream site configuration, not service secrets, OAuth state, or a substitute for the App's selected-repository installation.
-The same pair enables the downstream's static source-review shell.
-Its `site.base_url` owns the canonical `review/` route, while `site.curation_service` names only this transport service.
+`site.curation_service` is optional.
+When absent, the released integration uses the Orinoco Lite central-service origin.
+When present, it is the credential-free HTTPS origin of a compatible independently hosted backend, with no path, query, fragment, or credentials.
+It is not a service secret, OAuth state, or a substitute for the App's selected-repository installation.
+The site's `site.base_url` owns the canonical `edit/` and `review/` routes.
+The service independently verifies every browser coordinate against GitHub, the App installation, trusted repository content, and the exact operation.
 
 ## Provider capability gate
 
 The deployment environment must provide all of these:
 
-- one public HTTPS origin for the browser application and API routes;
-- static asset serving plus the checked Functions or equivalent adapter;
+- one public HTTPS origin for API routes and the minimal generated OAuth callback/transport response;
+- a checked Worker, Functions, or equivalent backend adapter with no static presentation deployment;
 - Fetch-compatible `Request`, `Response`, headers, streaming bodies, and URL behavior;
 - Web Crypto AES-GCM, SHA-256, and secure random generation;
 - preservation of multiple `Set-Cookie` headers on one response;
@@ -68,12 +68,12 @@ The deployment environment must provide all of these:
 - log redaction and no caching of authenticated pages or API responses; and
 - the request, response, CPU, memory, duration, subrequest, and payload capacity described below.
 
-The current source uses `functions/api/**` and Pages `EventContext`.
-On another provider, implement a thin hosting adapter that maps its router and static-asset behavior to those handlers while preserving Fetch and Web Crypto semantics.
+The current source uses Fetch-compatible API handlers.
+On another provider, implement a thin hosting adapter that maps its router to those handlers while preserving Fetch and Web Crypto semantics.
 Keep protocol and authorization code unchanged and exercise the adapter in the same test suite.
 
-`npm run check` compiles and tests the checked Pages Functions bundle; it does not validate an adapter for another host.
-A non-Pages adapter must add a tracked build and focused tests for route dispatch, middleware wrapping, external URL reconstruction, byte-preserved duplicate cookies, streaming and manual redirects, and static asset serving.
+`npm run check` compiles and tests the checked backend adapter; it does not validate an adapter for another host.
+A different adapter must add a tracked build and focused tests for route dispatch, middleware wrapping, external URL reconstruction, byte-preserved duplicate cookies, streaming, manual redirects, and generated protocol responses.
 
 A reverse proxy must preserve the externally visible scheme and authority in `Request.url`.
 Rewriting production requests to an internal HTTP origin breaks origin validation and secure host-only cookies unless the adapter reconstructs the exact external URL through a reviewed, trusted-proxy boundary.
@@ -82,12 +82,9 @@ Rewriting production requests to an internal HTTP origin breaks origin validatio
 
 | Route | Required behavior |
 | --- | --- |
-| `/` | Serve a service-status and handoff landing page with no candidate-review UI. |
-| `/review/`, `/review` | Redirect to `/`; the central service is not a source-review destination. |
-| `/review-transport/` | Serve the exact downstream-opener-bound OAuth, verified-read, confirmation, and comment transport. |
-| `/review-auth-complete/` | Serve only the lightweight OAuth-completion window. |
-| `/edit/` | Serve only the lightweight sign-in, unchanged-bundle receiver or file selector, confirmation, and proposal UI. |
-| `/edit` | Redirect once to the slash form. |
+| `/` | Return a small `404` or `410`; do not serve a landing page. |
+| `/review/`, `/review`, `/review-transport/`, `/review-auth-complete/` | Return a small `404` or compatibility `410`; do not redirect to or render a central review or confirmation surface. |
+| `/edit/`, `/edit` | Return a small `404` or compatibility `410`; do not render a receiver, file selector, confirmation, or editor. |
 | `/api/*` | Route to the stateless Functions handlers. |
 
 The service must not register `/api/shacl/editor`, serve `/editor-runtime/`, or render, frame, or assemble SHACL Vue at `/edit/`.
@@ -115,46 +112,56 @@ Calling handlers directly loses standardized exception responses and the API sec
 Register each exact path for all methods, then let the handler's `requireMethod` reject unsupported methods through the middleware.
 A router that registers only the accepted method may emit its own unsecured 404 or 405 and bypass the application's standardized response contract.
 
-Reproduce the checked static and API response headers: content security policy, `nosniff`, referrer policy, permissions policy, and the required cache policy.
-Authenticated HTML and every API response are `no-store`.
+Reproduce the checked API and generated-protocol response headers: content security policy, `nosniff`, referrer policy, permissions policy, and the required cache policy.
+Generated authenticated HTML and every API response are `no-store`.
 Do not let a CDN cache a response containing a token-bearing or OAuth-state cookie.
+Every popup navigation and redirect in the successful OAuth chain must explicitly use `Cross-Origin-Opener-Policy: unsafe-none`; a generic `same-origin` value on even an intermediate 302 permanently severs the downstream opener in Chromium.
 
 The browser and API must stay same-origin.
 Cookies use the `__Host-` prefix, `HttpOnly`, `Secure`, `SameSite=Lax`, and `Path=/`.
-OAuth state expires after ten minutes; a session is capped at eight hours.
+OAuth state expires after ten minutes; a session grant is capped at one hour and is consumed after a successful write.
 The callback clears the OAuth cookie and sets the session cookie in the same response, so an adapter that folds duplicate `Set-Cookie` fields is incompatible.
 Test the adapter's emitted HTTP response at byte or header-list level as well as through the browser runtime; two cookies represented as one comma-joined field are not equivalent.
 
 ## Static source-review transport boundary
 
-The downstream static `review/` route generates a fresh 256-bit nonce and opens `/review-transport/` with its exact repository, pull-request, artifact, and origin coordinates.
-OAuth uses a separate window so the transport retains the downstream opener.
+The downstream static `review/` route generates a fresh 256-bit nonce and opens the backend authorization route in a popup with its exact repository, pull-request, artifact, operation, and origin coordinates.
+OAuth remains in the popup, so the main browser and all review state remain on the downstream route.
 The sealed session grant binds all coordinates.
 
-Before sending proposal data, the backend reads `orinoco.yaml` at the verified proposal metadata base, requires the declared repository and central service, and derives the exact downstream `site.base_url` plus `review/`.
-The transport and downstream complete a typed ready/request handshake and require exact window, origin, nonce, repository, pull request, and artifact matches.
+Before sending proposal data, the backend reads `orinoco.yaml` at the verified proposal metadata base, derives the trusted repository from the GitHub objects, resolves the central-service default or verifies an explicit `site.curation_service` override, and derives the exact downstream `site.base_url` plus `review/`.
+The minimal generated callback/transport response and downstream complete a typed ready/request handshake and require exact opener window, origin, operation, nonce, repository, pull request, and artifact matches.
 Never send a token or CSRF value through browser messaging and never use `*` as a message target.
 
-The downstream returns one complete in-memory submission.
-The central origin must display the login, repository, pull request, proposal and head commits, and every path and disposition.
-Only a user click there may post the GitHub comment.
+The downstream displays the authenticated login, repository, pull request, proposal and head commits, and every path and disposition, then returns one complete in-memory submission only after the user's confirmation there.
+The popup performs the authenticated request and closes; the service does not render a confirmation page.
 Reject duplicate, replayed, framed, timed-out, or mismatched channels.
 Send `post-started` before the authenticated request and classify every result as retry-safe or potentially uncertain.
 A downstream may reconnect while preserving decisions only for an explicitly retry-safe pre-write rejection.
 It must keep the submission locked and tell the curator to inspect the pull request when a network, server, or malformed-success response could conceal a completed comment.
-Because browser messaging authenticates an origin rather than a path, a shared Pages hostname is an origin-wide boundary; the explicit central confirmation is mandatory, and unique downstream origins remain preferable when isolation is required.
+
+Detect the actual downstream browser origin.
+When it is on a shared `github.io` hostname, explain that the entire origin is one browser principal and require a visible, explicit, in-memory curator acknowledgment before enabling the direct GitHub submission action.
+Do not store that acknowledgment in local storage, a cookie, service state, or tracked configuration, and do not treat it as authentication or path proof.
+A custom or otherwise unique origin receives the normal flow.
 
 ## Static-editor handoff boundary
 
-The static site opens `/edit/` with its repository, exact editor origin, and a cryptographically random one-time nonce.
+The static site opens the backend SHACL authorization route with its repository, operation, exact editor origin, and a cryptographically random one-time nonce.
 The bundle remains in the static editor's memory through OAuth.
-The editor sends it only after the exact popup at `site.curation_service` signals readiness with the matching repository and nonce.
-The receiver accepts it only from the exact opener at the declared HTTPS editor origin with the same repository and nonce.
+The editor sends it only after the exact popup at the effective service origin signals readiness with the matching repository, operation, and nonce.
+The backend transport accepts it only from the exact opener at the declared HTTPS editor origin with the same coordinates.
+The backend independently reads `orinoco.yaml` at the trusted base commit before a SHACL write and requires its `site.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
+Successful writes consume the relevant grant; standalone SHACL branches are deterministic for the source commit and handoff nonce so GitHub ref creation rejects a concurrent replay.
 
 The URL and OAuth state must not contain the bundle.
 Neither side may use cross-origin browser storage as bundle recovery state.
-If navigation or browser policy severs the opener relationship, the curator may select the identical downloaded JSON bundle on `/edit/`.
+If navigation or browser policy severs the opener relationship, the curator may select the identical downloaded JSON bundle on the downstream `/edit/` route and begin a new popup session.
 Both transports must receive the same format, size, repository, source-commit, exact-head, curator-authorization, and public-data acknowledgment checks.
+
+On a shared `github.io` origin, keep **Download bundle** enabled without GitHub authorization or the origin acknowledgment and gate **Propose via GitHub** on the same explicit in-memory acknowledgment used by `/review/`.
+Keep the origin acknowledgment separate from the bundle's public-history and no-secrets acknowledgment.
+When the editor is framed, refuse direct GitHub proposal at both the visible controls and the runtime helper while leaving **Download bundle** available.
 
 ## Capacity floor
 

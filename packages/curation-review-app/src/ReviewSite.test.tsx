@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import reviewHtml from "../review/index.html?raw";
 import type { ReviewProposal } from "../shared/contracts";
 import { ARTIFACT_ID, proposal, submission } from "../tests/fixtures";
-import ReviewSiteLoader from "./ReviewSite";
+import ReviewSiteLoader, { isSharedGitHubPagesHostname } from "./ReviewSite";
 
 const SERVICE_ORIGIN = "https://transport.example";
 
@@ -132,13 +132,6 @@ function proposalMessage(
   };
 }
 
-function confirmationPending(nonce: string): Record<string, unknown> {
-  return {
-    ...coordinates(nonce),
-    format: "orinoco-lite-review-confirmation-pending-v1",
-  };
-}
-
 function postStarted(nonce: string): Record<string, unknown> {
   return {
     ...coordinates(nonce),
@@ -178,6 +171,20 @@ describe("deployed source-review document security", () => {
 });
 
 describe("deployed source-review route", () => {
+  it.each([
+    ["github.io", true],
+    ["owner.github.io", true],
+    ["OWNER.GITHUB.IO", true],
+    ["OWNER.GITHUB.IO.", true],
+    ["Owner.GitHub.Io...", true],
+    ["example.github.io.attacker.test", false],
+    ["example.github.io.attacker.test.", false],
+    ["notgithub.io", false],
+    ["curation.example.org", false],
+  ])("classifies %s shared-origin status exactly", (hostname, expected) => {
+    expect(isSharedGitHubPagesHostname(hostname)).toBe(expected);
+  });
+
   it("loads strict site-owned configuration and opens only the transport popup", async () => {
     const fetchMock = installConfig();
     const { open, popup } = installPopup();
@@ -190,14 +197,21 @@ describe("deployed source-review route", () => {
     expect(document.title).toBe("Example source metadata review");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Shared github.io security boundary",
+      }),
+    ).not.toBeInTheDocument();
+    expect(connect).toBeEnabled();
 
     await user.click(connect);
     expect(open).toHaveBeenCalledTimes(1);
     const openedUrl = new URL(String(open.mock.calls[0]?.[0]));
     expect(openedUrl.origin).toBe(SERVICE_ORIGIN);
-    expect(openedUrl.pathname).toBe("/review-transport/");
+    expect(openedUrl.pathname).toBe("/api/transport");
     expect(Object.fromEntries(openedUrl.searchParams)).toMatchObject({
       artifact_id: String(ARTIFACT_ID),
+      kind: "review",
       pull_request: "42",
       repository: "example/site",
       review_origin: window.location.origin,
@@ -325,11 +339,31 @@ describe("deployed source-review route", () => {
     await user.click(within(first).getByRole("radio", { name: "Accept" }));
     await user.click(within(second).getByRole("radio", { name: "Defer" }));
     const submit = screen.getByRole("button", {
-      name: "Post decisions to GitHub",
+      name: "Review decisions before posting",
     });
     act(() => {
       submit.click();
       submit.click();
+    });
+    expect(
+      screen.getByRole("heading", {
+        name: "Confirm the complete decision state",
+      }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(
+      popup.postMessageMock.mock.calls.filter(
+        ([value]) =>
+          (value as Record<string, unknown>).format ===
+          "orinoco-lite-review-submission-message-v1",
+      ),
+    ).toHaveLength(0);
+    const confirm = screen.getByRole("button", {
+      name: "Confirm and post to GitHub",
+    });
+    act(() => {
+      confirm.click();
+      confirm.click();
     });
     const submitted = {
       ...coordinates(nonce),
@@ -357,30 +391,10 @@ describe("deployed source-review route", () => {
       format: "orinoco-lite-review-submission-result-v1",
       retry_safe: false,
     };
-    const acknowledged = confirmationPending(nonce);
-    postFrom(popup, acknowledged, "https://attacker.example");
-    postFrom(window, acknowledged);
-    postFrom(popup, { ...acknowledged, pull_request: 43 });
-    postFrom(popup, { ...acknowledged, extra: true });
     postFrom(popup, result);
     expect(
       screen.queryByRole("link", { name: "View authenticated comment" }),
     ).not.toBeInTheDocument();
-
-    postFrom(popup, acknowledged);
-    expect(
-      screen.getByText(
-        "Review and confirm the complete decision summary in the GitHub transport window.",
-      ),
-    ).toBeVisible();
-    expect(popup.focusMock).toHaveBeenCalledTimes(2);
-    expect(popup.postMessageMock).toHaveBeenCalledWith(
-      {
-        ...coordinates(nonce),
-        format: "orinoco-lite-review-confirmation-ready-v1",
-      },
-      SERVICE_ORIGIN,
-    );
 
     const started = postStarted(nonce);
     postFrom(popup, started, "https://attacker.example");
@@ -427,9 +441,11 @@ describe("deployed source-review route", () => {
     await user.click(accept);
     await user.click(defer);
     await user.click(
-      screen.getByRole("button", { name: "Post decisions to GitHub" }),
+      screen.getByRole("button", { name: "Review decisions before posting" }),
     );
-    postFrom(popup, confirmationPending(firstNonce));
+    await user.click(
+      screen.getByRole("button", { name: "Confirm and post to GitHub" }),
+    );
     postFrom(popup, postStarted(firstNonce));
     postFrom(popup, {
       ...coordinates(firstNonce),
@@ -458,7 +474,10 @@ describe("deployed source-review route", () => {
     expect(defer).toBeChecked();
 
     await user.click(
-      screen.getByRole("button", { name: "Post decisions to GitHub" }),
+      screen.getByRole("button", { name: "Review decisions before posting" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Confirm and post to GitHub" }),
     );
     expect(popup.postMessageMock).toHaveBeenCalledWith(
       {
@@ -469,7 +488,6 @@ describe("deployed source-review route", () => {
       SERVICE_ORIGIN,
     );
 
-    postFrom(popup, confirmationPending(secondNonce));
     postFrom(popup, postStarted(secondNonce));
     postFrom(popup, {
       ...coordinates(secondNonce),
@@ -566,18 +584,18 @@ describe("deployed source-review route", () => {
       .click(within(second).getByRole("radio", { name: "Defer" }));
     vi.useFakeTimers();
     act(() =>
-      screen.getByRole("button", { name: "Post decisions to GitHub" }).click(),
+      screen
+        .getByRole("button", { name: "Review decisions before posting" })
+        .click(),
     );
-    const pendingNonce = openedNonce(open);
-    postFrom(popup, confirmationPending(pendingNonce));
-    act(() => vi.advanceTimersByTime(600_000));
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Review and confirm the complete decision summary",
+    act(() =>
+      screen
+        .getByRole("button", { name: "Confirm and post to GitHub" })
+        .click(),
     );
-    postFrom(popup, postStarted(pendingNonce));
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByRole("status")).toHaveTextContent(
-      "GitHub post result is uncertain",
+      "did not acknowledge the decisions",
     );
   });
 

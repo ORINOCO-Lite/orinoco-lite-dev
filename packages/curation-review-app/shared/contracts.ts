@@ -4,6 +4,8 @@ export type JsonValue =
 export type JsonObject = { [key: string]: JsonValue };
 
 export const MAX_SHACL_BUNDLE_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_CURATION_SERVICE_ORIGIN =
+  "https://orinoco-curation-review.pages.dev";
 export const SHACL_HANDOFF_NONCE = /^[0-9a-f]{64}$/;
 export const REVIEW_HANDOFF_NONCE = SHACL_HANDOFF_NONCE;
 
@@ -102,6 +104,7 @@ export interface AuthenticatedSession {
   csrf_token: string;
   login: string;
   review_grant: ReviewGrant | null;
+  shacl_grant: ShaclGrant | null;
 }
 
 export interface AnonymousSession {
@@ -138,14 +141,6 @@ export interface ReviewProposalMessage extends ReviewCoordinates {
 export interface ReviewSubmissionMessage extends ReviewCoordinates {
   format: "orinoco-lite-review-submission-message-v1";
   submission: CurationSubmission;
-}
-
-export interface ReviewConfirmationPendingMessage extends ReviewCoordinates {
-  format: "orinoco-lite-review-confirmation-pending-v1";
-}
-
-export interface ReviewConfirmationReadyMessage extends ReviewCoordinates {
-  format: "orinoco-lite-review-confirmation-ready-v1";
 }
 
 export interface ReviewPostStartedMessage extends ReviewCoordinates {
@@ -212,12 +207,47 @@ export interface ShaclProposalResult {
   pull_request_url: string;
 }
 
-export interface ShaclBundleMessage {
-  bundle: ShaclReviewBundle;
-  format: "orinoco-lite-shacl-bundle-message-v1";
+export interface ShaclGrant {
+  editor_origin: string;
+  expected_head_sha: string | null;
+  handoff_nonce: string;
+  pull_request: number | null;
+  repository: string;
+}
+
+export interface ShaclProposalMessage {
+  format: "orinoco-lite-shacl-proposal-message-v1";
+  handoff_nonce: string;
+  proposal: ShaclProposalRequest;
+  repository: string;
+}
+
+export interface ShaclProposalStartedMessage {
+  format: "orinoco-lite-shacl-proposal-started-v1";
   handoff_nonce: string;
   repository: string;
 }
+
+export interface ShaclProposalSuccessMessage {
+  error: null;
+  format: "orinoco-lite-shacl-proposal-result-v1";
+  handoff_nonce: string;
+  repository: string;
+  result: ShaclProposalResult;
+  retry_safe: false;
+}
+
+export interface ShaclProposalFailureMessage {
+  error: string;
+  format: "orinoco-lite-shacl-proposal-result-v1";
+  handoff_nonce: string;
+  repository: string;
+  result: null;
+  retry_safe: boolean;
+}
+
+export type ShaclProposalResultMessage =
+  ShaclProposalFailureMessage | ShaclProposalSuccessMessage;
 
 export interface ShaclProposalReadyMessage {
   format: "orinoco-lite-shacl-proposal-ready-v1";

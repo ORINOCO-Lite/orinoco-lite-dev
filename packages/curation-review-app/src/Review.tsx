@@ -143,6 +143,8 @@ export function Review({
   const [changedOnly, setChangedOnly] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [commentUrl, setCommentUrl] = useState<string | null>(null);
+  const [pendingSubmission, setPendingSubmission] =
+    useState<CurationSubmission | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [focusCandidate, setFocusCandidate] = useState<number | null>(null);
   const cards = useRef<Array<HTMLElement | null>>([]);
@@ -296,20 +298,37 @@ export function Review({
       repository: proposal.repository,
       source_coordinate: proposal.source_coordinate,
     };
+    setPendingSubmission(submission);
+    setFeedback(
+      "Review the complete decision summary below, then confirm the GitHub post.",
+    );
+  }
+
+  async function confirmSubmission(): Promise<void> {
+    if (pendingSubmission === null || submitting || commentUrl !== null) return;
     setSubmitting(true);
     setFeedback(null);
     try {
-      const result = await onSubmit(submission);
+      const result = await onSubmit(pendingSubmission);
       setCommentUrl(result.comment_url);
+      setPendingSubmission(null);
       setFeedback(
         "The complete decision state was posted to GitHub. The trusted workflow will revalidate it before committing.",
       );
     } catch (error) {
       submissionStarted.current = false;
+      setPendingSubmission(null);
       setFeedback(message(error));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function cancelConfirmation(): void {
+    if (submitting) return;
+    submissionStarted.current = false;
+    setPendingSubmission(null);
+    setFeedback(null);
   }
 
   return (
@@ -361,7 +380,12 @@ export function Review({
             {(["accept", "reject", "defer"] as const).map((value) => (
               <button
                 className={`bulk-decision bulk-decision-${value}`}
-                disabled={submitting || commentUrl !== null || unresolved === 0}
+                disabled={
+                  submitting ||
+                  pendingSubmission !== null ||
+                  commentUrl !== null ||
+                  unresolved === 0
+                }
                 key={value}
                 onClick={() => chooseUnresolved(value)}
                 type="button"
@@ -430,7 +454,11 @@ export function Review({
                 <CandidateCard
                   candidate={candidate}
                   decision={decisions[candidate.record_path]}
-                  disabled={submitting || commentUrl !== null}
+                  disabled={
+                    submitting ||
+                    pendingSubmission !== null ||
+                    commentUrl !== null
+                  }
                   index={index}
                   key={candidate.record_path}
                   onDecision={(value) => choose(candidate, value)}
@@ -445,6 +473,60 @@ export function Review({
             )}
           </div>
 
+          {pendingSubmission !== null && (
+            <section
+              className="submission-confirmation"
+              aria-labelledby="submission-confirmation-title"
+            >
+              <p className="eyebrow">Final downstream confirmation</p>
+              <h2 id="submission-confirmation-title">
+                Confirm the complete decision state
+              </h2>
+              <p>
+                Signed in as <strong>{login}</strong>. This will post one
+                authenticated comment to {proposal.repository} pull request #
+                {proposal.pull_request}.
+              </p>
+              <dl>
+                <dt>Proposal commit</dt>
+                <dd>
+                  <code>{proposal.proposal_sha}</code>
+                </dd>
+                <dt>Current head</dt>
+                <dd>
+                  <code>{proposal.head_sha}</code>
+                </dd>
+              </dl>
+              <ul aria-label="Decisions awaiting confirmation">
+                {proposal.candidates.map((candidate, index) => (
+                  <li key={candidate.record_path}>
+                    <code>{candidate.record_path}</code> (
+                    {candidate.friendly_id}){" → "}
+                    <strong>
+                      {pendingSubmission.decisions[index]?.disposition}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+              <div className="confirmation-actions">
+                <button
+                  disabled={submitting}
+                  onClick={() => void confirmSubmission()}
+                  type="button"
+                >
+                  {submitting ? "Posting…" : "Confirm and post to GitHub"}
+                </button>
+                <button
+                  disabled={submitting}
+                  onClick={cancelConfirmation}
+                  type="button"
+                >
+                  Return to decisions
+                </button>
+              </div>
+            </section>
+          )}
+
           <section className="submission-panel">
             <div>
               <h2>Submit complete decision state</h2>
@@ -454,12 +536,17 @@ export function Review({
                   : `${unresolved} remaining.`}
               </p>
             </div>
-            <button disabled={submitting || commentUrl !== null} type="submit">
-              {submitting
-                ? "Posting…"
-                : commentUrl === null
-                  ? "Post decisions to GitHub"
-                  : "Decisions posted"}
+            <button
+              disabled={
+                submitting || pendingSubmission !== null || commentUrl !== null
+              }
+              type="submit"
+            >
+              {commentUrl === null
+                ? pendingSubmission === null
+                  ? "Review decisions before posting"
+                  : "Awaiting confirmation"
+                : "Decisions posted"}
             </button>
           </section>
           {feedback !== null && (

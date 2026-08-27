@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -16,7 +17,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from .assets import hydrate_asset_cache, load_assets, verify_asset
-from .config import load_config_path
+from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
@@ -241,11 +242,20 @@ def build_site(
     runtime_root: Path,
     destination: Path,
     base_url: str,
+    github_repository_coordinate: str | None = None,
 ) -> dict[str, Any]:
     workspace = load_config_path(config)
     runtime_root = runtime_root.resolve()
     destination = _safe_destination(workspace, destination)
     base_url = normalize_build_base_url(base_url)
+    repository = (
+        github_repository(
+            github_repository_coordinate,
+            "GitHub repository build coordinate",
+        )
+        if github_repository_coordinate is not None
+        else workspace.repository
+    )
     parsed = urlsplit(base_url)
     _preflight_hugo(runtime_root, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
@@ -302,11 +312,15 @@ def build_site(
         workspace,
         runtime_root,
         destination / "edit",
+        repository=repository,
+        service_origin=workspace.curation_service,
     )
     review_report = bind_review(
         workspace,
         runtime_root,
         destination / "review",
+        repository=repository,
+        service_origin=workspace.curation_service,
     )
     entries = _manifest(destination)
     digest = hashlib.sha256(("\n".join(entries) + "\n").encode()).hexdigest()
@@ -338,7 +352,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True)
     args = parser.parse_args(argv)
     try:
-        report = build_site(args.config, args.runtime, args.destination, args.base_url)
+        report = build_site(
+            args.config,
+            args.runtime,
+            args.destination,
+            args.base_url,
+            os.environ.get("ORINOCO_GITHUB_REPOSITORY"),
+        )
     except (ConfigurationError, DriverError, IntegrityError) as error:
         print(f"orinoco build: {error}", file=sys.stderr)
         return 1

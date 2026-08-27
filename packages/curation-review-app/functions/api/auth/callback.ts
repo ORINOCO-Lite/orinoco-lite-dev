@@ -85,16 +85,19 @@ export async function onRequest(context: EventContext): Promise<Response> {
     `${origin}/api/auth/callback`,
   );
   const user = await new GitHubClient(token.accessToken).currentUser();
-  const destination = new URL("/", origin);
+  const destination = new URL("/api/transport", origin);
   if (oauth.kind === "review") {
-    destination.pathname = "/review-auth-complete/";
-  } else {
-    destination.pathname = "/edit/";
+    destination.searchParams.set("kind", "review");
+    destination.searchParams.set("artifact_id", String(oauth.artifact_id));
+    destination.searchParams.set("handoff_nonce", oauth.handoff_nonce);
+    destination.searchParams.set("pull_request", String(oauth.pull_request));
     destination.searchParams.set("repository", oauth.repository);
-    if (oauth.editor_origin !== null && oauth.handoff_nonce !== null) {
-      destination.searchParams.set("editor_origin", oauth.editor_origin);
-      destination.searchParams.set("handoff_nonce", oauth.handoff_nonce);
-    }
+    destination.searchParams.set("review_origin", oauth.review_origin);
+  } else {
+    destination.searchParams.set("kind", "shacl");
+    destination.searchParams.set("repository", oauth.repository);
+    destination.searchParams.set("editor_origin", oauth.editor_origin);
+    destination.searchParams.set("handoff_nonce", oauth.handoff_nonce);
     if (oauth.pull_request !== null && oauth.expected_head_sha !== null) {
       destination.searchParams.set(
         "expected_head_sha",
@@ -105,6 +108,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
   }
   const headers = new Headers({
     "Cache-Control": "no-store",
+    "Cross-Origin-Opener-Policy": "unsafe-none",
     Location: destination.toString(),
   });
   headers.append("Set-Cookie", clearCookie(OAUTH_COOKIE));
@@ -124,6 +128,16 @@ export async function onRequest(context: EventContext): Promise<Response> {
                 pull_request: oauth.pull_request,
                 repository: oauth.repository,
                 review_origin: oauth.review_origin,
+              }
+            : null,
+        shacl_grant:
+          oauth.kind === "shacl"
+            ? {
+                editor_origin: oauth.editor_origin,
+                expected_head_sha: oauth.expected_head_sha,
+                handoff_nonce: oauth.handoff_nonce,
+                pull_request: oauth.pull_request,
+                repository: oauth.repository,
               }
             : null,
       },

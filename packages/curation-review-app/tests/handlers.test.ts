@@ -253,6 +253,7 @@ describe("GitHub App user-to-server handlers", () => {
       ),
     );
     expect(start.status).toBe(302);
+    expect(start.headers.get("cross-origin-opener-policy")).toBe("unsafe-none");
     const authorization = new URL(start.headers.get("location") as string);
     expect(authorization.origin).toBe("https://github.com");
     expect(authorization.searchParams.get("client_id")).toBe("Iv1.example");
@@ -310,8 +311,11 @@ describe("GitHub App user-to-server handlers", () => {
       ),
     );
     expect(callback.status).toBe(302);
+    expect(callback.headers.get("cross-origin-opener-policy")).toBe(
+      "unsafe-none",
+    );
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/review-auth-complete/`,
+      `${ORIGIN}/api/transport?kind=review&artifact_id=${ARTIFACT_ID}&handoff_nonce=${REVIEW_NONCE}&pull_request=42&repository=example%2Fsite&review_origin=${encodeURIComponent(REVIEW_ORIGIN)}`,
     );
     const setCookie = callback.headers.get("set-cookie") as string;
     expect(setCookie).toContain(`${OAUTH_COOKIE}=;`);
@@ -326,6 +330,7 @@ describe("GitHub App user-to-server handlers", () => {
       csrf_token: expect.any(String),
       login: "octocat",
       review_grant: REVIEW_GRANT,
+      shacl_grant: null,
     });
     expect(setCookie).not.toContain("must-not-be-retained");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -449,6 +454,7 @@ describe("GitHub App user-to-server handlers", () => {
         ),
       ),
     );
+    expect(start.headers.get("cross-origin-opener-policy")).toBe("unsafe-none");
     const oauthCookie = cookiePair(
       start.headers.get("set-cookie") as string,
       OAUTH_COOKIE,
@@ -491,9 +497,34 @@ describe("GitHub App user-to-server handlers", () => {
         ),
       ),
     );
-    expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/edit/?repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${HEAD_SHA}&pull_request=42`,
+    expect(callback.headers.get("cross-origin-opener-policy")).toBe(
+      "unsafe-none",
     );
+    expect(callback.headers.get("location")).toBe(
+      `${ORIGIN}/api/transport?kind=shacl&repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${HEAD_SHA}&pull_request=42`,
+    );
+    const authenticated = await readSessionCookie(
+      new Request(ORIGIN, {
+        headers: {
+          Cookie: cookiePair(
+            callback.headers.get("set-cookie") as string,
+            SESSION_COOKIE,
+          ),
+        },
+      }),
+      env,
+    );
+    expect(authenticated).toMatchObject({
+      login: "octocat",
+      review_grant: null,
+      shacl_grant: {
+        editor_origin: EDITOR_ORIGIN,
+        expected_head_sha: HEAD_SHA,
+        handoff_nonce: HANDOFF_NONCE,
+        pull_request: 42,
+        repository: "example/site",
+      },
+    });
   });
 
   it.each([
@@ -519,7 +550,7 @@ describe("GitHub App user-to-server handlers", () => {
         ),
       ),
     ).rejects.toMatchObject({
-      code: "invalid_shacl_auth_target",
+      code: "invalid_shacl_transport",
       status: 400,
     });
   });
@@ -753,6 +784,16 @@ describe("curator authorization and exact-head submission handlers", () => {
     expect(await response.json()).toEqual({
       comment_url: "https://github.com/example/site/pull/42#issuecomment-123",
     });
+    const consumedCookie = cookiePair(
+      response.headers.get("set-cookie") as string,
+      SESSION_COOKIE,
+    );
+    await expect(
+      readSessionCookie(
+        new Request(ORIGIN, { headers: { Cookie: consumedCookie } }),
+        env,
+      ),
+    ).resolves.toMatchObject({ review_grant: null });
     const commentIndex = requests.findIndex((url) =>
       url.endsWith("/issues/42/comments"),
     );
@@ -763,6 +804,29 @@ describe("curator authorization and exact-head submission handlers", () => {
     expect(requests.findIndex((url) => url.endsWith("/pulls/42"))).toBeLessThan(
       commentIndex,
     );
+
+    await expect(
+      submitDecisions(
+        context(
+          new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
+            body: JSON.stringify(submission()),
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: consumedCookie,
+              Origin: ORIGIN,
+              "X-CSRF-Token": "csrf-token",
+            },
+            method: "POST",
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: "review_grant_required",
+      status: 403,
+    });
+    expect(
+      requests.filter((url) => url.endsWith("/issues/42/comments")),
+    ).toHaveLength(1);
   });
 
   it("reloads the proposal but rejects a stale head without posting", async () => {

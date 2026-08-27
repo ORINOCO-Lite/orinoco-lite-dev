@@ -1,25 +1,174 @@
+.bashrc sourced.
+.bash_profile sourced
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
+index 9621e55..3299eaa 100644
 --- a/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
-@@ -18,0 +19 @@
+@@ -15,6 +15,7 @@
+                             <v-checkbox
+                                 v-for="r in nodesToSubmit"
+                                 v-model="selectedNodesToSubmit"
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
-@@ -102,0 +104,7 @@
+                                 :value="r.node_iri"
+                                 align="start"
+                                 class="align-start"
+@@ -55,12 +56,95 @@
+                             <em><h3>Nothing to submit</h3></em>
+                         </div>
+                     </span>
++                    <v-alert
++                        v-if="proposalMode && framedContext"
++                        type="warning"
++                        variant="tonal"
++                        style="margin-top: 1em;"
++                    >
++                        <strong>Direct GitHub proposal unavailable while embedded</strong>
++                        <p>
++                            Open this editor in its own tab to propose via GitHub.
++                            Download bundle remains available in this embedded view.
++                        </p>
++                    </v-alert>
++                    <v-alert
++                        v-if="proposalMode && !framedContext && sharedGitHubPagesOrigin"
++                        type="warning"
++                        variant="tonal"
++                        style="margin-top: 1em;"
++                    >
++                        <strong>Shared github.io security boundary</strong>
++                        <p>
++                            Every project page on this github.io hostname shares one
++                            browser origin. Another page on the hostname could impersonate
++                            this path. A verified custom domain gives this site its own
++                            origin and enables the normal low-friction flow.
++                        </p>
++                        <v-checkbox
++                            v-model="sharedOriginAcknowledged"
++                            label="I understand this shared-origin risk and want to enable direct GitHub submission for this page."
++                        ></v-checkbox>
++                    </v-alert>
++                    <v-checkbox
++                        v-if="proposalMode && !framedContext"
++                        v-model="publicHistoryAcknowledged"
++                        label="I confirm this review bundle contains no secrets and is approved for public Git history, including GitHub retention after a temporary ref becomes unreachable."
++                    ></v-checkbox>
++                    <v-card
++                        v-if="pendingProposalBundle"
++                        variant="outlined"
++                        style="margin-top: 1em;"
++                    >
++                        <v-card-title>Confirm GitHub proposal</v-card-title>
++                        <v-card-text>
++                            <p>
++                                Repository:
++                                <strong>{{ config.review_bundle_proposal.repository }}</strong>
++                            </p>
++                            <p>
++                                Source commit:
++                                <code>{{ pendingProposalBundle.source_commit }}</code>
++                            </p>
++                            <p>
++                                {{ pendingProposalBundle.records.length }} edited
++                                {{ pendingProposalBundle.records.length === 1 ? 'record' : 'records' }}:
++                            </p>
++                            <ul>
++                                <li v-for="record in pendingProposalBundle.records" :key="record.pid">
++                                    <code>{{ record.source_path }}</code> ({{ record.pid }})
++                                </li>
++                            </ul>
++                        </v-card-text>
++                        <v-card-actions>
++                            <v-btn
++                                :disabled="
++                                    framedContext ||
++                                    proposing ||
++                                    !publicHistoryAcknowledged ||
++                                    (sharedGitHubPagesOrigin && !sharedOriginAcknowledged)
++                                "
++                                @click="confirmProposal()"
++                            >
++                                Confirm and create draft pull request
++                            </v-btn>
++                            <v-btn :disabled="proposing" @click="cancelProposal()">
++                                Return to editor
++                            </v-btn>
++                        </v-card-actions>
++                    </v-card>
+                 </span>
+             </v-skeleton-loader>
+             <span v-if="responseReceived">
+                 <v-icon v-if="responseSuccess" style="color: green">mdi-check-circle</v-icon>
+                 <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
+                 {{ responseText }}
++                <a
++                    v-if="proposalResult"
++                    :href="proposalResult.pull_request_url"
++                    rel="noreferrer"
++                    target="_blank"
++                >Open draft pull request</a>
+                 <br />
+                 <br />
+                 <v-btn
+@@ -103,6 +187,20 @@
+             <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
+                 <v-icon>mdi-check-circle-outline</v-icon> Submit
+             </v-btn>
 +            <v-btn
 +                v-if="proposalMode && !responseReceived && nodesToSubmit.length"
++                :disabled="
++                    framedContext ||
++                    proposing ||
++                    pendingProposalBundle ||
++                    !publicHistoryAcknowledged ||
++                    (sharedGitHubPagesOrigin && !sharedOriginAcknowledged)
++                "
 +                @click="proposeRecords()"
 +            >
 +                <v-icon>mdi-source-pull</v-icon>
 +                Propose via GitHub
 +            </v-btn>
-@@ -139 +147 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
+             <v-btn v-if="responseReceived" @click="clearSubmitErrors()">
+                 <v-icon>mdi-check-circle-outline</v-icon> OK
+             </v-btn>
+@@ -136,7 +234,15 @@
+ <script setup>
+ import { computed, ref, inject } from 'vue';
+ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJSON, dlTTL} from '@/modules/utils';
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
-+import { beginReviewBundleProposal, buildReviewBundle, dispatchReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
-@@ -174,0 +183,26 @@ const patchDownloadMode = computed(
++import {
++    beginReviewBundleProposal,
++    buildReviewBundle,
++    dispatchReviewBundle,
++    isFramedContext,
++    isSharedGithubPagesOrigin,
++    recordSubmissionLabel,
++    reviewBundleFilename,
++} from '@/modules/review-bundle';
+
+ import { useToken } from '@/composables/tokens';
+ import { DataFactory, Store } from 'n3';
+@@ -162,6 +268,11 @@ const awaitingResponse = ref(false);
+ const responseReceived = ref(false);
+ const responseSuccess = ref(false);
+ const responseFailure = ref(false);
++const pendingProposalBundle = ref(null);
++const proposalResult = ref(null);
++const proposing = ref(false);
++const publicHistoryAcknowledged = ref(false);
++const sharedOriginAcknowledged = ref(false);
+
+ const showCompleteFailure = ref(false);
+ const responseText = ref('');
+@@ -172,6 +283,34 @@ const copiedIndex = ref(null);
+ const patchDownloadMode = computed(
+     () => config.value?.review_bundle_mode === 'patch-download'
+ );
 +const proposalMode = computed(
 +    () =>
 +        patchDownloadMode.value &&
 +        typeof config.value?.review_bundle_proposal === 'object'
 +);
++const framedContext = isFramedContext();
++const sharedGitHubPagesOrigin = isSharedGithubPagesOrigin();
 +
 +function accessibleRecordSubmissionLabel(record) {
 +    const classLabel = getDisplayName(
@@ -41,7 +190,19 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +        recordLabel,
 +    });
 +}
-@@ -235,0 +270,40 @@ async function submit() {
+
+ function toggleFailureResponse() {
+     showCompleteFailure.value = !showCompleteFailure.value;
+@@ -189,7 +328,93 @@ function clearSubmitErrors() {
+     responseErrors.value = [];
+     responseReceived.value = false;
+     awaitingResponse.value = false;
++    pendingProposalBundle.value = null;
++    proposalResult.value = null;
++    proposing.value = false;
++
++}
++
 +async function buildSelectedReviewBundle() {
 +    const selected = nodesToSubmit.value.filter((node) =>
 +        selectedNodesToSubmit.value.includes(node.node_iri)
@@ -68,21 +229,68 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +}
 +
 +async function proposeRecords() {
++    if (
++        framedContext ||
++        !publicHistoryAcknowledged.value ||
++        (sharedGitHubPagesOrigin && !sharedOriginAcknowledged.value)
++    ) return;
++    try {
++        const bundle = await buildSelectedReviewBundle();
++        dispatchReviewBundle(bundle);
++        pendingProposalBundle.value = bundle;
++        proposalResult.value = null;
++    } catch (error) {
++        reviewBundleFailure(error);
++    }
++}
+
++function cancelProposal() {
++    if (proposing.value) return;
++    pendingProposalBundle.value = null;
++}
++
++async function confirmProposal() {
++    if (
++        framedContext ||
++        !pendingProposalBundle.value ||
++        proposing.value ||
++        !publicHistoryAcknowledged.value ||
++        (sharedGitHubPagesOrigin && !sharedOriginAcknowledged.value)
++    ) return;
 +    let handoff;
++    proposing.value = true;
 +    try {
 +        handoff = beginReviewBundleProposal(
 +            config.value.review_bundle_proposal
 +        );
-+        const bundle = await buildSelectedReviewBundle();
-+        dispatchReviewBundle(bundle);
-+        handoff.deliver(bundle);
++        const result = await handoff.deliver({
++            acknowledge_public_data: true,
++            bundle: pendingProposalBundle.value,
++            format: 'orinoco-lite-shacl-proposal-v1',
++            repository: config.value.review_bundle_proposal.repository,
++            target: { kind: 'standalone' },
++        });
++        proposalResult.value = result;
++        pendingProposalBundle.value = null;
++        responseSuccess.value = true;
++        responseFailure.value = false;
++        responseReceived.value = true;
++        responseText.value = 'GitHub created the attributed bundle commit and draft pull request.';
 +    } catch (error) {
 +        handoff?.cancel();
-+        reviewBundleFailure(error);
++        responseFailure.value = true;
++        responseReceived.value = true;
++        responseText.value = `The GitHub proposal could not be completed: ${error.message}`;
++    } finally {
++        proposing.value = false;
 +    }
-+}
-+
-@@ -242,13 +316 @@ async function downloadRecords() {
+ }
+
+ async function submit() {
+@@ -239,24 +464,11 @@ async function downloadRecords() {
+     );
+     if (patchDownloadMode.value) {
+         try {
 -            const response = await fetch(config.value.review_bundle_catalog, {
 -                cache: 'no-cache',
 -                credentials: 'omit',
@@ -97,10 +305,13 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 -                selectedNodes: toSubmit,
 -            });
 +            const bundle = await buildSelectedReviewBundle();
-@@ -255,0 +318 @@ async function downloadRecords() {
+             dlJSON(bundle, reviewBundleFilename(bundle.records));
 +            dispatchReviewBundle(bundle);
-@@ -257,3 +320 @@ async function downloadRecords() {
+         } catch (error) {
 -            responseFailure.value = true;
 -            responseReceived.value = true;
 -            responseText.value = `The review bundle could not be created: ${error.message}`;
 +            reviewBundleFailure(error);
+         }
+         return;
+     }

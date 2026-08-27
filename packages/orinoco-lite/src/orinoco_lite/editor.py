@@ -102,10 +102,15 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
-def _editor_config(workspace: WorkspaceConfig) -> dict[str, Any]:
-    github_handoff = (
-        workspace.repository is not None and workspace.curation_service is not None
-    )
+def _editor_config(
+    workspace: WorkspaceConfig,
+    *,
+    repository: str | None = None,
+    service_origin: str | None = None,
+) -> dict[str, Any]:
+    resolved_repository = repository or workspace.repository
+    resolved_service = service_origin or workspace.curation_service
+    github_handoff = resolved_repository is not None
     config: dict[str, Any] = {
         "app_name": f"{workspace.site_name} metadata review",
         "class_url": "dlschemas_owl.ttl",
@@ -140,8 +145,8 @@ def _editor_config(workspace: WorkspaceConfig) -> dict[str, Any]:
     }
     if github_handoff:
         config["review_bundle_proposal"] = {
-            "repository": workspace.repository,
-            "service_origin": workspace.curation_service,
+            "repository": resolved_repository,
+            "service_origin": resolved_service,
         }
     return config
 
@@ -215,6 +220,9 @@ def bind_editor(
     workspace: WorkspaceConfig,
     runtime_root: Path,
     destination: Path,
+    *,
+    repository: str | None = None,
+    service_origin: str | None = None,
 ) -> dict[str, Any]:
     from .projection import load_contract
 
@@ -250,7 +258,14 @@ def bind_editor(
         entry["rdf_turtle"] = record_rdf[entry["pid"]]
     (destination / "data").mkdir(exist_ok=True)
     _write_json(destination / "data/record-sources.json", catalog)
-    _write_json(destination / "config.json", _editor_config(workspace))
+    _write_json(
+        destination / "config.json",
+        _editor_config(
+            workspace,
+            repository=repository,
+            service_origin=service_origin,
+        ),
+    )
     (destination / "records.ttl").write_text(combined_rdf, encoding="utf-8")
     return {
         "catalog_format": CATALOG_FORMAT,

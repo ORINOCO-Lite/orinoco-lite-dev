@@ -200,11 +200,6 @@ describe("artifact-backed GitHub proposal loading", () => {
       label: "an unsupported contract",
     },
     {
-      config: ORINOCO_CONFIG.replace("example/site", "other/site"),
-      expected: "repository does not match",
-      label: "a different repository",
-    },
-    {
       config: ORINOCO_CONFIG.replace(
         "https://site.example/",
         "http://site.example/",

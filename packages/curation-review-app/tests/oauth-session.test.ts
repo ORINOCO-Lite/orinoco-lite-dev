@@ -30,6 +30,7 @@ describe("short-lived GitHub authentication", () => {
       28_800,
     );
     expect(cookie).toContain("__Host-orinoco_session=");
+    expect(cookie).toContain("Max-Age=3600");
     expect(cookie).toContain("HttpOnly; Secure; SameSite=Lax");
     expect(cookie).not.toContain("ghu_secret");
     const request = new Request("https://review.example/api/session", {

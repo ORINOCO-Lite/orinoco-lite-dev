@@ -191,7 +191,7 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             source = target.read_text(encoding="utf-8")
             self.assertEqual(source.count(SUBMISSION_ARIA_BINDING), 1)
             self.assertIn(
-                "import { beginReviewBundleProposal, buildReviewBundle,",
+                "    beginReviewBundleProposal,\n    buildReviewBundle,",
                 source,
             )
             self.assertIn("recordIri: record.node_iri", source)
@@ -199,6 +199,12 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             self.assertEqual(source.count(REVIEW_BUNDLE_DISPATCH), 2)
             self.assertEqual(source.count(REVIEW_BUNDLE_PROPOSAL), 1)
             self.assertEqual(source.count("Propose via GitHub"), 1)
+            self.assertIn("const framedContext = isFramedContext();", source)
+            self.assertIn(
+                "Direct GitHub proposal unavailable while embedded",
+                source,
+            )
+            self.assertEqual(source.count("framedContext ||"), 4)
             self.assertIn(DOWNLOAD_AND_DISPATCH, source)
 
     def test_missing_accessibility_patch_fails_closed(self) -> None:

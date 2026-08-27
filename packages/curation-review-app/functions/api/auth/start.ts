@@ -32,6 +32,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
   return new Response(null, {
     headers: {
       "Cache-Control": "no-store",
+      "Cross-Origin-Opener-Policy": "unsafe-none",
       Location: authorize.toString(),
       "Set-Cookie": await createOAuthCookie(context.env, {
         artifact_id: target.artifactId,

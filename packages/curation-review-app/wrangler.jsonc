@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "orinoco-curation-review",
-  "pages_build_output_dir": "./dist",
+  "pages_build_output_dir": "./service-dist",
   "compatibility_date": "2026-08-20",
   "vars": {
     "GITHUB_CLIENT_ID": "Iv23limCfUnRPCFcXx3H",

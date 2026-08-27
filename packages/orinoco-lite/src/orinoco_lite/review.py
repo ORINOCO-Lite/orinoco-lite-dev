@@ -15,17 +15,21 @@ CONFIG_FORMAT = "orinoco-curation-review-config"
 CONFIG_VERSION = 1
 
 
-def _review_config(workspace: WorkspaceConfig) -> dict[str, Any]:
-    if workspace.repository is None or workspace.curation_service is None:
+def _review_config(
+    workspace: WorkspaceConfig,
+    *,
+    repository: str,
+    service_origin: str,
+) -> dict[str, Any]:
+    if not repository:
         raise ConfigurationError(
-            "Static source review requires site.repository and "
-            "site.curation_service"
+            "Static source review requires a trusted GitHub repository build coordinate"
         )
     return {
         "app_name": _review_app_name(workspace.site_name),
         "format": CONFIG_FORMAT,
-        "repository": workspace.repository,
-        "service_origin": workspace.curation_service,
+        "repository": repository,
+        "service_origin": service_origin,
         "version": CONFIG_VERSION,
     }
 
@@ -45,17 +49,15 @@ def bind_review(
     workspace: WorkspaceConfig,
     runtime_root: Path,
     destination: Path,
+    *,
+    repository: str | None = None,
+    service_origin: str | None = None,
 ) -> dict[str, Any]:
-    """Bind the review shell when GitHub curation is explicitly configured."""
+    """Bind review using the repository supplied by the trusted site build."""
 
-    configured = (
-        workspace.repository is not None and workspace.curation_service is not None
-    )
-    if (workspace.repository is None) != (workspace.curation_service is None):
-        raise ConfigurationError(
-            "site.repository and site.curation_service must be configured together"
-        )
-    if not configured:
+    resolved_repository = repository or workspace.repository
+    resolved_service = service_origin or workspace.curation_service
+    if resolved_repository is None:
         _remove_destination(destination)
         return {"enabled": False}
 
@@ -67,7 +69,11 @@ def bind_review(
     shutil.copytree(shell, destination)
     (destination / "config.json").write_text(
         json.dumps(
-            _review_config(workspace),
+            _review_config(
+                workspace,
+                repository=resolved_repository,
+                service_origin=resolved_service,
+            ),
             ensure_ascii=False,
             indent=2,
             sort_keys=True,
@@ -77,6 +83,6 @@ def bind_review(
     )
     return {
         "enabled": True,
-        "repository": workspace.repository,
-        "service_origin": workspace.curation_service,
+        "repository": resolved_repository,
+        "service_origin": resolved_service,
     }

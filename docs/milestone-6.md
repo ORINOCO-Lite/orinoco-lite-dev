@@ -119,11 +119,12 @@ The receiver-only current boundary and deployment supersede that presentation su
 
 The downstream static site is the only SHACL Vue editor for that downstream.
 Its editing session exposes two explicit actions for the same unchanged version 2 bundle: credential-free **Download bundle** and **Propose via GitHub**.
-The latter opens a configurable stateless GitHub service for sign-in, public-data confirmation, and bundle receipt; that service does not assemble, embed, or host another editor.
+The latter opens a stateless GitHub service popup only for backend sign-in and verified GitHub transport; the downstream owns public-data confirmation and bundle memory or file reselection.
+The released central service is the default, with one optional self-host override, and the service does not assemble, embed, or host another editor.
 
 The live browser handoff validates the configured service origin, the exact static-site origin, both window identities, and a cryptographically random one-time nonce while keeping the bundle out of URLs, OAuth state, cross-origin storage, and durable service state.
-If OAuth or browser policy breaks the live window relationship, the curator may download the same bundle and select it on the lightweight receiver page.
-The static site never receives a GitHub token, and the receiver applies the same repository, source-commit, exact-head, format, size, authorization, and acknowledgment checks to either transport.
+If OAuth or browser policy breaks the live window relationship, the curator may download the same bundle, select it again on downstream `/edit/`, and begin a fresh popup session.
+The static site never receives a GitHub token, and the service applies the same repository, source-commit, exact-head, format, size, authorization, and acknowledgment checks to either editor-memory or reselected-file transport.
 
 This resolves M6-Q001 in favor of two actions in one static editor rather than two editor destinations.
 It supersedes only the central editor-input artifact and the central-wrapper-owned editor assembly and session portions of HR-213 and M5-D014.
@@ -132,20 +133,49 @@ It retains the immutable released editor and schema, exact source binding, uncha
 ### M6-D006 — Keep source-adapter review in the downstream static site
 
 The downstream's deployed `/review/` route is the only source-adapter decision interface for that site.
-The generated static route contains the released, content-neutral review shell plus a build-bound repository and central-service origin.
+The generated static route contains the released, content-neutral review shell plus a build-derived repository and the effective default or override service origin.
 The workflow links directly to that route with the repository, pull-request number, and exact Actions artifact ID.
 
 The central service exposes no second decision-review page.
-Its hidden transport route performs GitHub authorization and verified reads, binds a short-lived session grant to the exact repository, pull request, artifact, downstream origin, and one-time nonce, and verifies the downstream coordinates from `orinoco.yaml` at the proposal's metadata base before releasing proposal data.
+Its minimal generated popup transport performs GitHub authorization and verified reads, binds a short-lived session grant to the exact operation, repository, pull request, artifact, downstream origin, and one-time nonce, and verifies the downstream coordinates from `orinoco.yaml` at the proposal's metadata base before releasing proposal data.
 The transport sends data only after an exact ready/request handshake.
-It shows the authenticated reviewer the complete repository, commit, path, and disposition summary on the central origin and posts only after an explicit confirmation.
+The downstream shows the authenticated reviewer the complete repository, commit, path, and disposition summary and instructs the popup to post only after an explicit confirmation there.
 
 Browser messaging can authenticate an origin but not a path.
 A GitHub Pages project site therefore shares its browser trust boundary with other pages on that account's Pages hostname.
-Exact repository configuration, one-shot window and nonce checks, and the central confirmation remain mandatory; a downstream may use a unique origin when it needs a narrower browser boundary.
+Exact build-derived repository binding and one-shot window and nonce checks remain mandatory.
+A shared `github.io` deployment also explains the origin-wide boundary and requires an explicit in-memory acknowledgment before direct GitHub submission; a custom or otherwise unique origin receives the normal flow.
 
-This resolves the unintended second-page design without changing proposal, candidate, decision-cache, provenance, artifact, or finalization authority.
+M6-D007 supersedes M6-D006's originally accepted central confirmation while preserving its proposal, candidate, decision-cache, provenance, artifact, and finalization authority.
 It also leaves M6-D005's distinct `/edit/` SHACL Vue route unchanged.
+
+### M6-D007 — Keep presentation downstream and make the service backend-only
+
+The accepted authentication choices and rejected alternatives are explained in [`curation-service-authentication-options.md`](curation-service-authentication-options.md).
+
+The downstream's deployed `/edit/` and `/review/` routes own every user-facing editing, review, warning, and confirmation surface.
+The main browser remains on that downstream origin throughout GitHub authorization and submission.
+The central Orinoco Lite service supplies the default stateless GitHub App authorization and verified transport; `site.curation_service` is only an optional override for an independently hosted compatible service.
+Repository identity is derived from the trusted downstream build or its general project identity and is verified independently by the service.
+It is not another curation-specific setting.
+
+The service has no landing page, editor, review application, upload page, or final-confirmation page and deploys no static presentation assets.
+It may return only the minimal generated, restrictive-CSP OAuth callback and popup transport document required to retain host-only session cookies and complete an exact opener, origin, operation, repository, and nonce-bound channel.
+Neither a GitHub token nor CSRF material crosses that channel.
+Root and retired presentation routes fail closed with `404` or `410`.
+
+Browser messaging authenticates an origin rather than a path.
+A downstream on a shared `github.io` origin must therefore explain that another compromised page on the same origin could impersonate the intended `/edit/` or `/review/` path.
+Before either route enables a direct GitHub write, it requires an explicit, in-memory acknowledgment of that shared-origin limitation.
+The acknowledgment informs the curator but is not treated as an authorization or security proof.
+It is not stored in local storage, a cookie, service state, or tracked configuration.
+A custom or otherwise unique downstream origin receives the normal low-friction flow.
+**Download bundle** remains enabled and credential-free in both cases.
+
+The template and backend-deployment skill guide maintainers through adding and verifying a custom domain while preserving the shared-`github.io` fallback.
+The service still revalidates curator access, App installation, repository, pull request, commits, paths, artifact or unchanged bundle, and exact head immediately before a write.
+This decision supersedes M6-D005 and M6-D006 only where they required a central receiver, upload fallback, presentation, confirmation, independently configured repository coordinate, or central landing surface.
+Their downstream-interface, exact-source, statelessness, GitHub-authority, fixed-path handoff, and trusted-replacement boundaries remain in force.
 
 ## Workstream 1: reference and projection alignment
 
@@ -180,9 +210,10 @@ Cache keys include the runner platform and required commit IDs; every job verifi
 The downstream static editor retains its normal **Download bundle** behavior and adds an explicit **Propose via GitHub** action for the same editor result.
 The site must make both actions visible in the editing session and bind them to the repository and exact source commit represented by the generated editor input.
 
-The proposal action opens the configured central service only for GitHub sign-in, confirmation, and bundle receipt.
-The service must not assemble or host SHACL Vue or own another editing session.
-A live transfer validates the expected service origin, static-site origin, both windows, and a one-time nonce; selecting a previously downloaded unchanged bundle on the receiver page is the fallback when OAuth or browser policy prevents that transfer.
+The proposal action opens the configured service only as a backend OAuth and GitHub-transport popup.
+The service must not assemble or host SHACL Vue, receive a browser-selected fallback file, own another editing session, or render confirmation UI.
+A live transfer validates the expected service origin, static-site origin, both windows, repository, operation, and a one-time nonce.
+If OAuth or browser policy prevents that transfer, **Download bundle** preserves the unchanged credential-free result; the user may reselect it on the downstream `/edit/` route before retrying.
 Neither path adds cross-origin bundle storage or an OAuth recovery store.
 
 Acceptance exercises one public-data edit through sign-in, bundle generation, the temporary handoff, trusted canonical replacement, validation, and a final branch with no handoff bundle.
@@ -194,7 +225,7 @@ The obsolete demonstration pull request 7 was closed without merge as superseded
 Acquire current Zotero data read-only, record its exact library/content coordinate, and generate a new proposal from the current demonstration default branch.
 
 The proposal link must open the demonstration site's deployed `/review/` route as specified by M6-D006.
-The central deployment is authentication and verified GitHub transport only and is not a review destination.
+The central deployment is backend-only authentication and verified GitHub transport and is not a review, confirmation, upload, or landing destination.
 
 Human review may use the existing bulk initializer, but every candidate still receives an explicit disposition before finalization.
 The accepted result must validate on both supported platforms.
@@ -222,8 +253,11 @@ Milestone 6 is complete when:
 
 1. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
 2. well-formed unresolved references survive validation and projection by default, an omitted graph-target policy drops and reports nonmaterialized edges, and explicit `reject` remains strict;
-3. the deployed downstream static editor exposes both actions, the central service exposes no duplicate editor, and one current SHACL Vue edit completes the GitHub handoff and trusted replacement path; and
+3. the deployed downstream static editor exposes both actions, keeps its main page on the downstream origin, and completes one current SHACL Vue GitHub handoff and trusted replacement while the central service exposes no static presentation surface;
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
+
+For the direct GitHub paths, acceptance also proves the normal flow on a custom or otherwise unique origin and the explanation plus explicit acknowledgment gate on a shared `github.io` origin.
+**Download bundle** remains usable there without GitHub authentication or acknowledgment.
 
 Acceptance records representative commands, releases, pull requests, and runs.
 It does not duplicate commit ancestry already enforced by Git and the workflow or reproduce every transient artifact coordinate.
@@ -244,8 +278,8 @@ Do not change installation scope or retarget the proposal without John's explici
 Should a record show two explicit actions—**Edit or download** and **Propose through GitHub**—or should **Edit** open the authenticated GitHub wrapper by default with download retained there?
 
 The accepted result is one downstream static editor with two clearly named actions: **Download bundle** and **Propose via GitHub**.
-The central service is only the authenticated receiver and GitHub transport; it does not host an alternative editor.
-M6-D005 records the complete boundary.
+The central service is only backend authorization and GitHub transport; it does not host an alternative editor, receiver, upload fallback, or confirmation page.
+M6-D005 records the retained editor boundary, and M6-D007 records the superseding browser and service boundary.
 
 ### Resolved Pre-M6-Q001 — What moves to the new organization?
 
