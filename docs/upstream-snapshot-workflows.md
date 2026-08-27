@@ -71,8 +71,8 @@ It is not involved in validation, projection, building, serving, or deployment a
 Those operations use Orinoco Lite directly.
 
 `check-upstream-orinoco` first probes the engine locked by the generated repository, then exercises the current development engine against that lock's verified released runtime in fresh processes.
-This distinction matters during engine development: template `v0.2.0rc7` locks engine/runtime `v0.2.0rc4`, which predates the explicit general open-reference and graph policies required by this corpus.
-The generated repository's own normal `pixi run validate`, `pixi run build`, and `pixi run serve` commands become the direct standalone interface once a release containing these policies is adopted.
+Template `v0.2.0rc12` locks engine/runtime `v0.2.0rc8`, which contains the general open-reference and graph defaults required by this corpus.
+The released probe and development gate therefore exercise the same policy boundary, while the generated repository's own normal `pixi run validate`, `pixi run build`, and `pixi run serve` commands are its direct standalone interface.
 No ad hoc runtime archive is produced to bridge that release boundary.
 
 After the check, preview the generated site with:
@@ -154,5 +154,6 @@ The implementation now has focused regressions for:
 - editor builds from an initialized repository whose first commit has not yet been created; and
 - direct script imports in locked environments that already contain an unrelated `tools` namespace.
 
-Strict closed-reference, closed-graph, and all-record editor behavior remains the default for existing downstreams.
-The broader policies are explicit opt-ins in this generated corpus, so future snapshots reveal drift without silently weakening ordinary consumer validation.
+Template `v0.2.0rc12` and engine/runtime `v0.2.0rc8` preserve well-formed unresolved references and omit nonmaterialized graph edges with diagnostics by default.
+This generated corpus declares both policies explicitly so future snapshots reveal drift without relying on an implicit default.
+Existing downstreams that explicitly retain `reject` remain strict through the tested update path, and the corpus continues to select its editable-record editor scope explicitly.
