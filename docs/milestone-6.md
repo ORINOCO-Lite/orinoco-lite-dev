@@ -92,6 +92,7 @@ The repository and GitHub App ownership transfers completed on 2026-08-26.
 The App installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website`; authenticated discovery and the exact-head SHACL editor passed without creating a review comment, branch, or pull request.
 The custody audit also replaced the accidental query-things and things-enrichment-tools merge tips with the already accepted linear heads by exact lease, and fast-forwarded the Things Schemas mirror default ref to its accepted pin.
 The Congo mirror retains its upstream `stable` history plus two owned commits; its local Dependabot policy disables independent version-update pull requests, and the nine superseded bot pull requests were closed.
+The central backend then advanced from [engineering pull request 50](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50) at `b992e9788ee66572ca613cfa230cb2ecda40667e` with runtime `v0.2.0rc6`; its [final deployment evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) records the provider configuration, immutable deployment, authenticated read-only proof, and retained rollback.
 
 ## Workstream 1: reference and projection alignment
 
