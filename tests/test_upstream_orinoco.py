@@ -11,6 +11,17 @@ from tools import upstream_orinoco as fixture
 
 
 class UpstreamOrinocoTests(unittest.TestCase):
+    def test_default_template_pin_tracks_the_open_reference_release(self) -> None:
+        self.assertEqual(
+            fixture.DEFAULT_TEMPLATE_SOURCE,
+            "gh:ORINOCO-Lite/orinoco-lite-template",
+        )
+        self.assertEqual(fixture.DEFAULT_TEMPLATE_VERSION, "v0.2.0rc12")
+        self.assertEqual(
+            fixture.DEFAULT_TEMPLATE_SOURCE,
+            fixture.PUBLIC_TEMPLATE_SOURCE,
+        )
+
     def test_projection_tracks_every_observed_top_level_class(self) -> None:
         classes = Counter(
             {
