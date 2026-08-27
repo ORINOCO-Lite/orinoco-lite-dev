@@ -26,7 +26,7 @@ RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
-ACCEPTED_CONSUMER_COMMIT = "32c8df154fa11693efe9d20d298f553943b89096"
+ACCEPTED_CONSUMER_COMMIT = "4108568df2adc52d619d365e5dc735b30b7730b9"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
