@@ -209,6 +209,25 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
+        nested_modules = (
+            ROOT / "submodules" / "www-from-model" / ".gitmodules"
+        )
+        result = subprocess.run(
+            [
+                "git",
+                "config",
+                "-f",
+                str(nested_modules),
+                "--get",
+                "submodule.themes/congo.branch",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
     def test_retired_engineering_pages_workflow_stays_absent(self) -> None:
         workflow = ROOT / ".github" / "workflows" / "upstream-pages-trial.yml"
         self.assertFalse(workflow.exists())
