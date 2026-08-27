@@ -62,6 +62,8 @@ Refresh tokens are discarded.
 ## Cloudflare Pages Functions
 
 The Pages output directory is `service-dist/` and contains only routing configuration; it has no static presentation assets.
+Its manifest sends the exact root and `/api/*` to Functions.
+The root Function returns an empty, hardened, non-cacheable `404` so a superseded Pages asset cannot reappear from static hosting or cache, while every other non-API presentation path remains outside the Functions deployment.
 Pages Functions are under `functions/`; `npm run pages:functions:build` verifies their Worker bundle without publishing it.
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
 Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
