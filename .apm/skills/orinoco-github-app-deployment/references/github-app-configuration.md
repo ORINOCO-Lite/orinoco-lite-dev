@@ -45,7 +45,7 @@ A GitHub App's owner controls its settings and client secrets.
 Transferring the App does not by itself:
 
 - move or reconfigure the hosting project;
-- change `PUBLIC_ORIGIN` or downstream variables;
+- change `PUBLIC_ORIGIN` or downstream `site.repository` and `site.curation_service` values;
 - install the App on the new owner's repositories;
 - approve newly requested permissions on existing installations; or
 - rotate the client secret already configured at the host.
@@ -62,9 +62,14 @@ Backend deployment is necessary but not sufficient.
 Each downstream must have:
 
 - the App installed on that repository;
-- trusted default-branch workflows that produce the exact review and editor artifacts;
+- a trusted default-branch workflow that produces the exact source-adapter review artifact;
+- trusted default-branch SHACL handoff replacement and validation behavior;
+- a static site built from its exact source commit with the released editor and schema, including both **Download bundle** and **Propose via GitHub**;
 - a curator with repository `write` or `admin`; and
-- for self-hosting, the Actions variable `CURATION_REVIEW_APP_ORIGIN` set to the credential-free HTTPS origin with no path, query, or fragment.
+- `site.repository` set to its exact GitHub `owner/repository` and `site.curation_service` set to the credential-free HTTPS receiver origin with no path, query, fragment, or credentials.
+
+Do not publish a SHACL editor-input Actions artifact for this path.
+The central service does not acquire static editor files or assemble an editor.
 
 Do not put the client ID or either secret in a downstream repository.
 A public client ID belongs at the service deployment, and both secrets belong only in the host's encrypted secret store.
@@ -79,4 +84,4 @@ Ask for only values that cannot be discovered safely:
 4. the downstream repositories that may be installed; and
 5. whether a write-path test is authorized in a named integration repository.
 
-Discover release coordinates, current settings, repository identities, and provider capabilities read-only before asking the operator to repeat them.
+Discover the application commit, current settings, repository identities, and provider capabilities read-only before asking the operator to repeat them.

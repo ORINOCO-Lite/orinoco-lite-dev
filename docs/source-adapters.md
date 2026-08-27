@@ -5,8 +5,9 @@ Status: normative specification
 This document defines the shared metadata behavior and supported GitHub review contract for Orinoco Lite source adapters.
 The hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
 The distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
-The GitHub profiles reuse one small stateless authentication application and keep their two expiring GitHub Actions presentation artifacts distinct: one proposal-review bundle and one exact-head editor input.
-Neither artifact is a metadata service or durable curation store.
+The two GitHub profiles reuse one small stateless authentication application.
+The source-adapter profile has one expiring GitHub Actions proposal-review bundle; the SHACL Vue profile uses the editor already generated and deployed with the downstream static site and does not add an editor-input artifact.
+Neither the proposal-review artifact nor the static editor output is a metadata service or durable curation store.
 This document does not define a Python ABI, plugin protocol, persistent metadata service, or second hosting-provider profile.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
@@ -46,7 +47,8 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
 | Hosted decision-review presentation | One expiring GitHub Actions artifact per proposal | Reproducibly present source and proposal coordinates plus per-record UI facts without becoming metadata, candidate, decision, or provenance authority. |
-| Hosted SHACL Vue presentation | One expiring GitHub Actions artifact per exact input commit | Present only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` for in-memory combination with an immutable released editor shell and schema; it is not metadata, a generated editor bundle, provenance, or durable state. |
+| SHACL Vue presentation | Downstream static `edit/` output | Serve the exact-commit `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` with an immutable released editor shell and schema. The static site is the only SHACL Vue editor; its generated output is not metadata, a generated review bundle, provenance, or durable curation state. |
+| Hosted SHACL Vue handoff | Stateless GitHub authorization and receiver page | Authenticate, confirm, and transport the editor's unchanged bundle to the fixed-path Git handoff without assembling or hosting another editor or retaining curation state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
@@ -181,10 +183,10 @@ Supported inputs include:
 - one or more metadata commits pushed by authorized humans.
 
 SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), not this decision-review and finalization profile.
-Its existing generated bundle is exposed to a thin Orinoco GitHub wrapper, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
-Trusted default-branch code first publishes an exact-commit editor-input artifact containing only the three normal static editor data files.
-The stateless application verifies that artifact and combines its data in browser memory with the generic shell and schema from one immutable, digest-verified runtime release.
-The resulting unchanged bundle then enters the profile's fixed-path Git handoff and trusted Python replacement; the browser and hosted service perform no metadata conversion.
+Its existing generated bundle is exposed by the downstream static editor to a thin Orinoco GitHub handoff, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
+The downstream build combines exact-commit static editor data with the generic shell and schema from one immutable, digest-verified runtime release.
+That static site remains the only SHACL Vue editor and provides both **Download bundle** and **Propose via GitHub** for the same unchanged bundle.
+The stateless application supplies only GitHub sign-in, confirmation, and bundle receipt before the profile's fixed-path Git handoff and trusted Python replacement; the browser and hosted service perform no metadata conversion.
 
 Human review MAY add, modify, or delete metadata beyond the original candidate plan on the same pull request.
 That scope is governed by ordinary pull-request review, attribution, and final validation rather than an adapter restriction.
@@ -416,15 +418,16 @@ The presentation bundle expires under ordinary GitHub artifact retention and MAY
 Git commits, the authenticated submission comment, and the compact decision cache remain the durable review state.
 
 The separate SHACL Vue profile MUST preserve this exactly-one decision-review artifact contract.
-For every exact pull-request or current default-branch commit that it exposes for editing, trusted default-branch code publishes exactly one additional artifact named `orinoco-shacl-vue-input-<source_sha>` containing only `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json`.
-The central application verifies the trusted run and exact source commit, then combines those files only in browser memory with a generic shell and schema from an immutable, digest-verified runtime release.
-That artifact is reproducible presentation input, not canonical metadata, a generated editor bundle, candidate or decision state, provenance, or a durable curation record.
-It neither changes candidate membership nor enters the source-adapter finalizer.
+It adds no editor-input Actions artifact.
+For each exact commit exposed for editing, the downstream build emits `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` as ordinary static site output and combines them with the editor shell and schema from an immutable, digest-verified runtime release.
+The central application MUST NOT retrieve those files or assemble, embed, or host another editor.
+The generated static input is not canonical metadata, a generated review bundle, candidate or decision state, provenance, or durable curation state, and it neither changes candidate membership nor enters the source-adapter finalizer.
 
 The shared GitHub App requests metadata read, Actions read, contents write, and pull requests write.
 Contents write is confined to an explicit SHACL Vue handoff at exact Git coordinates; the decision-review path only reads contents and posts the authenticated comment.
-The wrapper MUST require an explicit public-data and no-secrets acknowledgment before it creates the fixed-path bundle handoff.
-No separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this presentation path.
+Actions read serves the source-adapter decision-review artifact and is not used to assemble a SHACL Vue editor.
+The receiver MUST require an explicit public-data and no-secrets acknowledgment before it creates the fixed-path bundle handoff.
+No second editor page, separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this path.
 
 The project MAY publish one central application origin by default.
 That origin MUST remain configurable, and a downstream MAY self-host the same stateless application without creating another host profile or durable authority.
@@ -447,7 +450,7 @@ Beyond that boundary:
 - No custom distributed transaction, journal, lock service, or crash-recovery protocol is introduced.
 - No tracked inventory, review document, exhaustive manifest, DataLad sidecar, reconciliation report, or custom attestation graph is introduced.
 - No artifact is added merely to authenticate another artifact produced by the same trusted workflow.
-- The GitHub Actions decision-review bundle and exact-head editor-input artifact are transient UI output, not candidate inventories, generated editor bundles, attestations, journals, provenance, or recovery mechanisms.
+- The GitHub Actions decision-review bundle and generated static editor input are transient UI output, not candidate inventories, generated review bundles, attestations, journals, provenance, or recovery mechanisms.
 - No semantic overlay beyond `annotations` is introduced without a focused specification change and a source or human state that Git, PAV, and the compact decision cache cannot represent.
 - A stronger attacker or availability model requires a separate reviewed design rather than incremental workflow machinery.
 

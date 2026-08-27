@@ -164,6 +164,8 @@ A downstream selects its review-application origin independently, and that origi
 The same application code MAY be deployed elsewhere by setting `PUBLIC_ORIGIN`; the profile does not require a particular hosting provider.
 A conforming deployment MAY serve the static application and stateless authorization routes from one Cloudflare Pages or Workers deployment.
 It MUST NOT require a durable database, object store, metadata service, candidate store, or decision store.
+For the separate SHACL Vue profile, that origin MAY also serve a lightweight sign-in, confirmation, and bundle-receiver page, but it MUST NOT assemble, embed, or host a SHACL Vue editor.
+The downstream static site remains that profile's only editor.
 
 Cloudflare project provisioning, GitHub App registration, secrets, and a live deployment are external operational changes.
 They require separately reviewed acceptance coordinates and are not implied by implementation of this profile.

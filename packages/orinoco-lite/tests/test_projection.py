@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import Mock, patch
 
@@ -16,13 +18,14 @@ from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
 from orinoco_lite.errors import DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
-    EXTERNALLY_RESOLVABLE_LINK_FIELDS,
     _all_links,
     _apply_inline,
     _is_historical_provenance,
     _machine_pav_fingerprint,
+    _matches_policy,
     _native_fingerprint,
     _relationship_targets,
+    _route_for_pid,
     load_contract,
     projection_manifest,
     render_projection,
@@ -38,12 +41,13 @@ SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
 
 
 class SemanticReferencePolicyTests(unittest.TestCase):
-    """Keep external identifier agencies distinct from local graph closure."""
+    """Apply one general open-reference policy to every recognized link."""
 
     @staticmethod
     def _validate(
         record: dict[str, object],
         *,
+        missing_reference_targets: str = "reject",
         to_ttl: Mock | None = None,
     ) -> dict[str, object]:
         contract = Mock(
@@ -52,7 +56,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
             unrendered_classes=frozenset(),
             relationship_fields=("about",),
             graph_node_classes=frozenset({"acme:Thing"}),
-            missing_reference_targets="reject",
+            missing_reference_targets=missing_reference_targets,
             missing_graph_targets="reject",
         )
         schema_view = Mock()
@@ -83,7 +87,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
         ):
             return validate_semantics(Mock(), Path("/unused-runtime"))
 
-    def test_external_identifier_creator_passes_lite_closure_and_stays_scalar(
+    def test_preserve_policy_reports_external_creator_and_keeps_scalar(
         self,
     ) -> None:
         creator = "https://identifiers.example/agency"
@@ -100,8 +104,17 @@ class SemanticReferencePolicyTests(unittest.TestCase):
         }
 
         self.assertEqual(
-            self._validate(record),
-            {"records": 1, "graph_nodes": 1, "graph_edges": 0},
+            self._validate(record, missing_reference_targets="preserve"),
+            {
+                "records": 1,
+                "graph_nodes": 1,
+                "graph_edges": 0,
+                "preserved_reference_targets": 1,
+                "preserved_reference_unique_targets": 1,
+                "preserved_references_by_field": {
+                    "identifiers.creator": 1,
+                },
+            },
         )
         projected = deepcopy(record)
         _apply_inline(projected, "identifiers::creator", {})
@@ -169,7 +182,11 @@ class SemanticReferencePolicyTests(unittest.TestCase):
             DriverError,
             "JSON/RDF/JSON schema validation failed: invalid creator PID",
         ):
-            self._validate(record, to_ttl=to_ttl)
+            self._validate(
+                record,
+                missing_reference_targets="preserve",
+                to_ttl=to_ttl,
+            )
 
         to_ttl.convert.assert_called_once()
 
@@ -215,7 +232,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
                 ):
                     self._validate(record)
 
-    def test_required_local_links_exclude_identifier_creators(self) -> None:
+    def test_explicit_reject_policy_includes_identifier_creators(self) -> None:
         record = {
             "pid": "acme:.",
             "about": [
@@ -236,11 +253,180 @@ class SemanticReferencePolicyTests(unittest.TestCase):
                 ("about.roles", "acme:roles/one"),
                 ("kind", "acme:kinds/one"),
                 ("rules", "acme:rules/one"),
+                (
+                    "identifiers.creator",
+                    "https://identifiers.example/agency",
+                ),
             ],
         )
+        with self.assertRaisesRegex(
+            DriverError,
+            "dangling identifiers.creator target",
+        ):
+            self._validate(
+                {
+                    "pid": "acme:.",
+                    "schema_type": "acme:Thing",
+                    "identifiers": [
+                        {"creator": "https://identifiers.example/agency"}
+                    ],
+                }
+            )
+
+
+class QueryInlineParityTests(unittest.TestCase):
+    """Match the pinned query-things path walker without a live resolver."""
+
+    def setUp(self) -> None:
+        self.by_pid = {
+            "acme:one": {"pid": "acme:one", "label": "One"},
+            "acme:two": {"pid": "acme:two", "label": "Two"},
+        }
+
+    def test_nested_path_preserves_missing_children_and_unresolved_scalars(
+        self,
+    ) -> None:
+        record = {
+            "groups": [
+                {
+                    "items": [
+                        {"target": "acme:one"},
+                        {"label": "no target"},
+                    ]
+                },
+                {
+                    "items": {
+                        "target": [
+                            "acme:two",
+                            "external:missing",
+                            "plain text",
+                        ]
+                    }
+                },
+            ]
+        }
+
+        _apply_inline(record, "groups::items::target", self.by_pid)
+
         self.assertEqual(
-            EXTERNALLY_RESOLVABLE_LINK_FIELDS,
-            frozenset({"identifiers.creator"}),
+            record["groups"][0]["items"][0]["target"],
+            self.by_pid["acme:one"],
+        )
+        self.assertEqual(
+            record["groups"][0]["items"][1],
+            {"label": "no target"},
+        )
+        self.assertEqual(
+            record["groups"][1]["items"]["target"],
+            [
+                self.by_pid["acme:two"],
+                "external:missing",
+                "plain text",
+            ],
+        )
+
+    def test_multivalued_qualified_relationship_keeps_context_entries(
+        self,
+    ) -> None:
+        record = {
+            "associated_with": [
+                {
+                    "object": ["acme:one", "external:missing"],
+                    "roles": ["external:role"],
+                },
+                {"roles": ["external:context-only"]},
+                {"object": "acme:two"},
+            ]
+        }
+
+        _apply_inline(record, "associated_with::object", self.by_pid)
+
+        self.assertEqual(
+            record["associated_with"],
+            [
+                {
+                    "object": [self.by_pid["acme:one"], "external:missing"],
+                    "roles": ["external:role"],
+                },
+                {"roles": ["external:context-only"]},
+                {"object": self.by_pid["acme:two"]},
+            ],
+        )
+
+    def test_behavior_matches_the_exact_pinned_query_things_walker(self) -> None:
+        source = (
+            ENGINE_ROOT
+            / "submodules/query-things/query_things/inline_things.py"
+        )
+        if not source.is_file():
+            self.skipTest("pinned query-things source fixture is unavailable")
+        common = types.ModuleType("query_things.common")
+        common.RecordCache = object
+        common.iter_json_objects = lambda: ()
+        common.make_record_resolver = lambda **_kwargs: None
+        common.stdargs = {
+            "--api-url": {},
+            "--record-cache": {},
+            "--token": {},
+            "collection": {},
+        }
+        spec = importlib.util.spec_from_file_location(
+            "orinoco_pinned_query_inline",
+            source,
+        )
+        assert spec is not None and spec.loader is not None
+        pinned = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"query_things.common": common}):
+            spec.loader.exec_module(pinned)
+
+        value = {
+            "groups": [
+                {
+                    "items": [
+                        {"target": ["acme:one", "external:missing"]},
+                        {"label": "unmatched"},
+                    ]
+                }
+            ]
+        }
+        expected = deepcopy(value)
+        pinned.walk(
+            expected,
+            ("groups", "items", "target"),
+            self.by_pid.get,
+        )
+        actual = deepcopy(value)
+        _apply_inline(actual, "groups::items::target", self.by_pid)
+
+        self.assertEqual(actual, expected)
+
+    def test_recursive_selector_follows_qualified_pid_arrays(self) -> None:
+        records = [
+            {
+                "pid": "acme:projects/child",
+                "part_of": [{"object": ["acme:projects/mid", "external:parent"]}],
+            },
+            {
+                "pid": "acme:projects/mid",
+                "part_of": "acme:.",
+            },
+            {"pid": "acme:."},
+        ]
+        by_pid = {record["pid"]: record for record in records}
+        policy = Mock(
+            select={
+                "links_to": {
+                    "pid": "acme:.",
+                    "field": "part_of",
+                    "recursive": True,
+                }
+            }
+        )
+
+        self.assertTrue(_matches_policy(records[0], policy, by_pid))
+        self.assertEqual(
+            _route_for_pid(records[0]["pid"], "acme:"),
+            "projects/child",
         )
 
 
@@ -286,6 +472,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             "routing:\n  strip_prefix: 'acme:'\n"
             "homepage:\n  pid: 'acme:.'\n  template: site/projection-templates/page.md.j2\n"
             "pages:\n  'acme:Person':\n    template: site/projection-templates/page.md.j2\n"
+            "    inline: [attributes::annotations::source::creator]\n"
             "unrendered_classes: []\n"
             "graph:\n  producer: site/projection-tools/graph.py\n"
             "  node_classes: ['acme:Person']\n  relationship_fields: []\n"
@@ -343,7 +530,13 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
-        self.assertEqual(load_contract(self.workspace).editor_record_scope, "all")
+        contract = load_contract(self.workspace)
+        self.assertEqual(contract.editor_record_scope, "all")
+        self.assertEqual(contract.missing_reference_targets, "preserve")
+        self.assertEqual(
+            contract.pages["acme:Person"].inline,
+            ("attributes::annotations::source::creator",),
+        )
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
         ) as semantic:
@@ -425,13 +618,12 @@ class GenericProjectionContractTests(unittest.TestCase):
             manifest,
         )
 
-    def test_open_reference_policy_preserves_links_and_drops_graph_edges(self) -> None:
+    def test_default_open_reference_policy_reports_omissions(self) -> None:
         projection = self.root / "site/projection.yaml"
         projection.write_text(
             projection.read_text(encoding="utf-8")
             .replace(
                 "homepage:\n",
-                "references:\n  missing_targets: preserve\n"
                 "editor:\n  record_scope: editable\nhomepage:\n",
             )
             .replace(
@@ -455,7 +647,12 @@ class GenericProjectionContractTests(unittest.TestCase):
                 "pid": "acme:people/one",
                 "schema_type": "acme:Person",
                 "display_label": "One",
-                "about": ["ext:topic"],
+                "about": [
+                    {
+                        "object": ["ext:topic", "ext:topic-two"],
+                        "roles": ["ext:qualified-role"],
+                    }
+                ],
                 "identifiers": [{"creator": "https://registry.example/"}],
             },
         ]
@@ -487,15 +684,15 @@ class GenericProjectionContractTests(unittest.TestCase):
                 "records": 2,
                 "graph_nodes": 2,
                 "graph_edges": 0,
-                "preserved_reference_targets": 3,
-                "preserved_reference_unique_targets": 3,
+                "preserved_reference_targets": 5,
+                "preserved_reference_unique_targets": 5,
                 "preserved_references_by_field": {
-                    "about": 1,
-                    "about.roles": 1,
+                    "about": 2,
+                    "about.roles": 2,
                     "identifiers.creator": 1,
                 },
-                "dropped_graph_edges": 1,
-                "dropped_graph_edges_by_field": {"about": 1},
+                "dropped_graph_edges": 2,
+                "dropped_graph_edges_by_field": {"about": 2},
                 "targetless_relationship_contexts": 1,
                 "targetless_relationship_contexts_by_field": {"about": 1},
             },
@@ -521,7 +718,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             return_value=report,
         ):
             rendered = render_projection(self.workspace, self.runtime, output)
-        self.assertEqual(rendered["dropped_graph_edges"], 1)
+        self.assertEqual(rendered["dropped_graph_edges"], 2)
         self.assertEqual(
             json.loads((output / "static/graph.json").read_text(encoding="utf-8"))[
                 "edges"

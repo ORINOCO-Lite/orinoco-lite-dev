@@ -69,7 +69,13 @@ FRAMEWORK_DIRECTORIES = (
 PAGE_POLICIES: dict[str, dict[str, Any]] = {
     "xyzri:XYZDataset": {
         "template": "site/projection-templates/dataset.md.j2",
-        "inline": ["about", "attributed_to", "kind", "rules", "characterized_by"],
+        "inline": [
+            "about",
+            "attributed_to::object",
+            "kind",
+            "rules",
+            "characterized_by::object",
+        ],
     },
     "xyzri:XYZObjective": {
         "template": "site/projection-templates/objective.md.j2",
@@ -93,9 +99,9 @@ PAGE_POLICIES: dict[str, dict[str, Any]] = {
             {"from": "part_of", "to": "parts"},
         ],
         "inline": [
-            "associated_with",
+            "associated_with::object",
             "associated_with::roles",
-            "influenced_by",
+            "influenced_by::object",
             "influenced_by::roles",
             "identifiers::creator",
             "part_of",
@@ -110,18 +116,18 @@ PAGE_POLICIES: dict[str, dict[str, Any]] = {
             }
         },
         "inline": [
-            "delegated_by",
+            "delegated_by::object",
             "delegated_by::roles",
             "identifiers::creator",
         ],
     },
     "xyzri:XYZPublication": {
         "template": "site/projection-templates/publication.md.j2",
-        "inline": ["about", "attributed_to"],
+        "inline": ["about", "attributed_to::object"],
     },
     "xyzri:XYZInstrument": {
         "template": "site/projection-templates/instrument.md.j2",
-        "inline": ["about", "attributed_to", "kind", "rules"],
+        "inline": ["about", "attributed_to::object", "kind", "rules"],
     },
 }
 HOMEPAGE_POLICY = {
@@ -132,9 +138,9 @@ HOMEPAGE_POLICY = {
         {"from": "part_of", "to": "parts"},
     ],
     "inline": [
-        "associated_with",
+        "associated_with::object",
         "associated_with::roles",
-        "influenced_by",
+        "influenced_by::object",
         "influenced_by::roles",
         "identifiers::creator",
         "part_of",

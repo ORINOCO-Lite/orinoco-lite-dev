@@ -18,6 +18,9 @@ CONFIG_CONTRACT_VERSION = 2
 LOCK_CONTRACT_VERSION = 1
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DRIVER_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$")
+GITHUB_REPOSITORY = re.compile(
+    r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})/[A-Za-z0-9_.-]{1,100}$"
+)
 
 DEFAULT_PATHS: dict[str, str] = {
     "records": "metadata/records",
@@ -95,6 +98,37 @@ def _absolute_http_url(value: object, label: str, *, https_only: bool) -> str:
     return value
 
 
+def _curation_service_origin(value: object, label: str) -> str:
+    """Return a credential-free HTTPS origin, with loopback HTTP for development."""
+
+    if not isinstance(value, str) or not value:
+        raise ConfigurationError(f"{label} must be an absolute origin")
+    try:
+        parsed = urlsplit(value)
+        parsed.port
+    except ValueError as error:
+        raise ConfigurationError(f"{label} is invalid") from error
+    loopback = parsed.scheme == "http" and parsed.hostname in {
+        "127.0.0.1",
+        "localhost",
+    }
+    if (
+        (parsed.scheme != "https" and not loopback)
+        or not parsed.netloc
+        or parsed.hostname is None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ConfigurationError(
+            f"{label} must be a credential-free HTTPS origin "
+            "(or a loopback development origin)"
+        )
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _inside(root: Path, relative: str, label: str) -> Path:
     candidate = root.joinpath(*PurePosixPath(relative).parts)
     resolved_root = root.resolve()
@@ -116,6 +150,8 @@ class WorkspaceConfig:
     paths: Mapping[str, str]
     command_aliases: Mapping[str, str]
     raw: Mapping[str, Any]
+    repository: str | None = None
+    curation_service: str | None = None
 
     def path(self, name: str) -> Path:
         try:
@@ -213,6 +249,29 @@ def load_workspace(
     )
     if not base_url.endswith("/"):
         base_url += "/"
+    repository_value = site.get("repository")
+    service_value = site.get("curation_service")
+    if (repository_value is None) != (service_value is None):
+        raise ConfigurationError(
+            "orinoco.yaml site.repository and site.curation_service must be "
+            "configured together"
+        )
+    repository: str | None = None
+    curation_service: str | None = None
+    if repository_value is not None:
+        if (
+            not isinstance(repository_value, str)
+            or not GITHUB_REPOSITORY.fullmatch(repository_value)
+            or ".." in repository_value
+        ):
+            raise ConfigurationError(
+                "orinoco.yaml site.repository must use GitHub owner/repository form"
+            )
+        repository = repository_value
+        curation_service = _curation_service_origin(
+            service_value,
+            "orinoco.yaml site.curation_service",
+        )
 
     path_values = raw.get("paths", {})
     if not isinstance(path_values, dict) or not all(
@@ -268,6 +327,8 @@ def load_workspace(
         paths=paths,
         command_aliases=normalized_aliases,
         raw=raw,
+        repository=repository,
+        curation_service=curation_service,
     )
 
 

@@ -23,6 +23,11 @@ GIT_IDENTITY = {
 }
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
 REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
+REVIEW_BUNDLE_PROPOSAL = "beginReviewBundleProposal("
+DOWNLOAD_AND_DISPATCH = (
+    "dlJSON(bundle, reviewBundleFilename(bundle.records));\n"
+    "            dispatchReviewBundle(bundle);"
+)
 POOL_UI_COMMIT = "668175a11e10f6f8f6eb1a9c9df25aaac58c5b83"
 SHACL_VUE_COMMIT = "2d3673e0a3bd1054f41c303bc7faa4111277c2d0"
 
@@ -103,12 +108,13 @@ def _apply_submission_accessibility_patch(
     source = component.read_text(encoding="utf-8")
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
-        or source.count(REVIEW_BUNDLE_DISPATCH) != 1
+        or source.count(REVIEW_BUNDLE_DISPATCH) != 2
+        or source.count(REVIEW_BUNDLE_PROPOSAL) != 1
+        or source.count("Propose via GitHub") != 1
         or "return recordSubmissionLabel({" not in source
         or "recordIri: record.node_iri" not in source
         or "prefixes: allPrefixes" not in source
-        or source.index("dlJSON(bundle, reviewBundleFilename(bundle.records));")
-        > source.index(REVIEW_BUNDLE_DISPATCH)
+        or DOWNLOAD_AND_DISPATCH not in source
     ):
         raise DriverError("Editor submission patch is incomplete")
 

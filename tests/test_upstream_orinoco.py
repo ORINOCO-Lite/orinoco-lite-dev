@@ -34,6 +34,28 @@ class UpstreamOrinocoTests(unittest.TestCase):
         )
         self.assertEqual(contract["graph"]["missing_external_targets"], "drop")
 
+    def test_projection_targets_objects_inside_qualified_relationships(self) -> None:
+        contract = fixture.projection_contract(Counter())
+        policies = {
+            **contract["pages"],
+            "homepage": contract["homepage"],
+        }
+        qualified_fields = {
+            "xyzri:XYZDataset": ("attributed_to", "characterized_by"),
+            "xyzri:XYZProject": ("associated_with", "influenced_by"),
+            "xyzri:XYZPerson": ("delegated_by",),
+            "xyzri:XYZPublication": ("attributed_to",),
+            "xyzri:XYZInstrument": ("attributed_to",),
+            "homepage": ("associated_with", "influenced_by"),
+        }
+
+        for policy_name, fields in qualified_fields.items():
+            inline = policies[policy_name]["inline"]
+            for field in fields:
+                with self.subTest(policy=policy_name, field=field):
+                    self.assertIn(f"{field}::object", inline)
+                    self.assertNotIn(field, inline)
+
     def test_source_copy_flattens_annex_style_links_and_ignores_nested_git(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
