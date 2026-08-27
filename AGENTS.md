@@ -18,8 +18,8 @@ Compare authoritative heads only during a deliberate update, then record the acc
 ## Repository boundaries
 
 - This repository owns engineering integration, the `orinoco-lite` engine, runtime assembly, immutable release evidence, reusable CI, and cross-layer acceptance.
-- `con/orinoco-lite-template` owns Copier source, generated template output, framework ownership, and update mechanics.
-- `con/test-orinoco-downstream-website` owns the complete accepted content, site policy, presentation overrides, provenance, and consumer acceptance.
+- `ORINOCO-Lite/orinoco-lite-template` owns Copier source, generated template output, framework ownership, and update mechanics.
+- `ORINOCO-Lite/test-orinoco-downstream-website` owns the complete accepted content, site policy, presentation overrides, provenance, and consumer acceptance.
 - A supported downstream is one ordinary Git repository with no submodules or gitlinks.
 Keep component coordination and upstream-rebase history inside the engineering workspace.
 - The test consumer contains all accepted Milestone 3 content and the complete test contract.

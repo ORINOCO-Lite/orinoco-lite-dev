@@ -44,7 +44,7 @@ DEFAULT_REPEAT_DESTINATION = (
     ROOT / "build" / "pages-preview-repeat" / "orinoco-lite-dev"
 )
 DEFAULT_EDITOR_SOURCE = ROOT / "build" / "pages-editor"
-DEFAULT_BASE_URL = "https://con.github.io/orinoco-lite-dev/"
+DEFAULT_BASE_URL = "https://orinoco-lite.github.io/orinoco-lite-dev/"
 EDITOR_ROUTE = "edit/"
 CATALOG_NAME = "record-sources.json"
 PUBLICATION_NAME = "publication.json"

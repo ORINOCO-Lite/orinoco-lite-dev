@@ -52,9 +52,9 @@ ORINOCO_ANNOTATIONS = ORINOCO_STORAGE / "metadata" / "overlays" / "annotations"
 ORINOCO_STORAGE_MANIFEST = ORINOCO_STORAGE / "manifest.json"
 UPSTREAM_SITE = ROOT / "submodules" / "www-from-model"
 DEFAULT_DESTINATION = BUILD / "upstream-orinoco-site"
-DEFAULT_TEMPLATE_SOURCE = "gh:con/orinoco-lite-template"
-DEFAULT_TEMPLATE_VERSION = "v0.2.0rc7"
-PUBLIC_TEMPLATE_SOURCE = "gh:con/orinoco-lite-template"
+DEFAULT_TEMPLATE_SOURCE = "gh:ORINOCO-Lite/orinoco-lite-template"
+DEFAULT_TEMPLATE_VERSION = "v0.2.0rc10"
+PUBLIC_TEMPLATE_SOURCE = "gh:ORINOCO-Lite/orinoco-lite-template"
 IGNORED_SOURCE_NAMES = frozenset(
     {".datalad", ".git", ".github", ".gitmodules", "__pycache__"}
 )

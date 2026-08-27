@@ -79,7 +79,7 @@ def write_auditable_site(root: Path, *, local_url: bool = False) -> None:
     root.mkdir(parents=True)
     root.joinpath("index.html").write_text(
         "<!doctype html><title>CON</title>\n"
-        '<a href="https://con.github.io/orinoco-lite-dev/edit/'
+        '<a href="https://orinoco-lite.github.io/orinoco-lite-dev/edit/'
         '?sh%3ANodeShape=dlthings%3AThing&pid=xyzrins%3A.&edit=true">'
         "Edit</a>\n",
         encoding="utf-8",
@@ -100,14 +100,16 @@ def write_auditable_site(root: Path, *, local_url: bool = False) -> None:
 class CONPagesTests(unittest.TestCase):
     def test_pages_url_requires_credential_free_https(self) -> None:
         self.assertEqual(
-            PAGES.normalized_pages_url("https://con.github.io/orinoco-lite-dev"),
+            PAGES.normalized_pages_url(
+                "https://orinoco-lite.github.io/orinoco-lite-dev"
+            ),
             (
-                "https://con.github.io/orinoco-lite-dev/",
+                "https://orinoco-lite.github.io/orinoco-lite-dev/",
                 "/orinoco-lite-dev/",
             ),
         )
         for value in (
-            "http://con.github.io/orinoco-lite-dev/",
+            "http://orinoco-lite.github.io/orinoco-lite-dev/",
             "https://user@example.test/orinoco-lite-dev/",
             "https://example.test/orinoco-lite-dev/?token=secret",
             "https://example.test/../escape/",
@@ -292,12 +294,12 @@ class CONPagesTests(unittest.TestCase):
                 self.assertEqual(base_url, PAGES.DEFAULT_BASE_URL)
                 self.assertEqual(
                     os.environ["SHACL_VUE_URL"],
-                    "https://con.github.io/orinoco-lite-dev/edit/",
+                    "https://orinoco-lite.github.io/orinoco-lite-dev/edit/",
                 )
                 path.mkdir(parents=True)
                 path.joinpath("index.html").write_text(
                     "<!doctype html><title>CON</title>\n"
-                    '<a href="https://con.github.io/orinoco-lite-dev/edit/'
+                    '<a href="https://orinoco-lite.github.io/orinoco-lite-dev/edit/'
                     "?sh%3ANodeShape=dlthings%3AThing&pid=xyzrins%3A."
                     '&edit=true">Edit</a>\n',
                     encoding="utf-8",
