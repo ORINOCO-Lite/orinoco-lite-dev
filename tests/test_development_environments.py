@@ -337,6 +337,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("path: build/accepted-consumer", workflow)
         self.assertIn("sparse-checkout-cone-mode: false", workflow)
         for relative in (
+            "/.gitignore",
             "/metadata/",
             "/site/projection.yaml",
             "/site/projection-templates/",
