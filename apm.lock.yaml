@@ -4,6 +4,60 @@ dependencies: []
 deployments:
 - kind: project-relative
   target: agents
+  value: .agents/skills/orinoco-github-app-deployment
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/orinoco-github-app-deployment/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:24c83d63c21bf5e49085c77e8159fd9414c0661fe6687388beb6fb4fb9d22210
+- kind: project-relative
+  target: agents
+  value: .agents/skills/orinoco-github-app-deployment/agents/openai.yaml
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:dea44d3fdba18d2feeccdbd6c08d1ccae70bef8f52b8918b5975c439b099ff0b
+- kind: project-relative
+  target: agents
+  value: .agents/skills/orinoco-github-app-deployment/references/github-app-configuration.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:a7c313e4f0c803ecdc91368fdf747e296b9401d00701540f524fc4decf88dad2
+- kind: project-relative
+  target: agents
+  value: .agents/skills/orinoco-github-app-deployment/references/runtime-and-hosting-contract.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:c1c20db88ab5198768c899aa099c9900c76800613635bca3057626c760940968
+- kind: project-relative
+  target: agents
+  value: .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md
+  runtime: null
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: sha256:bef1d548182a948d65827f39d16248e971d9999a961e602beb6d5c490325caf3
+- kind: project-relative
+  target: agents
   value: .agents/skills/upstream-convergence
   runtime: null
   scope: project
@@ -39,11 +93,22 @@ deployments:
   active_owner: .
   content_hash: sha256:d785bd0a0caf520e333ecd2a04dd1185011ac33fb0bd0c2a367305207bcca526
 local_deployed_files:
+- .agents/skills/orinoco-github-app-deployment
+- .agents/skills/orinoco-github-app-deployment/SKILL.md
+- .agents/skills/orinoco-github-app-deployment/agents/openai.yaml
+- .agents/skills/orinoco-github-app-deployment/references/github-app-configuration.md
+- .agents/skills/orinoco-github-app-deployment/references/runtime-and-hosting-contract.md
+- .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md
 - .agents/skills/upstream-convergence
 - .agents/skills/upstream-convergence/SKILL.md
 - .agents/skills/upstream-convergence/agents/openai.yaml
 - .agents/skills/upstream-convergence/references/git-and-evidence.md
 local_deployed_file_hashes:
+  .agents/skills/orinoco-github-app-deployment/SKILL.md: sha256:24c83d63c21bf5e49085c77e8159fd9414c0661fe6687388beb6fb4fb9d22210
+  .agents/skills/orinoco-github-app-deployment/agents/openai.yaml: sha256:dea44d3fdba18d2feeccdbd6c08d1ccae70bef8f52b8918b5975c439b099ff0b
+  .agents/skills/orinoco-github-app-deployment/references/github-app-configuration.md: sha256:a7c313e4f0c803ecdc91368fdf747e296b9401d00701540f524fc4decf88dad2
+  .agents/skills/orinoco-github-app-deployment/references/runtime-and-hosting-contract.md: sha256:c1c20db88ab5198768c899aa099c9900c76800613635bca3057626c760940968
+  .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md: sha256:bef1d548182a948d65827f39d16248e971d9999a961e602beb6d5c490325caf3
   .agents/skills/upstream-convergence/SKILL.md: sha256:95b5722413fde58f504f0e02948606a79656ab26f541f2e8ed813d098ec29598
   .agents/skills/upstream-convergence/agents/openai.yaml: sha256:02f0f683979c83e34a93e978020fdc599407560ad9ff8bc51be7729cc922d201
   .agents/skills/upstream-convergence/references/git-and-evidence.md: sha256:d785bd0a0caf520e333ecd2a04dd1185011ac33fb0bd0c2a367305207bcca526
