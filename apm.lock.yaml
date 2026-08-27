@@ -46,7 +46,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:d2d9172bba23b96a3a9b509b0b898b0b7ce196efd3cf90744cdc000fe2062082
+  content_hash: sha256:4d1463d2b84d54ef05036cbb4078874ea604e025995a4e0f28064c95967075a7
 - kind: project-relative
   target: agents
   value: .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md
@@ -55,7 +55,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:988a7e4dcbf6332a0006f9bdb4510e474af5f20c077cc9c50a6b9a5b25f5f955
+  content_hash: sha256:1a962e797529d3c0244eab5fc7f365eeb0184b75e2702c0319b7665feb42484a
 - kind: project-relative
   target: agents
   value: .agents/skills/upstream-convergence
@@ -107,8 +107,8 @@ local_deployed_file_hashes:
   .agents/skills/orinoco-github-app-deployment/SKILL.md: sha256:48c5dfc3e26998243d8129451850b35379b49b984903dfb1d1f2187162c89771
   .agents/skills/orinoco-github-app-deployment/agents/openai.yaml: sha256:dea44d3fdba18d2feeccdbd6c08d1ccae70bef8f52b8918b5975c439b099ff0b
   .agents/skills/orinoco-github-app-deployment/references/github-app-configuration.md: sha256:95ced4ab720a221bd8ad6be21156f32ac725ef8ab6b927513d9ee87f44a40c4a
-  .agents/skills/orinoco-github-app-deployment/references/runtime-and-hosting-contract.md: sha256:d2d9172bba23b96a3a9b509b0b898b0b7ce196efd3cf90744cdc000fe2062082
-  .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md: sha256:988a7e4dcbf6332a0006f9bdb4510e474af5f20c077cc9c50a6b9a5b25f5f955
+  .agents/skills/orinoco-github-app-deployment/references/runtime-and-hosting-contract.md: sha256:4d1463d2b84d54ef05036cbb4078874ea604e025995a4e0f28064c95967075a7
+  .agents/skills/orinoco-github-app-deployment/references/verification-rotation-and-rollback.md: sha256:1a962e797529d3c0244eab5fc7f365eeb0184b75e2702c0319b7665feb42484a
   .agents/skills/upstream-convergence/SKILL.md: sha256:95b5722413fde58f504f0e02948606a79656ab26f541f2e8ed813d098ec29598
   .agents/skills/upstream-convergence/agents/openai.yaml: sha256:02f0f683979c83e34a93e978020fdc599407560ad9ff8bc51be7729cc922d201
   .agents/skills/upstream-convergence/references/git-and-evidence.md: sha256:d785bd0a0caf520e333ecd2a04dd1185011ac33fb0bd0c2a367305207bcca526

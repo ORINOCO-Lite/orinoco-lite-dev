@@ -26,8 +26,8 @@ The downstream static-site release remains responsible for its immutable editor 
 - `/api/discovery` and `/api/auth/discovery-start` return HTTP 410 `review_discovery_retired` without a GitHub request or OAuth-state cookie.
 - A callback probe with exactly `code=probe`, `state=probe`, and `iss=https://github.com/login/oauth`, but no OAuth-state cookie, returns HTTP 401 `missing_oauth_state` before any token exchange.
 An `iss`-only probe is malformed and correctly returns HTTP 400 `invalid_oauth_callback`.
-- Authorization starts with a 302 to GitHub containing the exact client ID, callback, state, and PKCE challenge, and no OAuth scope.
-- A successful callback returns only the minimal generated popup-transport protocol response with its restrictive CSP and no product presentation.
+- Authorization starts with a 302 to GitHub containing the exact client ID, callback, state, and PKCE challenge, no OAuth scope, and `Cross-Origin-Opener-Policy: unsafe-none`.
+- A successful callback uses the same opener-preserving policy and redirects to the minimal generated popup-transport protocol response, which has its restrictive CSP and no product presentation.
 - Security and `no-store` response headers are present, and the callback adapter emits two distinct `Set-Cookie` fields in the actual wire or header-list representation, not one comma-joined field.
 
 Do not add a green root page as a health probe.
@@ -39,6 +39,7 @@ Use one selected integration repository and complete a real sign-in.
 Without submitting a review or proposing a handoff, verify:
 
 - the session identifies the expected user;
+- the popup retains its exact downstream opener across the outbound GitHub authorization and return redirects in a real browser;
 - the downstream's deployed `/review/` route loads its build-derived repository and effective default or override service origin and opens only the exact backend popup;
 - after the ready/request handshake, a source-adapter proposal renders in that downstream page after exact artifact, metadata-base configuration, and head verification;
 - the downstream route shows the complete submission summary and the popup does not post without the explicit final click there;
@@ -46,9 +47,10 @@ Without submitting a review or proposing a handoff, verify:
 - downstream `/edit/` is the only editor and file-reselection surface and contains its exact-commit shell, schema, RDF catalog, and record inputs;
 - the static editor exposes both **Download bundle** and **Propose via GitHub**;
 - opening **Propose via GitHub** carries only the expected operation, repository, exact static-editor origin, and one-time nonce, and the popup's readiness message is bound to the exact two windows, origins, operation, repository, and nonce;
-- focused origin-policy tests classify the actual browser origin and cover both the normal custom- or unique-origin flow and the shared-`github.io` flow;
+- focused origin-policy tests classify the actual browser origin, including terminal-dot spelling, and cover both the normal custom- or unique-origin flow and the shared-`github.io` flow;
 - on the exercised downstream, a shared `github.io` origin explains its origin-wide trust boundary and requires a fresh in-memory acknowledgment before either direct GitHub write action becomes usable, without writing local storage, a cookie, service state, or tracked configuration, while a custom or otherwise unique origin omits that additional warning;
-- **Download bundle** remains usable on a shared origin without the origin acknowledgment, GitHub sign-in, or a reachable service, and the separate public-history acknowledgment still appears before a SHACL Git write; and
+- **Download bundle** remains usable on a shared origin without the origin acknowledgment, GitHub sign-in, or a reachable service, and the separate public-history acknowledgment still appears before a SHACL Git write;
+- a framed editor refuses direct GitHub proposal while **Download bundle** remains usable; and
 - logout clears the session.
 
 Do not send a SHACL bundle or confirm a source-review submission during this read-only proof.
@@ -59,6 +61,7 @@ Also verify that a read-only user or uninstalled repository is rejected when suc
 Only after separate authorization, use a disposable or designated integration repository to test the source-adapter comment and/or fixed-path SHACL handoff.
 Record the exact test repository, static source commit, pull request, head, artifact when applicable, written refs, and cleanup.
 Verify trusted replacement and absence of the temporary bundle from the final branch.
+Verify that a successful write consumes its session grant, the standalone SHACL ref is deterministic for the source and nonce, and an ordinary sequential replay cannot produce another write.
 Never use the real production site as a write fixture.
 
 ## Downstream custom-domain guide

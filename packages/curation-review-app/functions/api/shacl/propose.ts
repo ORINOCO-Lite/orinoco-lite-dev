@@ -14,7 +14,11 @@ import {
   parseShaclProposalRequest,
 } from "../../lib/shacl";
 import { createShaclProposal } from "../../lib/shacl-proposal";
-import { configuredOrigin, readSessionCookie } from "../../lib/session";
+import {
+  configuredOrigin,
+  consumeSessionGrantCookie,
+  readSessionCookie,
+} from "../../lib/session";
 
 export async function onRequest(context: EventContext): Promise<Response> {
   requireMethod(context.request, "POST");
@@ -60,6 +64,17 @@ export async function onRequest(context: EventContext): Promise<Response> {
   const result = await createShaclProposal(
     new GitHubClient(session.access_token),
     proposal,
+    grant,
+    configuredOrigin(context.env),
   );
-  return jsonResponse(result, { status: 201 });
+  return jsonResponse(result, {
+    headers: {
+      "Set-Cookie": await consumeSessionGrantCookie(
+        context.env,
+        session,
+        "shacl",
+      ),
+    },
+    status: 201,
+  });
 }

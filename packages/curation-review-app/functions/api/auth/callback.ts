@@ -108,6 +108,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
   }
   const headers = new Headers({
     "Cache-Control": "no-store",
+    "Cross-Origin-Opener-Policy": "unsafe-none",
     Location: destination.toString(),
   });
   headers.append("Set-Cookie", clearCookie(OAUTH_COOKIE));

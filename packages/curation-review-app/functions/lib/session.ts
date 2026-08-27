@@ -21,7 +21,7 @@ export const SESSION_COOKIE = "__Host-orinoco_session";
 
 const VERSION = "v1";
 const OAUTH_TTL_SECONDS = 600;
-const MAX_SESSION_TTL_SECONDS = 28_800;
+const MAX_SESSION_TTL_SECONDS = 3_600;
 
 interface OAuthCookieCommon {
   code_verifier: string;
@@ -460,6 +460,26 @@ export async function createSessionCookie(
       shacl_grant: state.shacl_grant ?? null,
     }),
     lifetime,
+  );
+}
+
+export async function consumeSessionGrantCookie(
+  env: Env,
+  session: SessionCookieState,
+  kind: "review" | "shacl",
+): Promise<string> {
+  const remaining = session.expires_at - nowSeconds();
+  if (remaining < 60) return clearCookie(SESSION_COOKIE);
+  return createSessionCookie(
+    env,
+    {
+      access_token: session.access_token,
+      csrf_token: session.csrf_token,
+      login: session.login,
+      review_grant: kind === "review" ? null : session.review_grant,
+      shacl_grant: kind === "shacl" ? null : session.shacl_grant,
+    },
+    remaining,
   );
 }
 

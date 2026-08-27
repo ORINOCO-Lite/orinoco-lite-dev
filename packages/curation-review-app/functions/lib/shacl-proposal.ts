@@ -1,16 +1,18 @@
 import type {
+  ShaclGrant,
   ShaclProposalRequest,
   ShaclProposalResult,
 } from "../../shared/contracts";
-import { randomToken } from "./encoding";
 import { GitHubClient } from "./github";
 import { HttpError } from "./http";
+import { siteCoordinates } from "./proposal";
 import { SHACL_BUNDLE_PATH, serializeShaclReviewBundle } from "./shacl";
 
 const COMMIT_HEADLINE = "chore(metadata): hand off SHACL Vue edit";
 const PULL_REQUEST_TITLE = "chore(metadata): propose SHACL Vue edit";
 
 interface PullRequestCoordinates {
+  baseSha: string;
   branch: string;
   headSha: string;
   number: number;
@@ -49,6 +51,8 @@ function parsePullRequest(
     record.state !== "open" ||
     record.draft !== true ||
     typeof base?.ref !== "string" ||
+    typeof base.sha !== "string" ||
+    !/^[0-9a-f]{40}$/.test(base.sha) ||
     typeof head?.ref !== "string" ||
     typeof head.sha !== "string" ||
     !/^[0-9a-f]{40}$/.test(head.sha) ||
@@ -67,6 +71,7 @@ function parsePullRequest(
     );
   }
   return {
+    baseSha: base.sha,
     branch: head.ref,
     headSha: head.sha,
     number,
@@ -120,10 +125,54 @@ async function requireEmptyHandoffPath(
   }
 }
 
+async function requireTrustedEditorDeployment(
+  github: GitHubClient,
+  repository: string,
+  baseSha: string,
+  grant: ShaclGrant,
+  serviceOrigin: string,
+): Promise<void> {
+  const contents = await github.contents(repository, [
+    { key: "site-config", path: "orinoco.yaml", ref: baseSha },
+  ]);
+  const site = siteCoordinates(contents.get("site-config") ?? null);
+  if (
+    new URL(site.editorSiteUrl).origin !== grant.editor_origin ||
+    site.reviewServiceOrigin !== serviceOrigin
+  ) {
+    throw new HttpError(
+      403,
+      "shacl_transport_mismatch",
+      "This editor does not match the repository's trusted deployment.",
+    );
+  }
+}
+
 export async function createShaclProposal(
   github: GitHubClient,
   proposal: ShaclProposalRequest,
+  grant: ShaclGrant,
+  serviceOrigin: string,
 ): Promise<ShaclProposalResult> {
+  const pullRequest =
+    proposal.target.kind === "pull_request"
+      ? proposal.target.pull_request
+      : null;
+  const expectedHeadSha =
+    proposal.target.kind === "pull_request"
+      ? proposal.target.expected_head_sha
+      : null;
+  if (
+    grant.repository.toLowerCase() !== proposal.repository.toLowerCase() ||
+    grant.pull_request !== pullRequest ||
+    grant.expected_head_sha !== expectedHeadSha
+  ) {
+    throw new HttpError(
+      403,
+      "shacl_grant_required",
+      "Sign in from this downstream editor before proposing its bundle.",
+    );
+  }
   const user = await github.currentUser();
   await github.requireCurator(proposal.repository, user.login);
   const bytes = serializeShaclReviewBundle(proposal.bundle);
@@ -147,6 +196,13 @@ export async function createShaclProposal(
         "The draft pull-request head no longer matches the SHACL bundle source commit.",
       );
     }
+    await requireTrustedEditorDeployment(
+      github,
+      proposal.repository,
+      pull.baseSha,
+      grant,
+      serviceOrigin,
+    );
     await requireEmptyHandoffPath(github, proposal.repository, pull.headSha);
     const commit = await github.commitFileAtHead(
       proposal.repository,
@@ -177,8 +233,15 @@ export async function createShaclProposal(
       "The repository default-branch head no longer matches the SHACL bundle source commit.",
     );
   }
+  await requireTrustedEditorDeployment(
+    github,
+    proposal.repository,
+    base.sha,
+    grant,
+    serviceOrigin,
+  );
   await requireEmptyHandoffPath(github, proposal.repository, base.sha);
-  const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${randomToken(9)}`;
+  const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   await github.createBranch(proposal.repository, branch, base.sha);
   try {
     const commit = await github.commitFileAtHead(

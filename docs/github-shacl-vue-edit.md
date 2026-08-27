@@ -26,7 +26,8 @@ The trusted downstream build MUST derive the exact GitHub `owner/repository` coo
 It MUST NOT require a curator or maintainer to repeat that value in a separate curation setting.
 When `site.curation_service` is absent, the released integration uses the Orinoco Lite central-service origin.
 That field is an optional credential-free HTTPS-origin override for a compatible independently hosted service.
-Browser-supplied repository and service coordinates remain routing hints; the service MUST verify the repository, installation, curator permission, source commit, and exact head independently before a write.
+Browser-supplied repository, origin, and service coordinates remain routing hints.
+Before a write, the service MUST verify the repository, installation, curator permission, source commit, and exact head independently; read `orinoco.yaml` at the trusted default-branch or pull-request base commit; and require the initiating editor origin and effective curation-service origin to match that trusted deployment.
 
 The service MUST NOT expose `/edit/`, an upload or confirmation page, a landing application, or any static presentation assets.
 The downstream `/edit/` route owns sign-in status, file reselection, warnings, and confirmation and MUST keep the bundle only in browser memory until the explicit proposal request completes or the page is closed.
@@ -65,6 +66,7 @@ If authorization or browser policy severs the opener relationship, the curator M
 The service MUST apply the same coordinate, format, size, authorization, acknowledgment, and exact-head checks regardless of whether the unchanged bundle remained in the editor session or was reselected there.
 The downstream MUST display the authenticated login, repository, source and head commits, changed paths, and public-history warnings and require an explicit confirmation before it instructs the popup to submit the proposal.
 The GitHub token, session cookie, and CSRF material MUST remain at the service origin and MUST NOT cross the browser channel.
+When the editor is framed, it MUST refuse direct GitHub proposal actions and explain why while preserving **Download bundle**.
 
 ## Downstream origin policy
 
@@ -72,7 +74,7 @@ A custom domain or other origin dedicated to one downstream receives the normal 
 The template MUST guide maintainers through adding and verifying that domain before enabling direct GitHub submission.
 
 A project deployed below a shared `github.io` origin shares a browser security principal with every other path on that hostname.
-The integration MUST classify the actual browser origin at runtime; a configured custom-domain value MUST NOT bypass the gate while the page is running on `github.io`.
+The integration MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; a configured custom-domain value MUST NOT bypass the gate while the page is running on `github.io`.
 The downstream MUST explain that another compromised page on the same origin could impersonate `/edit/`, and it MUST require an explicit in-memory acknowledgment of that limitation before enabling **Propose via GitHub**.
 That acknowledgment is informed consent, not authorization or proof of path identity; all exact-channel and server-side checks still apply.
 It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or used to weaken those checks.
@@ -94,7 +96,8 @@ The handoff commit MUST:
 - be the exact head of a same-repository draft pull-request branch.
 
 For an existing pull request, its previous head is the handoff parent.
-For a standalone edit, the service requires the bundle source commit to equal the repository's current default-branch head, creates a unique branch there, appends the handoff, and opens a draft pull request against that branch.
+For a standalone edit, the service requires the bundle source commit to equal the repository's current default-branch head, creates a branch deterministically bound to that source and the one-time handoff nonce, appends the handoff, and opens a draft pull request against that branch.
+Successful writes consume the sealed grant; deterministic branch creation is also the stateless replay gate for standalone proposals.
 The service MUST NOT create a pull request against another repository, write to an external source, or use contents permission for any other operation.
 
 The handoff is ephemeral transport, not a metadata proposal, review bundle, manifest, provenance record, or durable curation authority.

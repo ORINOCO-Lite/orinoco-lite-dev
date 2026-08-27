@@ -50,7 +50,7 @@ Effective access is the intersection of:
 - the signed-in curator's own access.
 
 The App does not need account-email permission, and the service does not need the curator's email address.
-It needs the authenticated GitHub login and stable GitHub account identifier for display and audit correlation, plus GitHub's authorization decision for the exact repository operation.
+It keeps only the authenticated GitHub login for display and audit correlation, plus GitHub's authorization decision for the exact repository operation.
 The service continues to check `write` or `admin` access immediately before a write.
 
 This differs from a GitHub OAuth App: `user:email` is an OAuth scope that grants access to email addresses.
@@ -91,7 +91,7 @@ This is a protocol endpoint, not a navigable application or landing page.
 Tokens and CSRF material never cross it.
 5. The downstream displays the authenticated login, repository, pull request, commits, paths, dispositions, and public-history warning.
 The user confirms there.
-The popup uses its same-origin session to perform the verified GitHub request and then closes.
+The popup uses its same-origin session to perform the verified GitHub request, the successful response consumes that exact grant, and the popup then closes.
 6. If the live SHACL handoff fails, the user keeps the downloaded bundle and selects it again on the downstream `/edit/` route before retrying.
 The service does not host an upload fallback or retain the bundle.
 
@@ -111,7 +111,7 @@ The accepted shared-origin mitigation is defense in depth:
 - short-lived, one-shot sealed state and host-only secure cookies;
 - a minimal callback document with a restrictive CSP, no storage, no third-party scripts, and no framing;
 - selected-repository GitHub App installation and minimum App permissions;
-- server-side revalidation of collaborator access, repository, pull request, commits, artifact or bundle, permitted paths, and exact head immediately before any write; and
+- server-side revalidation of collaborator access, repository, trusted base configuration, downstream and service origins, pull request, commits, artifact or bundle, permitted paths, and exact head immediately before any write; and
 - a complete downstream confirmation summary before the final click.
 
 These controls substantially constrain an attack, but they do not make two paths on one origin separate principals.
@@ -122,6 +122,11 @@ A custom or otherwise unique downstream origin therefore receives the normal low
 A shared `github.io` deployment shows a clear origin-wide security explanation and requires a visible, explicit, in-memory acknowledgment before enabling a direct GitHub write.
 The acknowledgment is not stored in local storage, a cookie, service state, or tracked configuration and is not treated as authorization or path proof.
 The SHACL editor keeps **Download bundle** enabled without that acknowledgment, GitHub sign-in, or a reachable service.
+It also refuses direct GitHub proposal while framed, because GitHub Pages cannot supply a reliable `frame-ancestors` response header; downloading remains available.
+
+The backend has no durable transaction store, so it cannot serialize two truly simultaneous comment requests.
+The downstream and popup lock after the first post starts, successful responses consume the grant, and uncertain results require inspection before retrying.
+Standalone SHACL proposal branches are deterministic for one source commit and handoff nonce, making GitHub ref creation a stateless concurrency and replay gate.
 
 The template and deployment skill guide maintainers through GitHub's current [domain verification](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages), [custom-domain configuration](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site), and [HTTPS enablement](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
 They do not freeze mutable DNS targets.

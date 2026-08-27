@@ -24,6 +24,7 @@ const {
     buildReviewBundle,
     beginReviewBundleProposal,
     dispatchReviewBundle,
+    isFramedContext,
     isSharedGithubPagesOrigin,
     recordSubmissionLabel,
     REVIEW_BUNDLE_EVENT,
@@ -321,7 +322,10 @@ describe('Orinoco review bundles', () => {
             ['github.io', true],
             ['owner.github.io', true],
             ['OWNER.GITHUB.IO', true],
+            ['OWNER.GITHUB.IO.', true],
+            ['Owner.GitHub.Io...', true],
             ['example.github.io.attacker.test', false],
+            ['example.github.io.attacker.test.', false],
             ['notgithub.io', false],
             ['curation.example.org', false],
         ]) {
@@ -350,6 +354,34 @@ describe('Orinoco review bundles', () => {
                 /invalid/
             );
         }
+    });
+
+    it('refuses direct GitHub proposals in framed contexts', () => {
+        const proposal = {
+            repository: 'ORINOCO-Lite/example-site',
+            service_origin: 'https://review.example.test',
+        };
+        const open = vi.fn();
+        const framed = {
+            open,
+            self: {},
+            top: {},
+        };
+
+        expect(isFramedContext(framed)).toBe(true);
+        expect(() => beginReviewBundleProposal(proposal, framed)).toThrow(
+            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.'
+        );
+        expect(open).not.toHaveBeenCalled();
+        expect(isFramedContext({ self: window, top: window })).toBe(false);
+
+        const inaccessible = { self: window };
+        Object.defineProperty(inaccessible, 'top', {
+            get() {
+                throw new Error('cross-origin frame');
+            },
+        });
+        expect(isFramedContext(inaccessible)).toBe(true);
     });
 
     it('rejects old catalogs and produces deterministic filenames', () => {

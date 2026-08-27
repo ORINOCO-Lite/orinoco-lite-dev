@@ -333,7 +333,7 @@ function framed(): boolean {
 }
 
 export function isSharedGitHubPagesHostname(hostname: string): boolean {
-  hostname = hostname.toLowerCase();
+  hostname = hostname.toLowerCase().replace(/\.+$/, "");
   return hostname === "github.io" || hostname.endsWith(".github.io");
 }
 

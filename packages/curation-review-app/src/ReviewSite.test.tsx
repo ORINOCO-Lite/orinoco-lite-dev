@@ -175,7 +175,10 @@ describe("deployed source-review route", () => {
     ["github.io", true],
     ["owner.github.io", true],
     ["OWNER.GITHUB.IO", true],
+    ["OWNER.GITHUB.IO.", true],
+    ["Owner.GitHub.Io...", true],
     ["example.github.io.attacker.test", false],
+    ["example.github.io.attacker.test.", false],
     ["notgithub.io", false],
     ["curation.example.org", false],
   ])("classifies %s shared-origin status exactly", (hostname, expected) => {

@@ -89,7 +89,7 @@ Repository identity MUST be derived from the trusted downstream build or its gen
 Before sending proposal data, the service verifies the repository against the GitHub objects and App installation, verifies `site.base_url` and any explicit `site.curation_service` override from `orinoco.yaml` at the proposal metadata base, resolves an omitted override to the released central-service default, and completes an exact ready/request handshake with the same window, origin, operation, nonce, and coordinates.
 Neither tokens nor CSRF material cross that channel.
 
-The static application sends one complete decision submission back through the same one-shot channel.
+The static application sends one complete decision submission back through the same one-shot channel, and a successful write consumes the sealed grant so a later transport cannot reuse it.
 The downstream MUST display the authenticated login, repository, pull request, proposal and head commits, and every record path and disposition.
 Only an explicit user confirmation on that downstream route may instruct the popup to post the comment.
 Replayed, mismatched, stale, framed, timed-out, or duplicate messages fail closed.
@@ -108,7 +108,7 @@ A custom domain or another origin dedicated to one downstream receives the norma
 The template MUST guide maintainers through adding and verifying that domain.
 
 On a shared `github.io` origin, the static application MUST explain that browser messaging authenticates the whole origin rather than its `/review/` path and that another compromised page on that hostname could impersonate the intended route.
-It MUST classify the actual browser origin at runtime; configured or link coordinates MUST NOT bypass the gate while the page is running on `github.io`.
+It MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; configured or link coordinates MUST NOT bypass the gate while the page is running on `github.io`.
 It MUST require an explicit in-memory acknowledgment of that limitation before enabling the direct GitHub submission action.
 The acknowledgment is informed consent, not authorization or proof of path identity.
 It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or weaken the exact-channel or server-side checks.

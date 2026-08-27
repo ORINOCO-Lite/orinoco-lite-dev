@@ -103,11 +103,26 @@ function handoffNonce(target) {
 }
 
 export function isSharedGithubPagesOrigin(target = window) {
-    const hostname = String(target.location?.hostname || '').toLowerCase();
+    const hostname = String(target.location?.hostname || '')
+        .toLowerCase()
+        .replace(/\.+$/, '');
     return hostname === 'github.io' || hostname.endsWith('.github.io');
 }
 
+export function isFramedContext(target = window) {
+    try {
+        return target.top !== target.self;
+    } catch {
+        return true;
+    }
+}
+
 export function beginReviewBundleProposal(value, target = window) {
+    if (isFramedContext(target)) {
+        throw new Error(
+            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.'
+        );
+    }
     const { repository, serviceOrigin } = reviewProposalCoordinates(value);
     const sourceOrigin = editorOrigin(target);
     const nonce = handoffNonce(target);

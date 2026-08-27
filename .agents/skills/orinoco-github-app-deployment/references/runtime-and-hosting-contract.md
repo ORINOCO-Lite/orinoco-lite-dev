@@ -115,10 +115,11 @@ A router that registers only the accepted method may emit its own unsecured 404 
 Reproduce the checked API and generated-protocol response headers: content security policy, `nosniff`, referrer policy, permissions policy, and the required cache policy.
 Generated authenticated HTML and every API response are `no-store`.
 Do not let a CDN cache a response containing a token-bearing or OAuth-state cookie.
+Every popup navigation and redirect in the successful OAuth chain must explicitly use `Cross-Origin-Opener-Policy: unsafe-none`; a generic `same-origin` value on even an intermediate 302 permanently severs the downstream opener in Chromium.
 
 The browser and API must stay same-origin.
 Cookies use the `__Host-` prefix, `HttpOnly`, `Secure`, `SameSite=Lax`, and `Path=/`.
-OAuth state expires after ten minutes; a session is capped at eight hours.
+OAuth state expires after ten minutes; a session grant is capped at one hour and is consumed after a successful write.
 The callback clears the OAuth cookie and sets the session cookie in the same response, so an adapter that folds duplicate `Set-Cookie` fields is incompatible.
 Test the adapter's emitted HTTP response at byte or header-list level as well as through the browser runtime; two cookies represented as one comma-joined field are not equivalent.
 
@@ -150,6 +151,8 @@ The static site opens the backend SHACL authorization route with its repository,
 The bundle remains in the static editor's memory through OAuth.
 The editor sends it only after the exact popup at the effective service origin signals readiness with the matching repository, operation, and nonce.
 The backend transport accepts it only from the exact opener at the declared HTTPS editor origin with the same coordinates.
+The backend independently reads `orinoco.yaml` at the trusted base commit before a SHACL write and requires its `site.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
+Successful writes consume the relevant grant; standalone SHACL branches are deterministic for the source commit and handoff nonce so GitHub ref creation rejects a concurrent replay.
 
 The URL and OAuth state must not contain the bundle.
 Neither side may use cross-origin browser storage as bundle recovery state.
@@ -158,6 +161,7 @@ Both transports must receive the same format, size, repository, source-commit, e
 
 On a shared `github.io` origin, keep **Download bundle** enabled without GitHub authorization or the origin acknowledgment and gate **Propose via GitHub** on the same explicit in-memory acknowledgment used by `/review/`.
 Keep the origin acknowledgment separate from the bundle's public-history and no-secrets acknowledgment.
+When the editor is framed, refuse direct GitHub proposal at both the visible controls and the runtime helper while leaving **Download bundle** available.
 
 ## Capacity floor
 

@@ -1,7 +1,7 @@
 .bashrc sourced.
 .bash_profile sourced
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
-index 9621e55..395a8a6 100644
+index 9621e55..3299eaa 100644
 --- a/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
 @@ -15,6 +15,7 @@
@@ -12,12 +12,24 @@ index 9621e55..395a8a6 100644
                                  :value="r.node_iri"
                                  align="start"
                                  class="align-start"
-@@ -55,12 +56,82 @@
+@@ -55,12 +56,95 @@
                              <em><h3>Nothing to submit</h3></em>
                          </div>
                      </span>
 +                    <v-alert
-+                        v-if="proposalMode && sharedGitHubPagesOrigin"
++                        v-if="proposalMode && framedContext"
++                        type="warning"
++                        variant="tonal"
++                        style="margin-top: 1em;"
++                    >
++                        <strong>Direct GitHub proposal unavailable while embedded</strong>
++                        <p>
++                            Open this editor in its own tab to propose via GitHub.
++                            Download bundle remains available in this embedded view.
++                        </p>
++                    </v-alert>
++                    <v-alert
++                        v-if="proposalMode && !framedContext && sharedGitHubPagesOrigin"
 +                        type="warning"
 +                        variant="tonal"
 +                        style="margin-top: 1em;"
@@ -35,7 +47,7 @@ index 9621e55..395a8a6 100644
 +                        ></v-checkbox>
 +                    </v-alert>
 +                    <v-checkbox
-+                        v-if="proposalMode"
++                        v-if="proposalMode && !framedContext"
 +                        v-model="publicHistoryAcknowledged"
 +                        label="I confirm this review bundle contains no secrets and is approved for public Git history, including GitHub retention after a temporary ref becomes unreachable."
 +                    ></v-checkbox>
@@ -67,6 +79,7 @@ index 9621e55..395a8a6 100644
 +                        <v-card-actions>
 +                            <v-btn
 +                                :disabled="
++                                    framedContext ||
 +                                    proposing ||
 +                                    !publicHistoryAcknowledged ||
 +                                    (sharedGitHubPagesOrigin && !sharedOriginAcknowledged)
@@ -95,13 +108,14 @@ index 9621e55..395a8a6 100644
                  <br />
                  <br />
                  <v-btn
-@@ -103,6 +174,19 @@
+@@ -103,6 +187,20 @@
              <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
                  <v-icon>mdi-check-circle-outline</v-icon> Submit
              </v-btn>
 +            <v-btn
 +                v-if="proposalMode && !responseReceived && nodesToSubmit.length"
 +                :disabled="
++                    framedContext ||
 +                    proposing ||
 +                    pendingProposalBundle ||
 +                    !publicHistoryAcknowledged ||
@@ -115,7 +129,7 @@ index 9621e55..395a8a6 100644
              <v-btn v-if="responseReceived" @click="clearSubmitErrors()">
                  <v-icon>mdi-check-circle-outline</v-icon> OK
              </v-btn>
-@@ -136,7 +220,14 @@
+@@ -136,7 +234,15 @@
  <script setup>
  import { computed, ref, inject } from 'vue';
  import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJSON, dlTTL} from '@/modules/utils';
@@ -124,6 +138,7 @@ index 9621e55..395a8a6 100644
 +    beginReviewBundleProposal,
 +    buildReviewBundle,
 +    dispatchReviewBundle,
++    isFramedContext,
 +    isSharedGithubPagesOrigin,
 +    recordSubmissionLabel,
 +    reviewBundleFilename,
@@ -131,7 +146,7 @@ index 9621e55..395a8a6 100644
 
  import { useToken } from '@/composables/tokens';
  import { DataFactory, Store } from 'n3';
-@@ -162,6 +253,11 @@ const awaitingResponse = ref(false);
+@@ -162,6 +268,11 @@ const awaitingResponse = ref(false);
  const responseReceived = ref(false);
  const responseSuccess = ref(false);
  const responseFailure = ref(false);
@@ -143,7 +158,7 @@ index 9621e55..395a8a6 100644
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
-@@ -172,6 +268,33 @@ const copiedIndex = ref(null);
+@@ -172,6 +283,34 @@ const copiedIndex = ref(null);
  const patchDownloadMode = computed(
      () => config.value?.review_bundle_mode === 'patch-download'
  );
@@ -152,6 +167,7 @@ index 9621e55..395a8a6 100644
 +        patchDownloadMode.value &&
 +        typeof config.value?.review_bundle_proposal === 'object'
 +);
++const framedContext = isFramedContext();
 +const sharedGitHubPagesOrigin = isSharedGithubPagesOrigin();
 +
 +function accessibleRecordSubmissionLabel(record) {
@@ -177,7 +193,7 @@ index 9621e55..395a8a6 100644
 
  function toggleFailureResponse() {
      showCompleteFailure.value = !showCompleteFailure.value;
-@@ -189,7 +312,91 @@ function clearSubmitErrors() {
+@@ -189,7 +328,93 @@ function clearSubmitErrors() {
      responseErrors.value = [];
      responseReceived.value = false;
      awaitingResponse.value = false;
@@ -214,6 +230,7 @@ index 9621e55..395a8a6 100644
 +
 +async function proposeRecords() {
 +    if (
++        framedContext ||
 +        !publicHistoryAcknowledged.value ||
 +        (sharedGitHubPagesOrigin && !sharedOriginAcknowledged.value)
 +    ) return;
@@ -234,6 +251,7 @@ index 9621e55..395a8a6 100644
 +
 +async function confirmProposal() {
 +    if (
++        framedContext ||
 +        !pendingProposalBundle.value ||
 +        proposing.value ||
 +        !publicHistoryAcknowledged.value ||
@@ -269,7 +287,7 @@ index 9621e55..395a8a6 100644
  }
 
  async function submit() {
-@@ -239,24 +446,11 @@ async function downloadRecords() {
+@@ -239,24 +464,11 @@ async function downloadRecords() {
      );
      if (patchDownloadMode.value) {
          try {

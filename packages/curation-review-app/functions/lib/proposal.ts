@@ -401,7 +401,8 @@ function recordPid(value: string, label: string): string {
   return pid;
 }
 
-interface ReviewSiteCoordinates {
+export interface SiteCoordinates {
+  editorSiteUrl: string;
   reviewServiceOrigin: string;
   reviewSiteUrl: string;
 }
@@ -437,7 +438,7 @@ function safeSiteUrl(value: unknown): URL | null {
   return url;
 }
 
-function reviewSiteCoordinates(value: string | null): ReviewSiteCoordinates {
+export function siteCoordinates(value: string | null): SiteCoordinates {
   if (value === null) {
     invalid("The proposal metadata base has no orinoco.yaml configuration.");
   }
@@ -488,6 +489,7 @@ function reviewSiteCoordinates(value: string | null): ReviewSiteCoordinates {
   }
   if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
   return {
+    editorSiteUrl: new URL("edit/", baseUrl).toString(),
     reviewServiceOrigin: serviceUrl.origin,
     reviewSiteUrl: new URL("review/", baseUrl).toString(),
   };
@@ -566,7 +568,7 @@ export async function loadReviewProposal(
     ]),
   ];
   const contents = await github.contents(repository, requests);
-  const review = reviewSiteCoordinates(contents.get("site-config") ?? null);
+  const review = siteCoordinates(contents.get("site-config") ?? null);
   const candidates = recordPaths.map((path, index) => {
     const item = presentation.get(path);
     if (item === undefined) throw new Error("candidate alignment was lost");
