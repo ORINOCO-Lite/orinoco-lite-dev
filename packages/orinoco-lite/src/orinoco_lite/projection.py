@@ -45,8 +45,6 @@ FORBIDDEN_BRIDGE_PREDICATES = {
     "schema:memberOf",
     "schema:subjectOf",
 }
-# A narrow query/projection exception, not a general open-graph policy.
-EXTERNALLY_RESOLVABLE_LINK_FIELDS = frozenset({"identifiers.creator"})
 SEMANTIC_IDENTIFIER_FIELDS = {
     "about",
     "alternate_of",
@@ -147,7 +145,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     unrendered = value.get("unrendered_classes")
     graph = value.get("graph")
     routing = value.get("routing")
-    references = value.get("references", {"missing_targets": "reject"})
+    references = value.get("references", {"missing_targets": "preserve"})
     editor = value.get("editor", {"record_scope": "all"})
     if (
         not isinstance(homepage, dict)
@@ -215,7 +213,9 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
             ):
                 raise ConfigurationError(f"{label}.select.{operator} is malformed")
         if not isinstance(inline, list) or not all(
-            isinstance(item, str) and item and item.count("::") <= 1
+            isinstance(item, str)
+            and item
+            and all(component for component in item.split("::"))
             for item in inline
         ):
             raise ConfigurationError(f"{label}.inline is malformed")
@@ -359,20 +359,9 @@ def _record_links(
 def _all_links(
     record: Mapping[str, Any], fields: Sequence[str]
 ) -> Iterable[tuple[str, str]]:
-    """Yield references that must resolve within the local record pool.
+    """Yield every reference governed by explicit local-closure policy."""
 
-    ``Identifier.creator`` is the sole deliberate exception.  Its pinned
-    schema range remains ``Thing``, and the converter still validates it.
-    LinkML serializes the reference as a PID string; pinned qri inlining
-    replaces a locally resolvable PID and preserves an unresolved PID scalar.
-    This filter adopts that narrow behavior without opening graph edges.
-    """
-
-    yield from (
-        (field, target)
-        for field, target in _record_links(record, fields)
-        if field not in EXTERNALLY_RESOLVABLE_LINK_FIELDS
-    )
+    yield from _record_links(record, fields)
 
 
 def _semantic_identifier_view(
@@ -665,22 +654,41 @@ def _toyaml(value: Any) -> str:
 
 
 def _inline(value: Any, by_pid: Mapping[str, dict[str, Any]]) -> Any:
-    scalar = not isinstance(value, list)
-    values = [value] if scalar else value
-    rendered = []
-    for item in values:
-        pid = item.get("object") if isinstance(item, dict) else item
-        if isinstance(pid, list):
-            replacement = [deepcopy(by_pid.get(one, one)) for one in pid]
-        else:
-            replacement = deepcopy(by_pid.get(pid, pid))
-        if isinstance(item, dict):
-            copy = deepcopy(item)
-            copy["object"] = replacement
-            rendered.append(copy)
-        else:
-            rendered.append(replacement)
-    return rendered[0] if scalar and rendered else rendered
+    """Resolve terminal PID strings with pinned query-things semantics."""
+
+    if isinstance(value, str):
+        if value and ":" in value:
+            resolved = by_pid.get(value)
+            if resolved is not None:
+                return deepcopy(resolved)
+        return value
+    if isinstance(value, list):
+        return [_inline(item, by_pid) for item in value]
+    return value
+
+
+def _walk_inline(
+    container: Any,
+    path: tuple[str, ...],
+    by_pid: Mapping[str, dict[str, Any]],
+) -> None:
+    """Walk arbitrary dict/list nesting without discarding unmatched values."""
+
+    if not path:
+        return
+    key = path[0]
+    if isinstance(container, dict) and key in container:
+        value = container[key]
+        if len(path) == 1:
+            container[key] = _inline(value, by_pid)
+        elif isinstance(value, dict):
+            _walk_inline(value, path[1:], by_pid)
+        elif isinstance(value, list):
+            for item in value:
+                _walk_inline(item, path[1:], by_pid)
+    elif isinstance(container, list):
+        for item in container:
+            _walk_inline(item, path, by_pid)
 
 
 def _incoming(
@@ -696,29 +704,7 @@ def _incoming(
 def _apply_inline(
     record: dict[str, Any], operation: str, by_pid: Mapping[str, dict[str, Any]]
 ) -> None:
-    parent, separator, child = operation.partition("::")
-    if parent not in record:
-        return
-    if not separator:
-        record[parent] = _inline(record[parent], by_pid)
-        return
-    values = record[parent]
-    scalar = not isinstance(values, list)
-    values = [values] if scalar else values
-    rendered = []
-    for value in values:
-        copy = deepcopy(value)
-        if not isinstance(copy, dict) or child not in copy:
-            # Match the accepted qri inline operator: entries without the
-            # requested PID-bearing child do not survive that operation.
-            continue
-        child_value = copy[child]
-        child_scalar = not isinstance(child_value, list)
-        child_values = [child_value] if child_scalar else child_value
-        replacements = [deepcopy(by_pid.get(pid, pid)) for pid in child_values]
-        copy[child] = replacements[0] if child_scalar and replacements else replacements
-        rendered.append(copy)
-    record[parent] = rendered[0] if scalar and rendered else rendered
+    _walk_inline(record, tuple(operation.split("::")), by_pid)
 
 
 def _render_record(
