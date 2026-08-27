@@ -6,12 +6,20 @@ import {
   readSessionCookie,
 } from "../functions/lib/session";
 import { base64urlEncode } from "../functions/lib/encoding";
+import type { ReviewGrant } from "../shared/contracts";
 
 const env: Env = {
   GITHUB_CLIENT_ID: "Iv1.example",
   GITHUB_CLIENT_SECRET: "secret",
   PUBLIC_ORIGIN: "https://review.example",
   SESSION_SEAL_KEY: base64urlEncode(new Uint8Array(32).fill(7)),
+};
+const REVIEW_GRANT: ReviewGrant = {
+  artifact_id: 123456789,
+  handoff_nonce: "e".repeat(64),
+  pull_request: 42,
+  repository: "example/site",
+  review_origin: "https://site.example",
 };
 
 describe("short-lived GitHub authentication", () => {
@@ -30,6 +38,57 @@ describe("short-lived GitHub authentication", () => {
     await expect(readSessionCookie(request, env)).resolves.toMatchObject({
       access_token: "ghu_secret",
       login: "octocat",
+      review_grant: null,
+    });
+  });
+
+  it("round-trips the exact downstream review transport grant", async () => {
+    const cookie = await createSessionCookie(
+      env,
+      {
+        access_token: "ghu_secret",
+        csrf_token: "csrf",
+        login: "octocat",
+        review_grant: REVIEW_GRANT,
+      },
+      28_800,
+    );
+    const request = new Request("https://review.example/api/session", {
+      headers: { Cookie: cookie.split(";", 1)[0] ?? "" },
+    });
+
+    await expect(readSessionCookie(request, env)).resolves.toMatchObject({
+      review_grant: REVIEW_GRANT,
+    });
+  });
+
+  it.each([
+    {
+      grant: { ...REVIEW_GRANT, review_origin: "http://site.example" },
+      label: "an unsafe review origin",
+    },
+    {
+      grant: { ...REVIEW_GRANT, handoff_nonce: "not-random" },
+      label: "an invalid review nonce",
+    },
+  ])("rejects a sealed grant with $label", async ({ grant }) => {
+    const cookie = await createSessionCookie(
+      env,
+      {
+        access_token: "ghu_secret",
+        csrf_token: "csrf",
+        login: "octocat",
+        review_grant: grant,
+      },
+      28_800,
+    );
+    const request = new Request("https://review.example/api/session", {
+      headers: { Cookie: cookie.split(";", 1)[0] ?? "" },
+    });
+
+    await expect(readSessionCookie(request, env)).rejects.toMatchObject({
+      code: "invalid_session",
+      status: 401,
     });
   });
 

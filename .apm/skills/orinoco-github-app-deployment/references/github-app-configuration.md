@@ -65,11 +65,12 @@ Each downstream must have:
 - a trusted default-branch workflow that produces the exact source-adapter review artifact;
 - trusted default-branch SHACL handoff replacement and validation behavior;
 - a static site built from its exact source commit with the released editor and schema, including both **Download bundle** and **Propose via GitHub**;
+- the released static source-review shell bound at `site.base_url/review/` with workflow links pointing there rather than to the central service;
 - a curator with repository `write` or `admin`; and
 - `site.repository` set to its exact GitHub `owner/repository` and `site.curation_service` set to the credential-free HTTPS receiver origin with no path, query, fragment, or credentials.
 
 Do not publish a SHACL editor-input Actions artifact for this path.
-The central service does not acquire static editor files or assemble an editor.
+The central service does not acquire either static interface's files, assemble an editor, or render source-adapter candidates.
 
 Do not put the client ID or either secret in a downstream repository.
 A public client ID belongs at the service deployment, and both secrets belong only in the host's encrypted secret store.

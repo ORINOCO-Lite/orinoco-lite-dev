@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import ipaddress
 from pathlib import Path, PurePosixPath
 import os
 import re
@@ -21,6 +22,8 @@ DRIVER_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$")
 GITHUB_REPOSITORY = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})/[A-Za-z0-9_.-]{1,100}$"
 )
+REVIEW_APP_NAME_SUFFIX = " source metadata review"
+REVIEW_APP_NAME_MAXIMUM = 256
 
 DEFAULT_PATHS: dict[str, str] = {
     "records": "metadata/records",
@@ -98,17 +101,86 @@ def _absolute_http_url(value: object, label: str, *, https_only: bool) -> str:
     return value
 
 
+def _browser_text_length(value: str) -> int:
+    """Return the UTF-16 code-unit length used by browser string contracts."""
+
+    try:
+        return len(value.encode("utf-16-le")) // 2
+    except UnicodeEncodeError as error:
+        raise ConfigurationError("Text configuration must be valid Unicode") from error
+
+
+def _review_app_name(site_name: str) -> str:
+    """Return the site-owned review title accepted by the static browser shell."""
+
+    if not site_name or site_name != site_name.strip():
+        raise ConfigurationError(
+            "orinoco.yaml site.name must be a non-empty unpadded string"
+        )
+    value = f"{site_name}{REVIEW_APP_NAME_SUFFIX}"
+    if (
+        _browser_text_length(value) > REVIEW_APP_NAME_MAXIMUM
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+    ):
+        raise ConfigurationError(
+            "orinoco.yaml site.name must produce a one-line source-review "
+            "application name of at most 256 browser characters"
+        )
+    return value
+
+
+def _canonical_origin_host(hostname: str, label: str) -> str:
+    """Return a browser-compatible canonical host without credentials or port."""
+
+    if "%" in hostname:
+        raise ConfigurationError(f"{label} has a non-canonical host")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        if re.fullmatch(r"[0-9.]+", hostname):
+            # WHATWG URLs reinterpret abbreviated and legacy numeric IPv4
+            # spellings. Reject them rather than emitting an origin that the
+            # browser silently changes.
+            raise ConfigurationError(f"{label} has a non-canonical host")
+        try:
+            ascii_hostname = hostname.encode("ascii").decode("ascii").lower()
+        except UnicodeError as error:
+            raise ConfigurationError(
+                f"{label} host must use its ASCII browser form"
+            ) from error
+        if not ascii_hostname or not re.fullmatch(r"[a-z0-9._-]+", ascii_hostname):
+            raise ConfigurationError(f"{label} has an invalid host")
+        if any(
+            re.fullmatch(r"0x[0-9a-f]+", part)
+            for part in ascii_hostname.rstrip(".").split(".")
+        ):
+            raise ConfigurationError(f"{label} has a non-canonical host")
+        return ascii_hostname
+    if isinstance(address, ipaddress.IPv6Address):
+        return f"[{address.compressed}]"
+    return str(address)
+
+
 def _curation_service_origin(value: object, label: str) -> str:
     """Return a credential-free HTTPS origin, with loopback HTTP for development."""
 
-    if not isinstance(value, str) or not value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+    ):
         raise ConfigurationError(f"{label} must be an absolute origin")
     try:
         parsed = urlsplit(value)
-        parsed.port
+        port = parsed.port
     except ValueError as error:
         raise ConfigurationError(f"{label} is invalid") from error
-    loopback = parsed.scheme == "http" and parsed.hostname in {
+    hostname = parsed.hostname
+    canonical_host = (
+        _canonical_origin_host(hostname, label) if hostname is not None else None
+    )
+    loopback = parsed.scheme == "http" and canonical_host in {
         "127.0.0.1",
         "localhost",
     }
@@ -126,7 +198,14 @@ def _curation_service_origin(value: object, label: str) -> str:
             f"{label} must be a credential-free HTTPS origin "
             "(or a loopback development origin)"
         )
-    return f"{parsed.scheme}://{parsed.netloc}"
+    default_port = 443 if parsed.scheme == "https" else 80
+    authority = canonical_host
+    if port is not None and port != default_port:
+        authority = f"{authority}:{port}"
+    origin = f"{parsed.scheme}://{authority}"
+    if len(origin) > 256:
+        raise ConfigurationError(f"{label} must be at most 256 characters")
+    return origin
 
 
 def _inside(root: Path, relative: str, label: str) -> Path:
@@ -239,9 +318,16 @@ def load_workspace(
     site = raw.get("site")
     if not isinstance(site, dict):
         raise ConfigurationError("orinoco.yaml site must be a mapping")
-    site_name = site.get("name")
-    if not isinstance(site_name, str) or not site_name.strip():
+    site_name_value = site.get("name")
+    if not isinstance(site_name_value, str) or not site_name_value.strip():
         raise ConfigurationError("orinoco.yaml site.name must be a non-empty string")
+    site_name = site_name_value.strip()
+    if any(
+        ord(character) < 0x20 or ord(character) == 0x7F
+        for character in site_name
+    ):
+        raise ConfigurationError("orinoco.yaml site.name must be a one-line string")
+    _browser_text_length(site_name)
     base_url = _absolute_http_url(
         site.get("base_url", "http://127.0.0.1:8767/"),
         "orinoco.yaml site.base_url",
@@ -272,6 +358,7 @@ def load_workspace(
             service_value,
             "orinoco.yaml site.curation_service",
         )
+        _review_app_name(site_name)
 
     path_values = raw.get("paths", {})
     if not isinstance(path_values, dict) or not all(
@@ -322,7 +409,7 @@ def load_workspace(
         root=resolved_root,
         config_path=config_path,
         lock_path=lock_path,
-        site_name=site_name.strip(),
+        site_name=site_name,
         base_url=base_url,
         paths=paths,
         command_aliases=normalized_aliases,

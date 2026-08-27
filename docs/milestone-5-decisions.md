@@ -56,6 +56,9 @@ Milestone 6 decision M6-D005 and HR-227 supersede the editor-input artifact and 
 M5-D014 remains the historical record of what Milestone 5 implemented and accepted.
 Its immutable released editor and schema, exact source binding, unchanged version 2 bundle, fixed-path temporary handoff, trusted Python conversion and replacement, stateless service, and Git authority boundaries remain in force.
 
+Milestone 6 decision M6-D006 and HR-228 supersede the central-interface and central-review-route portions of M5-D009 and M5-D013.
+Their proposal artifact, GitHub authentication, complete-submission, trusted-Action, and statelessness boundaries remain in force; the downstream static site now renders the decision interface at `/review/`.
+
 ## Superseded exploration
 
 The following are not dormant requirements and must not be restored without a focused specification change:

@@ -6,6 +6,7 @@ import {
   ARTIFACT_ID,
   BASE_SHA,
   HEAD_SHA,
+  ORINOCO_CONFIG,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
@@ -39,6 +40,7 @@ interface ClientOptions {
   runEvent?: string;
   runHeadSha?: string;
   runStatus?: string;
+  siteConfig?: string | null;
 }
 
 function contentFixture(): Map<string, string> {
@@ -70,6 +72,8 @@ function client(options: ClientOptions = {}): GitHubClient {
   const bundle = options.bundle ?? reviewBundle();
   const archive = reviewBundleArchive(bundle);
   const content = options.contents ?? contentFixture();
+  const siteConfig =
+    "siteConfig" in options ? options.siteConfig : ORINOCO_CONFIG;
   return {
     artifactArchive: async () => archive,
     artifactMetadata: async () => ({
@@ -93,7 +97,9 @@ function client(options: ClientOptions = {}): GitHubClient {
       new Map(
         requests.map((request) => [
           request.key,
-          content.get(`${request.path}@${request.ref}`) ?? null,
+          request.path === "orinoco.yaml" && request.ref === BASE_SHA
+            ? (siteConfig ?? null)
+            : (content.get(`${request.path}@${request.ref}`) ?? null),
         ]),
       ),
     firstPullRequestCommit: async () => ({
@@ -144,6 +150,131 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(result.candidates[0]?.before).toContain("Original first");
     expect(result.candidates[0]?.after).toContain("Current first");
     expect(result.candidates[1]?.operation).toBe("add");
+    expect(result.review_service_origin).toBe("https://review.example");
+    expect(result.review_site_url).toBe("https://site.example/review/");
+  });
+
+  it.each([
+    {
+      config: null,
+      expected: "has no orinoco.yaml",
+      label: "a missing config",
+    },
+    {
+      config: "contract_version: [\n",
+      expected: "orinoco.yaml is invalid",
+      label: "malformed YAML",
+    },
+    {
+      config: `${ORINOCO_CONFIG}contract_version: 2\n`,
+      expected: "orinoco.yaml is invalid",
+      label: "duplicate keys",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "base_url: https://site.example/",
+        "base_url: !untrusted https://site.example/",
+      ),
+      expected: "orinoco.yaml is invalid",
+      label: "an unknown YAML tag",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "name: Example site",
+        "name: &site-name Example site\n  copied_name: *site-name",
+      ),
+      expected: "orinoco.yaml is invalid",
+      label: "a YAML alias",
+    },
+    {
+      config: `${ORINOCO_CONFIG}---\ncontract_version: 2\n`,
+      expected: "orinoco.yaml is invalid",
+      label: "multiple YAML documents",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "contract_version: 2",
+        "contract_version: 1",
+      ),
+      expected: "contract is unsupported",
+      label: "an unsupported contract",
+    },
+    {
+      config: ORINOCO_CONFIG.replace("example/site", "other/site"),
+      expected: "repository does not match",
+      label: "a different repository",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "https://site.example/",
+        "http://site.example/",
+      ),
+      expected: "site.base_url is unsafe",
+      label: "an unsafe site URL",
+    },
+    {
+      config: ORINOCO_CONFIG.replace("https://site.example/", "/project/"),
+      expected: "site.base_url is unsafe",
+      label: "a relative site URL",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "base_url: https://site.example/",
+        'base_url: "https://site.exa\\tmple/"',
+      ),
+      expected: "site.base_url is unsafe",
+      label: "a control character in the site URL",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "https://review.example/",
+        "https://review.example/api/",
+      ),
+      expected: "site.curation_service is not an origin",
+      label: "a non-origin curation service",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "https://review.example/",
+        "https://review.example/./",
+      ),
+      expected: "site.curation_service is not an origin",
+      label: "a normalized curation-service path",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "https://review.example/",
+        "http://review.example/",
+      ),
+      expected: "site.curation_service is not an origin",
+      label: "an unsafe curation service",
+    },
+  ])("rejects $label at the metadata base", async ({ config, expected }) => {
+    await expect(
+      loadReviewProposal(
+        client({ siteConfig: config }),
+        "example/site",
+        42,
+        ARTIFACT_ID,
+      ),
+    ).rejects.toThrow(expected);
+  });
+
+  it("appends the review route to a normalized site base path", async () => {
+    const result = await loadReviewProposal(
+      client({
+        siteConfig: ORINOCO_CONFIG.replace(
+          "https://site.example/",
+          "https://site.example/project",
+        ).replace("https://review.example/", "https://review.example"),
+      }),
+      "example/site",
+      42,
+      ARTIFACT_ID,
+    );
+
+    expect(result.review_site_url).toBe("https://site.example/project/review/");
+    expect(result.review_service_origin).toBe("https://review.example");
   });
 
   it("does not parse or authorize candidate facts from the pull-request body", async () => {
@@ -175,11 +306,21 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(result.candidates[0]?.before).toContain("Original first");
   });
 
-  it("rejects proposal writes outside the metadata roots", async () => {
+  it("rejects proposal writes outside the metadata roots, including its trusted config", async () => {
     await expect(
       loadReviewProposal(
         client({
           files: [{ filename: ".github/workflows/pwn.yml", status: "added" }],
+        }),
+        "example/site",
+        42,
+        ARTIFACT_ID,
+      ),
+    ).rejects.toThrow("outside the metadata roots");
+    await expect(
+      loadReviewProposal(
+        client({
+          files: [{ filename: "orinoco.yaml", status: "modified" }],
         }),
         "example/site",
         42,

@@ -5,6 +5,7 @@ export type JsonObject = { [key: string]: JsonValue };
 
 export const MAX_SHACL_BUNDLE_BYTES = 10 * 1024 * 1024;
 export const SHACL_HANDOFF_NONCE = /^[0-9a-f]{64}$/;
+export const REVIEW_HANDOFF_NONCE = SHACL_HANDOFF_NONCE;
 
 export function isSafeEditorOrigin(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 256) return false;
@@ -30,6 +31,12 @@ export function isSafeEditorOrigin(value: unknown): value is string {
 
 export function isShaclHandoffNonce(value: unknown): value is string {
   return typeof value === "string" && SHACL_HANDOFF_NONCE.test(value);
+}
+
+export const isSafeReviewOrigin = isSafeEditorOrigin;
+
+export function isReviewHandoffNonce(value: unknown): value is string {
+  return typeof value === "string" && REVIEW_HANDOFF_NONCE.test(value);
 }
 
 export type CandidateOperation = "add" | "delete" | "modify";
@@ -59,6 +66,8 @@ export interface ReviewProposal {
   pull_request: number;
   pull_request_url: string;
   repository: string;
+  review_service_origin: string;
+  review_site_url: string;
   source_coordinate: JsonObject;
 }
 
@@ -80,10 +89,19 @@ export interface CurationSubmission {
   source_coordinate: JsonObject;
 }
 
+export interface ReviewGrant {
+  artifact_id: number;
+  handoff_nonce: string;
+  pull_request: number;
+  repository: string;
+  review_origin: string;
+}
+
 export interface AuthenticatedSession {
   authenticated: true;
   csrf_token: string;
   login: string;
+  review_grant: ReviewGrant | null;
 }
 
 export interface AnonymousSession {
@@ -96,26 +114,60 @@ export interface SubmitResult {
   comment_url: string;
 }
 
-export interface DiscoveryArtifact {
-  created_at: string;
-  expires_at: string;
-  id: number;
-  name: string;
-}
-
-export interface DiscoveryPullRequest {
-  artifacts: DiscoveryArtifact[];
-  draft: boolean;
-  head_sha: string;
-  number: number;
-  proposal_sha: string;
-  title: string;
-}
-
-export interface ReviewDiscovery {
-  pull_requests: DiscoveryPullRequest[];
+export interface ReviewCoordinates {
+  artifact_id: number;
+  handoff_nonce: string;
+  pull_request: number;
   repository: string;
 }
+
+export interface ReviewTransportReadyMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-transport-ready-v1";
+}
+
+export interface ReviewProposalRequestMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-proposal-request-v1";
+}
+
+export interface ReviewProposalMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-proposal-message-v1";
+  login: string;
+  proposal: ReviewProposal;
+}
+
+export interface ReviewSubmissionMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-submission-message-v1";
+  submission: CurationSubmission;
+}
+
+export interface ReviewConfirmationPendingMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-confirmation-pending-v1";
+}
+
+export interface ReviewConfirmationReadyMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-confirmation-ready-v1";
+}
+
+export interface ReviewPostStartedMessage extends ReviewCoordinates {
+  format: "orinoco-lite-review-post-started-v1";
+}
+
+export interface ReviewSubmissionSuccessMessage extends ReviewCoordinates {
+  comment_url: string;
+  error: null;
+  format: "orinoco-lite-review-submission-result-v1";
+  retry_safe: false;
+}
+
+export interface ReviewSubmissionFailureMessage extends ReviewCoordinates {
+  comment_url: null;
+  error: string;
+  format: "orinoco-lite-review-submission-result-v1";
+  retry_safe: boolean;
+}
+
+export type ReviewSubmissionResultMessage =
+  ReviewSubmissionFailureMessage | ReviewSubmissionSuccessMessage;
 
 export interface ShaclReviewRecord {
   pid: string;

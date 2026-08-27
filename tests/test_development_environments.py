@@ -254,6 +254,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             cwd=ROOT,
             text=True,
         ).strip()
+        things_schemas_gitlink = subprocess.check_output(
+            ["git", "rev-parse", "HEAD:submodules/things-schemas"],
+            cwd=ROOT,
+            text=True,
+        ).strip()
         shacl_gitlink = subprocess.check_output(
             ["git", "rev-parse", "HEAD:shacl-vue"],
             cwd=ROOT / "submodules" / "pool.psychoinformatics.de-ui",
@@ -264,6 +269,19 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             release_spec["provenance"]["component_commits"]["pool_ui"],
             pool_gitlink,
+        )
+        self.assertEqual(
+            release_spec["provenance"]["component_commits"]["things_schemas"],
+            things_schemas_gitlink,
+        )
+        self.assertEqual(
+            release_spec["provenance"]["source_inventory"]["schema"]["commit"],
+            things_schemas_gitlink,
+        )
+        self.assertEqual(
+            release_spec["compatibility"]["schema_profile"],
+            "things-schemas/demo-research-information@"
+            f"{things_schemas_gitlink}",
         )
         self.assertEqual(
             release_spec["provenance"]["source_inventory"]["editor_shell"][

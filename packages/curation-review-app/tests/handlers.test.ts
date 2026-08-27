@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequest as authorizationStart } from "../functions/api/auth/start";
-import { onRequest as discoveryAuthorizationStart } from "../functions/api/auth/discovery-start";
 import { onRequest as shaclAuthorizationStart } from "../functions/api/auth/shacl-start";
 import { onRequest as authorizationCallback } from "../functions/api/auth/callback";
 import { onRequest as loadProposal } from "../functions/api/proposal";
@@ -18,16 +17,20 @@ import {
   ARTIFACT_ID,
   BASE_SHA,
   HEAD_SHA,
+  ORINOCO_CONFIG,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
   reviewBundleArchive,
   submission,
 } from "./fixtures";
+import type { ReviewGrant } from "../shared/contracts";
 
 const ORIGIN = "https://review.example";
 const EDITOR_ORIGIN = "https://site.example";
 const HANDOFF_NONCE = "d".repeat(64);
+const REVIEW_ORIGIN = "https://site.example";
+const REVIEW_NONCE = "e".repeat(64);
 const GITHUB_OAUTH_ISSUER = "https://github.com/login/oauth";
 const ARTIFACT_STORAGE =
   "https://pipelines.actions.githubusercontent.com/results/archive.zip?sig=short-lived";
@@ -38,6 +41,29 @@ const env: Env = {
   PUBLIC_ORIGIN: ORIGIN,
   SESSION_SEAL_KEY: base64urlEncode(new Uint8Array(32).fill(7)),
 };
+const REVIEW_GRANT: ReviewGrant = {
+  artifact_id: ARTIFACT_ID,
+  handoff_nonce: REVIEW_NONCE,
+  pull_request: 42,
+  repository: "example/site",
+  review_origin: REVIEW_ORIGIN,
+};
+const REVIEW_TRANSPORT_MISMATCHES = [
+  {
+    label: "a different downstream review origin",
+    siteConfig: ORINOCO_CONFIG.replace(
+      "https://site.example/",
+      "https://other-site.example/",
+    ),
+  },
+  {
+    label: "a different curation service origin",
+    siteConfig: ORINOCO_CONFIG.replace(
+      "https://review.example/",
+      "https://other-review.example/",
+    ),
+  },
+];
 
 function context(request: Request): EventContext {
   return {
@@ -58,7 +84,9 @@ function cookiePair(header: string, name: string): string {
   return match[1];
 }
 
-async function sessionCookie(): Promise<string> {
+async function sessionCookie(
+  reviewGrant: ReviewGrant | null = REVIEW_GRANT,
+): Promise<string> {
   return (
     await createSessionCookie(
       env,
@@ -66,6 +94,7 @@ async function sessionCookie(): Promise<string> {
         access_token: "ghu_short_lived",
         csrf_token: "csrf-token",
         login: "octocat",
+        review_grant: reviewGrant,
       },
       28_800,
     )
@@ -85,6 +114,7 @@ function blob(text: string): Record<string, unknown> {
 function proposalApi(
   url: string,
   init: RequestInit | undefined,
+  siteConfig: string = ORINOCO_CONFIG,
 ): Response | null {
   if (url.endsWith("/collaborators/octocat/permission")) {
     return Response.json({ permission: "write" });
@@ -168,7 +198,11 @@ function proposalApi(
       .filter(([key]) => key.startsWith("expression"))
       .forEach(([key, expression]) => {
         const index = key.slice("expression".length);
-        if (expression === `${BASE_SHA}:metadata/records/example/first.yaml`) {
+        if (expression === `${BASE_SHA}:orinoco.yaml`) {
+          repository[`blob${index}`] = blob(siteConfig);
+        } else if (
+          expression === `${BASE_SHA}:metadata/records/example/first.yaml`
+        ) {
           repository[`blob${index}`] = blob(
             "pid: example:first\ntitle: Original first\n",
           );
@@ -214,7 +248,7 @@ describe("GitHub App user-to-server handlers", () => {
     const start = await authorizationStart(
       context(
         new Request(
-          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42&review_origin=${encodeURIComponent(REVIEW_ORIGIN)}&handoff_nonce=${REVIEW_NONCE}`,
         ),
       ),
     );
@@ -236,9 +270,12 @@ describe("GitHub App user-to-server handlers", () => {
     );
     expect(oauth).toMatchObject({
       artifact_id: ARTIFACT_ID,
+      handoff_nonce: REVIEW_NONCE,
+      kind: "review",
       origin: ORIGIN,
       pull_request: 42,
       repository: "example/site",
+      review_origin: REVIEW_ORIGIN,
       state: authorization.searchParams.get("state"),
     });
 
@@ -274,7 +311,7 @@ describe("GitHub App user-to-server handlers", () => {
     );
     expect(callback.status).toBe(302);
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/review/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+      `${ORIGIN}/review-auth-complete/`,
     );
     const setCookie = callback.headers.get("set-cookie") as string;
     expect(setCookie).toContain(`${OAUTH_COOKIE}=;`);
@@ -288,6 +325,7 @@ describe("GitHub App user-to-server handlers", () => {
       access_token: "ghu_short_lived",
       csrf_token: expect.any(String),
       login: "octocat",
+      review_grant: REVIEW_GRANT,
     });
     expect(setCookie).not.toContain("must-not-be-retained");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -325,7 +363,7 @@ describe("GitHub App user-to-server handlers", () => {
     const start = await authorizationStart(
       context(
         new Request(
-          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+          `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42&review_origin=${encodeURIComponent(REVIEW_ORIGIN)}&handoff_nonce=${REVIEW_NONCE}`,
         ),
       ),
     );
@@ -348,54 +386,29 @@ describe("GitHub App user-to-server handlers", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("preserves a repository-only discovery target through authentication", async () => {
-    const start = await discoveryAuthorizationStart(
-      context(
-        new Request(
-          `${ORIGIN}/api/auth/discovery-start?repository=example%2Fsite`,
+  it.each([
+    ["a missing review origin", `handoff_nonce=${REVIEW_NONCE}`],
+    [
+      "an unsafe review origin",
+      `review_origin=${encodeURIComponent("http://site.example")}&handoff_nonce=${REVIEW_NONCE}`,
+    ],
+    [
+      "an invalid review nonce",
+      `review_origin=${encodeURIComponent(REVIEW_ORIGIN)}&handoff_nonce=not-random`,
+    ],
+  ])("rejects review authentication with %s", async (_label, transport) => {
+    await expect(
+      authorizationStart(
+        context(
+          new Request(
+            `${ORIGIN}/api/auth/start?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42&${transport}`,
+          ),
         ),
       ),
-    );
-    const oauthCookie = cookiePair(
-      start.headers.get("set-cookie") as string,
-      OAUTH_COOKIE,
-    );
-    const oauth = await readOAuthCookie(
-      new Request(ORIGIN, { headers: { Cookie: oauthCookie } }),
-      env,
-    );
-    expect(oauth).toMatchObject({
-      kind: "discovery",
-      repository: "example/site",
+    ).rejects.toMatchObject({
+      code: "invalid_review_transport",
+      status: 400,
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input) === "https://github.com/login/oauth/access_token") {
-          return Response.json({
-            access_token: "ghu_short_lived",
-            expires_in: 28_800,
-            scope: "",
-            token_type: "bearer",
-          });
-        }
-        if (String(input) === "https://api.github.com/user") {
-          return Response.json({ id: 1, login: "octocat" });
-        }
-        throw new Error(`Unexpected GitHub request: ${String(input)}`);
-      }),
-    );
-    const callback = await authorizationCallback(
-      context(
-        new Request(
-          `${ORIGIN}/api/auth/callback?code=temporary-code&state=${oauth.state}`,
-          { headers: { Cookie: oauthCookie } },
-        ),
-      ),
-    );
-    expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/?repository=example%2Fsite`,
-    );
   });
 
   it("reports denied and misdirected installation callbacks without exchanging a token", async () => {
@@ -513,6 +526,34 @@ describe("GitHub App user-to-server handlers", () => {
 });
 
 describe("curator authorization and exact-head submission handlers", () => {
+  it.each([
+    { grant: null, label: "a missing" },
+    {
+      grant: { ...REVIEW_GRANT, artifact_id: ARTIFACT_ID + 1 },
+      label: "a mismatched",
+    },
+  ])(
+    "rejects $label review grant before loading proposal data",
+    async ({ grant }) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(
+        loadProposal(
+          context(
+            new Request(
+              `${ORIGIN}/api/proposal?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+              { headers: { Cookie: await sessionCookie(grant) } },
+            ),
+          ),
+        ),
+      ).rejects.toMatchObject({
+        code: "review_grant_required",
+        status: 403,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects a signed-in repository reader before loading proposal data", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
       Response.json({ permission: "read" }),
@@ -536,6 +577,139 @@ describe("curator authorization and exact-head submission handlers", () => {
       "/collaborators/octocat/permission",
     );
   });
+
+  it("releases a proposal bound to the trusted downstream configuration", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = proposalApi(String(input), init);
+        if (response !== null) return response;
+        throw new Error(`Unexpected GitHub request: ${String(input)}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await loadProposal(
+      context(
+        new Request(
+          `${ORIGIN}/api/proposal?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+          { headers: { Cookie: await sessionCookie() } },
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      review_service_origin: ORIGIN,
+      review_site_url: `${REVIEW_ORIGIN}/review/`,
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          String(input) === "https://api.github.com/graphql" &&
+          String(init?.body).includes(`${BASE_SHA}:orinoco.yaml`),
+      ),
+    ).toBe(true);
+  });
+
+  it.each(REVIEW_TRANSPORT_MISMATCHES)(
+    "does not release a proposal configured for $label",
+    async ({ siteConfig }) => {
+      const fetchMock = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          const response = proposalApi(String(input), init, siteConfig);
+          if (response !== null) return response;
+          throw new Error(`Unexpected GitHub request: ${String(input)}`);
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        loadProposal(
+          context(
+            new Request(
+              `${ORIGIN}/api/proposal?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
+              { headers: { Cookie: await sessionCookie() } },
+            ),
+          ),
+        ),
+      ).rejects.toMatchObject({
+        code: "review_transport_mismatch",
+        status: 403,
+      });
+      expect(
+        fetchMock.mock.calls.some(([input]) =>
+          String(input).endsWith("/issues/42/comments"),
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it("rejects a mismatched submission grant before making GitHub requests", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      submitDecisions(
+        context(
+          new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
+            body: JSON.stringify(submission()),
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: await sessionCookie({
+                ...REVIEW_GRANT,
+                pull_request: 41,
+              }),
+              Origin: ORIGIN,
+              "X-CSRF-Token": "csrf-token",
+            },
+            method: "POST",
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: "review_grant_required",
+      status: 403,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(REVIEW_TRANSPORT_MISMATCHES)(
+    "does not post decisions configured for $label",
+    async ({ siteConfig }) => {
+      const fetchMock = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          const response = proposalApi(String(input), init, siteConfig);
+          if (response !== null) return response;
+          throw new Error(`Unexpected GitHub request: ${String(input)}`);
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        submitDecisions(
+          context(
+            new Request(`${ORIGIN}/api/submit?artifact_id=${ARTIFACT_ID}`, {
+              body: JSON.stringify(submission()),
+              headers: {
+                "Content-Type": "application/json",
+                Cookie: await sessionCookie(),
+                Origin: ORIGIN,
+                "X-CSRF-Token": "csrf-token",
+              },
+              method: "POST",
+            }),
+          ),
+        ),
+      ).rejects.toMatchObject({
+        code: "review_transport_mismatch",
+        status: 403,
+      });
+      expect(
+        fetchMock.mock.calls.some(([input]) =>
+          String(input).endsWith("/issues/42/comments"),
+        ),
+      ).toBe(false);
+    },
+  );
 
   it("reloads and verifies the proposal before posting the authenticated comment", async () => {
     const requests: string[] = [];

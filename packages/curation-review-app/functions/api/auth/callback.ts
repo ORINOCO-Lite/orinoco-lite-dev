@@ -87,11 +87,8 @@ export async function onRequest(context: EventContext): Promise<Response> {
   const user = await new GitHubClient(token.accessToken).currentUser();
   const destination = new URL("/", origin);
   if (oauth.kind === "review") {
-    destination.pathname = "/review/";
-    destination.searchParams.set("artifact_id", String(oauth.artifact_id));
-    destination.searchParams.set("repository", oauth.repository);
-    destination.searchParams.set("pull_request", String(oauth.pull_request));
-  } else if (oauth.kind === "shacl") {
+    destination.pathname = "/review-auth-complete/";
+  } else {
     destination.pathname = "/edit/";
     destination.searchParams.set("repository", oauth.repository);
     if (oauth.editor_origin !== null && oauth.handoff_nonce !== null) {
@@ -105,8 +102,6 @@ export async function onRequest(context: EventContext): Promise<Response> {
       );
       destination.searchParams.set("pull_request", String(oauth.pull_request));
     }
-  } else {
-    destination.searchParams.set("repository", oauth.repository);
   }
   const headers = new Headers({
     "Cache-Control": "no-store",
@@ -121,6 +116,16 @@ export async function onRequest(context: EventContext): Promise<Response> {
         access_token: token.accessToken,
         csrf_token: randomToken(),
         login: user.login,
+        review_grant:
+          oauth.kind === "review"
+            ? {
+                artifact_id: oauth.artifact_id,
+                handoff_nonce: oauth.handoff_nonce,
+                pull_request: oauth.pull_request,
+                repository: oauth.repository,
+                review_origin: oauth.review_origin,
+              }
+            : null,
       },
       token.expiresIn,
     ),

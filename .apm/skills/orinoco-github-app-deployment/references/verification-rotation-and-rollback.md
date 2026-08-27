@@ -20,11 +20,13 @@ The downstream static-site release remains responsible for its immutable editor 
 
 ### 2. Anonymous, non-mutating probes
 
-- `/`, `/review/`, and `/edit/` return the expected application surfaces.
-- `/review` and `/edit` redirect exactly once to their slash forms.
+- `/` returns the service landing page, `/review` and `/review/` redirect to it, and neither renders source-adapter candidates.
+- `/review-transport/` rejects missing or malformed exact handoff coordinates, `/review-auth-complete/` is only the OAuth completion surface, and `/edit/` remains the SHACL receiver.
+- `/edit` redirects exactly once to its slash form.
 - `/edit/?repository=<owner%2Frepository>` describes a lightweight sign-in, unchanged-bundle receiver or file selector, confirmation, and GitHub proposal flow; it does not render or frame SHACL Vue.
 - `/api/shacl/editor` is not registered and no `/editor-runtime/` tree serves an editor shell or schema.
 - `/api/session` returns HTTP 200 with `authenticated: false` while anonymous.
+- `/api/discovery` and `/api/auth/discovery-start` return HTTP 410 `review_discovery_retired` without a GitHub request or OAuth-state cookie.
 - A callback probe with exactly `code=probe`, `state=probe`, and `iss=https://github.com/login/oauth`, but no OAuth-state cookie, returns HTTP 401 `missing_oauth_state` before any token exchange.
 An `iss`-only probe is malformed and correctly returns HTTP 400 `invalid_oauth_callback`.
 - Authorization starts with a 302 to GitHub containing the exact client ID, callback, state, and PKCE challenge, and no OAuth scope.
@@ -39,15 +41,17 @@ Use one selected integration repository and complete a real sign-in.
 Without submitting a review or proposing a handoff, verify:
 
 - the session identifies the expected user;
-- repository-scoped discovery succeeds for the selected installed repository;
-- a source-adapter proposal renders after exact artifact and head verification;
+- the downstream's deployed `/review/` route loads its strict repository and service configuration and opens only the exact central transport;
+- after the ready/request handshake, a source-adapter proposal renders in that downstream page after exact artifact, metadata-base configuration, and head verification;
+- the central transport shows the complete submission summary and does not post without the explicit final click;
+- retry-safe pre-write failures permit a new transport handoff without losing downstream decisions, while uncertain post-started failures keep submission locked and require pull-request inspection;
 - `/edit/` remains only the receiver and file-upload fallback, with no editor shell, schema, RDF catalog, iframe, or second editing session;
 - the static editor at the downstream's exact source commit exposes both **Download bundle** and **Propose via GitHub**;
 - opening **Propose via GitHub** carries only the expected repository, exact static-editor origin, and one-time nonce, and the receiver's readiness message is bound to the exact two windows, origins, repository, and nonce; and
 - logout clears the session.
 
-Do not send a bundle or invoke the proposal API during this read-only proof.
-Also verify that repository-scoped discovery rejects a read-only user or an uninstalled repository when such a safe fixture is available.
+Do not send a SHACL bundle or confirm a source-review submission during this read-only proof.
+Also verify that a read-only user or uninstalled repository is rejected when such a safe fixture is available.
 
 ### 4. Explicitly authorized write proof
 
@@ -68,7 +72,7 @@ Never use the real production site as a write fixture.
 | GitHub 403/404 | App not installed, permission approval pending, user lacks write or admin, or session token expired. |
 | Artifact failure | Egress blocked, redirect auto-followed or rewritten, destination host rejected, or provider size limit exceeded. This applies to the source-adapter review artifact, not SHACL editor input. |
 | Static UI works but APIs 404 | Only `dist/` was deployed; Functions or the provider adapter is absent. |
-| A second editor or `/editor-runtime/` is still available | A superseded application revision or stale build directory was deployed. Rebuild from the reviewed receiver-only revision. |
+| A central source-review page, second editor, or `/editor-runtime/` is still available | A superseded application revision or stale build directory was deployed. Rebuild from the reviewed transport-only revision. |
 
 Both the successful OAuth callback and logout emit two cookies in one response.
 Exercise both paths when validating an adapter's header behavior.
@@ -128,13 +132,13 @@ Record:
 - application commit, tree, and clean-state proof;
 - public origin and client ID;
 - App ID, owner, permissions, and selected repositories;
-- each exercised downstream's `site.repository`, `site.curation_service`, and exact static source commit;
+- each exercised downstream's `site.repository`, `site.base_url`, `site.curation_service`, exact static source commit, and deployed `/review/` coordinate;
 - immutable deployment ID and URL, provider runtime class, source trigger, clean-trigger flag, Functions presence, and configuration-key inventory with secret values redacted;
 - build and probe results, including absence of hosted editor routes and assets;
 - authorized write-test coordinates, if any; and
 - rollback deployment ID and URL plus rotation and duplicate-editor consequences.
 
-Do not record a runtime release, archive digest, manifest digest, or staging report as backend evidence because the receiver-only service consumes none.
+Do not record a runtime release, archive digest, manifest digest, or staging report as backend evidence because the transport-only service consumes none.
 Keep those coordinates with the downstream static-site release evidence.
 
 Never record secret values, OAuth codes, cookies, access or refresh tokens, or raw provider logs that contain them.

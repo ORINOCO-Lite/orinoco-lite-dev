@@ -9,7 +9,10 @@ import { HttpError, requireExactKeys } from "./http";
 import type { Env } from "./pages";
 import {
   isSafeEditorOrigin,
+  isSafeReviewOrigin,
+  isReviewHandoffNonce,
   isShaclHandoffNonce,
+  type ReviewGrant,
 } from "../../shared/contracts";
 
 export const OAUTH_COOKIE = "__Host-orinoco_oauth";
@@ -30,12 +33,10 @@ interface OAuthCookieCommon {
 
 export interface ReviewOAuthCookieState extends OAuthCookieCommon {
   artifact_id: number;
+  handoff_nonce: string;
   kind: "review";
   pull_request: number;
-}
-
-export interface DiscoveryOAuthCookieState extends OAuthCookieCommon {
-  kind: "discovery";
+  review_origin: string;
 }
 
 export interface ShaclOAuthCookieState extends OAuthCookieCommon {
@@ -46,11 +47,9 @@ export interface ShaclOAuthCookieState extends OAuthCookieCommon {
   pull_request: number | null;
 }
 
-export type OAuthCookieState =
-  DiscoveryOAuthCookieState | ReviewOAuthCookieState | ShaclOAuthCookieState;
+export type OAuthCookieState = ReviewOAuthCookieState | ShaclOAuthCookieState;
 
 type OAuthCookieInput =
-  | Omit<DiscoveryOAuthCookieState, "expires_at" | "issued_at">
   | Omit<ReviewOAuthCookieState, "expires_at" | "issued_at">
   | Omit<ShaclOAuthCookieState, "expires_at" | "issued_at">;
 
@@ -60,6 +59,7 @@ export interface SessionCookieState {
   expires_at: number;
   issued_at: number;
   login: string;
+  review_grant: ReviewGrant | null;
 }
 
 function nowSeconds(): number {
@@ -80,6 +80,49 @@ function requireTimestamp(value: unknown, label: string): number {
     throw new HttpError(401, "invalid_session", `${label} is invalid.`);
   }
   return Number(value);
+}
+
+function parseReviewGrant(value: unknown): ReviewGrant | null {
+  if (value === null) return null;
+  if (
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join("\0") !==
+      [
+        "artifact_id",
+        "handoff_nonce",
+        "pull_request",
+        "repository",
+        "review_origin",
+      ]
+        .sort()
+        .join("\0")
+  ) {
+    throw new HttpError(401, "invalid_session", "The session is invalid.");
+  }
+  const grant = value as Record<string, unknown>;
+  if (
+    !Number.isSafeInteger(grant.artifact_id) ||
+    Number(grant.artifact_id) < 1 ||
+    !Number.isSafeInteger(grant.pull_request) ||
+    Number(grant.pull_request) < 1 ||
+    !validOneLine(grant.repository, 200) ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/.test(
+      grant.repository,
+    ) ||
+    grant.repository.includes("..") ||
+    !isSafeReviewOrigin(grant.review_origin) ||
+    !isReviewHandoffNonce(grant.handoff_nonce)
+  ) {
+    throw new HttpError(401, "invalid_session", "The session is invalid.");
+  }
+  return {
+    artifact_id: Number(grant.artifact_id),
+    handoff_nonce: grant.handoff_nonce,
+    pull_request: Number(grant.pull_request),
+    repository: grant.repository,
+    review_origin: grant.review_origin,
+  };
 }
 
 function cookieValue(request: Request, name: string): string | null {
@@ -235,41 +278,33 @@ export async function readOAuthCookie(
   const kind = (value as Record<string, unknown>).kind;
   requireExactKeys(
     value,
-    kind === "discovery"
+    kind === "review"
       ? [
+          "artifact_id",
           "code_verifier",
           "expires_at",
+          "handoff_nonce",
           "issued_at",
           "kind",
           "origin",
+          "pull_request",
           "repository",
+          "review_origin",
           "state",
         ]
-      : kind === "review"
-        ? [
-            "artifact_id",
-            "code_verifier",
-            "expires_at",
-            "issued_at",
-            "kind",
-            "origin",
-            "pull_request",
-            "repository",
-            "state",
-          ]
-        : [
-            "code_verifier",
-            "editor_origin",
-            "expected_head_sha",
-            "expires_at",
-            "handoff_nonce",
-            "issued_at",
-            "kind",
-            "origin",
-            "pull_request",
-            "repository",
-            "state",
-          ],
+      : [
+          "code_verifier",
+          "editor_origin",
+          "expected_head_sha",
+          "expires_at",
+          "handoff_nonce",
+          "issued_at",
+          "kind",
+          "origin",
+          "pull_request",
+          "repository",
+          "state",
+        ],
     "OAuth state",
   );
   const issuedAt = requireTimestamp(value.issued_at, "OAuth issued_at");
@@ -281,9 +316,7 @@ export async function readOAuthCookie(
     !validOneLine(value.origin, 256) ||
     !validOneLine(value.repository, 200) ||
     !validOneLine(value.state, 128) ||
-    (value.kind !== "discovery" &&
-      value.kind !== "review" &&
-      value.kind !== "shacl")
+    (value.kind !== "review" && value.kind !== "shacl")
   ) {
     throw new HttpError(
       401,
@@ -299,9 +332,6 @@ export async function readOAuthCookie(
     repository: value.repository,
     state: value.state,
   };
-  if (value.kind === "discovery") {
-    return { ...common, kind: "discovery" };
-  }
   if (value.kind === "shacl") {
     const uploadOnly =
       value.editor_origin === null && value.handoff_nonce === null;
@@ -339,7 +369,9 @@ export async function readOAuthCookie(
     !Number.isSafeInteger(value.artifact_id) ||
     Number(value.artifact_id) < 1 ||
     !Number.isSafeInteger(value.pull_request) ||
-    Number(value.pull_request) < 1
+    Number(value.pull_request) < 1 ||
+    !isSafeReviewOrigin(value.review_origin) ||
+    !isReviewHandoffNonce(value.handoff_nonce)
   ) {
     throw new HttpError(
       401,
@@ -350,14 +382,21 @@ export async function readOAuthCookie(
   return {
     ...common,
     artifact_id: Number(value.artifact_id),
+    handoff_nonce: value.handoff_nonce,
     kind: "review",
     pull_request: Number(value.pull_request),
+    review_origin: value.review_origin,
   };
 }
 
 export async function createSessionCookie(
   env: Env,
-  state: Omit<SessionCookieState, "expires_at" | "issued_at">,
+  state: Omit<
+    SessionCookieState,
+    "expires_at" | "issued_at" | "review_grant"
+  > & {
+    review_grant?: ReviewGrant | null;
+  },
   expiresIn: number,
 ): Promise<string> {
   if (!Number.isSafeInteger(expiresIn) || expiresIn < 60) {
@@ -375,6 +414,7 @@ export async function createSessionCookie(
       ...state,
       expires_at: issuedAt + lifetime,
       issued_at: issuedAt,
+      review_grant: state.review_grant ?? null,
     }),
     lifetime,
   );
@@ -395,11 +435,19 @@ export async function readSessionCookie(
   const value = await unseal(env, "session", encoded);
   requireExactKeys(
     value,
-    ["access_token", "csrf_token", "expires_at", "issued_at", "login"],
+    [
+      "access_token",
+      "csrf_token",
+      "expires_at",
+      "issued_at",
+      "login",
+      "review_grant",
+    ],
     "session",
   );
   const issuedAt = requireTimestamp(value.issued_at, "session issued_at");
   const expiresAt = requireTimestamp(value.expires_at, "session expires_at");
+  const reviewGrant = parseReviewGrant(value.review_grant);
   if (
     expiresAt <= nowSeconds() ||
     expiresAt - issuedAt > MAX_SESSION_TTL_SECONDS ||
@@ -419,5 +467,6 @@ export async function readSessionCookie(
     expires_at: expiresAt,
     issued_at: issuedAt,
     login: value.login,
+    review_grant: reviewGrant,
   };
 }

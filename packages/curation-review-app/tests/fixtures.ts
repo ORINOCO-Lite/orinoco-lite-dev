@@ -9,6 +9,13 @@ export const CLAIM_ONE = `sha256:${"1".repeat(64)}`;
 export const CLAIM_TWO = `sha256:${"2".repeat(64)}`;
 export const ARTIFACT_ID = 123456789;
 export const WORKFLOW_RUN_ID = 987654321;
+export const ORINOCO_CONFIG = `contract_version: 2
+site:
+  name: Example site
+  base_url: https://site.example/
+  repository: example/site
+  curation_service: https://review.example/
+`;
 
 export function proposalCommitMessage(): string {
   return `[DATALAD RUNCMD] chore(curation): propose zotero metadata
@@ -112,6 +119,8 @@ export function proposal(): ReviewProposal {
     pull_request: 42,
     pull_request_url: "https://github.com/example/site/pull/42",
     repository: "example/site",
+    review_service_origin: "https://review.example",
+    review_site_url: "https://site.example/review/",
     source_coordinate: { group: 6197458, library_version: 451 },
   };
 }

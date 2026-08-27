@@ -2,6 +2,7 @@ import { parseDocument } from "yaml";
 import type {
   CandidateOperation,
   JsonObject,
+  ReviewGrant,
   ReviewProposal,
 } from "../../shared/contracts";
 import {
@@ -399,6 +400,136 @@ function recordPid(value: string, label: string): string {
   return pid;
 }
 
+interface ReviewSiteCoordinates {
+  reviewServiceOrigin: string;
+  reviewSiteUrl: string;
+}
+
+function safeSiteUrl(value: unknown): URL | null {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 2_048 ||
+    value !== value.trim() ||
+    /[\\?#\u0000-\u001f\u007f]/.test(value)
+  ) {
+    return null;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const loopback =
+    url.protocol === "http:" &&
+    (url.hostname === "127.0.0.1" || url.hostname === "localhost");
+  if (
+    (url.protocol !== "https:" && !loopback) ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    return null;
+  }
+  return url;
+}
+
+function reviewSiteCoordinates(
+  value: string | null,
+  repository: string,
+): ReviewSiteCoordinates {
+  if (value === null) {
+    invalid("The proposal metadata base has no orinoco.yaml configuration.");
+  }
+  let parsed: unknown;
+  try {
+    const document = parseDocument(value, {
+      prettyErrors: false,
+      schema: "core",
+      uniqueKeys: true,
+    });
+    if (document.errors.length > 0 || document.warnings.length > 0) {
+      throw new Error("invalid YAML");
+    }
+    parsed = document.toJS({ maxAliasCount: 0 }) as unknown;
+  } catch {
+    invalid("The proposal metadata-base orinoco.yaml is invalid.");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    invalid("The proposal metadata-base orinoco.yaml is not a mapping.");
+  }
+  const config = parsed as Record<string, unknown>;
+  if (config.contract_version !== 2) {
+    invalid("The proposal metadata-base orinoco.yaml contract is unsupported.");
+  }
+  if (
+    config.site === null ||
+    typeof config.site !== "object" ||
+    Array.isArray(config.site)
+  ) {
+    invalid("The proposal metadata-base orinoco.yaml site is not a mapping.");
+  }
+  const site = config.site as Record<string, unknown>;
+  if (
+    typeof site.repository !== "string" ||
+    site.repository.toLowerCase() !== repository.toLowerCase()
+  ) {
+    invalid(
+      "The proposal metadata-base repository does not match this review.",
+    );
+  }
+  const baseUrl = safeSiteUrl(site.base_url);
+  if (baseUrl === null) {
+    invalid("The proposal metadata-base site.base_url is unsafe.");
+  }
+  const serviceValue = site.curation_service;
+  const serviceUrl = safeSiteUrl(serviceValue);
+  if (
+    serviceUrl === null ||
+    serviceUrl.pathname !== "/" ||
+    (serviceValue !== serviceUrl.origin &&
+      serviceValue !== `${serviceUrl.origin}/`)
+  ) {
+    invalid(
+      "The proposal metadata-base site.curation_service is not an origin.",
+    );
+  }
+  if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
+  return {
+    reviewServiceOrigin: serviceUrl.origin,
+    reviewSiteUrl: new URL("review/", baseUrl).toString(),
+  };
+}
+
+export function requireReviewTransport(
+  proposal: ReviewProposal,
+  grant: ReviewGrant,
+  serviceOrigin: string,
+): void {
+  let reviewOrigin: string;
+  try {
+    reviewOrigin = new URL(proposal.review_site_url).origin;
+  } catch {
+    throw new HttpError(
+      403,
+      "review_transport_mismatch",
+      "This review does not match the repository's trusted deployment.",
+    );
+  }
+  if (
+    proposal.review_service_origin !== serviceOrigin ||
+    reviewOrigin !== grant.review_origin
+  ) {
+    throw new HttpError(
+      403,
+      "review_transport_mismatch",
+      "This review does not match the repository's trusted deployment.",
+    );
+  }
+}
+
 export async function loadReviewProposal(
   github: GitHubClient,
   repository: string,
@@ -436,12 +567,19 @@ export async function loadReviewProposal(
   const presentation = bundleCandidates(bundle, files);
 
   const recordPaths = [...files.records.keys()].sort();
-  const requests = recordPaths.flatMap((path, index) => [
-    { key: `before:${index}`, path, ref: proposal.baseSha },
-    { key: `proposed:${index}`, path, ref: proposal.proposalSha },
-    { key: `after:${index}`, path, ref: pull.headSha },
-  ]);
+  const requests = [
+    { key: "site-config", path: "orinoco.yaml", ref: proposal.baseSha },
+    ...recordPaths.flatMap((path, index) => [
+      { key: `before:${index}`, path, ref: proposal.baseSha },
+      { key: `proposed:${index}`, path, ref: proposal.proposalSha },
+      { key: `after:${index}`, path, ref: pull.headSha },
+    ]),
+  ];
   const contents = await github.contents(repository, requests);
+  const review = reviewSiteCoordinates(
+    contents.get("site-config") ?? null,
+    pull.repository,
+  );
   const candidates = recordPaths.map((path, index) => {
     const item = presentation.get(path);
     if (item === undefined) throw new Error("candidate alignment was lost");
@@ -485,6 +623,8 @@ export async function loadReviewProposal(
     pull_request: pullRequest,
     pull_request_url: pull.url,
     repository: pull.repository,
+    review_service_origin: review.reviewServiceOrigin,
+    review_site_url: review.reviewSiteUrl,
     source_coordinate: proposal.sourceCoordinate,
   };
 }

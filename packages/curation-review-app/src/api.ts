@@ -1,6 +1,5 @@
 import type {
   CurationSubmission,
-  ReviewDiscovery,
   ReviewProposal,
   SessionStatus,
   ShaclProposalRequest,
@@ -68,13 +67,17 @@ export function authenticationUrl(
   repository: string,
   pullRequest: number,
   artifactId: number,
+  reviewOrigin?: string,
+  handoffNonce?: string,
 ): string {
-  return `/api/auth/start?${targetQuery(repository, pullRequest, artifactId)}`;
-}
-
-export function discoveryAuthenticationUrl(repository: string): string {
-  const query = new URLSearchParams({ repository });
-  return `/api/auth/discovery-start?${query.toString()}`;
+  const query = new URLSearchParams(
+    targetQuery(repository, pullRequest, artifactId),
+  );
+  if (reviewOrigin !== undefined && handoffNonce !== undefined) {
+    query.set("review_origin", reviewOrigin);
+    query.set("handoff_nonce", handoffNonce);
+  }
+  return `/api/auth/start?${query.toString()}`;
 }
 
 export function shaclAuthenticationUrl(
@@ -99,17 +102,6 @@ export function shaclAuthenticationUrl(
 export async function loadSession(): Promise<SessionStatus> {
   return responseJson<SessionStatus>(
     await fetch("/api/session", { headers: { Accept: "application/json" } }),
-  );
-}
-
-export async function loadDiscovery(
-  repository: string,
-): Promise<ReviewDiscovery> {
-  const query = new URLSearchParams({ repository });
-  return responseJson<ReviewDiscovery>(
-    await fetch(`/api/discovery?${query.toString()}`, {
-      headers: { Accept: "application/json" },
-    }),
   );
 }
 

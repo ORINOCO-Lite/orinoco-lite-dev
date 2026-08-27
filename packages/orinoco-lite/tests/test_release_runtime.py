@@ -132,6 +132,16 @@ provenance:
             workflow.count("python -m orinoco_lite.release_runtime"),
             2,
         )
+        self.assertEqual(
+            workflow.count("python -m orinoco_lite.release_review"),
+            2,
+        )
+        self.assertIn(
+            "diff -qr build/runtime-review-shell-first "
+            "build/runtime-review-shell",
+            workflow,
+        )
+        self.assertIn("npm install --global npm@11.6.0", workflow)
         self.assertNotIn("python -m orinoco_lite release assemble", workflow)
 
 

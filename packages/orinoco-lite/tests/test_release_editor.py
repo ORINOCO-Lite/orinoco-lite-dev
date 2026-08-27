@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -15,6 +16,7 @@ from orinoco_lite.release_editor import (
     REVIEW_BUNDLE_PROPOSAL,
     SUBMISSION_ARIA_BINDING,
     _apply_submission_accessibility_patch,
+    _dependency_inventory,
     _initialize_repository,
 )
 
@@ -65,6 +67,101 @@ class DeterministicEditorGitTests(unittest.TestCase):
                         GIT_IDENTITY["GIT_COMMITTER_EMAIL"],
                     ],
                 )
+
+
+class DependencyInventoryTests(unittest.TestCase):
+    @staticmethod
+    def write_package(
+        root: Path,
+        name: str,
+        version: str,
+        license_text: str,
+    ) -> None:
+        root.mkdir(parents=True)
+        (root / "package.json").write_text(
+            json.dumps({"license": "MIT", "name": name, "version": version})
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "LICENSE").write_text(license_text, encoding="utf-8")
+
+    def test_recurses_through_installed_package_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            node_modules = root / "node_modules"
+            self.write_package(
+                node_modules / "example",
+                "example",
+                "2.0.0",
+                "MIT top-level\n",
+            )
+            parent = node_modules / "parent"
+            self.write_package(parent, "parent", "1.0.0", "MIT parent\n")
+            self.write_package(
+                parent / "node_modules/example",
+                "example",
+                "1.0.0",
+                "MIT nested\n",
+            )
+            self.write_package(
+                parent / "fixtures/not-installed",
+                "not-installed",
+                "9.9.9",
+                "MIT fixture\n",
+            )
+
+            inventory = _dependency_inventory(
+                node_modules,
+                root / "licenses",
+                component="review",
+            )
+            repeated = _dependency_inventory(
+                node_modules,
+                root / "licenses-repeated",
+                component="review",
+            )
+
+            self.assertEqual(inventory, repeated)
+            self.assertEqual(inventory["format"], "orinoco-review-dependency-inventory")
+            self.assertEqual(
+                [(item["name"], item["version"]) for item in inventory["packages"]],
+                [
+                    ("example", "1.0.0"),
+                    ("example", "2.0.0"),
+                    ("parent", "1.0.0"),
+                ],
+            )
+
+    def test_copied_license_names_do_not_collide_after_sanitizing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            node_modules = root / "node_modules"
+            self.write_package(
+                node_modules / "@scope/example",
+                "@scope/example",
+                "1.0.0",
+                "MIT scoped\n",
+            )
+            self.write_package(
+                node_modules / "-scope-example",
+                "-scope-example",
+                "1.0.0",
+                "MIT unscoped\n",
+            )
+
+            inventory = _dependency_inventory(node_modules, root / "licenses")
+
+            license_files = [
+                item["license_files"][0] for item in inventory["packages"]
+            ]
+            self.assertEqual(len(set(license_files)), 2)
+            self.assertEqual(
+                {
+                    (root / "licenses" / path).read_text(encoding="utf-8")
+                    for path in license_files
+                },
+                {"MIT scoped\n", "MIT unscoped\n"},
+            )
 
 
 class SubmissionAccessibilityOverlayTests(unittest.TestCase):

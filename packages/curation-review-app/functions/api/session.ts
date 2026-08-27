@@ -10,6 +10,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
       authenticated: true,
       csrf_token: session.csrf_token,
       login: session.login,
+      review_grant: session.review_grant,
     });
   } catch (error) {
     if (!(error instanceof HttpError) || error.status !== 401) throw error;

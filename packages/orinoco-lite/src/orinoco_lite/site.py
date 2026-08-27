@@ -20,6 +20,7 @@ from .config import load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
+from .review import bind_review
 from .runtime import MANIFEST_NAME, load_runtime_manifest
 
 
@@ -302,6 +303,11 @@ def build_site(
         runtime_root,
         destination / "edit",
     )
+    review_report = bind_review(
+        workspace,
+        runtime_root,
+        destination / "review",
+    )
     entries = _manifest(destination)
     digest = hashlib.sha256(("\n".join(entries) + "\n").encode()).hexdigest()
     report = {
@@ -310,6 +316,7 @@ def build_site(
         "editor": editor_report,
         "files": len(entries),
         "manifest_sha256": digest,
+        "review": review_report,
         "version": 1,
     }
     (destination.parent / f"{destination.name}-manifest.sha256").write_text(

@@ -1,4 +1,8 @@
 import { HttpError } from "./http";
+import {
+  isReviewHandoffNonce,
+  isSafeReviewOrigin,
+} from "../../shared/contracts";
 
 const REPOSITORY =
   /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
@@ -7,6 +11,11 @@ export interface ReviewTarget {
   artifactId: number;
   pullRequest: number;
   repository: string;
+}
+
+export interface ReviewTransportTarget extends ReviewTarget {
+  handoffNonce: string;
+  reviewOrigin: string;
 }
 
 export function parseArtifactId(value: string | null): number {
@@ -84,6 +93,43 @@ export function reviewTarget(url: URL): ReviewTarget {
     artifactId: parseArtifactId(url.searchParams.get("artifact_id")),
     repository: parseRepository(url.searchParams.get("repository")),
     pullRequest: parsePullRequest(url.searchParams.get("pull_request")),
+  };
+}
+
+export function reviewTransportTarget(url: URL): ReviewTransportTarget {
+  const allowed = new Set([
+    "artifact_id",
+    "handoff_nonce",
+    "pull_request",
+    "repository",
+    "review_origin",
+  ]);
+  if ([...url.searchParams.keys()].some((key) => !allowed.has(key))) {
+    throw new HttpError(
+      400,
+      "unexpected_query",
+      "The review transport request has an unexpected query field.",
+    );
+  }
+  if (
+    [...allowed].some((key) => url.searchParams.getAll(key).length !== 1) ||
+    !isSafeReviewOrigin(url.searchParams.get("review_origin")) ||
+    !isReviewHandoffNonce(url.searchParams.get("handoff_nonce"))
+  ) {
+    throw new HttpError(
+      400,
+      "invalid_review_transport",
+      "The downstream review transport coordinates are invalid.",
+    );
+  }
+  const reviewUrl = new URL(url);
+  reviewUrl.searchParams.delete("review_origin");
+  reviewUrl.searchParams.delete("handoff_nonce");
+  const target = reviewTarget(reviewUrl);
+  return {
+    ...target,
+    handoffNonce: url.searchParams.get("handoff_nonce") as string,
+    reviewOrigin: url.searchParams.get("review_origin") as string,
   };
 }
 

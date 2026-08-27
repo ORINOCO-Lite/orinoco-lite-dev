@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   isSafeEditorOrigin,
+  isSafeReviewOrigin,
+  isReviewHandoffNonce,
   isShaclHandoffNonce,
   MAX_SHACL_BUNDLE_BYTES,
   type ShaclProposalReadyMessage,
   type CurationSubmission,
-  type Disposition,
-  type ReviewCandidate,
-  type ReviewDiscovery,
+  type ReviewCoordinates,
+  type ReviewConfirmationPendingMessage,
+  type ReviewConfirmationReadyMessage,
+  type ReviewPostStartedMessage,
   type ReviewProposal,
+  type ReviewProposalMessage,
+  type ReviewSubmissionResultMessage,
+  type ReviewTransportReadyMessage,
   type SessionStatus,
   type ShaclBundleMessage,
   type ShaclProposalRequest,
@@ -18,8 +24,6 @@ import {
 import {
   ApiError,
   authenticationUrl,
-  discoveryAuthenticationUrl,
-  loadDiscovery,
   loadProposal,
   loadSession,
   logout,
@@ -30,8 +34,15 @@ import {
 
 interface Target {
   artifactId: number;
+  handoffNonce: string;
   pullRequest: number;
   repository: string;
+  reviewOrigin: string;
+}
+
+interface BoundReviewProposal extends ReviewProposal {
+  review_service_origin: string;
+  review_site_url: string;
 }
 
 interface ShaclTarget {
@@ -42,22 +53,29 @@ interface ShaclTarget {
   repository: string;
 }
 
-type DecisionState = Record<string, Disposition | undefined>;
-type DecisionFilter = "all" | "unresolved" | Disposition;
-
 function currentTarget(): Target | null {
   if (
-    window.location.pathname !== "/" &&
-    window.location.pathname !== "/review" &&
-    window.location.pathname !== "/review/"
+    window.location.pathname !== "/review-transport" &&
+    window.location.pathname !== "/review-transport/"
   ) {
     return null;
   }
   const query = new URLSearchParams(window.location.search);
+  const allowed = new Set([
+    "artifact_id",
+    "handoff_nonce",
+    "pull_request",
+    "repository",
+    "review_origin",
+  ]);
+  if ([...query.keys()].some((key) => !allowed.has(key))) return null;
   const artifact = query.get("artifact_id");
+  const handoffNonce = query.get("handoff_nonce");
   const repository = query.get("repository");
   const number = query.get("pull_request");
+  const reviewOrigin = query.get("review_origin");
   if (
+    [...allowed].some((key) => query.getAll(key).length !== 1) ||
     artifact === null ||
     !/^[1-9][0-9]{0,15}$/.test(artifact) ||
     repository === null ||
@@ -65,13 +83,21 @@ function currentTarget(): Target | null {
       repository,
     ) ||
     number === null ||
-    !/^[1-9][0-9]{0,9}$/.test(number)
+    !/^[1-9][0-9]{0,9}$/.test(number) ||
+    !isSafeReviewOrigin(reviewOrigin) ||
+    !isReviewHandoffNonce(handoffNonce)
   ) {
     return null;
   }
   const artifactId = Number(artifact);
   if (!Number.isSafeInteger(artifactId)) return null;
-  return { artifactId, pullRequest: Number(number), repository };
+  return {
+    artifactId,
+    handoffNonce,
+    pullRequest: Number(number),
+    repository,
+    reviewOrigin,
+  };
 }
 
 function validRepository(value: string | null): value is string {
@@ -145,236 +171,13 @@ function currentShaclTarget(): ShaclTarget | null {
   };
 }
 
-function contextualRepository(): string | null {
-  if (
-    window.location.pathname !== "/" &&
-    window.location.pathname !== "/review" &&
-    window.location.pathname !== "/review/"
-  ) {
-    return null;
-  }
-  const query = new URLSearchParams(window.location.search);
-  const values = query.getAll("repository");
-  const value = values[0] ?? null;
-  return values.length === 1 && validRepository(value) ? value : null;
-}
-
 function message(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return "The review could not be loaded.";
 }
 
-interface LandingProps {
-  discovery: ReviewDiscovery | null;
-  failure: string | null;
-  repository: string | null;
-  session: SessionStatus | null;
-}
-
-function Landing({
-  discovery,
-  failure,
-  repository,
-  session,
-}: LandingProps): React.JSX.Element {
-  const requested = useMemo(
-    () => new URLSearchParams(window.location.search),
-    [],
-  );
-  const [selectedPull, setSelectedPull] = useState("");
-  const [selectedArtifact, setSelectedArtifact] = useState("");
-  const selectedProposal = discovery?.pull_requests.find(
-    (pull) => String(pull.number) === selectedPull,
-  );
-  const artifacts = selectedProposal?.artifacts ?? [];
-
-  useEffect(() => {
-    if (discovery === null) return;
-    const requestedPull = requested.get("pull_request");
-    const requestedExists = discovery.pull_requests.some(
-      (pull) => String(pull.number) === requestedPull,
-    );
-    if (requestedExists) {
-      setSelectedPull(requestedPull ?? "");
-    } else if (discovery.pull_requests.length === 1) {
-      setSelectedPull(String(discovery.pull_requests[0]?.number ?? ""));
-    } else {
-      setSelectedPull("");
-    }
-  }, [discovery, requested]);
-
-  useEffect(() => {
-    const requestedArtifact = requested.get("artifact_id");
-    const requestedExists = artifacts.some(
-      (artifact) => String(artifact.id) === requestedArtifact,
-    );
-    if (requestedExists) {
-      setSelectedArtifact(requestedArtifact ?? "");
-    } else if (artifacts.length === 1) {
-      setSelectedArtifact(String(artifacts[0]?.id ?? ""));
-    } else {
-      setSelectedArtifact("");
-    }
-  }, [artifacts, requested]);
-
-  function selectRepository(event: React.FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const query = new URLSearchParams({
-      repository: String(data.get("repository") ?? ""),
-    });
-    window.location.assign(`/?${query.toString()}`);
-  }
-
-  function openReview(event: React.FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    if (repository === null || selectedPull === "" || selectedArtifact === "") {
-      return;
-    }
-    const query = new URLSearchParams({
-      artifact_id: selectedArtifact,
-      pull_request: selectedPull,
-      repository,
-    });
-    window.location.assign(`/review/?${query.toString()}`);
-  }
-
-  if (repository === null) {
-    return (
-      <main className="landing" id="main-content">
-        <p className="eyebrow">Orinoco Lite</p>
-        <h1>Review repository metadata</h1>
-        <p className="lede">
-          Start from a repository or pull-request link. The repository remains
-          explicit because one GitHub identity can curate more than one site.
-        </p>
-        <form className="target-form" onSubmit={selectRepository}>
-          <label>
-            Repository
-            <input
-              autoComplete="off"
-              name="repository"
-              pattern="[^/]+/[^/]+"
-              placeholder="owner/repository"
-              required
-            />
-          </label>
-          <button type="submit">Continue</button>
-        </form>
-        <p className="quiet">
-          The application stores no metadata or review decisions.
-        </p>
-      </main>
-    );
-  }
-
-  if (session === null) {
-    return (
-      <main className="landing" id="main-content">
-        <p>Checking the GitHub session…</p>
-      </main>
-    );
-  }
-
-  if (!session.authenticated) {
-    return (
-      <main className="landing" id="main-content">
-        <p className="eyebrow">Authenticated curation</p>
-        <h1>Continue with {repository}</h1>
-        <p className="lede">
-          Sign in to list only this repository&apos;s open curation proposals
-          and available review artifacts.
-        </p>
-        <a
-          className="button-link"
-          href={discoveryAuthenticationUrl(repository)}
-        >
-          Continue with GitHub
-        </a>
-        <p className="quiet">
-          GitHub limits access to collaborators with write or admin permission.
-        </p>
-      </main>
-    );
-  }
-
-  return (
-    <main className="landing" id="main-content">
-      <p className="eyebrow">Signed in as {session.login}</p>
-      <h1>Curate {repository}</h1>
-      <p className="lede">
-        Choose from the open proposals and expiring artifacts verified directly
-        from GitHub. A fully populated pull-request link opens its exact review
-        immediately.
-      </p>
-      {failure !== null && <p className="feedback">{failure}</p>}
-      {discovery === null && failure === null ? (
-        <p>Loading open proposals from GitHub…</p>
-      ) : (
-        <>
-          <form className="target-form" onSubmit={openReview}>
-            <label>
-              Repository
-              <input readOnly value={repository} />
-            </label>
-            <label>
-              Open curation pull request
-              <select
-                aria-label="Open curation pull request"
-                onChange={(event) => setSelectedPull(event.target.value)}
-                required
-                value={selectedPull}
-              >
-                <option value="">Choose a pull request</option>
-                {discovery?.pull_requests.map((pull) => (
-                  <option key={pull.number} value={pull.number}>
-                    #{pull.number} — {pull.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Review artifact
-              <select
-                aria-label="Review artifact"
-                disabled={selectedProposal === undefined}
-                onChange={(event) => setSelectedArtifact(event.target.value)}
-                required
-                value={selectedArtifact}
-              >
-                <option value="">Choose an artifact</option>
-                {artifacts.map((artifact) => (
-                  <option key={artifact.id} value={artifact.id}>
-                    {artifact.id} — expires {artifact.expires_at}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              disabled={selectedPull === "" || selectedArtifact === ""}
-              type="submit"
-            >
-              Open review
-            </button>
-          </form>
-          {discovery?.pull_requests.length === 0 && (
-            <p className="quiet">
-              No open source-adapter curation pull requests are available.
-            </p>
-          )}
-          {selectedProposal !== undefined && artifacts.length === 0 && (
-            <p className="quiet">
-              This proposal has no unexpired matching review artifact. Rerun its
-              trusted proposal workflow to reproduce one.
-            </p>
-          )}
-        </>
-      )}
-      <p className="quiet">
-        The application stores no metadata, bundles, or review decisions.
-      </p>
-    </main>
-  );
+function retrySafeSubmissionFailure(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500;
 }
 
 function SignIn({ target }: { target: Target }): React.JSX.Element {
@@ -393,11 +196,498 @@ function SignIn({ target }: { target: Target }): React.JSX.Element {
           target.repository,
           target.pullRequest,
           target.artifactId,
+          target.reviewOrigin,
+          target.handoffNonce,
         )}
+        rel="noreferrer"
+        target="orinoco-review-auth"
       >
         Continue with GitHub
       </a>
       <p className="quiet">Repository: {target.repository}</p>
+    </main>
+  );
+}
+
+function matchingReviewGrant(
+  session: Extract<SessionStatus, { authenticated: true }>,
+  target: Target,
+): boolean {
+  const grant = session.review_grant;
+  return (
+    grant !== null &&
+    grant.artifact_id === target.artifactId &&
+    grant.handoff_nonce === target.handoffNonce &&
+    grant.pull_request === target.pullRequest &&
+    grant.repository.toLowerCase() === target.repository.toLowerCase() &&
+    grant.review_origin === target.reviewOrigin
+  );
+}
+
+function coordinates(target: Target): ReviewCoordinates {
+  return {
+    artifact_id: target.artifactId,
+    handoff_nonce: target.handoffNonce,
+    pull_request: target.pullRequest,
+    repository: target.repository,
+  };
+}
+
+function exactCoordinates(
+  value: Record<string, unknown>,
+  target: Target,
+): boolean {
+  return (
+    value.artifact_id === target.artifactId &&
+    value.handoff_nonce === target.handoffNonce &&
+    value.pull_request === target.pullRequest &&
+    typeof value.repository === "string" &&
+    value.repository.toLowerCase() === target.repository.toLowerCase()
+  );
+}
+
+function sameJson(
+  expected: unknown,
+  observed: unknown,
+  seen = new WeakSet<object>(),
+): boolean {
+  if (expected === observed) return true;
+  if (
+    expected === null ||
+    observed === null ||
+    typeof expected !== "object" ||
+    typeof observed !== "object" ||
+    Array.isArray(expected) !== Array.isArray(observed) ||
+    seen.has(observed)
+  ) {
+    return false;
+  }
+  seen.add(observed);
+  if (Array.isArray(expected) && Array.isArray(observed)) {
+    if (expected.length !== observed.length) return false;
+    return expected.every((item, index) =>
+      sameJson(item, observed[index], seen),
+    );
+  }
+  const expectedRecord = expected as Record<string, unknown>;
+  const observedRecord = observed as Record<string, unknown>;
+  const expectedKeys = Object.keys(expectedRecord).sort();
+  const observedKeys = Object.keys(observedRecord).sort();
+  return (
+    expectedKeys.length === observedKeys.length &&
+    expectedKeys.every(
+      (key, index) =>
+        key === observedKeys[index] &&
+        sameJson(expectedRecord[key], observedRecord[key], seen),
+    )
+  );
+}
+
+function verifiedSubmission(
+  value: unknown,
+  proposal: BoundReviewProposal,
+  target: Target,
+): CurationSubmission | null {
+  if (
+    !exactKeys(value, [
+      "adapter",
+      "decisions",
+      "format",
+      "head_sha",
+      "proposal_sha",
+      "pull_request",
+      "repository",
+      "source_coordinate",
+    ])
+  ) {
+    return null;
+  }
+  const submitted = value as Record<string, unknown>;
+  if (
+    submitted.adapter !== proposal.adapter ||
+    submitted.format !== "orinoco-lite-curation-submission-v1" ||
+    submitted.head_sha !== proposal.head_sha ||
+    submitted.proposal_sha !== proposal.proposal_sha ||
+    submitted.pull_request !== target.pullRequest ||
+    typeof submitted.repository !== "string" ||
+    submitted.repository.toLowerCase() !== target.repository.toLowerCase() ||
+    !sameJson(proposal.source_coordinate, submitted.source_coordinate) ||
+    !Array.isArray(submitted.decisions) ||
+    submitted.decisions.length !== proposal.candidates.length
+  ) {
+    return null;
+  }
+  for (let index = 0; index < proposal.candidates.length; index += 1) {
+    const candidate = proposal.candidates[index];
+    const decision = submitted.decisions[index];
+    if (
+      candidate === undefined ||
+      !exactKeys(decision, ["disposition", "operation", "pid", "record_path"])
+    ) {
+      return null;
+    }
+    const item = decision as Record<string, unknown>;
+    if (
+      (item.disposition !== "accept" &&
+        item.disposition !== "reject" &&
+        item.disposition !== "defer") ||
+      item.operation !== candidate.operation ||
+      item.pid !== candidate.pid ||
+      item.record_path !== candidate.record_path
+    ) {
+      return null;
+    }
+  }
+  return submitted as unknown as CurationSubmission;
+}
+
+function boundReviewProposal(
+  value: ReviewProposal,
+  target: Target,
+): BoundReviewProposal | null {
+  const record = value as ReviewProposal & {
+    review_service_origin?: unknown;
+    review_site_url?: unknown;
+  };
+  if (
+    record.review_service_origin !== window.location.origin ||
+    !oneLine(record.review_site_url)
+  ) {
+    return null;
+  }
+  let site: URL;
+  try {
+    site = new URL(record.review_site_url);
+  } catch {
+    return null;
+  }
+  if (
+    site.href !== record.review_site_url ||
+    site.origin !== target.reviewOrigin ||
+    !site.pathname.endsWith("/review/") ||
+    site.search !== "" ||
+    site.hash !== "" ||
+    value.pull_request !== target.pullRequest ||
+    value.repository.toLowerCase() !== target.repository.toLowerCase()
+  ) {
+    return null;
+  }
+  return record as BoundReviewProposal;
+}
+
+interface TransportRelayState {
+  active: boolean;
+  confirmationAcknowledged: boolean;
+  opener: Window;
+  postStarted: boolean;
+  proposalSent: boolean;
+  resultSent: boolean;
+  submissionAccepted: boolean;
+}
+
+interface ReviewTransportProps {
+  proposal: BoundReviewProposal;
+  session: Extract<SessionStatus, { authenticated: true }>;
+  target: Target;
+}
+
+function ReviewTransport({
+  proposal,
+  session,
+  target,
+}: ReviewTransportProps): React.JSX.Element {
+  const relay = useRef<TransportRelayState | null>(null);
+  const [submission, setSubmission] = useState<CurationSubmission | null>(null);
+  const [feedback, setFeedback] = useState(
+    "Waiting for the deployed review page to request the verified proposal.",
+  );
+  const [confirmationReady, setConfirmationReady] = useState(false);
+  const [posting, setPosting] = useState(false);
+
+  useEffect(() => {
+    const opener = window.opener;
+    if (opener === null) {
+      setFeedback(
+        "This transport must be opened from the deployed downstream review page.",
+      );
+      return;
+    }
+    const state: TransportRelayState = {
+      active: true,
+      confirmationAcknowledged: false,
+      opener,
+      postStarted: false,
+      proposalSent: false,
+      resultSent: false,
+      submissionAccepted: false,
+    };
+    relay.current = state;
+
+    function postedMessage(event: MessageEvent<unknown>): void {
+      if (
+        !state.active ||
+        event.source !== opener ||
+        event.origin !== target.reviewOrigin ||
+        event.data === null ||
+        typeof event.data !== "object" ||
+        Array.isArray(event.data)
+      ) {
+        return;
+      }
+      const value = event.data as Record<string, unknown>;
+      if (value.format === "orinoco-lite-review-proposal-request-v1") {
+        if (
+          state.proposalSent ||
+          !exactKeys(value, [
+            "artifact_id",
+            "format",
+            "handoff_nonce",
+            "pull_request",
+            "repository",
+          ]) ||
+          !exactCoordinates(value, target)
+        ) {
+          return;
+        }
+        state.proposalSent = true;
+        const response: ReviewProposalMessage = {
+          ...coordinates(target),
+          format: "orinoco-lite-review-proposal-message-v1",
+          login: session.login,
+          proposal,
+        };
+        opener.postMessage(response, target.reviewOrigin);
+        setFeedback(
+          "The verified proposal is connected to the downstream review page.",
+        );
+        return;
+      }
+      if (value.format === "orinoco-lite-review-confirmation-ready-v1") {
+        if (
+          !state.submissionAccepted ||
+          state.confirmationAcknowledged ||
+          state.postStarted ||
+          !exactKeys(value, [
+            "artifact_id",
+            "format",
+            "handoff_nonce",
+            "pull_request",
+            "repository",
+          ]) ||
+          !exactCoordinates(value, target)
+        ) {
+          return;
+        }
+        state.confirmationAcknowledged = true;
+        setConfirmationReady(true);
+        setFeedback(
+          "The downstream review is waiting for this final confirmation.",
+        );
+        return;
+      }
+      if (value.format !== "orinoco-lite-review-submission-message-v1") return;
+      if (
+        !state.proposalSent ||
+        state.submissionAccepted ||
+        !exactKeys(value, [
+          "artifact_id",
+          "format",
+          "handoff_nonce",
+          "pull_request",
+          "repository",
+          "submission",
+        ]) ||
+        !exactCoordinates(value, target)
+      ) {
+        return;
+      }
+      const accepted = verifiedSubmission(value.submission, proposal, target);
+      if (accepted === null) return;
+      state.submissionAccepted = true;
+      setSubmission(accepted);
+      const acknowledgement: ReviewConfirmationPendingMessage = {
+        ...coordinates(target),
+        format: "orinoco-lite-review-confirmation-pending-v1",
+      };
+      opener.postMessage(acknowledgement, target.reviewOrigin);
+      setFeedback(
+        "Confirm this read-only decision summary before posting to GitHub.",
+      );
+    }
+
+    window.addEventListener("message", postedMessage);
+    const ready: ReviewTransportReadyMessage = {
+      ...coordinates(target),
+      format: "orinoco-lite-review-transport-ready-v1",
+    };
+    opener.postMessage(ready, target.reviewOrigin);
+    return () => {
+      state.active = false;
+      if (relay.current === state) relay.current = null;
+      window.removeEventListener("message", postedMessage);
+    };
+  }, [
+    proposal,
+    session.login,
+    target.artifactId,
+    target.handoffNonce,
+    target.pullRequest,
+    target.repository,
+    target.reviewOrigin,
+  ]);
+
+  async function confirmPost(): Promise<void> {
+    const state = relay.current;
+    if (
+      state === null ||
+      !state.active ||
+      state.opener.closed ||
+      submission === null ||
+      !state.confirmationAcknowledged ||
+      state.postStarted ||
+      state.resultSent
+    ) {
+      return;
+    }
+    state.postStarted = true;
+    const started: ReviewPostStartedMessage = {
+      ...coordinates(target),
+      format: "orinoco-lite-review-post-started-v1",
+    };
+    state.opener.postMessage(started, target.reviewOrigin);
+    setPosting(true);
+    setFeedback("Posting the confirmed decision state to GitHub…");
+    let response: ReviewSubmissionResultMessage;
+    try {
+      const result = await submitDecisions(
+        submission,
+        session.csrf_token,
+        target.artifactId,
+      );
+      response = {
+        ...coordinates(target),
+        comment_url: result.comment_url,
+        error: null,
+        format: "orinoco-lite-review-submission-result-v1",
+        retry_safe: false,
+      };
+      setFeedback("The authenticated decision comment was posted to GitHub.");
+    } catch (error) {
+      response = {
+        ...coordinates(target),
+        comment_url: null,
+        error: message(error),
+        format: "orinoco-lite-review-submission-result-v1",
+        retry_safe: retrySafeSubmissionFailure(error),
+      };
+      setFeedback(
+        response.error ?? "The confirmed decisions could not be posted.",
+      );
+    }
+    if (state.active && !state.resultSent) {
+      state.resultSent = true;
+      state.opener.postMessage(response, target.reviewOrigin);
+    }
+    setPosting(false);
+  }
+
+  if (submission !== null) {
+    return (
+      <main className="landing" id="main-content">
+        <p className="eyebrow">Authenticated GitHub confirmation</p>
+        <h1>Confirm decisions before posting</h1>
+        <p className="lede">
+          The downstream site collected these choices. This central-origin page
+          is the final read-only confirmation before the authenticated write.
+        </p>
+        <dl>
+          <dt>Signed in as</dt>
+          <dd>{session.login}</dd>
+          <dt>Repository</dt>
+          <dd>{target.repository}</dd>
+          <dt>Pull request</dt>
+          <dd>#{target.pullRequest}</dd>
+          <dt>Proposal SHA</dt>
+          <dd>{proposal.proposal_sha}</dd>
+          <dt>Head SHA</dt>
+          <dd>{proposal.head_sha}</dd>
+        </dl>
+        <h2>Complete decision state</h2>
+        <ul aria-label="Confirmed decisions">
+          {proposal.candidates.map((candidate, index) => (
+            <li key={candidate.record_path}>
+              <code>{candidate.record_path}</code> ({candidate.friendly_id}) →{" "}
+              <strong>{submission.decisions[index]?.disposition}</strong>
+            </li>
+          ))}
+        </ul>
+        <button
+          disabled={
+            posting || !confirmationReady || relay.current?.postStarted === true
+          }
+          onClick={() => void confirmPost()}
+          type="button"
+        >
+          {posting
+            ? "Posting confirmed decisions…"
+            : !confirmationReady
+              ? "Waiting for downstream acknowledgement…"
+              : "Post these decisions to GitHub"}
+        </button>
+        <p className="feedback" role="status">
+          {feedback}
+        </p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="landing" id="main-content">
+      <p className="eyebrow">Authenticated GitHub transport</p>
+      <h1>Connected to the downstream review</h1>
+      <p className="lede">
+        Candidate review stays in the deployed static website. Keep this small
+        window open while it relays the verified proposal. GitHub posting
+        requires a separate confirmation here; no token is sent downstream.
+      </p>
+      <p className="feedback" role="status">
+        {feedback}
+      </p>
+      <p className="quiet">
+        {target.repository} pull request #{target.pullRequest}; signed in as{" "}
+        {session.login}.
+      </p>
+    </main>
+  );
+}
+
+function AuthComplete(): React.JSX.Element {
+  return (
+    <main className="landing" id="main-content">
+      <p className="eyebrow">GitHub sign-in complete</p>
+      <h1>Return to the review transport</h1>
+      <p className="lede">
+        The transport window will detect this short-lived session and reconnect
+        to the deployed review page. This window can now be closed.
+      </p>
+      <button onClick={() => window.close()} type="button">
+        Close sign-in window
+      </button>
+    </main>
+  );
+}
+
+function ServiceLanding(): React.JSX.Element {
+  return (
+    <main className="landing" id="main-content">
+      <p className="eyebrow">Orinoco Lite GitHub transport</p>
+      <h1>Open review from the deployed website</h1>
+      <p className="lede">
+        Source-adapter review is part of each downstream static site at its
+        <code> /review/</code> route. This service only provides short-lived
+        GitHub authentication and authenticated transport; it does not host a
+        second review application.
+      </p>
     </main>
   );
 }
@@ -913,517 +1203,23 @@ function ShaclHandoff({
   );
 }
 
-function RecordSide({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}): React.JSX.Element {
-  return (
-    <section className="record-side">
-      <h4>{label}</h4>
-      <pre>{value ?? "Record does not exist."}</pre>
-    </section>
-  );
-}
-
-interface CandidateCardProps {
-  candidate: ReviewCandidate;
-  decision: Disposition | undefined;
-  index: number;
-  onDecision: (value: Disposition) => void;
-  register: (element: HTMLElement | null) => void;
-}
-
-function CandidateCard({
-  candidate,
-  decision,
-  index,
-  onDecision,
-  register,
-}: CandidateCardProps): React.JSX.Element {
-  const changed = candidate.before !== candidate.after;
-  return (
-    <article
-      aria-labelledby={`candidate-${index}`}
-      className={`candidate ${decision === undefined ? "candidate-unresolved" : ""}`}
-      data-candidate-index={index}
-      ref={register}
-      tabIndex={-1}
-    >
-      <header className="candidate-header">
-        <div>
-          <p className="candidate-id">{candidate.friendly_id}</p>
-          <h2 id={`candidate-${index}`}>{candidate.label}</h2>
-        </div>
-        <div className="badges">
-          <span className={`badge badge-${candidate.operation}`}>
-            {candidate.operation}
-          </span>
-          {!changed && <span className="badge">matches baseline at head</span>}
-        </div>
-      </header>
-
-      <div
-        className="record-diff"
-        aria-label={`Before and after for ${candidate.label}`}
-      >
-        <RecordSide label="Before proposal" value={candidate.before} />
-        <RecordSide label="Current pull-request head" value={candidate.after} />
-      </div>
-
-      <details className="details">
-        <summary>Source and proposal details</summary>
-        <dl>
-          <dt>PID</dt>
-          <dd>{candidate.pid}</dd>
-          <dt>Source record</dt>
-          <dd>{candidate.source_record_id}</dd>
-          <dt>Source namespace</dt>
-          <dd>{candidate.source_namespace}</dd>
-          <dt>Path</dt>
-          <dd>{candidate.record_path}</dd>
-          <dt>Claim hash</dt>
-          <dd>{candidate.claim_sha256}</dd>
-        </dl>
-        {candidate.blockers.length > 0 && (
-          <div className="blockers">
-            <h4>Diagnostics</h4>
-            <ul>
-              {candidate.blockers.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </details>
-
-      <fieldset className="decision-group">
-        <legend>Decision for {candidate.friendly_id}</legend>
-        {(["accept", "reject", "defer"] as const).map((value) => (
-          <label className={`decision decision-${value}`} key={value}>
-            <input
-              checked={decision === value}
-              name={`decision-${index}`}
-              onChange={() => onDecision(value)}
-              type="radio"
-              value={value}
-            />
-            <span>
-              {value[0]?.toUpperCase()}
-              {value.slice(1)}
-            </span>
-          </label>
-        ))}
-      </fieldset>
-    </article>
-  );
-}
-
-interface ReviewProps {
-  artifactId: number;
-  proposal: ReviewProposal;
-  session: Extract<SessionStatus, { authenticated: true }>;
-}
-
-function Review({
-  artifactId,
-  proposal,
-  session,
-}: ReviewProps): React.JSX.Element {
-  const [decisions, setDecisions] = useState<DecisionState>({});
-  const [filter, setFilter] = useState<DecisionFilter>("all");
-  const [query, setQuery] = useState("");
-  const [changedOnly, setChangedOnly] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [commentUrl, setCommentUrl] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [focusCandidate, setFocusCandidate] = useState<number | null>(null);
-  const cards = useRef<Array<HTMLElement | null>>([]);
-
-  const unresolved = proposal.candidates.filter(
-    (candidate) => decisions[candidate.record_path] === undefined,
-  ).length;
-  const visible = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    return proposal.candidates.filter((candidate) => {
-      const disposition = decisions[candidate.record_path];
-      if (filter === "unresolved" && disposition !== undefined) return false;
-      if (filter !== "all" && filter !== "unresolved" && disposition !== filter)
-        return false;
-      if (changedOnly && candidate.before === candidate.after) return false;
-      if (!needle) return true;
-      return [
-        candidate.friendly_id,
-        candidate.label,
-        candidate.pid,
-        candidate.record_path,
-        candidate.source_namespace,
-        candidate.source_record_id,
-      ].some((value) => value.toLocaleLowerCase().includes(needle));
-    });
-  }, [changedOnly, decisions, filter, proposal.candidates, query]);
-  const visibleIndices = useMemo(
-    () => visible.map((candidate) => proposal.candidates.indexOf(candidate)),
-    [proposal.candidates, visible],
-  );
-
-  useEffect(() => {
-    if (focusCandidate === null) return;
-    const card = cards.current[focusCandidate];
-    if (card === null || card === undefined) return;
-    card.focus();
-    setFocusCandidate(null);
-  }, [focusCandidate, visibleIndices]);
-
-  useEffect(() => {
-    function shortcut(event: KeyboardEvent): void {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
-        return;
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        target instanceof HTMLButtonElement
-      )
-        return;
-      const current =
-        document.activeElement instanceof HTMLElement
-          ? Number(document.activeElement.dataset.candidateIndex)
-          : -1;
-      if (event.key === "j" || event.key === "k") {
-        event.preventDefault();
-        if (visibleIndices.length === 0) return;
-        const direction = event.key === "j" ? 1 : -1;
-        const currentPosition = visibleIndices.indexOf(current);
-        const start =
-          currentPosition >= 0
-            ? currentPosition
-            : direction > 0
-              ? -1
-              : visibleIndices.length;
-        const nextPosition = Math.min(
-          visibleIndices.length - 1,
-          Math.max(0, start + direction),
-        );
-        const next = visibleIndices[nextPosition];
-        if (next !== undefined) cards.current[next]?.focus();
-      } else if (
-        (event.key === "a" || event.key === "r" || event.key === "d") &&
-        current >= 0
-      ) {
-        event.preventDefault();
-        const candidate = proposal.candidates[current];
-        if (candidate !== undefined) {
-          const value =
-            event.key === "a"
-              ? "accept"
-              : event.key === "r"
-                ? "reject"
-                : "defer";
-          setDecisions((existing) => ({
-            ...existing,
-            [candidate.record_path]: value,
-          }));
-        }
-      }
-    }
-    window.addEventListener("keydown", shortcut);
-    return () => window.removeEventListener("keydown", shortcut);
-  }, [proposal.candidates, visibleIndices]);
-
-  function choose(candidate: ReviewCandidate, value: Disposition): void {
-    setDecisions((existing) => ({
-      ...existing,
-      [candidate.record_path]: value,
-    }));
-    setFeedback(null);
-  }
-
-  function chooseUnresolved(value: Disposition): void {
-    setDecisions((existing) => {
-      const next = { ...existing };
-      for (const candidate of proposal.candidates) {
-        if (next[candidate.record_path] === undefined) {
-          next[candidate.record_path] = value;
-        }
-      }
-      return next;
-    });
-    setFeedback(null);
-  }
-
-  async function submit(event: React.FormEvent): Promise<void> {
-    event.preventDefault();
-    if (unresolved > 0) {
-      setFeedback(
-        `${unresolved} ${unresolved === 1 ? "record still needs" : "records still need"} an Accept, Reject, or Defer decision.`,
-      );
-      const first = proposal.candidates.findIndex(
-        (candidate) => decisions[candidate.record_path] === undefined,
-      );
-      setQuery("");
-      setFilter("unresolved");
-      setChangedOnly(false);
-      setFocusCandidate(first);
-      return;
-    }
-    const submission: CurationSubmission = {
-      adapter: proposal.adapter,
-      decisions: proposal.candidates.map((candidate) => ({
-        disposition: decisions[candidate.record_path] as Disposition,
-        operation: candidate.operation,
-        pid: candidate.pid,
-        record_path: candidate.record_path,
-      })),
-      format: "orinoco-lite-curation-submission-v1",
-      head_sha: proposal.head_sha,
-      proposal_sha: proposal.proposal_sha,
-      pull_request: proposal.pull_request,
-      repository: proposal.repository,
-      source_coordinate: proposal.source_coordinate,
-    };
-    setSubmitting(true);
-    setFeedback(null);
-    try {
-      const result = await submitDecisions(
-        submission,
-        session.csrf_token,
-        artifactId,
-      );
-      setCommentUrl(result.comment_url);
-      setFeedback(
-        "The complete decision state was posted to GitHub. The trusted workflow will revalidate it before committing.",
-      );
-    } catch (error) {
-      setFeedback(message(error));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function signOut(): Promise<void> {
-    await logout(session.csrf_token);
-    window.location.reload();
-  }
-
-  return (
-    <>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Metadata proposal</p>
-          <h1>
-            {proposal.repository} #{proposal.pull_request}
-          </h1>
-        </div>
-        <div className="account">
-          <span>
-            Signed in as <strong>{session.login}</strong>
-          </span>
-          <button
-            className="text-button"
-            onClick={() => void signOut()}
-            type="button"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main id="main-content">
-        <section className="review-summary" aria-labelledby="review-title">
-          <div>
-            <p className="eyebrow">{proposal.adapter}</p>
-            <h2 id="review-title">Review every proposed record</h2>
-            <p>
-              The pull request contains the authoritative diff. Your complete
-              decision state is posted as an authenticated comment and rechecked
-              at the exact head.
-            </p>
-          </div>
-          <div className="completion" aria-live="polite">
-            <strong>
-              {proposal.candidates.length - unresolved}/
-              {proposal.candidates.length}
-            </strong>
-            <span>decisions complete</span>
-          </div>
-        </section>
-
-        <section className="bulk-decisions" aria-labelledby="bulk-title">
-          <div>
-            <h3 id="bulk-title">Set a default decision</h3>
-            <p>
-              Apply one decision to every unresolved record, then change any
-              exceptions in the record cards below. Existing choices are
-              preserved.
-            </p>
-          </div>
-          <div className="bulk-decision-actions">
-            {(["accept", "reject", "defer"] as const).map((value) => (
-              <button
-                className={`bulk-decision bulk-decision-${value}`}
-                disabled={unresolved === 0}
-                key={value}
-                onClick={() => chooseUnresolved(value)}
-                type="button"
-              >
-                {value[0]?.toUpperCase()}
-                {value.slice(1)} all unresolved
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="filters" aria-label="Review filters">
-          <label className="search">
-            Search records
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Label, PID, source, or path"
-              type="search"
-              value={query}
-            />
-          </label>
-          <label>
-            Decision
-            <select
-              onChange={(event) =>
-                setFilter(event.target.value as DecisionFilter)
-              }
-              value={filter}
-            >
-              <option value="all">All</option>
-              <option value="unresolved">Unresolved</option>
-              <option value="accept">Accepted</option>
-              <option value="reject">Rejected</option>
-              <option value="defer">Deferred</option>
-            </select>
-          </label>
-          <label className="checkbox">
-            <input
-              checked={changedOnly}
-              onChange={(event) => setChangedOnly(event.target.checked)}
-              type="checkbox"
-            />
-            Changed at current head only
-          </label>
-          <div className="review-actions">
-            <a
-              href={`/edit/?${new URLSearchParams({
-                expected_head_sha: proposal.head_sha,
-                pull_request: String(proposal.pull_request),
-                repository: proposal.repository,
-              }).toString()}`}
-            >
-              Propose downloaded SHACL bundle
-            </a>
-            <a
-              href={proposal.pull_request_url}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Open GitHub diff
-            </a>
-          </div>
-        </section>
-
-        <p className="keyboard-help">
-          Keyboard: J/K moves between records; A accepts, R rejects, and D
-          defers the focused record.
-        </p>
-
-        <form onSubmit={(event) => void submit(event)}>
-          <div className="candidate-list">
-            {visible.map((candidate) => {
-              const index = proposal.candidates.indexOf(candidate);
-              return (
-                <CandidateCard
-                  candidate={candidate}
-                  decision={decisions[candidate.record_path]}
-                  index={index}
-                  key={candidate.record_path}
-                  onDecision={(value) => choose(candidate, value)}
-                  register={(element) => {
-                    cards.current[index] = element;
-                  }}
-                />
-              );
-            })}
-            {visible.length === 0 && (
-              <p className="empty">No records match the current filters.</p>
-            )}
-          </div>
-
-          <section className="submission-panel">
-            <div>
-              <h2>Submit complete decision state</h2>
-              <p>
-                {unresolved === 0
-                  ? "Every candidate has one decision."
-                  : `${unresolved} remaining.`}
-              </p>
-            </div>
-            <button disabled={submitting || commentUrl !== null} type="submit">
-              {submitting
-                ? "Posting…"
-                : commentUrl === null
-                  ? "Post decisions to GitHub"
-                  : "Decisions posted"}
-            </button>
-          </section>
-          {feedback !== null && (
-            <p
-              className={commentUrl === null ? "feedback" : "feedback success"}
-              role="status"
-            >
-              {feedback}{" "}
-              {commentUrl !== null && (
-                <a href={commentUrl}>View authenticated comment</a>
-              )}
-            </p>
-          )}
-        </form>
-      </main>
-    </>
-  );
-}
-
 export default function App(): React.JSX.Element {
   const target = currentTarget();
   const shaclTarget = currentShaclTarget();
-  const repository = contextualRepository();
   const [session, setSession] = useState<SessionStatus | null>(null);
-  const [discovery, setDiscovery] = useState<ReviewDiscovery | null>(null);
-  const [proposal, setProposal] = useState<ReviewProposal | null>(null);
+  const [proposal, setProposal] = useState<BoundReviewProposal | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const authComplete =
+    window.location.pathname === "/review-auth-complete" ||
+    window.location.pathname === "/review-auth-complete/";
 
   useEffect(() => {
-    if (target === null && shaclTarget === null && repository === null) return;
+    if (target === null && shaclTarget === null) return;
     let active = true;
     void (async () => {
       try {
         const current = await loadSession();
-        if (!active) return;
-        setSession(current);
-        if (current.authenticated && target !== null) {
-          const loaded = await loadProposal(
-            target.repository,
-            target.pullRequest,
-            target.artifactId,
-          );
-          if (active) setProposal(loaded);
-        } else if (
-          current.authenticated &&
-          target === null &&
-          shaclTarget === null &&
-          repository !== null
-        ) {
-          const loaded = await loadDiscovery(repository);
-          if (active) setDiscovery(loaded);
-        }
+        if (active) setSession(current);
       } catch (error) {
         if (active) setFailure(message(error));
       }
@@ -1432,24 +1228,96 @@ export default function App(): React.JSX.Element {
       active = false;
     };
   }, [
-    repository,
     shaclTarget?.expectedHeadSha,
+    shaclTarget?.handoffNonce,
     shaclTarget?.pullRequest,
     shaclTarget?.repository,
+    target?.artifactId,
+    target?.handoffNonce,
+    target?.pullRequest,
+    target?.repository,
+    target?.reviewOrigin,
+  ]);
+
+  const grantMatches =
+    target !== null &&
+    session !== null &&
+    session.authenticated &&
+    matchingReviewGrant(session, target);
+
+  useEffect(() => {
+    if (target === null || grantMatches) return;
+    let active = true;
+    const interval = window.setInterval(() => {
+      void loadSession()
+        .then((current) => {
+          if (active) setSession(current);
+        })
+        .catch((error) => {
+          if (active) setFailure(message(error));
+        });
+    }, 1_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [grantMatches, target?.artifactId, target?.handoffNonce]);
+
+  useEffect(() => {
+    if (
+      target === null ||
+      session === null ||
+      !session.authenticated ||
+      !matchingReviewGrant(session, target)
+    ) {
+      return;
+    }
+    let active = true;
+    void loadProposal(target.repository, target.pullRequest, target.artifactId)
+      .then((loaded) => {
+        if (!active) return;
+        const bound = boundReviewProposal(loaded, target);
+        if (bound === null) {
+          setFailure(
+            "The proposal is not bound to this transport and downstream review route.",
+          );
+          return;
+        }
+        setProposal(bound);
+      })
+      .catch((error) => {
+        if (active) setFailure(message(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    grantMatches,
+    session,
     target?.artifactId,
     target?.pullRequest,
     target?.repository,
   ]);
 
+  if (authComplete) return <AuthComplete />;
   if (target === null && shaclTarget === null) {
-    return (
-      <Landing
-        discovery={discovery}
-        failure={failure}
-        repository={repository}
-        session={session}
-      />
-    );
+    if (
+      window.location.pathname === "/review-transport" ||
+      window.location.pathname === "/review-transport/"
+    ) {
+      return (
+        <main className="landing" id="main-content">
+          <p className="eyebrow">Transport unavailable</p>
+          <h1>The downstream handoff link is invalid</h1>
+          <p className="feedback">
+            Reopen the transport from the deployed site&apos;s{" "}
+            <code>/review/</code>
+            route.
+          </p>
+        </main>
+      );
+    }
+    return <ServiceLanding />;
   }
   if (failure !== null) {
     return (
@@ -1472,16 +1340,11 @@ export default function App(): React.JSX.Element {
     return <ShaclHandoff session={session} target={shaclTarget} />;
   }
   if (target === null) {
-    return (
-      <Landing
-        discovery={discovery}
-        failure={failure}
-        repository={repository}
-        session={session}
-      />
-    );
+    return <ServiceLanding />;
   }
-  if (!session.authenticated) return <SignIn target={target} />;
+  if (!session.authenticated || !matchingReviewGrant(session, target)) {
+    return <SignIn target={target} />;
+  }
   if (proposal === null)
     return (
       <main className="landing" id="main-content">
@@ -1489,10 +1352,6 @@ export default function App(): React.JSX.Element {
       </main>
     );
   return (
-    <Review
-      artifactId={target.artifactId}
-      proposal={proposal}
-      session={session}
-    />
+    <ReviewTransport proposal={proposal} session={session} target={target} />
   );
 }

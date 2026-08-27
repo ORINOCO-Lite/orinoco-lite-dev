@@ -1,7 +1,8 @@
 # Curation review application
 
-This package implements the stateless browser and authentication surface in [`docs/github-curation-review.md`](../../docs/github-curation-review.md).
-It reads a workflow-generated metadata proposal and ephemeral presentation artifact from GitHub, presents one complete set of record decisions, and posts that set as the authenticated user's pull-request comment.
+This package implements both halves of the browser boundary in [`docs/github-curation-review.md`](../../docs/github-curation-review.md).
+Its content-neutral static build is released inside the Orinoco runtime and bound into each configured downstream at `/review/`.
+Its central build provides only GitHub authentication, verified proposal reads, explicit final confirmation, and authenticated comment transport.
 It also implements the thin GitHub handoff in [`docs/github-shacl-vue-edit.md`](../../docs/github-shacl-vue-edit.md): it authenticates a curator, receives the unchanged bundle from the downstream static editor or a selected downloaded file, and creates an explicit temporary Git handoff for trusted Python replacement.
 It does not run adapters, convert metadata, apply decisions, or retain metadata, bundles, artifacts, or curation state.
 
@@ -23,6 +24,9 @@ npm run pages:dev
 ```
 
 Copy `.dev.vars.example` to the untracked `.dev.vars` file before running the Functions locally.
+
+`npm run build:review` independently produces the unconfigured downstream shell in `dist-review/`.
+Release assembly inventories its dependencies and places it in the runtime; the engine then supplies a strict `config.json` from the downstream's `site.repository` and `site.curation_service`.
 
 ## GitHub App configuration
 
@@ -60,8 +64,8 @@ Pages Functions are under `functions/`; `npm run pages:functions:build` verifies
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
 Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
 
-The central `https://orinoco-curation-review.pages.dev/` deployment is the default hosted option, but `PUBLIC_ORIGIN` is configurable and downstreams select their review-application origin independently.
-The origin is not embedded in a submission or PR-body machine protocol.
+The central `https://orinoco-curation-review.pages.dev/` deployment is the default authentication and GitHub-transport option, but `PUBLIC_ORIGIN` is configurable.
+It is not a source-adapter review destination.
 
 The SHACL Vue path reuses this same application deployment.
 It does not add a separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service.
@@ -70,15 +74,14 @@ That route is only a lightweight sign-in, in-memory receiver or file upload, pub
 It does not contain, frame, assemble, or host SHACL Vue.
 The downstream site's own `/edit/` route is the sole editor and offers both **Download review bundle** and **Propose via GitHub** for the same unchanged result.
 
-A canonical review link has this form:
+A canonical source-adapter review link belongs to the deployed downstream:
 
 ```text
-https://review.example/review/?repository=owner/repository&pull_request=42&artifact_id=123456789
+https://owner.example/site/review/?repository=owner/repository&pull_request=42&artifact_id=123456789
 ```
 
-An exact link opens that proposal directly.
-A repository-only entry link such as `https://review.example/?repository=owner/repository` preserves the site identity through authentication and then lists only that repository's relevant open curation pull requests and unexpired matching artifacts.
-Discovery is a live, stateless convenience; opening a choice performs the complete authoritative proposal verification again.
+That route renders the complete candidate review.
+It opens the central `/review-transport/` route in a separate window; OAuth uses a nested window so the transport retains the exact downstream opener.
 
 The link selects one artifact by immutable GitHub artifact ID.
 Its required name is `orinoco-curation-review-<proposal_sha>` and its ZIP contains exactly one regular top-level `review-bundle.json` using format `orinoco-lite-curation-review-bundle-v1`.
@@ -93,6 +96,17 @@ Oversized artifacts, candidate sets, and proposal paths are rejected before reco
 The pull-request body is only an accessible fallback and review link.
 The application never parses it for candidate identity, ordering, source coordinates, or completeness.
 It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for presentation facts.
+
+Before releasing proposal data, the central service verifies the downstream repository, base URL, and service origin from `orinoco.yaml` at the proposal's metadata base.
+A sealed short-lived grant and an exact ready/request handshake bind the repository, pull request, artifact, downstream origin, popup, and one-time nonce.
+The downstream keeps all decisions in browser memory.
+When the complete decision set returns, the central origin displays every path and disposition and requires a final user click before posting.
+Tokens and CSRF material never cross the browser-message channel.
+
+The transport sends `post-started` before its authenticated request.
+A typed result marks only a definite pre-write 4xx rejection as retry-safe; the static route may then reopen the transport without discarding decisions.
+Network, 5xx, malformed-success, timeout, and unknown results remain locked and tell the curator to inspect the pull request before another action.
+The retired `/api/discovery` and `/api/auth/discovery-start` routes return HTTP 410 and do not authenticate or contact GitHub.
 
 ## Static-editor SHACL Vue handoff
 

@@ -8,13 +8,14 @@ import {
 import { base64urlEncode } from "../functions/lib/encoding";
 import type { Env, EventContext } from "../functions/lib/pages";
 import { createSessionCookie } from "../functions/lib/session";
-import type { CurationSubmission } from "../shared/contracts";
+import type { CurationSubmission, ReviewGrant } from "../shared/contracts";
 import { MAX_GITHUB_TEXT_LENGTH } from "../shared/contracts";
 import {
   ARTIFACT_ID,
   BASE_SHA,
   CLAIM_ONE,
   HEAD_SHA,
+  ORINOCO_CONFIG,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
@@ -25,11 +26,20 @@ const CLOUDFLARE_FREE_SUBREQUEST_LIMIT = 50;
 const FILES_PER_COMMIT_PAGE = 100;
 const BLOBS_PER_GRAPHQL_REQUEST = 20;
 const ORIGIN = "https://review.example";
+const REVIEW_ORIGIN = "https://site.example";
+const REVIEW_NONCE = "e".repeat(64);
 const env: Env = {
   GITHUB_CLIENT_ID: "Iv1.example",
   GITHUB_CLIENT_SECRET: "client-secret",
   PUBLIC_ORIGIN: ORIGIN,
   SESSION_SEAL_KEY: base64urlEncode(new Uint8Array(32).fill(7)),
+};
+const REVIEW_GRANT: ReviewGrant = {
+  artifact_id: ARTIFACT_ID,
+  handoff_nonce: REVIEW_NONCE,
+  pull_request: 42,
+  repository: "example/site",
+  review_origin: REVIEW_ORIGIN,
 };
 
 function context(request: Request): EventContext {
@@ -189,6 +199,17 @@ describe("hosted service-resource envelope", () => {
             .filter(([key]) => key.startsWith("expression"))
             .forEach(([key, expression]) => {
               const alias = `blob${key.slice("expression".length)}`;
+              if (expression === `${BASE_SHA}:orinoco.yaml`) {
+                const text = ORINOCO_CONFIG;
+                repository[alias] = {
+                  __typename: "Blob",
+                  byteSize: new TextEncoder().encode(text).byteLength,
+                  isBinary: false,
+                  isTruncated: false,
+                  text,
+                };
+                return;
+              }
               const filename = expression.slice(
                 expression.lastIndexOf("/") + 1,
               );
@@ -220,6 +241,7 @@ describe("hosted service-resource envelope", () => {
         access_token: "ghu_short_lived",
         csrf_token: "csrf-token",
         login: "octocat",
+        review_grant: REVIEW_GRANT,
       },
       28_800,
     );
