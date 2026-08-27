@@ -19,9 +19,6 @@ FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "upstream_orinoco.py.pixi.lock"
 CHECK_ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "check_upstream_orinoco.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
-UPSTREAM_PAGES_WORKFLOW = (
-    ROOT / ".github" / "workflows" / "upstream-pages-trial.yml"
-)
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
@@ -151,14 +148,70 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("restore_local_state", builder)
         self.assertIn("--no-write-fetch-head", builder)
 
-    def test_static_builds_share_one_annex_metadata_pin(self) -> None:
+    def test_static_builder_uses_one_authoritative_annex_pin(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
             encoding="utf-8"
         )
         match = re.search(r"^annex_commit=([0-9a-f]{40})$", builder, re.M)
         self.assertIsNotNone(match)
-        workflow = UPSTREAM_PAGES_WORKFLOW.read_text(encoding="utf-8")
-        self.assertEqual(workflow.count(match.group(1)), 2)
+        self.assertEqual(builder.count(match.group(1)), 1)
+        self.assertIn(
+            "upstream_url=https://hub.psychoinformatics.de/www/"
+            "www-from-model.git",
+            builder,
+        )
+        self.assertIn(
+            '"$upstream_url" "+$annex_commit:$annex_remote_ref"',
+            builder,
+        )
+        self.assertIn(
+            '-c remote.$annex_remote_name.url="$upstream_url"',
+            builder,
+        )
+        self.assertNotIn(
+            "github.com/ORINOCO-Lite/www-from-model",
+            builder,
+        )
+
+    def test_supported_checkouts_never_follow_branch_hints(self) -> None:
+        paths = (
+            ROOT / "tools" / "checkout_submodules.py",
+            ROOT / "tools" / "upstream_checkout.py",
+            WORKFLOW,
+            RELEASE_WORKFLOW,
+        )
+        for path in paths:
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertNotIn("--remote", path.read_text(encoding="utf-8"))
+
+        for module in (
+            "submodules/dump-things-pyclient",
+            "submodules/dump-things-service",
+            "submodules/pool.psychoinformatics.de-ui",
+            "submodules/query-things",
+            "submodules/things-enrichment-tools",
+            "submodules/things-schemas",
+            "submodules/www-from-model",
+        ):
+            result = subprocess.run(
+                [
+                    "git",
+                    "config",
+                    "-f",
+                    ".gitmodules",
+                    "--get",
+                    f"submodule.{module}.branch",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_retired_engineering_pages_workflow_stays_absent(self) -> None:
+        workflow = ROOT / ".github" / "workflows" / "upstream-pages-trial.yml"
+        self.assertFalse(workflow.exists())
 
     def test_release_pin_surfaces_match_reviewed_gitlinks(self) -> None:
         package = tomllib.loads(PACKAGE_MANIFEST.read_text(encoding="utf-8"))

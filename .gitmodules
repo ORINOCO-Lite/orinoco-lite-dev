@@ -21,11 +21,9 @@
 [submodule "submodules/dump-things-pyclient"]
 	path = submodules/dump-things-pyclient
 	url = https://github.com/ORINOCO-Lite/dump-things-pyclient.git
-	branch = master
 [submodule "submodules/dump-things-service"]
 	path = submodules/dump-things-service
 	url = https://github.com/ORINOCO-Lite/dump-things-service.git
-	branch = master
 [submodule "submodules/dump-things-service-mirror"]
 	path = submodules/dump-things-service-mirror
 	url = https://github.com/leej3/dump-things-service-mirror.git
@@ -57,7 +55,6 @@
 [submodule "submodules/query-things"]
 	path = submodules/query-things
 	url = https://github.com/ORINOCO-Lite/query-things.git
-	branch = main
 [submodule "submodules/research-information-ui-assets"]
 	path = submodules/research-information-ui-assets
 	url = https://github.com/leej3/research-information-ui-assets.git
@@ -73,7 +70,6 @@
 [submodule "submodules/things-enrichment-tools"]
 	path = submodules/things-enrichment-tools
 	url = https://github.com/ORINOCO-Lite/things-enrichment-tools.git
-	branch = main
 [submodule "submodules/things-graph-renderer"]
 	path = submodules/things-graph-renderer
 	url = https://github.com/leej3/things-graph-renderer.git
@@ -81,7 +77,6 @@
 [submodule "submodules/things-schemas"]
 	path = submodules/things-schemas
 	url = https://github.com/ORINOCO-Lite/things-schemas.git
-	branch = main
 [submodule "submodules/tools"]
 	path = submodules/tools
 	url = https://github.com/leej3/tools.git
@@ -89,8 +84,6 @@
 [submodule "submodules/www-from-model"]
 	path = submodules/www-from-model
 	url = https://github.com/ORINOCO-Lite/www-from-model.git
-	branch = main
 [submodule "submodules/pool.psychoinformatics.de-ui"]
 	path = submodules/pool.psychoinformatics.de-ui
 	url = https://github.com/ORINOCO-Lite/pool.psychoinformatics.de-ui.git
-	branch = codex/local-deployment
