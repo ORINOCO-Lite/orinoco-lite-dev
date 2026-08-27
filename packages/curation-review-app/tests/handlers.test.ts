@@ -311,7 +311,7 @@ describe("GitHub App user-to-server handlers", () => {
     );
     expect(callback.status).toBe(302);
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/review-auth-complete/`,
+      `${ORIGIN}/api/transport?kind=review&artifact_id=${ARTIFACT_ID}&handoff_nonce=${REVIEW_NONCE}&pull_request=42&repository=example%2Fsite&review_origin=${encodeURIComponent(REVIEW_ORIGIN)}`,
     );
     const setCookie = callback.headers.get("set-cookie") as string;
     expect(setCookie).toContain(`${OAUTH_COOKIE}=;`);
@@ -326,6 +326,7 @@ describe("GitHub App user-to-server handlers", () => {
       csrf_token: expect.any(String),
       login: "octocat",
       review_grant: REVIEW_GRANT,
+      shacl_grant: null,
     });
     expect(setCookie).not.toContain("must-not-be-retained");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -492,8 +493,30 @@ describe("GitHub App user-to-server handlers", () => {
       ),
     );
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/edit/?repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${HEAD_SHA}&pull_request=42`,
+      `${ORIGIN}/api/transport?kind=shacl&repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${HEAD_SHA}&pull_request=42`,
     );
+    const authenticated = await readSessionCookie(
+      new Request(ORIGIN, {
+        headers: {
+          Cookie: cookiePair(
+            callback.headers.get("set-cookie") as string,
+            SESSION_COOKIE,
+          ),
+        },
+      }),
+      env,
+    );
+    expect(authenticated).toMatchObject({
+      login: "octocat",
+      review_grant: null,
+      shacl_grant: {
+        editor_origin: EDITOR_ORIGIN,
+        expected_head_sha: HEAD_SHA,
+        handoff_nonce: HANDOFF_NONCE,
+        pull_request: 42,
+        repository: "example/site",
+      },
+    });
   });
 
   it.each([
@@ -519,7 +542,7 @@ describe("GitHub App user-to-server handlers", () => {
         ),
       ),
     ).rejects.toMatchObject({
-      code: "invalid_shacl_auth_target",
+      code: "invalid_shacl_transport",
       status: 400,
     });
   });

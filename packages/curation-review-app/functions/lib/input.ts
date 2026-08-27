@@ -1,7 +1,9 @@
 import { HttpError } from "./http";
 import {
   isReviewHandoffNonce,
+  isSafeEditorOrigin,
   isSafeReviewOrigin,
+  isShaclHandoffNonce,
 } from "../../shared/contracts";
 
 const REPOSITORY =
@@ -16,6 +18,14 @@ export interface ReviewTarget {
 export interface ReviewTransportTarget extends ReviewTarget {
   handoffNonce: string;
   reviewOrigin: string;
+}
+
+export interface ShaclTransportTarget {
+  editorOrigin: string;
+  expectedHeadSha: string | null;
+  handoffNonce: string;
+  pullRequest: number | null;
+  repository: string;
 }
 
 export function parseArtifactId(value: string | null): number {
@@ -130,6 +140,57 @@ export function reviewTransportTarget(url: URL): ReviewTransportTarget {
     ...target,
     handoffNonce: url.searchParams.get("handoff_nonce") as string,
     reviewOrigin: url.searchParams.get("review_origin") as string,
+  };
+}
+
+export function shaclTransportTarget(url: URL): ShaclTransportTarget {
+  const allowed = new Set([
+    "editor_origin",
+    "expected_head_sha",
+    "handoff_nonce",
+    "pull_request",
+    "repository",
+  ]);
+  if ([...url.searchParams.keys()].some((key) => !allowed.has(key))) {
+    throw new HttpError(
+      400,
+      "unexpected_query",
+      "The SHACL transport request has an unexpected query field.",
+    );
+  }
+  if (
+    url.searchParams.getAll("editor_origin").length !== 1 ||
+    url.searchParams.getAll("handoff_nonce").length !== 1 ||
+    url.searchParams.getAll("repository").length !== 1 ||
+    !isSafeEditorOrigin(url.searchParams.get("editor_origin")) ||
+    !isShaclHandoffNonce(url.searchParams.get("handoff_nonce"))
+  ) {
+    throw new HttpError(
+      400,
+      "invalid_shacl_transport",
+      "The downstream SHACL transport coordinates are invalid.",
+    );
+  }
+  const pulls = url.searchParams.getAll("pull_request");
+  const heads = url.searchParams.getAll("expected_head_sha");
+  if (
+    pulls.length > 1 ||
+    heads.length > 1 ||
+    (pulls.length === 0) !== (heads.length === 0) ||
+    (heads.length === 1 && !/^[0-9a-f]{40}$/.test(heads[0] ?? ""))
+  ) {
+    throw new HttpError(
+      400,
+      "invalid_shacl_transport",
+      "The SHACL pull-request coordinates are invalid.",
+    );
+  }
+  return {
+    editorOrigin: url.searchParams.get("editor_origin") as string,
+    expectedHeadSha: heads[0] ?? null,
+    handoffNonce: url.searchParams.get("handoff_nonce") as string,
+    pullRequest: pulls.length === 1 ? parsePullRequest(pulls[0] ?? null) : null,
+    repository: parseRepository(url.searchParams.get("repository")),
   };
 }
 

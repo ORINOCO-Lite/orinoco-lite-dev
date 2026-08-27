@@ -5,14 +5,31 @@ import { getRecordQuads, quadsToTTL, toCURIE } from '@/modules/utils';
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 2;
 export const REVIEW_BUNDLE_EVENT = 'orinoco:review-bundle';
-export const REVIEW_BUNDLE_MESSAGE_FORMAT =
-    'orinoco-lite-shacl-bundle-message-v1';
+export const REVIEW_PROPOSAL_MESSAGE_FORMAT =
+    'orinoco-lite-shacl-proposal-message-v1';
 export const REVIEW_PROPOSAL_READY_FORMAT =
     'orinoco-lite-shacl-proposal-ready-v1';
+export const REVIEW_PROPOSAL_RESULT_FORMAT =
+    'orinoco-lite-shacl-proposal-result-v1';
+export const REVIEW_PROPOSAL_STARTED_FORMAT =
+    'orinoco-lite-shacl-proposal-started-v1';
 
 const GITHUB_REPOSITORY =
     /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
 const HANDOFF_TIMEOUT_MS = 10 * 60 * 1000;
+const POPUP_POLL_MS = 250;
+
+function exactKeys(value, expected) {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+    const observed = Object.keys(value).sort();
+    const required = [...expected].sort();
+    return (
+        observed.length === required.length &&
+        observed.every((key, index) => key === required[index])
+    );
+}
 
 export function dispatchReviewBundle(bundle, target = window) {
     return target.dispatchEvent(
@@ -85,46 +102,174 @@ function handoffNonce(target) {
         .join('');
 }
 
+export function isSharedGithubPagesOrigin(target = window) {
+    const hostname = String(target.location?.hostname || '').toLowerCase();
+    return hostname === 'github.io' || hostname.endsWith('.github.io');
+}
+
 export function beginReviewBundleProposal(value, target = window) {
     const { repository, serviceOrigin } = reviewProposalCoordinates(value);
     const sourceOrigin = editorOrigin(target);
     const nonce = handoffNonce(target);
-    const url = new URL('/edit/', serviceOrigin);
+    const url = new URL('/api/transport', serviceOrigin);
+    url.searchParams.set('kind', 'shacl');
     url.searchParams.set('repository', repository);
     url.searchParams.set('editor_origin', sourceOrigin);
     url.searchParams.set('handoff_nonce', nonce);
     let popup;
-    let bundle;
+    let proposal;
     let ready = false;
     let timeout;
+    let closedPoll;
+    let settled = false;
+    let started = false;
+    let resolveProposal;
+    let rejectProposal;
 
-    function dispose() {
-        target.removeEventListener('message', receiveReady);
+    function dispose({ reject } = {}) {
+        target.removeEventListener('message', receive);
         if (timeout !== undefined) target.clearTimeout(timeout);
-        bundle = undefined;
+        if (closedPoll !== undefined) target.clearInterval(closedPoll);
+        try {
+            if (popup && !popup.closed) popup.close?.();
+        } catch {
+            // Cleanup is best effort after the protocol has settled.
+        }
+        proposal = undefined;
+        if (!settled && reject) {
+            settled = true;
+            rejectProposal?.(new Error(reject));
+        }
     }
 
     function sendIfReady() {
-        if (!ready || bundle === undefined || popup?.closed) return;
+        if (!ready || proposal === undefined || popup?.closed || started) return;
         popup.postMessage(
             {
-                bundle,
-                format: REVIEW_BUNDLE_MESSAGE_FORMAT,
+                format: REVIEW_PROPOSAL_MESSAGE_FORMAT,
                 handoff_nonce: nonce,
+                proposal,
                 repository,
             },
             serviceOrigin
         );
-        dispose();
     }
 
-    function receiveReady(event) {
+    function receive(event) {
         if (
             event.origin !== serviceOrigin ||
             event.source !== popup ||
-            event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
             event.data?.handoff_nonce !== nonce ||
             event.data?.repository?.toLowerCase() !== repository.toLowerCase()
+        ) {
+            return;
+        }
+        if (
+            event.data?.format === 'orinoco-lite-transport-error-v1' &&
+            exactKeys(event.data, [
+                'format',
+                'handoff_nonce',
+                'kind',
+                'message',
+                'repository',
+            ]) &&
+            event.data.kind === 'shacl'
+        ) {
+            dispose({
+                reject:
+                    typeof event.data.message === 'string'
+                        ? event.data.message
+                        : 'The GitHub transport failed',
+            });
+            return;
+        }
+        if (
+            event.data?.format === REVIEW_PROPOSAL_STARTED_FORMAT &&
+            exactKeys(event.data, [
+                'format',
+                'handoff_nonce',
+                'repository',
+            ])
+        ) {
+            if (!ready || proposal === undefined || started) return;
+            started = true;
+            return;
+        }
+        if (
+            event.data?.format === REVIEW_PROPOSAL_RESULT_FORMAT &&
+            exactKeys(event.data, [
+                'error',
+                'format',
+                'handoff_nonce',
+                'repository',
+                'result',
+                'retry_safe',
+            ])
+        ) {
+            if (!started || settled) return;
+            const pullRequest = event.data.result?.pull_request;
+            const commitSha = event.data.result?.commit_sha;
+            const expectedCommitUrl =
+                typeof commitSha === 'string'
+                    ? `https://github.com/${repository}/commit/${commitSha}`
+                    : '';
+            const expectedPullUrl = Number.isSafeInteger(pullRequest)
+                ? `https://github.com/${repository}/pull/${pullRequest}`
+                : '';
+            if (
+                event.data.error === null &&
+                event.data.retry_safe === false &&
+                exactKeys(event.data.result, [
+                    'commit_sha',
+                    'commit_url',
+                    'pull_request',
+                    'pull_request_url',
+                ]) &&
+                /^[0-9a-f]{40}$/.test(commitSha || '') &&
+                Number.isSafeInteger(pullRequest) &&
+                pullRequest > 0 &&
+                event.data.result.commit_url?.toLowerCase() ===
+                    expectedCommitUrl.toLowerCase() &&
+                event.data.result.pull_request_url?.toLowerCase() ===
+                    expectedPullUrl.toLowerCase()
+            ) {
+                settled = true;
+                const result = event.data.result;
+                dispose();
+                resolveProposal?.(result);
+            } else if (
+                event.data.result === null &&
+                typeof event.data.error === 'string' &&
+                event.data.retry_safe === true
+            ) {
+                settled = true;
+                const message = event.data.error;
+                dispose();
+                rejectProposal?.(new Error(message));
+            } else if (
+                event.data.result === null &&
+                typeof event.data.error === 'string' &&
+                event.data.retry_safe === false
+            ) {
+                settled = true;
+                const message = event.data.error;
+                dispose();
+                rejectProposal?.(
+                    new Error(
+                        `${message} The GitHub proposal result is uncertain. Check the repository before retrying.`
+                    )
+                );
+            }
+            return;
+        }
+        if (
+            event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
+            !exactKeys(event.data, [
+                'format',
+                'handoff_nonce',
+                'repository',
+            ]) ||
+            ready
         ) {
             return;
         }
@@ -132,7 +277,7 @@ export function beginReviewBundleProposal(value, target = window) {
         sendIfReady();
     }
 
-    target.addEventListener('message', receiveReady);
+    target.addEventListener('message', receive);
     popup = target.open(
         url.toString(),
         `orinoco-lite-shacl-proposal-${nonce}`
@@ -141,12 +286,41 @@ export function beginReviewBundleProposal(value, target = window) {
         dispose();
         throw new Error('The GitHub proposal window was blocked');
     }
-    timeout = target.setTimeout(dispose, HANDOFF_TIMEOUT_MS);
+    timeout = target.setTimeout(
+        () =>
+            dispose({
+                reject: started
+                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    : 'The GitHub proposal transport expired before writing.',
+            }),
+        HANDOFF_TIMEOUT_MS
+    );
+    closedPoll = target.setInterval(() => {
+        if (popup.closed) {
+            dispose({
+                reject: started
+                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    : 'The GitHub proposal window was closed before writing.',
+            });
+        }
+    }, POPUP_POLL_MS);
     return {
-        cancel: dispose,
-        deliver(reviewBundle) {
-            bundle = reviewBundle;
+        cancel() {
+            dispose({ reject: 'The GitHub proposal was cancelled.' });
+        },
+        deliver(reviewProposal) {
+            if (proposal !== undefined || settled) {
+                return Promise.reject(
+                    new Error('The GitHub proposal was already delivered')
+                );
+            }
+            proposal = reviewProposal;
+            const result = new Promise((resolve, reject) => {
+                resolveProposal = resolve;
+                rejectProposal = reject;
+            });
             sendIfReady();
+            return result;
         },
     };
 }

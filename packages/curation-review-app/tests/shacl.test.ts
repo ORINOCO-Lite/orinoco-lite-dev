@@ -3,7 +3,7 @@ import { onRequest as proposeShacl } from "../functions/api/shacl/propose";
 import { base64urlEncode } from "../functions/lib/encoding";
 import type { Env, EventContext } from "../functions/lib/pages";
 import { createSessionCookie } from "../functions/lib/session";
-import type { ShaclReviewBundle } from "../shared/contracts";
+import type { ShaclGrant, ShaclReviewBundle } from "../shared/contracts";
 import {
   MAX_SHACL_BUNDLE_BYTES,
   SHACL_BUNDLE_PATH,
@@ -34,7 +34,17 @@ function context(request: Request): EventContext {
   };
 }
 
-async function sessionCookie(): Promise<string> {
+const SHACL_GRANT: ShaclGrant = {
+  editor_origin: "https://site.example",
+  expected_head_sha: null,
+  handoff_nonce: "d".repeat(64),
+  pull_request: null,
+  repository: "example/site",
+};
+
+async function sessionCookie(
+  shaclGrant: ShaclGrant | null = null,
+): Promise<string> {
   return (
     await createSessionCookie(
       env,
@@ -42,6 +52,7 @@ async function sessionCookie(): Promise<string> {
         access_token: "ghu_curator",
         csrf_token: "csrf-token",
         login: "octocat",
+        shacl_grant: shaclGrant,
       },
       28_800,
     )
@@ -239,4 +250,50 @@ describe("SHACL proposal API boundary", () => {
     }
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { grant: null, label: "missing" },
+    {
+      grant: { ...SHACL_GRANT, repository: "example/other" },
+      label: "repository-mismatched",
+    },
+    {
+      grant: {
+        ...SHACL_GRANT,
+        expected_head_sha: SOURCE,
+        pull_request: 42,
+      },
+      label: "target-mismatched",
+    },
+  ])(
+    "rejects a $label OAuth grant before contacting GitHub",
+    async ({ grant }) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        proposeShacl(
+          context(
+            new Request(`${ORIGIN}/api/shacl/propose`, {
+              body: JSON.stringify({
+                acknowledge_public_data: true,
+                bundle: bundle(),
+                format: "orinoco-lite-shacl-proposal-v1",
+                repository: "example/site",
+                target: { kind: "standalone" },
+              }),
+              headers: {
+                "Content-Type": "application/json",
+                Cookie: await sessionCookie(grant),
+                Origin: ORIGIN,
+                "X-CSRF-Token": "csrf-token",
+              },
+              method: "POST",
+            }),
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "shacl_grant_required", status: 403 });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 });

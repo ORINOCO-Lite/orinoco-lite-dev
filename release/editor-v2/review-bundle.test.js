@@ -24,10 +24,13 @@ const {
     buildReviewBundle,
     beginReviewBundleProposal,
     dispatchReviewBundle,
+    isSharedGithubPagesOrigin,
     recordSubmissionLabel,
     REVIEW_BUNDLE_EVENT,
-    REVIEW_BUNDLE_MESSAGE_FORMAT,
+    REVIEW_PROPOSAL_MESSAGE_FORMAT,
     REVIEW_PROPOSAL_READY_FORMAT,
+    REVIEW_PROPOSAL_RESULT_FORMAT,
+    REVIEW_PROPOSAL_STARTED_FORMAT,
     reviewBundleFilename,
     validateRecordCatalog,
 } = await import('../src/modules/review-bundle');
@@ -119,7 +122,7 @@ describe('Orinoco review bundles', () => {
         expect(observed).toBe(bundle);
     });
 
-    it('sends an in-memory bundle only to the exact proposal popup', () => {
+    it('sends a confirmed proposal only to the exact transport popup', async () => {
         const listeners = new Map();
         const popup = { closed: false, postMessage: vi.fn() };
         const nonce = '0a'.repeat(32);
@@ -131,10 +134,27 @@ describe('Orinoco review bundles', () => {
             crypto: {
                 getRandomValues: vi.fn((value) => value.fill(10)),
             },
-            location: { origin: 'https://site.example.test' },
+            location: {
+                hostname: 'site.example.test',
+                origin: 'https://site.example.test',
+            },
             open: vi.fn(() => popup),
             removeEventListener: vi.fn(),
+            clearInterval: vi.fn(),
             setTimeout: vi.fn(() => 17),
+            setInterval: vi.fn(() => 18),
+        };
+        const proposal = {
+            acknowledge_public_data: true,
+            bundle: {
+                format: 'orinoco-shacl-review-bundle',
+                records: [],
+                source_commit: SOURCE_COMMIT,
+                version: 2,
+            },
+            format: 'orinoco-lite-shacl-proposal-v1',
+            repository: 'ORINOCO-Lite/example-site',
+            target: { kind: 'standalone' },
         };
         const handoff = beginReviewBundleProposal(
             {
@@ -144,11 +164,11 @@ describe('Orinoco review bundles', () => {
             target
         );
         expect(target.open).toHaveBeenCalledWith(
-            'https://review.example.test/edit/?repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
+            'https://review.example.test/api/transport?kind=shacl&repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
                 nonce,
             `orinoco-lite-shacl-proposal-${nonce}`
         );
-        handoff.deliver(catalog);
+        const delivered = handoff.deliver(proposal);
         const receive = listeners.get('message');
         receive({
             data: {
@@ -181,17 +201,134 @@ describe('Orinoco review bundles', () => {
         });
         expect(popup.postMessage).toHaveBeenCalledWith(
             {
-                bundle: catalog,
-                format: REVIEW_BUNDLE_MESSAGE_FORMAT,
+                format: REVIEW_PROPOSAL_MESSAGE_FORMAT,
                 handoff_nonce: nonce,
+                proposal,
                 repository: 'ORINOCO-Lite/example-site',
             },
             'https://review.example.test'
         );
+        receive({
+            data: {
+                format: REVIEW_PROPOSAL_STARTED_FORMAT,
+                handoff_nonce: nonce,
+                repository: 'ORINOCO-Lite/example-site',
+            },
+            origin: 'https://review.example.test',
+            source: popup,
+        });
+        const result = {
+            commit_sha: 'c'.repeat(40),
+            commit_url:
+                'https://github.com/ORINOCO-Lite/example-site/commit/' +
+                'c'.repeat(40),
+            pull_request: 42,
+            pull_request_url:
+                'https://github.com/ORINOCO-Lite/example-site/pull/42',
+        };
+        receive({
+            data: {
+                error: null,
+                format: REVIEW_PROPOSAL_RESULT_FORMAT,
+                handoff_nonce: nonce,
+                repository: 'ORINOCO-Lite/example-site',
+                result,
+                retry_safe: false,
+            },
+            origin: 'https://review.example.test',
+            source: popup,
+        });
+        await expect(delivered).resolves.toBe(result);
         expect(target.removeEventListener).toHaveBeenCalledWith(
             'message',
             receive
         );
+        expect(target.clearTimeout).toHaveBeenCalledWith(17);
+        expect(target.clearInterval).toHaveBeenCalledWith(18);
+    });
+
+    it('distinguishes retry-safe failures from uncertain post-start results', async () => {
+        async function runFailure(retrySafe) {
+            const listeners = new Map();
+            const popup = { closed: false, postMessage: vi.fn() };
+            const target = {
+                addEventListener: (type, listener) =>
+                    listeners.set(type, listener),
+                clearInterval: vi.fn(),
+                clearTimeout: vi.fn(),
+                crypto: {
+                    getRandomValues: (value) => value.fill(10),
+                },
+                location: {
+                    hostname: 'site.example.test',
+                    origin: 'https://site.example.test',
+                },
+                open: () => popup,
+                removeEventListener: vi.fn(),
+                setInterval: () => 18,
+                setTimeout: () => 17,
+            };
+            const handoff = beginReviewBundleProposal(
+                {
+                    repository: 'ORINOCO-Lite/example-site',
+                    service_origin: 'https://review.example.test',
+                },
+                target
+            );
+            const delivered = handoff.deliver({
+                repository: 'ORINOCO-Lite/example-site',
+            });
+            const receive = listeners.get('message');
+            for (const format of [
+                REVIEW_PROPOSAL_READY_FORMAT,
+                REVIEW_PROPOSAL_STARTED_FORMAT,
+            ]) {
+                receive({
+                    data: {
+                        format,
+                        handoff_nonce: '0a'.repeat(32),
+                        repository: 'ORINOCO-Lite/example-site',
+                    },
+                    origin: 'https://review.example.test',
+                    source: popup,
+                });
+            }
+            receive({
+                data: {
+                    error: 'GitHub did not return a complete result.',
+                    format: REVIEW_PROPOSAL_RESULT_FORMAT,
+                    handoff_nonce: '0a'.repeat(32),
+                    repository: 'ORINOCO-Lite/example-site',
+                    result: null,
+                    retry_safe: retrySafe,
+                },
+                origin: 'https://review.example.test',
+                source: popup,
+            });
+            return delivered;
+        }
+
+        await expect(runFailure(true)).rejects.toThrow(
+            'GitHub did not return a complete result.'
+        );
+        await expect(runFailure(false)).rejects.toThrow(
+            /result is uncertain.*before retrying/
+        );
+    });
+
+    it('recognizes only the exact shared GitHub Pages hostname boundary', () => {
+        for (const [hostname, expected] of [
+            ['github.io', true],
+            ['owner.github.io', true],
+            ['OWNER.GITHUB.IO', true],
+            ['example.github.io.attacker.test', false],
+            ['notgithub.io', false],
+            ['curation.example.org', false],
+        ]) {
+            expect(
+                isSharedGithubPagesOrigin({ location: { hostname } })
+            ).toBe(expected);
+        }
     });
 
     it('rejects unsafe proposal coordinates before opening a window', () => {

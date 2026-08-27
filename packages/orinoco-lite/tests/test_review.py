@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
@@ -10,7 +9,7 @@ from urllib.parse import urlsplit
 
 from orinoco_lite import site
 from orinoco_lite.config import load_workspace
-from orinoco_lite.errors import ConfigurationError, DriverError
+from orinoco_lite.errors import DriverError
 from orinoco_lite.review import bind_review
 
 
@@ -26,7 +25,6 @@ contract_version: 2
 site:
   name: Review fixture
   base_url: https://example.invalid/orinoco/
-  repository: ORINOCO-Lite/example-site
   curation_service: HTTPS://Review.Example.Test:443/
 """
 
@@ -77,6 +75,7 @@ class StaticReviewBindingTests(unittest.TestCase):
                 load_workspace(root),
                 root / "runtime",
                 destination,
+                repository="ORINOCO-Lite/example-site",
             )
 
             self.assertEqual(
@@ -105,6 +104,7 @@ class StaticReviewBindingTests(unittest.TestCase):
                 load_workspace(root),
                 root / "runtime",
                 destination,
+                repository="ORINOCO-Lite/example-site",
             )
 
             self.assertEqual(second_report, report)
@@ -127,7 +127,12 @@ class StaticReviewBindingTests(unittest.TestCase):
             (shell / "index.html").write_text("review\n", encoding="utf-8")
             destination = root / "build/site/review"
 
-            bind_review(load_workspace(root), root / "runtime", destination)
+            bind_review(
+                load_workspace(root),
+                root / "runtime",
+                destination,
+                repository="ORINOCO-Lite/example-site",
+            )
 
             config = json.loads(
                 (destination / "config.json").read_text(encoding="utf-8")
@@ -164,23 +169,32 @@ class StaticReviewBindingTests(unittest.TestCase):
                     load_workspace(root),
                     root / "runtime",
                     root / "build/site/review",
+                    repository="ORINOCO-Lite/example-site",
                 )
 
-    def test_binding_defends_against_a_partially_configured_workspace(self) -> None:
+    def test_trusted_repository_uses_the_default_central_service(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
-            workspace = replace(
+            shell = root / "runtime/review-shell"
+            shell.mkdir(parents=True)
+            (shell / "index.html").write_text("review\n", encoding="utf-8")
+
+            report = bind_review(
                 load_workspace(root),
+                root / "runtime",
+                root / "build/site/review",
                 repository="ORINOCO-Lite/example-site",
             )
 
-            with self.assertRaisesRegex(ConfigurationError, "configured together"):
-                bind_review(
-                    workspace,
-                    root / "runtime",
-                    root / "build/site/review",
-                )
+            self.assertEqual(
+                report,
+                {
+                    "enabled": True,
+                    "repository": "ORINOCO-Lite/example-site",
+                    "service_origin": "https://orinoco-curation-review.pages.dev",
+                },
+            )
 
     def test_site_build_binds_review_before_hashing_the_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -225,6 +239,7 @@ class StaticReviewBindingTests(unittest.TestCase):
                     runtime,
                     destination,
                     "https://example.invalid/orinoco/",
+                    "ORINOCO-Lite/example-site",
                 )
 
             self.assertTrue(report["review"]["enabled"])

@@ -24,6 +24,7 @@ GITHUB_REPOSITORY = re.compile(
 )
 REVIEW_APP_NAME_SUFFIX = " source metadata review"
 REVIEW_APP_NAME_MAXIMUM = 256
+DEFAULT_CURATION_SERVICE = "https://orinoco-curation-review.pages.dev"
 
 DEFAULT_PATHS: dict[str, str] = {
     "records": "metadata/records",
@@ -208,6 +209,18 @@ def _curation_service_origin(value: object, label: str) -> str:
     return origin
 
 
+def github_repository(value: object, label: str) -> str:
+    """Return one exact GitHub owner/repository build coordinate."""
+
+    if (
+        not isinstance(value, str)
+        or not GITHUB_REPOSITORY.fullmatch(value)
+        or ".." in value
+    ):
+        raise ConfigurationError(f"{label} must use GitHub owner/repository form")
+    return value
+
+
 def _inside(root: Path, relative: str, label: str) -> Path:
     candidate = root.joinpath(*PurePosixPath(relative).parts)
     resolved_root = root.resolve()
@@ -230,7 +243,7 @@ class WorkspaceConfig:
     command_aliases: Mapping[str, str]
     raw: Mapping[str, Any]
     repository: str | None = None
-    curation_service: str | None = None
+    curation_service: str = DEFAULT_CURATION_SERVICE
 
     def path(self, name: str) -> Path:
         try:
@@ -337,28 +350,17 @@ def load_workspace(
         base_url += "/"
     repository_value = site.get("repository")
     service_value = site.get("curation_service")
-    if (repository_value is None) != (service_value is None):
-        raise ConfigurationError(
-            "orinoco.yaml site.repository and site.curation_service must be "
-            "configured together"
-        )
     repository: str | None = None
-    curation_service: str | None = None
+    curation_service = _curation_service_origin(
+        service_value if service_value is not None else DEFAULT_CURATION_SERVICE,
+        "orinoco.yaml site.curation_service",
+    )
     if repository_value is not None:
-        if (
-            not isinstance(repository_value, str)
-            or not GITHUB_REPOSITORY.fullmatch(repository_value)
-            or ".." in repository_value
-        ):
-            raise ConfigurationError(
-                "orinoco.yaml site.repository must use GitHub owner/repository form"
-            )
-        repository = repository_value
-        curation_service = _curation_service_origin(
-            service_value,
-            "orinoco.yaml site.curation_service",
+        repository = github_repository(
+            repository_value,
+            "orinoco.yaml site.repository",
         )
-        _review_app_name(site_name)
+    _review_app_name(site_name)
 
     path_values = raw.get("paths", {})
     if not isinstance(path_values, dict) or not all(

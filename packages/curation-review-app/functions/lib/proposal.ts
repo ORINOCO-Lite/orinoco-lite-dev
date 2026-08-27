@@ -5,6 +5,7 @@ import type {
   ReviewGrant,
   ReviewProposal,
 } from "../../shared/contracts";
+import { DEFAULT_CURATION_SERVICE_ORIGIN } from "../../shared/contracts";
 import {
   canonicalJson,
   MAX_ARTIFACT_ARCHIVE_BYTES,
@@ -436,10 +437,7 @@ function safeSiteUrl(value: unknown): URL | null {
   return url;
 }
 
-function reviewSiteCoordinates(
-  value: string | null,
-  repository: string,
-): ReviewSiteCoordinates {
+function reviewSiteCoordinates(value: string | null): ReviewSiteCoordinates {
   if (value === null) {
     invalid("The proposal metadata base has no orinoco.yaml configuration.");
   }
@@ -472,19 +470,11 @@ function reviewSiteCoordinates(
     invalid("The proposal metadata-base orinoco.yaml site is not a mapping.");
   }
   const site = config.site as Record<string, unknown>;
-  if (
-    typeof site.repository !== "string" ||
-    site.repository.toLowerCase() !== repository.toLowerCase()
-  ) {
-    invalid(
-      "The proposal metadata-base repository does not match this review.",
-    );
-  }
   const baseUrl = safeSiteUrl(site.base_url);
   if (baseUrl === null) {
     invalid("The proposal metadata-base site.base_url is unsafe.");
   }
-  const serviceValue = site.curation_service;
+  const serviceValue = site.curation_service ?? DEFAULT_CURATION_SERVICE_ORIGIN;
   const serviceUrl = safeSiteUrl(serviceValue);
   if (
     serviceUrl === null ||
@@ -576,10 +566,7 @@ export async function loadReviewProposal(
     ]),
   ];
   const contents = await github.contents(repository, requests);
-  const review = reviewSiteCoordinates(
-    contents.get("site-config") ?? null,
-    pull.repository,
-  );
+  const review = reviewSiteCoordinates(contents.get("site-config") ?? null);
   const candidates = recordPaths.map((path, index) => {
     const item = presentation.get(path);
     if (item === undefined) throw new Error("candidate alignment was lost");

@@ -6,13 +6,14 @@ import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Any, Sequence
 
 from . import __version__
 from .asset_cli import manage_assets
-from .config import load_workspace, load_workspace_lock
+from .config import github_repository, load_workspace, load_workspace_lock
 from .driver import invoke_driver
 from .errors import ConfigurationError, OrinocoError
 from .integrity import sha256_file
@@ -42,6 +43,15 @@ def _parser() -> argparse.ArgumentParser:
     build = commands.add_parser("build", help="build the deterministic static site")
     build.add_argument("--destination", type=Path)
     build.add_argument("--base-url")
+    build.add_argument(
+        "--github-repository",
+        default=os.environ.get("GITHUB_REPOSITORY"),
+        metavar="OWNER/REPOSITORY",
+        help=(
+            "trusted repository coordinate embedded in the static curation "
+            "interfaces (defaults to GITHUB_REPOSITORY)"
+        ),
+    )
     build.add_argument(
         "--skip-structural-validation",
         action="store_true",
@@ -153,6 +163,14 @@ def _validate(args: argparse.Namespace) -> int:
 
 def _build(args: argparse.Namespace) -> int:
     workspace, lock, runtime = _resolve(args)
+    build_repository = (
+        github_repository(
+            args.github_repository,
+            "GitHub repository build coordinate",
+        )
+        if args.github_repository is not None
+        else None
+    )
     if not args.skip_structural_validation:
         validate_workspace(workspace)
     semantic_status = invoke_driver("validate", workspace, lock, runtime)
@@ -160,12 +178,18 @@ def _build(args: argparse.Namespace) -> int:
         return semantic_status
     destination = _safe_build_destination(workspace, args.destination)
     base_url = args.base_url or workspace.base_url
+    build_environment = (
+        {"ORINOCO_GITHUB_REPOSITORY": build_repository}
+        if build_repository is not None
+        else None
+    )
     return invoke_driver(
         "build",
         workspace,
         lock,
         runtime,
         values={"base_url": base_url, "destination": str(destination)},
+        environment=build_environment,
     )
 
 

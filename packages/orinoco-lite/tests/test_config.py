@@ -6,7 +6,9 @@ import unittest
 
 from orinoco_lite.config import (
     ConfigurationError,
+    DEFAULT_CURATION_SERVICE,
     find_workspace_root,
+    github_repository,
     load_lock,
     load_workspace,
 )
@@ -73,7 +75,61 @@ class WorkspaceConfigTests(unittest.TestCase):
             (self.root / ".orinoco-lite/provenance").resolve(),
         )
         self.assertIsNone(workspace.repository)
-        self.assertIsNone(workspace.curation_service)
+        self.assertEqual(workspace.curation_service, DEFAULT_CURATION_SERVICE)
+
+    def test_curation_service_is_optional_and_independent_of_repository(
+        self,
+    ) -> None:
+        sites = (
+            (
+                "  repository: ORINOCO-Lite/example-site\n",
+                "ORINOCO-Lite/example-site",
+                DEFAULT_CURATION_SERVICE,
+            ),
+            (
+                "  curation_service: https://review.example.test/\n",
+                None,
+                "https://review.example.test",
+            ),
+        )
+        for extra, repository, service in sites:
+            with self.subTest(extra=extra):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG.replace(
+                        "  base_url: https://example.invalid/test-site/\n",
+                        "  base_url: https://example.invalid/test-site/\n" + extra,
+                    ),
+                    encoding="utf-8",
+                )
+
+                workspace = load_workspace(self.root)
+
+                self.assertEqual(workspace.repository, repository)
+                self.assertEqual(workspace.curation_service, service)
+
+    def test_trusted_build_repository_coordinate_is_strict(self) -> None:
+        self.assertEqual(
+            github_repository(
+                "ORINOCO-Lite/example-site",
+                "GitHub repository build coordinate",
+            ),
+            "ORINOCO-Lite/example-site",
+        )
+        for invalid in (
+            "not-a-repository",
+            "ORINOCO-Lite/example..site",
+            " ORINOCO-Lite/example-site",
+            "ORINOCO-Lite/example-site/extra",
+        ):
+            with self.subTest(value=invalid):
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "owner/repository",
+                ):
+                    github_repository(
+                        invalid,
+                        "GitHub repository build coordinate",
+                    )
 
     def test_static_editor_github_handoff_coordinates_are_explicit(self) -> None:
         origins = (
@@ -107,8 +163,6 @@ class WorkspaceConfigTests(unittest.TestCase):
 
     def test_static_editor_github_handoff_coordinates_fail_closed(self) -> None:
         invalid_sites = (
-            "  repository: ORINOCO-Lite/example-site\n",
-            "  curation_service: https://review.example.test/\n",
             "  repository: not-a-repository\n"
             "  curation_service: https://review.example.test/\n",
             "  repository: ORINOCO-Lite/example-site\n"

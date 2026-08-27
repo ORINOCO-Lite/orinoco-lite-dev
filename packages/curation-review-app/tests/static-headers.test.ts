@@ -2,17 +2,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const HEADERS = resolve("public/_headers");
+const ROUTES = resolve("service-dist/_routes.json");
 
-describe("static response headers", () => {
-  it("detaches the global no-store directive for fingerprinted assets", async () => {
-    const headers = await readFile(HEADERS, "utf8");
+describe("backend-only service output", () => {
+  it("routes only API requests to the stateless functions", async () => {
+    const routes = JSON.parse(await readFile(ROUTES, "utf8")) as unknown;
 
-    expect(headers).toContain("/*\n  Cache-Control: no-store\n");
-    expect(headers).toContain(
-      "/assets/*\n" +
-        "  ! Cache-Control\n" +
-        "  Cache-Control: public, max-age=31536000, immutable\n",
-    );
+    expect(routes).toEqual({ exclude: [], include: ["/api/*"], version: 1 });
   });
 });

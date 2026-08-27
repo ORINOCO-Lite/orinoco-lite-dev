@@ -23,7 +23,6 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
-    "vite.config.ts",
     "vite.review.config.ts",
     "vitest.config.ts"
   ]

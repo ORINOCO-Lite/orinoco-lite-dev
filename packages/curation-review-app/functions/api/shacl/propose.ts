@@ -36,6 +36,27 @@ export async function onRequest(context: EventContext): Promise<Response> {
   const proposal = parseShaclProposalRequest(
     await readJsonBody(context.request, MAX_SHACL_PROPOSAL_BODY_BYTES),
   );
+  const grant = session.shacl_grant;
+  const pullRequest =
+    proposal.target.kind === "pull_request"
+      ? proposal.target.pull_request
+      : null;
+  const expectedHeadSha =
+    proposal.target.kind === "pull_request"
+      ? proposal.target.expected_head_sha
+      : null;
+  if (
+    grant === null ||
+    grant.repository.toLowerCase() !== proposal.repository.toLowerCase() ||
+    grant.pull_request !== pullRequest ||
+    grant.expected_head_sha !== expectedHeadSha
+  ) {
+    throw new HttpError(
+      403,
+      "shacl_grant_required",
+      "Sign in from this downstream editor before proposing its bundle.",
+    );
+  }
   const result = await createShaclProposal(
     new GitHubClient(session.access_token),
     proposal,

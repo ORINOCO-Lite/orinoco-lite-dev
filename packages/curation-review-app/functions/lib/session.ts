@@ -13,6 +13,7 @@ import {
   isReviewHandoffNonce,
   isShaclHandoffNonce,
   type ReviewGrant,
+  type ShaclGrant,
 } from "../../shared/contracts";
 
 export const OAUTH_COOKIE = "__Host-orinoco_oauth";
@@ -40,9 +41,9 @@ export interface ReviewOAuthCookieState extends OAuthCookieCommon {
 }
 
 export interface ShaclOAuthCookieState extends OAuthCookieCommon {
-  editor_origin: string | null;
+  editor_origin: string;
   expected_head_sha: string | null;
-  handoff_nonce: string | null;
+  handoff_nonce: string;
   kind: "shacl";
   pull_request: number | null;
 }
@@ -60,6 +61,7 @@ export interface SessionCookieState {
   issued_at: number;
   login: string;
   review_grant: ReviewGrant | null;
+  shacl_grant: ShaclGrant | null;
 }
 
 function nowSeconds(): number {
@@ -122,6 +124,47 @@ function parseReviewGrant(value: unknown): ReviewGrant | null {
     pull_request: Number(grant.pull_request),
     repository: grant.repository,
     review_origin: grant.review_origin,
+  };
+}
+
+function parseShaclGrant(value: unknown): ShaclGrant | null {
+  if (value === null) return null;
+  requireExactKeys(
+    value,
+    [
+      "editor_origin",
+      "expected_head_sha",
+      "handoff_nonce",
+      "pull_request",
+      "repository",
+    ],
+    "SHACL grant",
+  );
+  const standalone =
+    value.expected_head_sha === null && value.pull_request === null;
+  const existing =
+    typeof value.expected_head_sha === "string" &&
+    /^[0-9a-f]{40}$/.test(value.expected_head_sha) &&
+    Number.isSafeInteger(value.pull_request) &&
+    Number(value.pull_request) > 0;
+  if (
+    !isSafeEditorOrigin(value.editor_origin) ||
+    !isShaclHandoffNonce(value.handoff_nonce) ||
+    !validOneLine(value.repository, 200) ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/.test(
+      value.repository,
+    ) ||
+    value.repository.includes("..") ||
+    (!standalone && !existing)
+  ) {
+    throw new HttpError(401, "invalid_session", "The session is invalid.");
+  }
+  return {
+    editor_origin: value.editor_origin,
+    expected_head_sha: existing ? String(value.expected_head_sha) : null,
+    handoff_nonce: value.handoff_nonce,
+    pull_request: existing ? Number(value.pull_request) : null,
+    repository: value.repository,
   };
 }
 
@@ -333,8 +376,6 @@ export async function readOAuthCookie(
     state: value.state,
   };
   if (value.kind === "shacl") {
-    const uploadOnly =
-      value.editor_origin === null && value.handoff_nonce === null;
     const editorOrigin = isSafeEditorOrigin(value.editor_origin)
       ? value.editor_origin
       : null;
@@ -349,7 +390,7 @@ export async function readOAuthCookie(
       /^[0-9a-f]{40}$/.test(value.expected_head_sha) &&
       Number.isSafeInteger(value.pull_request) &&
       Number(value.pull_request) > 0;
-    if ((!standalone && !existing) || (!uploadOnly && !liveHandoff)) {
+    if ((!standalone && !existing) || !liveHandoff) {
       throw new HttpError(
         401,
         "invalid_oauth_state",
@@ -358,9 +399,9 @@ export async function readOAuthCookie(
     }
     return {
       ...common,
-      editor_origin: liveHandoff ? editorOrigin : null,
+      editor_origin: editorOrigin,
       expected_head_sha: existing ? String(value.expected_head_sha) : null,
-      handoff_nonce: liveHandoff ? handoffNonce : null,
+      handoff_nonce: handoffNonce,
       kind: "shacl",
       pull_request: existing ? Number(value.pull_request) : null,
     };
@@ -393,9 +434,10 @@ export async function createSessionCookie(
   env: Env,
   state: Omit<
     SessionCookieState,
-    "expires_at" | "issued_at" | "review_grant"
+    "expires_at" | "issued_at" | "review_grant" | "shacl_grant"
   > & {
     review_grant?: ReviewGrant | null;
+    shacl_grant?: ShaclGrant | null;
   },
   expiresIn: number,
 ): Promise<string> {
@@ -415,6 +457,7 @@ export async function createSessionCookie(
       expires_at: issuedAt + lifetime,
       issued_at: issuedAt,
       review_grant: state.review_grant ?? null,
+      shacl_grant: state.shacl_grant ?? null,
     }),
     lifetime,
   );
@@ -442,12 +485,14 @@ export async function readSessionCookie(
       "issued_at",
       "login",
       "review_grant",
+      "shacl_grant",
     ],
     "session",
   );
   const issuedAt = requireTimestamp(value.issued_at, "session issued_at");
   const expiresAt = requireTimestamp(value.expires_at, "session expires_at");
   const reviewGrant = parseReviewGrant(value.review_grant);
+  const shaclGrant = parseShaclGrant(value.shacl_grant);
   if (
     expiresAt <= nowSeconds() ||
     expiresAt - issuedAt > MAX_SESSION_TTL_SECONDS ||
@@ -468,5 +513,6 @@ export async function readSessionCookie(
     issued_at: issuedAt,
     login: value.login,
     review_grant: reviewGrant,
+    shacl_grant: shaclGrant,
   };
 }

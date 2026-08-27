@@ -191,7 +191,7 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             source = target.read_text(encoding="utf-8")
             self.assertEqual(source.count(SUBMISSION_ARIA_BINDING), 1)
             self.assertIn(
-                "import { beginReviewBundleProposal, buildReviewBundle,",
+                "    beginReviewBundleProposal,\n    buildReviewBundle,",
                 source,
             )
             self.assertIn("recordIri: record.node_iri", source)
