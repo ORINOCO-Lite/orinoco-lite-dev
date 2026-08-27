@@ -72,6 +72,50 @@ class WorkspaceConfigTests(unittest.TestCase):
             workspace.path("provenance").resolve(),
             (self.root / ".orinoco-lite/provenance").resolve(),
         )
+        self.assertIsNone(workspace.repository)
+        self.assertIsNone(workspace.curation_service)
+
+    def test_static_editor_github_handoff_coordinates_are_explicit(self) -> None:
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG.replace(
+                "  base_url: https://example.invalid/test-site/\n",
+                "  base_url: https://example.invalid/test-site/\n"
+                "  repository: ORINOCO-Lite/example-site\n"
+                "  curation_service: https://review.example.test/\n",
+            ),
+            encoding="utf-8",
+        )
+
+        workspace = load_workspace(self.root)
+
+        self.assertEqual(workspace.repository, "ORINOCO-Lite/example-site")
+        self.assertEqual(
+            workspace.curation_service,
+            "https://review.example.test",
+        )
+
+    def test_static_editor_github_handoff_coordinates_fail_closed(self) -> None:
+        invalid_sites = (
+            "  repository: ORINOCO-Lite/example-site\n",
+            "  curation_service: https://review.example.test/\n",
+            "  repository: not-a-repository\n"
+            "  curation_service: https://review.example.test/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: http://review.example.test/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://review.example.test/edit/\n",
+        )
+        for extra in invalid_sites:
+            with self.subTest(extra=extra):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG.replace(
+                        "  base_url: https://example.invalid/test-site/\n",
+                        "  base_url: https://example.invalid/test-site/\n" + extra,
+                    ),
+                    encoding="utf-8",
+                )
+                with self.assertRaises(ConfigurationError):
+                    load_workspace(self.root)
 
     def test_nearest_ancestor_discovers_workspace(self) -> None:
         nested = self.root / "metadata" / "records"

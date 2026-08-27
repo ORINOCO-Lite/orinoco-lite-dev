@@ -16,6 +16,7 @@ from orinoco_lite.editor import (
     BUNDLE_FORMAT,
     VERSION,
     _atomic_apply,
+    _editor_config,
     _git_commit,
     _render_rdf_sources,
     apply_bundle,
@@ -200,6 +201,30 @@ class EditorBundleTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
 
             self.assertEqual(_git_commit(root), "0" * 40)
+
+    def test_editor_config_exposes_only_explicit_github_handoff(self) -> None:
+        self.assertNotIn("review_bundle_proposal", _editor_config(self.workspace))
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG.replace(
+                "  base_url: https://example.invalid/editor/\n",
+                "  base_url: https://example.invalid/editor/\n"
+                "  repository: ORINOCO-Lite/example-site\n"
+                "  curation_service: https://review.example.test/\n",
+            ),
+            encoding="utf-8",
+        )
+
+        config = _editor_config(load_workspace(self.root))
+
+        self.assertEqual(
+            config["review_bundle_proposal"],
+            {
+                "repository": "ORINOCO-Lite/example-site",
+                "service_origin": "https://review.example.test",
+            },
+        )
+        self.assertFalse(config["use_service"])
+        self.assertFalse(config["use_token"])
 
     def test_combined_editor_rdf_scopes_blank_nodes_per_record(self) -> None:
         from rdflib import BNode, Graph

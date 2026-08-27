@@ -7,6 +7,10 @@ import {
 } from "./encoding";
 import { HttpError, requireExactKeys } from "./http";
 import type { Env } from "./pages";
+import {
+  isSafeEditorOrigin,
+  isShaclHandoffNonce,
+} from "../../shared/contracts";
 
 export const OAUTH_COOKIE = "__Host-orinoco_oauth";
 export const SESSION_COOKIE = "__Host-orinoco_session";
@@ -35,7 +39,9 @@ export interface DiscoveryOAuthCookieState extends OAuthCookieCommon {
 }
 
 export interface ShaclOAuthCookieState extends OAuthCookieCommon {
+  editor_origin: string | null;
   expected_head_sha: string | null;
+  handoff_nonce: string | null;
   kind: "shacl";
   pull_request: number | null;
 }
@@ -253,8 +259,10 @@ export async function readOAuthCookie(
           ]
         : [
             "code_verifier",
+            "editor_origin",
             "expected_head_sha",
             "expires_at",
+            "handoff_nonce",
             "issued_at",
             "kind",
             "origin",
@@ -295,6 +303,15 @@ export async function readOAuthCookie(
     return { ...common, kind: "discovery" };
   }
   if (value.kind === "shacl") {
+    const uploadOnly =
+      value.editor_origin === null && value.handoff_nonce === null;
+    const editorOrigin = isSafeEditorOrigin(value.editor_origin)
+      ? value.editor_origin
+      : null;
+    const handoffNonce = isShaclHandoffNonce(value.handoff_nonce)
+      ? value.handoff_nonce
+      : null;
+    const liveHandoff = editorOrigin !== null && handoffNonce !== null;
     const standalone =
       value.expected_head_sha === null && value.pull_request === null;
     const existing =
@@ -302,7 +319,7 @@ export async function readOAuthCookie(
       /^[0-9a-f]{40}$/.test(value.expected_head_sha) &&
       Number.isSafeInteger(value.pull_request) &&
       Number(value.pull_request) > 0;
-    if (!standalone && !existing) {
+    if ((!standalone && !existing) || (!uploadOnly && !liveHandoff)) {
       throw new HttpError(
         401,
         "invalid_oauth_state",
@@ -311,7 +328,9 @@ export async function readOAuthCookie(
     }
     return {
       ...common,
+      editor_origin: liveHandoff ? editorOrigin : null,
       expected_head_sha: existing ? String(value.expected_head_sha) : null,
+      handoff_nonce: liveHandoff ? handoffNonce : null,
       kind: "shacl",
       pull_request: existing ? Number(value.pull_request) : null,
     };

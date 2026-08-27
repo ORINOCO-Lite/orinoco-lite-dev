@@ -9,8 +9,10 @@ from unittest.mock import patch
 
 from orinoco_lite.errors import DriverError
 from orinoco_lite.release_editor import (
+    DOWNLOAD_AND_DISPATCH,
     GIT_IDENTITY,
     REVIEW_BUNDLE_DISPATCH,
+    REVIEW_BUNDLE_PROPOSAL,
     SUBMISSION_ARIA_BINDING,
     _apply_submission_accessibility_patch,
     _initialize_repository,
@@ -92,16 +94,15 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             source = target.read_text(encoding="utf-8")
             self.assertEqual(source.count(SUBMISSION_ARIA_BINDING), 1)
             self.assertIn(
-                "import { buildReviewBundle, dispatchReviewBundle,",
+                "import { beginReviewBundleProposal, buildReviewBundle,",
                 source,
             )
             self.assertIn("recordIri: record.node_iri", source)
             self.assertIn("prefixes: allPrefixes", source)
-            self.assertEqual(source.count(REVIEW_BUNDLE_DISPATCH), 1)
-            self.assertLess(
-                source.index("dlJSON(bundle, reviewBundleFilename(bundle.records));"),
-                source.index(REVIEW_BUNDLE_DISPATCH),
-            )
+            self.assertEqual(source.count(REVIEW_BUNDLE_DISPATCH), 2)
+            self.assertEqual(source.count(REVIEW_BUNDLE_PROPOSAL), 1)
+            self.assertEqual(source.count("Propose via GitHub"), 1)
+            self.assertIn(DOWNLOAD_AND_DISPATCH, source)
 
     def test_missing_accessibility_patch_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

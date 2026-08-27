@@ -5,11 +5,150 @@ import { getRecordQuads, quadsToTTL, toCURIE } from '@/modules/utils';
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 2;
 export const REVIEW_BUNDLE_EVENT = 'orinoco:review-bundle';
+export const REVIEW_BUNDLE_MESSAGE_FORMAT =
+    'orinoco-lite-shacl-bundle-message-v1';
+export const REVIEW_PROPOSAL_READY_FORMAT =
+    'orinoco-lite-shacl-proposal-ready-v1';
+
+const GITHUB_REPOSITORY =
+    /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
+const HANDOFF_TIMEOUT_MS = 10 * 60 * 1000;
 
 export function dispatchReviewBundle(bundle, target = window) {
     return target.dispatchEvent(
         new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle })
     );
+}
+
+function reviewProposalCoordinates(value) {
+    const repository = requireString(value?.repository, 'proposal repository');
+    if (!GITHUB_REPOSITORY.test(repository) || repository.includes('..')) {
+        throw new Error('Review proposal has an invalid GitHub repository');
+    }
+    const serviceOrigin = requireString(
+        value?.service_origin,
+        'proposal service origin'
+    );
+    let service;
+    try {
+        service = new URL(serviceOrigin);
+    } catch {
+        throw new Error('Review proposal has an invalid service origin');
+    }
+    const loopback =
+        service.protocol === 'http:' &&
+        ['127.0.0.1', 'localhost'].includes(service.hostname);
+    if (
+        (service.protocol !== 'https:' && !loopback) ||
+        service.origin !== serviceOrigin ||
+        service.pathname !== '/' ||
+        service.search ||
+        service.hash ||
+        service.username ||
+        service.password
+    ) {
+        throw new Error('Review proposal has an invalid service origin');
+    }
+    return { repository, serviceOrigin };
+}
+
+function editorOrigin(target) {
+    const value = target.location?.origin;
+    let origin;
+    try {
+        origin = new URL(value);
+    } catch {
+        throw new Error('The static editor has an invalid origin');
+    }
+    const loopback =
+        origin.protocol === 'http:' &&
+        ['127.0.0.1', 'localhost'].includes(origin.hostname);
+    if (
+        (origin.protocol !== 'https:' && !loopback) ||
+        origin.origin !== value ||
+        origin.pathname !== '/' ||
+        origin.search ||
+        origin.hash ||
+        origin.username ||
+        origin.password
+    ) {
+        throw new Error('The static editor has an invalid origin');
+    }
+    return value;
+}
+
+function handoffNonce(target) {
+    const bytes = new Uint8Array(32);
+    target.crypto.getRandomValues(bytes);
+    return [...bytes]
+        .map((value) => value.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+export function beginReviewBundleProposal(value, target = window) {
+    const { repository, serviceOrigin } = reviewProposalCoordinates(value);
+    const sourceOrigin = editorOrigin(target);
+    const nonce = handoffNonce(target);
+    const url = new URL('/edit/', serviceOrigin);
+    url.searchParams.set('repository', repository);
+    url.searchParams.set('editor_origin', sourceOrigin);
+    url.searchParams.set('handoff_nonce', nonce);
+    let popup;
+    let bundle;
+    let ready = false;
+    let timeout;
+
+    function dispose() {
+        target.removeEventListener('message', receiveReady);
+        if (timeout !== undefined) target.clearTimeout(timeout);
+        bundle = undefined;
+    }
+
+    function sendIfReady() {
+        if (!ready || bundle === undefined || popup?.closed) return;
+        popup.postMessage(
+            {
+                bundle,
+                format: REVIEW_BUNDLE_MESSAGE_FORMAT,
+                handoff_nonce: nonce,
+                repository,
+            },
+            serviceOrigin
+        );
+        dispose();
+    }
+
+    function receiveReady(event) {
+        if (
+            event.origin !== serviceOrigin ||
+            event.source !== popup ||
+            event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
+            event.data?.handoff_nonce !== nonce ||
+            event.data?.repository?.toLowerCase() !== repository.toLowerCase()
+        ) {
+            return;
+        }
+        ready = true;
+        sendIfReady();
+    }
+
+    target.addEventListener('message', receiveReady);
+    popup = target.open(
+        url.toString(),
+        `orinoco-lite-shacl-proposal-${nonce}`
+    );
+    if (!popup) {
+        dispose();
+        throw new Error('The GitHub proposal window was blocked');
+    }
+    timeout = target.setTimeout(dispose, HANDOFF_TIMEOUT_MS);
+    return {
+        cancel: dispose,
+        deliver(reviewBundle) {
+            bundle = reviewBundle;
+            sendIfReady();
+        },
+    };
 }
 
 export function recordSubmissionLabel({

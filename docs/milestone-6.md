@@ -34,7 +34,7 @@ The milestone will:
 
 - preserve well-formed unresolved Things references by default while reporting references and graph edges that cannot be materialized locally;
 - remove environment-dependent compatibility tests and unexpected CI skips;
-- make the GitHub proposal route discoverable from the SHACL Vue editing experience and exercise one real proposal;
+- add **Propose via GitHub** to the downstream static SHACL Vue editing experience and exercise one real proposal;
 - regenerate and complete a current Zotero proposal rather than repair the obsolete Milestone 5 proposal;
 - and publish any follow-up immutable engine, runtime, and template release required by those Milestone 6 changes.
 
@@ -76,7 +76,8 @@ Its closed Zotero pull request is historical proposal evidence, not a current re
 Milestone 6 creates a fresh proposal from the current default branch and current read-only Zotero coordinate, completes review and finalization, and reruns the identical source to obtain an empty proposal.
 
 Milestone 6 also exercises the first live SHACL Vue GitHub proposal and trusted replacement.
-These operational proofs do not reopen the accepted Milestone 5 adapter, provenance, or stateless-service architecture.
+These operational proofs do not reopen the accepted Milestone 5 adapter, provenance, fixed-path handoff, trusted-replacement, or stateless-service boundaries.
+M6-D005 separately corrects only the editor-hosting and browser-session portion of the earlier SHACL presentation design.
 
 ### M6-D004 — Move repository custody before the milestone and after active work is merged
 
@@ -93,6 +94,20 @@ The App installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website
 The custody audit also replaced the accidental query-things and things-enrichment-tools merge tips with the already accepted linear heads by exact lease, and fast-forwarded the Things Schemas mirror default ref to its accepted pin.
 The Congo mirror retains its upstream `stable` history plus two owned commits; its local Dependabot policy disables independent version-update pull requests, and the nine superseded bot pull requests were closed.
 The central backend then advanced from [engineering pull request 50](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50) at `b992e9788ee66572ca613cfa230cb2ecda40667e` with runtime `v0.2.0rc6`; its [final deployment evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) records the provider configuration, immutable deployment, authenticated read-only proof, and retained rollback.
+
+### M6-D005 — Keep SHACL Vue in the downstream static site
+
+The downstream static site is the only SHACL Vue editor for that downstream.
+Its editing session exposes two explicit actions for the same unchanged version 2 bundle: credential-free **Download bundle** and **Propose via GitHub**.
+The latter opens a configurable stateless GitHub service for sign-in, public-data confirmation, and bundle receipt; that service does not assemble, embed, or host another editor.
+
+The live browser handoff validates the configured service origin, the exact static-site origin, both window identities, and a cryptographically random one-time nonce while keeping the bundle out of URLs, OAuth state, cross-origin storage, and durable service state.
+If OAuth or browser policy breaks the live window relationship, the curator may download the same bundle and select it on the lightweight receiver page.
+The static site never receives a GitHub token, and the receiver applies the same repository, source-commit, exact-head, format, size, authorization, and acknowledgment checks to either transport.
+
+This resolves M6-Q001 in favor of two actions in one static editor rather than two editor destinations.
+It supersedes only the central editor-input artifact and the central-wrapper-owned editor assembly and session portions of HR-213 and M5-D014.
+It retains the immutable released editor and schema, exact source binding, unchanged bundle, fixed-path temporary Git handoff, trusted Python conversion and replacement, and stateless GitHub App boundary accepted in Milestone 5.
 
 ## Workstream 1: reference and projection alignment
 
@@ -124,12 +139,13 @@ Cache keys include the runner platform and required commit IDs; every job verifi
 
 ## Workstream 3: SHACL Vue proposal entry
 
-The credential-free downstream editor retains its normal **Download review bundle** behavior.
-The separate central wrapper remains the GitHub-authenticated proposal surface and already requests GitHub sign-in when needed.
+The downstream static editor retains its normal **Download bundle** behavior and adds an explicit **Propose via GitHub** action for the same editor result.
+The site must make both actions visible in the editing session and bind them to the repository and exact source commit represented by the generated editor input.
 
-The site must make that distinction visible before a curator performs edits.
-The chosen record action opens the wrapper with the repository and, where applicable, exact pull-request head and selected record.
-The wrapper owns the editing session from its beginning; Milestone 6 does not add cross-origin bundle storage or an OAuth recovery store to transfer a completed static-editor session.
+The proposal action opens the configured central service only for GitHub sign-in, confirmation, and bundle receipt.
+The service must not assemble or host SHACL Vue or own another editing session.
+A live transfer validates the expected service origin, static-site origin, both windows, and a one-time nonce; selecting a previously downloaded unchanged bundle on the receiver page is the fallback when OAuth or browser policy prevents that transfer.
+Neither path adds cross-origin bundle storage or an OAuth recovery store.
 
 Acceptance exercises one public-data edit through sign-in, bundle generation, the temporary handoff, trusted canonical replacement, validation, and a final branch with no handoff bundle.
 Automation still does not approve or merge the proposal.
@@ -165,20 +181,21 @@ Milestone 6 is complete when:
 
 1. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
 2. well-formed unresolved references survive validation and projection by default, omitted graph edges are reported, and strict site policy remains available;
-3. one current SHACL Vue edit completes the GitHub handoff and trusted replacement path; and
+3. the deployed downstream static editor exposes both actions, the central service exposes no duplicate editor, and one current SHACL Vue edit completes the GitHub handoff and trusted replacement path; and
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 
 Acceptance records representative commands, releases, pull requests, and runs.
 It does not duplicate commit ancestry already enforced by Git and the workflow or reproduce every transient artifact coordinate.
 
-## Open questions
+## Resolved questions
 
-### M6-Q001 — Which edit action is primary?
+### Resolved M6-Q001 — Which edit action is primary?
 
 Should a record show two explicit actions—**Edit or download** and **Propose through GitHub**—or should **Edit** open the authenticated GitHub wrapper by default with download retained there?
 
-The recommended default is two clearly named actions.
-It preserves the credential-free editor while making the proposal path visible before editing.
+The accepted result is one downstream static editor with two clearly named actions: **Download bundle** and **Propose via GitHub**.
+The central service is only the authenticated receiver and GitHub transport; it does not host an alternative editor.
+M6-D005 records the complete boundary.
 
 ### Resolved Pre-M6-Q001 — What moves to the new organization?
 

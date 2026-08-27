@@ -81,8 +81,14 @@ export function shaclAuthenticationUrl(
   repository: string,
   pullRequest?: number,
   expectedHeadSha?: string,
+  editorOrigin?: string,
+  handoffNonce?: string,
 ): string {
   const query = new URLSearchParams({ repository });
+  if (editorOrigin !== undefined && handoffNonce !== undefined) {
+    query.set("editor_origin", editorOrigin);
+    query.set("handoff_nonce", handoffNonce);
+  }
   if (pullRequest !== undefined && expectedHeadSha !== undefined) {
     query.set("expected_head_sha", expectedHeadSha);
     query.set("pull_request", String(pullRequest));

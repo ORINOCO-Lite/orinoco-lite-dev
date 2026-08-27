@@ -1,7 +1,6 @@
 import {
   act,
   cleanup,
-  fireEvent,
   render,
   screen,
   waitFor,
@@ -9,13 +8,26 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  ReviewDiscovery,
-  ReviewProposal,
-  ShaclReviewBundle,
+import {
+  MAX_SHACL_BUNDLE_BYTES,
+  type ReviewDiscovery,
+  type ReviewProposal,
+  type ShaclReviewBundle,
 } from "../shared/contracts";
 import App from "./App";
 import { ARTIFACT_ID, proposal } from "../tests/fixtures";
+
+const EDITOR_ORIGIN = "https://site.example";
+const HANDOFF_NONCE = "d".repeat(64);
+
+function liveHandoffTarget(extra = ""): string {
+  const query = new URLSearchParams({
+    repository: "example/site",
+    editor_origin: EDITOR_ORIGIN,
+    handoff_nonce: HANDOFF_NONCE,
+  });
+  return `/edit/?${query.toString()}${extra}`;
+}
 
 function json(value: unknown, status = 200): Response {
   return Response.json(value, { status });
@@ -71,9 +83,13 @@ function shaclBundle(): ShaclReviewBundle {
 }
 
 function sendEditorBundle(
-  frame: HTMLIFrameElement,
-  value: ShaclReviewBundle = shaclBundle(),
-  options: { origin?: string; source?: MessageEventSource | null } = {},
+  source: MessageEventSource,
+  value: unknown = shaclBundle(),
+  options: {
+    nonce?: string;
+    origin?: string;
+    source?: MessageEventSource | null;
+  } = {},
 ): void {
   act(() => {
     window.dispatchEvent(
@@ -81,13 +97,25 @@ function sendEditorBundle(
         data: {
           bundle: value,
           format: "orinoco-lite-shacl-bundle-message-v1",
+          handoff_nonce: options.nonce ?? HANDOFF_NONCE,
           repository: "example/site",
         },
-        origin: options.origin ?? window.location.origin,
-        source: options.source ?? frame.contentWindow,
+        origin: options.origin ?? EDITOR_ORIGIN,
+        source: options.source ?? source,
       }),
     );
   });
+}
+
+function installOpener(): Window & { postMessage: ReturnType<typeof vi.fn> } {
+  const opener = { postMessage: vi.fn() } as unknown as Window & {
+    postMessage: ReturnType<typeof vi.fn>;
+  };
+  Object.defineProperty(window, "opener", {
+    configurable: true,
+    value: opener,
+  });
+  return opener;
 }
 
 beforeEach(() => {
@@ -100,6 +128,10 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  Object.defineProperty(window, "opener", {
+    configurable: true,
+    value: null,
+  });
   vi.unstubAllGlobals();
 });
 
@@ -123,7 +155,10 @@ describe("curation review interface", () => {
     expect(reject).toBeChecked();
     expect(accept).not.toBeChecked();
     expect(
-      screen.getByRole("link", { name: "Edit in SHACL Vue" }),
+      screen.queryByRole("link", { name: "Edit in SHACL Vue" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Propose downloaded SHACL bundle" }),
     ).toHaveAttribute(
       "href",
       `/edit/?expected_head_sha=${proposal().head_sha}&pull_request=42&repository=example%2Fsite`,
@@ -356,20 +391,17 @@ describe("repository-scoped curation discovery", () => {
       "readonly",
     );
     expect(screen.getByRole("button", { name: "Open review" })).toBeEnabled();
-    expect(
-      screen.getByRole("option", { name: /Draft PR #42/ }),
-    ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
-describe("SHACL Vue browser-memory proposal wrapper", () => {
+describe("SHACL Vue browser-memory proposal handoff", () => {
   it("starts a repository-bound curation journey", () => {
     window.history.replaceState({}, "", "/");
     render(<App />);
     expect(
       screen.getByRole("heading", {
-        name: "Review or edit repository metadata",
+        name: "Review repository metadata",
       }),
     ).toBeInTheDocument();
     expect(
@@ -385,7 +417,7 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     window.history.replaceState(
       {},
       "",
-      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+      `${liveHandoffTarget()}&pull_request=42&expected_head_sha=${source}`,
     );
     vi.stubGlobal(
       "fetch",
@@ -396,12 +428,18 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
       await screen.findByRole("link", { name: "Continue with GitHub" }),
     ).toHaveAttribute(
       "href",
-      `/api/auth/shacl-start?repository=example%2Fsite&expected_head_sha=${source}&pull_request=42`,
+      `/api/auth/shacl-start?repository=example%2Fsite&editor_origin=https%3A%2F%2Fsite.example&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${source}&pull_request=42`,
+    );
+    expect(
+      screen.getByText(/Secure GitHub sign-in intentionally ends this popup/),
+    ).toHaveTextContent(
+      "after sign-in, download its normal bundle and select that file here",
     );
   });
 
-  it("embeds the same-origin editor and performs one acknowledged explicit write", async () => {
-    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
+  it("receives the static editor bundle and performs one acknowledged explicit write", async () => {
+    window.history.replaceState({}, "", liveHandoffTarget());
+    const opener = installOpener();
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -433,29 +471,26 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("heading", {
-      name: "Waiting for a SHACL Vue v2 bundle",
+      name: "Waiting for the static editor",
     });
-    const frame = screen.getByTitle(
-      "SHACL Vue metadata editor",
-    ) as HTMLIFrameElement;
-    expect(frame).toHaveAttribute(
-      "src",
-      "/api/shacl/editor?repository=example%2Fsite",
+    expect(
+      screen.getByText(/If you were already signed in when this window opened/),
+    ).toHaveTextContent(
+      "GitHub sign-in ends that live link, so download the unchanged bundle",
     );
-    const editor = screen.getByRole("region", { name: "Edit in SHACL Vue" });
-    expect(editor).toHaveAttribute("aria-busy", "true");
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      {
+        format: "orinoco-lite-shacl-proposal-ready-v1",
+        handoff_nonce: HANDOFF_NONCE,
+        repository: "example/site",
+      },
+      EDITOR_ORIGIN,
+    );
     expect(
-      screen.getByText("Loading the exact-coordinate editor…"),
-    ).toBeInTheDocument();
-    fireEvent.load(frame);
-    expect(editor).toHaveAttribute("aria-busy", "false");
-    expect(
-      screen.getByText(
-        "Editor loaded. Generate the normal bundle when your edit is complete.",
-      ),
-    ).toBeInTheDocument();
+      screen.queryByTitle("SHACL Vue metadata editor"),
+    ).not.toBeInTheDocument();
     const bundle = shaclBundle();
-    sendEditorBundle(frame, bundle);
+    sendEditorBundle(opener, bundle);
     expect(
       await screen.findByRole("heading", { name: "1 edited record" }),
     ).toBeInTheDocument();
@@ -488,8 +523,9 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("accepts the typed bundle message only from its same-origin iframe", async () => {
-    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
+  it("accepts the typed bundle only from its exact opener, origin, and nonce", async () => {
+    window.history.replaceState({}, "", liveHandoffTarget());
+    const opener = installOpener();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -502,37 +538,34 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     );
     render(<App />);
     await screen.findByRole("heading", {
-      name: "Waiting for a SHACL Vue v2 bundle",
+      name: "Waiting for the static editor",
     });
-    const frame = screen.getByTitle(
-      "SHACL Vue metadata editor",
-    ) as HTMLIFrameElement;
-    sendEditorBundle(frame, shaclBundle(), {
-      origin: "https://editor.example",
+    sendEditorBundle(opener, shaclBundle(), {
+      origin: "http://editor.example",
     });
     expect(
       screen.queryByRole("heading", { name: "1 edited record" }),
     ).not.toBeInTheDocument();
-    sendEditorBundle(frame, shaclBundle(), { source: window });
+    sendEditorBundle(opener, shaclBundle(), { source: window });
     expect(
       screen.queryByRole("heading", { name: "1 edited record" }),
     ).not.toBeInTheDocument();
-    sendEditorBundle(frame);
+    sendEditorBundle(opener, shaclBundle(), { nonce: "e".repeat(64) });
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
+    sendEditorBundle(opener);
     expect(
       await screen.findByRole("heading", { name: "1 edited record" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Browser source: this embedded editor"),
+      screen.getByText(`Browser source: ${EDITOR_ORIGIN}`),
     ).toBeInTheDocument();
   });
 
-  it("binds the embedded editor to exact existing-PR coordinates", async () => {
-    const source = "a".repeat(40);
-    window.history.replaceState(
-      {},
-      "",
-      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
-    );
+  it("rejects malformed and oversized live bundles before retaining them", async () => {
+    window.history.replaceState({}, "", liveHandoffTarget());
+    const opener = installOpener();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -544,21 +577,115 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
       ),
     );
     render(<App />);
-    const frame = (await screen.findByTitle(
-      "SHACL Vue metadata editor",
-    )) as HTMLIFrameElement;
-    expect(frame).toHaveAttribute(
-      "src",
-      `/api/shacl/editor?repository=example%2Fsite&expected_head_sha=${source}&pull_request=42`,
+    await screen.findByRole("heading", {
+      name: "Waiting for the static editor",
+    });
+
+    sendEditorBundle(opener, { ...shaclBundle(), retained_copy: true });
+    const duplicate = shaclBundle();
+    duplicate.records.push({ ...duplicate.records[0]! });
+    sendEditorBundle(opener, duplicate);
+    const badPath = shaclBundle();
+    badPath.records[0]!.source_path = "../record.yaml";
+    sendEditorBundle(opener, badPath);
+    const badDigest = shaclBundle();
+    badDigest.records[0]!.source_sha256 = "not-a-digest";
+    sendEditorBundle(opener, badDigest);
+    const oversized = shaclBundle();
+    oversized.records[0]!.rdf_turtle = "x".repeat(MAX_SHACL_BUNDLE_BYTES);
+    sendEditorBundle(opener, oversized);
+
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
+    sendEditorBundle(opener);
+    expect(
+      await screen.findByRole("heading", { name: "1 edited record" }),
+    ).toBeInTheDocument();
+  });
+
+  it("accepts the unchanged downloaded bundle as a fallback", async () => {
+    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+        }),
+      ),
     );
+    const user = userEvent.setup();
+    render(<App />);
+    const input = await screen.findByLabelText(
+      "Use a downloaded review bundle",
+    );
+
+    await user.upload(
+      input,
+      new File([JSON.stringify(shaclBundle())], "review.json", {
+        type: "application/json",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "1 edited record" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Browser source: downloaded file: review.json"),
+    ).toBeInTheDocument();
+  });
+
+  it("rejects malformed and oversized downloaded bundles", async () => {
+    window.history.replaceState({}, "", "/edit/?repository=example%2Fsite");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const input = await screen.findByLabelText(
+      "Use a downloaded review bundle",
+    );
+    const duplicate = shaclBundle();
+    duplicate.records.push({ ...duplicate.records[0]! });
+    await user.upload(
+      input,
+      new File([JSON.stringify(duplicate)], "duplicate.json", {
+        type: "application/json",
+      }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "not a SHACL Vue v2 review bundle",
+    );
+    await user.upload(
+      input,
+      new File(["x".repeat(MAX_SHACL_BUNDLE_BYTES + 1)], "oversized.json", {
+        type: "application/json",
+      }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "must be no larger than 10 MiB",
+    );
+    expect(
+      screen.queryByRole("heading", { name: "1 edited record" }),
+    ).not.toBeInTheDocument();
   });
 
   it("binds an existing-PR handoff to the received source commit", async () => {
     const source = "a".repeat(40);
+    const opener = installOpener();
     window.history.replaceState(
       {},
       "",
-      `/edit/?repository=example%2Fsite&pull_request=42&expected_head_sha=${source}`,
+      `${liveHandoffTarget()}&pull_request=42&expected_head_sha=${source}`,
     );
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -592,12 +719,9 @@ describe("SHACL Vue browser-memory proposal wrapper", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("heading", {
-      name: "Waiting for a SHACL Vue v2 bundle",
+      name: "Waiting for the static editor",
     });
-    const frame = screen.getByTitle(
-      "SHACL Vue metadata editor",
-    ) as HTMLIFrameElement;
-    sendEditorBundle(frame);
+    sendEditorBundle(opener);
     await screen.findByRole("heading", { name: "1 edited record" });
     expect(
       screen.getByRole("spinbutton", { name: "Draft pull request" }),

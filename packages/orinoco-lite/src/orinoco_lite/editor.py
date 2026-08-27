@@ -102,17 +102,25 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
-def _editor_config(site_name: str) -> dict[str, Any]:
-    return {
-        "app_name": f"{site_name} metadata review",
+def _editor_config(workspace: WorkspaceConfig) -> dict[str, Any]:
+    github_handoff = (
+        workspace.repository is not None and workspace.curation_service is not None
+    )
+    config: dict[str, Any] = {
+        "app_name": f"{workspace.site_name} metadata review",
         "class_url": "dlschemas_owl.ttl",
         "data_url": "records.ttl",
         "external_config_url": "config_default_xyzri.yaml",
         "front_page_content": (
             "Edit a public record, validate it, then download a review bundle. "
-            "This browser has no write service or authentication credential."
+            + (
+                "You may also explicitly propose the same bundle through GitHub. "
+                if github_handoff
+                else ""
+            )
+            + "This static editor receives no authentication credential."
         ),
-        "page_title": f"{site_name} metadata review",
+        "page_title": f"{workspace.site_name} metadata review",
         "priority_classes": [
             {
                 "class": "dlthings:Thing",
@@ -130,6 +138,12 @@ def _editor_config(site_name: str) -> dict[str, Any]:
         "use_service": False,
         "use_token": False,
     }
+    if github_handoff:
+        config["review_bundle_proposal"] = {
+            "repository": workspace.repository,
+            "service_origin": workspace.curation_service,
+        }
+    return config
 
 
 def _converters(schema: Path):
@@ -236,7 +250,7 @@ def bind_editor(
         entry["rdf_turtle"] = record_rdf[entry["pid"]]
     (destination / "data").mkdir(exist_ok=True)
     _write_json(destination / "data/record-sources.json", catalog)
-    _write_json(destination / "config.json", _editor_config(workspace.site_name))
+    _write_json(destination / "config.json", _editor_config(workspace))
     (destination / "records.ttl").write_text(combined_rdf, encoding="utf-8")
     return {
         "catalog_format": CATALOG_FORMAT,

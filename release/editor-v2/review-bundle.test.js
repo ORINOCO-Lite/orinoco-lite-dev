@@ -22,9 +22,12 @@ vi.mock('@/modules/utils', () => ({
 
 const {
     buildReviewBundle,
+    beginReviewBundleProposal,
     dispatchReviewBundle,
     recordSubmissionLabel,
     REVIEW_BUNDLE_EVENT,
+    REVIEW_BUNDLE_MESSAGE_FORMAT,
+    REVIEW_PROPOSAL_READY_FORMAT,
     reviewBundleFilename,
     validateRecordCatalog,
 } = await import('../src/modules/review-bundle');
@@ -114,6 +117,102 @@ describe('Orinoco review bundles', () => {
 
         expect(dispatchReviewBundle(bundle)).toBe(true);
         expect(observed).toBe(bundle);
+    });
+
+    it('sends an in-memory bundle only to the exact proposal popup', () => {
+        const listeners = new Map();
+        const popup = { closed: false, postMessage: vi.fn() };
+        const nonce = '0a'.repeat(32);
+        const target = {
+            addEventListener: vi.fn((type, listener) =>
+                listeners.set(type, listener)
+            ),
+            clearTimeout: vi.fn(),
+            crypto: {
+                getRandomValues: vi.fn((value) => value.fill(10)),
+            },
+            location: { origin: 'https://site.example.test' },
+            open: vi.fn(() => popup),
+            removeEventListener: vi.fn(),
+            setTimeout: vi.fn(() => 17),
+        };
+        const handoff = beginReviewBundleProposal(
+            {
+                repository: 'ORINOCO-Lite/example-site',
+                service_origin: 'https://review.example.test',
+            },
+            target
+        );
+        expect(target.open).toHaveBeenCalledWith(
+            'https://review.example.test/edit/?repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
+                nonce,
+            `orinoco-lite-shacl-proposal-${nonce}`
+        );
+        handoff.deliver(catalog);
+        const receive = listeners.get('message');
+        receive({
+            data: {
+                format: REVIEW_PROPOSAL_READY_FORMAT,
+                handoff_nonce: nonce,
+                repository: 'ORINOCO-Lite/example-site',
+            },
+            origin: 'https://evil.example',
+            source: popup,
+        });
+        expect(popup.postMessage).not.toHaveBeenCalled();
+        receive({
+            data: {
+                format: REVIEW_PROPOSAL_READY_FORMAT,
+                handoff_nonce: '0b'.repeat(32),
+                repository: 'ORINOCO-Lite/example-site',
+            },
+            origin: 'https://review.example.test',
+            source: popup,
+        });
+        expect(popup.postMessage).not.toHaveBeenCalled();
+        receive({
+            data: {
+                format: REVIEW_PROPOSAL_READY_FORMAT,
+                handoff_nonce: nonce,
+                repository: 'ORINOCO-Lite/example-site',
+            },
+            origin: 'https://review.example.test',
+            source: popup,
+        });
+        expect(popup.postMessage).toHaveBeenCalledWith(
+            {
+                bundle: catalog,
+                format: REVIEW_BUNDLE_MESSAGE_FORMAT,
+                handoff_nonce: nonce,
+                repository: 'ORINOCO-Lite/example-site',
+            },
+            'https://review.example.test'
+        );
+        expect(target.removeEventListener).toHaveBeenCalledWith(
+            'message',
+            receive
+        );
+    });
+
+    it('rejects unsafe proposal coordinates before opening a window', () => {
+        for (const proposal of [
+            {
+                repository: 'not-a-repository',
+                service_origin: 'https://review.example.test',
+            },
+            {
+                repository: 'ORINOCO-Lite/example-site',
+                service_origin: 'http://review.example.test',
+            },
+            {
+                repository: 'ORINOCO-Lite/example-site',
+                service_origin: 'https://review.example.test/edit/',
+            },
+        ]) {
+            expect(() => beginReviewBundleProposal(proposal)).toThrow(
+                /invalid/
+            );
+        }
     });
 
     it('rejects old catalogs and produces deterministic filenames', () => {

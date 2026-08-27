@@ -4,12 +4,13 @@ import type {
   ShaclReviewBundle,
   ShaclReviewRecord,
 } from "../../shared/contracts";
+import { MAX_SHACL_BUNDLE_BYTES } from "../../shared/contracts";
 import { utf8 } from "./encoding";
 import { HttpError, requireExactKeys } from "./http";
 import { parseRepository } from "./input";
 
 export const SHACL_BUNDLE_PATH = ".orinoco-lite/shacl-vue-review-bundle.json";
-export const MAX_SHACL_BUNDLE_BYTES = 10 * 1024 * 1024;
+export { MAX_SHACL_BUNDLE_BYTES };
 export const MAX_SHACL_PROPOSAL_BODY_BYTES = MAX_SHACL_BUNDLE_BYTES + 64 * 1024;
 
 const COMMIT = /^[0-9a-f]{40}$/;

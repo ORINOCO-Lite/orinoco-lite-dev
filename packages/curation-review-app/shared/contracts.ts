@@ -3,6 +3,35 @@ export type JsonValue =
   JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
 
+export const MAX_SHACL_BUNDLE_BYTES = 10 * 1024 * 1024;
+export const SHACL_HANDOFF_NONCE = /^[0-9a-f]{64}$/;
+
+export function isSafeEditorOrigin(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 256) return false;
+  let origin: URL;
+  try {
+    origin = new URL(value);
+  } catch {
+    return false;
+  }
+  const loopback =
+    origin.protocol === "http:" &&
+    (origin.hostname === "127.0.0.1" || origin.hostname === "localhost");
+  return (
+    (origin.protocol === "https:" || loopback) &&
+    origin.origin === value &&
+    origin.pathname === "/" &&
+    origin.search === "" &&
+    origin.hash === "" &&
+    origin.username === "" &&
+    origin.password === ""
+  );
+}
+
+export function isShaclHandoffNonce(value: unknown): value is string {
+  return typeof value === "string" && SHACL_HANDOFF_NONCE.test(value);
+}
+
 export type CandidateOperation = "add" | "delete" | "modify";
 export type Disposition = "accept" | "defer" | "reject";
 
@@ -134,5 +163,12 @@ export interface ShaclProposalResult {
 export interface ShaclBundleMessage {
   bundle: ShaclReviewBundle;
   format: "orinoco-lite-shacl-bundle-message-v1";
+  handoff_nonce: string;
+  repository: string;
+}
+
+export interface ShaclProposalReadyMessage {
+  format: "orinoco-lite-shacl-proposal-ready-v1";
+  handoff_nonce: string;
   repository: string;
 }

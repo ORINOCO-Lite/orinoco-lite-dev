@@ -3,10 +3,23 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
 @@ -18,0 +19 @@
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
-@@ -139 +140 @@
+@@ -102,0 +104,7 @@
++            <v-btn
++                v-if="proposalMode && !responseReceived && nodesToSubmit.length"
++                @click="proposeRecords()"
++            >
++                <v-icon>mdi-source-pull</v-icon>
++                Propose via GitHub
++            </v-btn>
+@@ -139 +147 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
-+import { buildReviewBundle, dispatchReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
-@@ -174,0 +176,21 @@
++import { beginReviewBundleProposal, buildReviewBundle, dispatchReviewBundle, recordSubmissionLabel, reviewBundleFilename } from '@/modules/review-bundle';
+@@ -174,0 +183,26 @@ const patchDownloadMode = computed(
++const proposalMode = computed(
++    () =>
++        patchDownloadMode.value &&
++        typeof config.value?.review_bundle_proposal === 'object'
++);
 +
 +function accessibleRecordSubmissionLabel(record) {
 +    const classLabel = getDisplayName(
@@ -28,5 +41,66 @@ diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 +        recordLabel,
 +    });
 +}
-@@ -255,0 +278 @@
+@@ -235,0 +270,40 @@ async function submit() {
++async function buildSelectedReviewBundle() {
++    const selected = nodesToSubmit.value.filter((node) =>
++        selectedNodesToSubmit.value.includes(node.node_iri)
++    );
++    const response = await fetch(config.value.review_bundle_catalog, {
++        cache: 'no-cache',
++        credentials: 'omit',
++    });
++    if (!response.ok) {
++        throw new Error(`record catalog request failed (${response.status})`);
++    }
++    return buildReviewBundle({
++        catalog: await response.json(),
++        graph: rdfDS.data.graph,
++        prefixes: allPrefixes,
++        selectedNodes: selected,
++    });
++}
++
++function reviewBundleFailure(error) {
++    responseFailure.value = true;
++    responseReceived.value = true;
++    responseText.value = `The review bundle could not be created: ${error.message}`;
++}
++
++async function proposeRecords() {
++    let handoff;
++    try {
++        handoff = beginReviewBundleProposal(
++            config.value.review_bundle_proposal
++        );
++        const bundle = await buildSelectedReviewBundle();
++        dispatchReviewBundle(bundle);
++        handoff.deliver(bundle);
++    } catch (error) {
++        handoff?.cancel();
++        reviewBundleFailure(error);
++    }
++}
++
+@@ -242,13 +316 @@ async function downloadRecords() {
+-            const response = await fetch(config.value.review_bundle_catalog, {
+-                cache: 'no-cache',
+-                credentials: 'omit',
+-            });
+-            if (!response.ok) {
+-                throw new Error(`record catalog request failed (${response.status})`);
+-            }
+-            const bundle = await buildReviewBundle({
+-                catalog: await response.json(),
+-                graph: rdfDS.data.graph,
+-                prefixes: allPrefixes,
+-                selectedNodes: toSubmit,
+-            });
++            const bundle = await buildSelectedReviewBundle();
+@@ -255,0 +318 @@ async function downloadRecords() {
 +            dispatchReviewBundle(bundle);
+@@ -257,3 +320 @@ async function downloadRecords() {
+-            responseFailure.value = true;
+-            responseReceived.value = true;
+-            responseText.value = `The review bundle could not be created: ${error.message}`;
++            reviewBundleFailure(error);

@@ -94,6 +94,10 @@ export async function onRequest(context: EventContext): Promise<Response> {
   } else if (oauth.kind === "shacl") {
     destination.pathname = "/edit/";
     destination.searchParams.set("repository", oauth.repository);
+    if (oauth.editor_origin !== null && oauth.handoff_nonce !== null) {
+      destination.searchParams.set("editor_origin", oauth.editor_origin);
+      destination.searchParams.set("handoff_nonce", oauth.handoff_nonce);
+    }
     if (oauth.pull_request !== null && oauth.expected_head_sha !== null) {
       destination.searchParams.set(
         "expected_head_sha",

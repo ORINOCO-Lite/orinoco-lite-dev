@@ -52,6 +52,10 @@ All other accepted Milestone 4 boundaries remain in force, including the ordinar
 Milestone 6 decision M6-D001 supersedes M5-D019's field-specific exception and general local-closure default with upstream-compatible preservation of well-formed unresolved references.
 M5-D019 remains the historical decision for the reviewed `dump-research-info` correction; its prohibition on substituting a venue for an identifier creator remains valid semantic evidence.
 
+Milestone 6 decision M6-D005 and HR-227 supersede the editor-input artifact and the central-wrapper-owned editor assembly and session portions of HR-213 and M5-D014.
+M5-D014 remains the historical record of what Milestone 5 implemented and accepted.
+Its immutable released editor and schema, exact source binding, unchanged version 2 bundle, fixed-path temporary handoff, trusted Python conversion and replacement, stateless service, and Git authority boundaries remain in force.
+
 ## Superseded exploration
 
 The following are not dormant requirements and must not be restored without a focused specification change:

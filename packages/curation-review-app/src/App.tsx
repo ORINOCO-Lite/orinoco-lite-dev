@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  CurationSubmission,
-  DiscoveryPullRequest,
-  Disposition,
-  ReviewCandidate,
-  ReviewDiscovery,
-  ReviewProposal,
-  SessionStatus,
-  ShaclBundleMessage,
-  ShaclProposalRequest,
-  ShaclProposalResult,
-  ShaclReviewBundle,
+import {
+  isSafeEditorOrigin,
+  isShaclHandoffNonce,
+  MAX_SHACL_BUNDLE_BYTES,
+  type ShaclProposalReadyMessage,
+  type CurationSubmission,
+  type Disposition,
+  type ReviewCandidate,
+  type ReviewDiscovery,
+  type ReviewProposal,
+  type SessionStatus,
+  type ShaclBundleMessage,
+  type ShaclProposalRequest,
+  type ShaclProposalResult,
+  type ShaclReviewBundle,
 } from "../shared/contracts";
 import {
   ApiError,
@@ -32,7 +35,9 @@ interface Target {
 }
 
 interface ShaclTarget {
+  editorOrigin?: string;
   expectedHeadSha?: string;
+  handoffNonce?: string;
   pullRequest?: number;
   repository: string;
 }
@@ -87,7 +92,13 @@ function currentShaclTarget(): ShaclTarget | null {
     return null;
   }
   const query = new URLSearchParams(window.location.search);
-  const allowed = new Set(["expected_head_sha", "pull_request", "repository"]);
+  const allowed = new Set([
+    "editor_origin",
+    "expected_head_sha",
+    "handoff_nonce",
+    "pull_request",
+    "repository",
+  ]);
   if ([...query.keys()].some((key) => !allowed.has(key))) return null;
   const repository = query.get("repository");
   if (query.getAll("repository").length !== 1 || !validRepository(repository)) {
@@ -95,8 +106,28 @@ function currentShaclTarget(): ShaclTarget | null {
   }
   const pullValues = query.getAll("pull_request");
   const headValues = query.getAll("expected_head_sha");
+  const editorOrigins = query.getAll("editor_origin");
+  const handoffNonces = query.getAll("handoff_nonce");
+  if (
+    (editorOrigins.length === 0 && handoffNonces.length !== 0) ||
+    (editorOrigins.length !== 0 && handoffNonces.length === 0) ||
+    editorOrigins.length > 1 ||
+    handoffNonces.length > 1 ||
+    (editorOrigins.length === 1 &&
+      (!isSafeEditorOrigin(editorOrigins[0]) ||
+        !isShaclHandoffNonce(handoffNonces[0])))
+  ) {
+    return null;
+  }
+  const handoff =
+    editorOrigins.length === 1
+      ? {
+          editorOrigin: editorOrigins[0],
+          handoffNonce: handoffNonces[0],
+        }
+      : {};
   if (pullValues.length === 0 && headValues.length === 0) {
-    return { repository };
+    return { repository, ...handoff };
   }
   if (
     pullValues.length !== 1 ||
@@ -110,6 +141,7 @@ function currentShaclTarget(): ShaclTarget | null {
     expectedHeadSha: headValues[0],
     pullRequest: Number(pullValues[0]),
     repository,
+    ...handoff,
   };
 }
 
@@ -155,8 +187,6 @@ function Landing({
     (pull) => String(pull.number) === selectedPull,
   );
   const artifacts = selectedProposal?.artifacts ?? [];
-  const editablePulls =
-    discovery?.pull_requests.filter((pull) => pull.draft) ?? [];
 
   useEffect(() => {
     if (discovery === null) return;
@@ -209,28 +239,11 @@ function Landing({
     window.location.assign(`/review/?${query.toString()}`);
   }
 
-  function openEdit(event: React.FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    if (repository === null) return;
-    const data = new FormData(event.currentTarget);
-    const selected = String(data.get("edit_target") ?? "default");
-    const query = new URLSearchParams({ repository });
-    if (selected !== "default") {
-      const pull = editablePulls.find(
-        (candidate) => String(candidate.number) === selected,
-      );
-      if (pull === undefined) return;
-      query.set("expected_head_sha", pull.head_sha);
-      query.set("pull_request", String(pull.number));
-    }
-    window.location.assign(`/edit/?${query.toString()}`);
-  }
-
   if (repository === null) {
     return (
       <main className="landing" id="main-content">
         <p className="eyebrow">Orinoco Lite</p>
-        <h1>Review or edit repository metadata</h1>
+        <h1>Review repository metadata</h1>
         <p className="lede">
           Start from a repository or pull-request link. The repository remains
           explicit because one GitHub identity can curate more than one site.
@@ -270,8 +283,7 @@ function Landing({
         <h1>Continue with {repository}</h1>
         <p className="lede">
           Sign in to list only this repository&apos;s open curation proposals
-          and available review artifacts, or to start an attributed SHACL Vue
-          edit.
+          and available review artifacts.
         </p>
         <a
           className="button-link"
@@ -356,30 +368,6 @@ function Landing({
               trusted proposal workflow to reproduce one.
             </p>
           )}
-          <section className="edit-entry" aria-labelledby="edit-entry-title">
-            <h2 id="edit-entry-title">Propose a SHACL Vue edit</h2>
-            <p>
-              Preserve Download bundle in the editor, or send that same
-              browser-memory result through an explicit attributed GitHub
-              proposal.
-            </p>
-            <form className="edit-target-form" onSubmit={openEdit}>
-              <label>
-                Edit target
-                <select defaultValue="default" name="edit_target">
-                  <option value="default">
-                    Current default branch — create a draft pull request
-                  </option>
-                  {editablePulls.map((pull: DiscoveryPullRequest) => (
-                    <option key={pull.number} value={pull.number}>
-                      Draft PR #{pull.number} — {pull.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit">Open SHACL Vue proposal</button>
-            </form>
-          </section>
         </>
       )}
       <p className="quiet">
@@ -421,8 +409,12 @@ function ShaclSignIn({ target }: { target: ShaclTarget }): React.JSX.Element {
       <h1>Sign in to propose a SHACL Vue edit</h1>
       <p className="lede">
         GitHub limits this explicit write operation to collaborators with write
-        or admin permission. After sign-in, the exact-coordinate editor opens
-        here without storing its generated bundle on the service.
+        or admin permission. Secure GitHub sign-in intentionally ends this
+        popup&apos;s live link to the editor. Keep the static editor open; after
+        sign-in, download its normal bundle and select that file here, or sign
+        in first and choose <strong>Propose via GitHub</strong> again for a
+        direct in-memory handoff. This page does not host a second editor or
+        store the bundle.
       </p>
       <a
         className="button-link"
@@ -430,6 +422,8 @@ function ShaclSignIn({ target }: { target: ShaclTarget }): React.JSX.Element {
           target.repository,
           target.pullRequest,
           target.expectedHeadSha,
+          target.editorOrigin,
+          target.handoffNonce,
         )}
       >
         Continue with GitHub
@@ -439,9 +433,51 @@ function ShaclSignIn({ target }: { target: ShaclTarget }): React.JSX.Element {
   );
 }
 
+function exactKeys(value: unknown, expected: readonly string[]): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const observed = Object.keys(value).sort();
+  const required = [...expected].sort();
+  return (
+    observed.length === required.length &&
+    observed.every((key, index) => key === required[index])
+  );
+}
+
+function oneLine(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 4_096 &&
+    !/[\u0000-\u001f\u007f]/.test(value)
+  );
+}
+
+function validRecordPath(value: string): boolean {
+  const root = "metadata/records/";
+  return (
+    value.startsWith(root) &&
+    (value.endsWith(".yaml") || value.endsWith(".yml")) &&
+    value.length <= 1_024 &&
+    !/[\\\u0000-\u001f\u007f]/.test(value) &&
+    value
+      .slice(root.length)
+      .split("/")
+      .every(
+        (part) =>
+          part.length > 0 &&
+          part !== "." &&
+          part !== ".." &&
+          !part.startsWith("."),
+      )
+  );
+}
+
 function browserBundle(value: unknown): ShaclReviewBundle | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value))
+  if (!exactKeys(value, ["format", "records", "source_commit", "version"])) {
     return null;
+  }
   const record = value as Record<string, unknown>;
   if (
     record.format !== "orinoco-shacl-review-bundle" ||
@@ -450,33 +486,77 @@ function browserBundle(value: unknown): ShaclReviewBundle | null {
     !/^[0-9a-f]{40}$/.test(record.source_commit) ||
     !Array.isArray(record.records) ||
     record.records.length === 0 ||
-    record.records.length > 50 ||
-    record.records.some(
-      (item) =>
-        item === null ||
-        typeof item !== "object" ||
-        Array.isArray(item) ||
-        typeof (item as Record<string, unknown>).pid !== "string" ||
-        typeof (item as Record<string, unknown>).rdf_turtle !== "string" ||
-        typeof (item as Record<string, unknown>).schema_type !== "string" ||
-        typeof (item as Record<string, unknown>).source_path !== "string" ||
-        typeof (item as Record<string, unknown>).source_sha256 !== "string",
-    )
+    record.records.length > 50
   ) {
     return null;
   }
-  return value as ShaclReviewBundle;
+  const records = [];
+  const pids = new Set<string>();
+  const paths = new Set<string>();
+  for (const item of record.records) {
+    if (
+      !exactKeys(item, [
+        "pid",
+        "rdf_turtle",
+        "schema_type",
+        "source_path",
+        "source_sha256",
+      ])
+    ) {
+      return null;
+    }
+    const candidate = item as Record<string, unknown>;
+    if (
+      !oneLine(candidate.pid) ||
+      !oneLine(candidate.schema_type) ||
+      !oneLine(candidate.source_path) ||
+      !validRecordPath(candidate.source_path) ||
+      typeof candidate.source_sha256 !== "string" ||
+      !/^[0-9a-f]{64}$/.test(candidate.source_sha256) ||
+      typeof candidate.rdf_turtle !== "string" ||
+      candidate.rdf_turtle.trim().length === 0 ||
+      candidate.rdf_turtle.includes("\0") ||
+      pids.has(candidate.pid) ||
+      paths.has(candidate.source_path)
+    ) {
+      return null;
+    }
+    pids.add(candidate.pid);
+    paths.add(candidate.source_path);
+    records.push({
+      pid: candidate.pid,
+      rdf_turtle: candidate.rdf_turtle,
+      schema_type: candidate.schema_type,
+      source_path: candidate.source_path,
+      source_sha256: candidate.source_sha256,
+    });
+  }
+  const bundle: ShaclReviewBundle = {
+    format: "orinoco-shacl-review-bundle",
+    records,
+    source_commit: record.source_commit,
+    version: 2,
+  };
+  if (
+    new TextEncoder().encode(`${JSON.stringify(bundle, null, 2)}\n`)
+      .byteLength > MAX_SHACL_BUNDLE_BYTES
+  ) {
+    return null;
+  }
+  return bundle;
 }
 
 function messageBundle(
   value: unknown,
   repository: string,
+  handoffNonce: string,
 ): ShaclReviewBundle | null {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     return null;
   const message = value as Partial<ShaclBundleMessage>;
   if (
     message.format !== "orinoco-lite-shacl-bundle-message-v1" ||
+    message.handoff_nonce !== handoffNonce ||
     typeof message.repository !== "string" ||
     message.repository.toLowerCase() !== repository.toLowerCase()
   ) {
@@ -494,9 +574,8 @@ function ShaclHandoff({
   session,
   target,
 }: ShaclHandoffProps): React.JSX.Element {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [bundle, setBundle] = useState<ShaclReviewBundle | null>(null);
-  const [editorLoading, setEditorLoading] = useState(true);
+  const [bundleSource, setBundleSource] = useState<string | null>(null);
   const [acknowledgePublicData, setAcknowledgePublicData] = useState(false);
   const [kind, setKind] = useState<"pull_request" | "standalone">(
     target.pullRequest === undefined ? "standalone" : "pull_request",
@@ -507,40 +586,97 @@ function ShaclHandoff({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [result, setResult] = useState<ShaclProposalResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const editorSource = useMemo(() => {
-    const query = new URLSearchParams({ repository: target.repository });
-    if (
-      target.pullRequest !== undefined &&
-      target.expectedHeadSha !== undefined
-    ) {
-      query.set("expected_head_sha", target.expectedHeadSha);
-      query.set("pull_request", String(target.pullRequest));
-    }
-    return `/api/shacl/editor?${query.toString()}`;
-  }, [target.expectedHeadSha, target.pullRequest, target.repository]);
-
   useEffect(() => {
     function postedMessage(event: MessageEvent<unknown>): void {
       if (
-        event.origin !== window.location.origin ||
-        iframeRef.current === null ||
-        event.source !== iframeRef.current.contentWindow
+        target.editorOrigin === undefined ||
+        target.handoffNonce === undefined ||
+        window.opener === null ||
+        event.source !== window.opener ||
+        event.origin !== target.editorOrigin
       ) {
         return;
       }
-      const received = messageBundle(event.data, target.repository);
+      const received = messageBundle(
+        event.data,
+        target.repository,
+        target.handoffNonce,
+      );
       if (received === null) return;
+      if (
+        target.expectedHeadSha !== undefined &&
+        target.expectedHeadSha !== received.source_commit
+      ) {
+        setFeedback(
+          "The received bundle does not match the exact pull-request head in this link.",
+        );
+        return;
+      }
       setBundle(received);
+      setBundleSource(event.origin);
       setAcknowledgePublicData(false);
       setFeedback(null);
       setResult(null);
     }
 
     window.addEventListener("message", postedMessage);
+    if (
+      window.opener !== null &&
+      target.editorOrigin !== undefined &&
+      target.handoffNonce !== undefined
+    ) {
+      const ready: ShaclProposalReadyMessage = {
+        format: "orinoco-lite-shacl-proposal-ready-v1",
+        handoff_nonce: target.handoffNonce,
+        repository: target.repository,
+      };
+      window.opener.postMessage(ready, target.editorOrigin);
+    }
     return () => {
       window.removeEventListener("message", postedMessage);
     };
-  }, [target.repository]);
+  }, [
+    target.editorOrigin,
+    target.expectedHeadSha,
+    target.handoffNonce,
+    target.repository,
+  ]);
+
+  async function loadBundleFile(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file === undefined) return;
+    if (file.size > MAX_SHACL_BUNDLE_BYTES) {
+      setFeedback("The review bundle file must be no larger than 10 MiB.");
+      return;
+    }
+    try {
+      const received = browserBundle(JSON.parse(await file.text()) as unknown);
+      if (received === null) {
+        setFeedback("The selected file is not a SHACL Vue v2 review bundle.");
+        return;
+      }
+      if (
+        target.expectedHeadSha !== undefined &&
+        target.expectedHeadSha !== received.source_commit
+      ) {
+        setFeedback(
+          "The selected bundle does not match the exact pull-request head in this link.",
+        );
+        return;
+      }
+      setBundle(received);
+      setBundleSource(`downloaded file: ${file.name}`);
+      setAcknowledgePublicData(false);
+      setFeedback(null);
+      setResult(null);
+    } catch {
+      setFeedback("The selected file is not valid JSON.");
+    }
+  }
 
   async function propose(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -634,10 +770,11 @@ function ShaclHandoff({
             <p className="eyebrow">Browser-memory handoff</p>
             <h2>Propose the normal SHACL Vue bundle through GitHub</h2>
             <p>
-              The exact-coordinate editor below keeps the generated bundle in
-              browser memory. Its normal Download bundle action is unchanged;
-              this wrapper also receives that same bundle for an explicit Git
-              proposal. The trusted workflow performs conversion and validation.
+              Continue editing on the downstream static site. This page only
+              receives that editor&apos;s normal bundle in browser memory,
+              confirms the public Git operation, and asks GitHub to create or
+              update a draft proposal. The trusted workflow performs conversion
+              and validation.
             </p>
             {target.pullRequest !== undefined &&
               target.expectedHeadSha !== undefined && (
@@ -649,44 +786,24 @@ function ShaclHandoff({
           </div>
         </section>
 
-        <section
-          aria-busy={editorLoading}
-          aria-labelledby="editor-title"
-          className="editor-panel"
-        >
-          <div className="editor-heading">
-            <div>
-              <p className="eyebrow">Human edit</p>
-              <h2 id="editor-title">Edit in SHACL Vue</h2>
-            </div>
-            <p aria-live="polite" className="editor-status">
-              {editorLoading
-                ? "Loading the exact-coordinate editor…"
-                : "Editor loaded. Generate the normal bundle when your edit is complete."}
-            </p>
-          </div>
-          <p className="editor-copy">
-            Download bundle continues to save the normal SHACL Vue result. The
-            proposal control below becomes available only after this embedded,
-            same-origin editor sends that exact result to the wrapper.
-          </p>
-          <iframe
-            className="editor-frame"
-            onLoad={() => setEditorLoading(false)}
-            ref={iframeRef}
-            src={editorSource}
-            title="SHACL Vue metadata editor"
-          />
-        </section>
-
         {bundle === null ? (
           <section className="handoff-waiting" aria-live="polite">
-            <h2>Waiting for a SHACL Vue v2 bundle</h2>
+            <h2>Waiting for the static editor</h2>
             <p>
-              Generate the normal bundle in the embedded editor. The same result
-              remains available for download and is delivered here in browser
-              memory for the GitHub proposal action.
+              Choose <strong>Propose via GitHub</strong> in the downstream
+              editor. If you were already signed in when this window opened, the
+              bundle can arrive directly while both windows remain open. GitHub
+              sign-in ends that live link, so download the unchanged bundle in
+              the still-open editor and select it below.
             </p>
+            <label className="bundle-upload">
+              Use a downloaded review bundle
+              <input
+                accept="application/json,.json"
+                onChange={(event) => void loadBundleFile(event)}
+                type="file"
+              />
+            </label>
           </section>
         ) : (
           <section className="handoff-bundle" aria-labelledby="bundle-title">
@@ -699,7 +816,7 @@ function ShaclHandoff({
               <p>
                 Source commit: <code>{bundle.source_commit}</code>
               </p>
-              <p className="quiet">Browser source: this embedded editor</p>
+              <p className="quiet">Browser source: {bundleSource}</p>
             </div>
             <ul>
               {bundle.records.map((record) => (
@@ -1201,7 +1318,7 @@ function Review({
                 repository: proposal.repository,
               }).toString()}`}
             >
-              Edit in SHACL Vue
+              Propose downloaded SHACL bundle
             </a>
             <a
               href={proposal.pull_request_url}

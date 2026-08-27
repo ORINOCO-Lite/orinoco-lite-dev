@@ -48,6 +48,8 @@ flowchart TB
 
 The arrows express release and update direction, not repository nesting.
 The engineering workspace may remain multi-repository; the template and every supported consumer are independently usable repositories.
+The editor shown in the downstream output is the only SHACL Vue editor for that site.
+It provides credential-free bundle download and an explicit GitHub proposal handoff; the optional central service handles only OAuth, confirmation, bundle receipt, and GitHub transport and does not host another editor.
 
 ## Repository map
 

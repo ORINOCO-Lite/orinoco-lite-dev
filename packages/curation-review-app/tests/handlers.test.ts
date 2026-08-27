@@ -26,6 +26,8 @@ import {
 } from "./fixtures";
 
 const ORIGIN = "https://review.example";
+const EDITOR_ORIGIN = "https://site.example";
+const HANDOFF_NONCE = "d".repeat(64);
 const GITHUB_OAUTH_ISSUER = "https://github.com/login/oauth";
 const ARTIFACT_STORAGE =
   "https://pipelines.actions.githubusercontent.com/results/archive.zip?sig=short-lived";
@@ -430,7 +432,7 @@ describe("GitHub App user-to-server handlers", () => {
     const start = await shaclAuthorizationStart(
       context(
         new Request(
-          `${ORIGIN}/api/auth/shacl-start?repository=example%2Fsite&pull_request=42&expected_head_sha=${HEAD_SHA}`,
+          `${ORIGIN}/api/auth/shacl-start?repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&pull_request=42&expected_head_sha=${HEAD_SHA}`,
         ),
       ),
     );
@@ -443,7 +445,9 @@ describe("GitHub App user-to-server handlers", () => {
       env,
     );
     expect(oauth).toMatchObject({
+      editor_origin: EDITOR_ORIGIN,
       expected_head_sha: HEAD_SHA,
+      handoff_nonce: HANDOFF_NONCE,
       kind: "shacl",
       pull_request: 42,
       repository: "example/site",
@@ -475,8 +479,36 @@ describe("GitHub App user-to-server handlers", () => {
       ),
     );
     expect(callback.headers.get("location")).toBe(
-      `${ORIGIN}/edit/?repository=example%2Fsite&expected_head_sha=${HEAD_SHA}&pull_request=42`,
+      `${ORIGIN}/edit/?repository=example%2Fsite&editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=${HANDOFF_NONCE}&expected_head_sha=${HEAD_SHA}&pull_request=42`,
     );
+  });
+
+  it.each([
+    [
+      "a missing handoff nonce",
+      `editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}`,
+    ],
+    [
+      "an unsafe editor origin",
+      `editor_origin=${encodeURIComponent("http://site.example")}&handoff_nonce=${HANDOFF_NONCE}`,
+    ],
+    [
+      "an invalid handoff nonce",
+      `editor_origin=${encodeURIComponent(EDITOR_ORIGIN)}&handoff_nonce=not-random`,
+    ],
+  ])("rejects %s", async (_label, handoff) => {
+    await expect(
+      shaclAuthorizationStart(
+        context(
+          new Request(
+            `${ORIGIN}/api/auth/shacl-start?repository=example%2Fsite&${handoff}`,
+          ),
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: "invalid_shacl_auth_target",
+      status: 400,
+    });
   });
 });
 
