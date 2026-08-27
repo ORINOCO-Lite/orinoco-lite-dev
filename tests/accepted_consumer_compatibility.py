@@ -28,7 +28,7 @@ from orinoco_lite.release_schema import localize_schema
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SOURCE = ROOT / "submodules/things-schemas/src"
 CONSUMER_ENVIRONMENT = "ORINOCO_TEST_ACCEPTED_CONSUMER"
-CONSUMER_COMMIT = "7f57c82468b7483bd6926435034a71013cbc9c89"
+CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 TRACKED_INPUTS = (
     "metadata",
     "site/projection.yaml",
