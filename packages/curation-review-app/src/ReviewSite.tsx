@@ -310,6 +310,7 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
   const handoff = useRef<HandoffState | null>(null);
   const listenerInstalled = useRef(false);
   const pending = useRef<PendingSubmission | null>(null);
+  const [listenerReady, setListenerReady] = useState(false);
   const [nonce, setNonce] = useState<string | null>(null);
   const [loadedProposal, setLoadedProposal] =
     useState<BoundReviewProposal | null>(null);
@@ -566,6 +567,7 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
 
     listenerInstalled.current = true;
     window.addEventListener("message", postedMessage);
+    setListenerReady(true);
     return () => {
       listenerInstalled.current = false;
       window.removeEventListener("message", postedMessage);
@@ -756,7 +758,7 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
               {feedback}
             </p>
           )}
-          {handoff.current === null && !postUncertain && (
+          {listenerReady && handoff.current === null && !postUncertain && (
             <button onClick={connect} type="button">
               Reopen GitHub transport
             </button>
@@ -780,9 +782,11 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         transport window authenticates you and verifies the exact proposal.
         Posting requires a separate confirmation in that window.
       </p>
-      <button onClick={connect} type="button">
-        {nonce === null ? "Connect with GitHub" : "Reopen GitHub transport"}
-      </button>
+      {listenerReady && (
+        <button onClick={connect} type="button">
+          {nonce === null ? "Connect with GitHub" : "Reopen GitHub transport"}
+        </button>
+      )}
       {feedback !== null && (
         <p className="feedback" role="status">
           {feedback}
