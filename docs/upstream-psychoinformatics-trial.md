@@ -409,7 +409,7 @@ It also shows precisely what that success does not reproduce—the canonical poo
 
 ## Deliverables
 
-- `.github/workflows/upstream-pages-trial.yml`: manual, pinned Pages workflow
+- `.github/workflows/upstream-pages-trial.yml`: historical manual, pinned Pages workflow removed from current `main` when engineering Pages retired
 - `tools/build_upstream_site.sh`: local upstream checkout/hydrate/build entry point
 - `tools/adapt_upstream_pages.py`: artifact-only project-path adapter and audit
 - `tests/test_adapt_upstream_pages.py`: focused rewrite, validation, and idempotence tests
