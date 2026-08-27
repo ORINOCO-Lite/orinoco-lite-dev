@@ -562,6 +562,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             contract.route_rules,
             (RouteRule(strip_prefix="acme:", route_prefix=""),),
         )
+        self.assertEqual(contract.routing_policy, "routing.strip_prefix")
         self.assertEqual(contract.editor_record_scope, "all")
         self.assertEqual(contract.missing_reference_targets, "preserve")
         self.assertEqual(contract.missing_graph_targets, "drop")
@@ -578,15 +579,54 @@ class GenericProjectionContractTests(unittest.TestCase):
             semantic.assert_called_once()
         self.assertTrue(report["deterministic"])
         self.assertTrue(
+            (self.root / "generated/projection/content/_index.md").is_file()
+        )
+        self.assertTrue(
             (
                 self.root
                 / "generated/projection/content/people/one/_index.md"
             ).is_file()
         )
+        self.assertEqual(
+            _route_for_pid("acme:/people/one/", "acme:"),
+            "people/one",
+        )
+        manifest = (
+            self.root / "generated/projection/SHA256SUMS"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(manifest.startswith(MANIFEST_HEADER + "\n"))
+        self.assertIn(f"pin:algorithm@{PROJECTION_ALGORITHM}", manifest)
         imported = self.runtime / "schema/types/base.yaml"
         imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
             verify_projection(self.workspace, self.runtime)
+
+    def test_legacy_single_prefix_paths_remain_unchanged(self) -> None:
+        self.assertEqual(
+            {
+                pid: _route_for_pid(pid, "acme:")
+                for pid in (
+                    "acme:people/one",
+                    "acme:/people/one/",
+                    "acme:one",
+                )
+            },
+            {
+                "acme:people/one": "people/one",
+                "acme:/people/one/": "people/one",
+                "acme:one": "one",
+            },
+        )
+
+    def test_single_namespace_list_keeps_namespaces_diagnostic(self) -> None:
+        with self.assertRaisesRegex(
+            DriverError,
+            "outside routing.namespaces: 'other:one'",
+        ):
+            _route_for_pid(
+                "other:one",
+                (RouteRule("acme:", ""),),
+            )
 
     def test_ordered_namespace_routes_render_stably_and_enter_manifest(self) -> None:
         (self.root / "metadata/records/Person/two.yaml").write_text(
@@ -611,6 +651,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             encoding="utf-8",
         )
         contract = load_contract(self.workspace)
+        self.assertEqual(contract.routing_policy, "routing.namespaces")
         self.assertEqual(
             contract.route_rules,
             (
@@ -625,7 +666,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(
             DriverError,
-            "outside routing.namespaces: other:one",
+            "outside routing.namespaces: 'other:one'",
         ):
             _route_for_pid("other:one", contract.route_rules)
 
@@ -678,7 +719,8 @@ class GenericProjectionContractTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(
                 DriverError,
-                "acme:people/one -> people/one, vocab:ONE -> PEOPLE/ONE",
+                "acme:people/one -> content/people/one/_index.md, "
+                "vocab:ONE -> content/PEOPLE/ONE/_index.md",
             ):
                 render_projection(
                     self.workspace,
@@ -689,7 +731,16 @@ class GenericProjectionContractTests(unittest.TestCase):
     def test_namespace_routing_rejects_unsafe_or_duplicate_rules(self) -> None:
         projection = self.root / "site/projection.yaml"
         original = projection.read_text(encoding="utf-8")
-        for route_prefix in ("/absolute", "one/../two", "one//two", "one\\two"):
+        route_prefixes = (
+            "'/absolute'",
+            "'one/../two'",
+            "'one//two'",
+            "'one\\two'",
+            "'one two'",
+            '"one\\tpath"',
+            '"one\\x7fpath"',
+        )
+        for route_prefix in route_prefixes:
             with self.subTest(route_prefix=route_prefix):
                 projection.write_text(
                     original.replace(
@@ -697,7 +748,7 @@ class GenericProjectionContractTests(unittest.TestCase):
                         "routing:\n"
                         "  namespaces:\n"
                         "  - strip_prefix: 'acme:'\n"
-                        f"    route_prefix: '{route_prefix}'\n",
+                        f"    route_prefix: {route_prefix}\n",
                     ),
                     encoding="utf-8",
                 )
@@ -723,8 +774,109 @@ class GenericProjectionContractTests(unittest.TestCase):
             "repeats strip_prefix: acme:",
         ):
             load_contract(self.workspace)
+        projection.write_text(
+            original.replace(
+                "routing:\n  strip_prefix: 'acme:'\n",
+                "routing:\n  strip_prefix: 'acme: bad'\n",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            ConfigurationError,
+            "without whitespace or control characters",
+        ):
+            load_contract(self.workspace)
         with self.assertRaisesRegex(DriverError, "unsafe route"):
             _route_for_pid("acme:people/../secret", "acme:")
+        for pid in (
+            "acme:people one",
+            "acme:people\tone",
+            "acme:people\none",
+            "acme:people\x7fone",
+            "acme:people\\one",
+        ):
+            with self.subTest(pid=repr(pid)):
+                with self.assertRaisesRegex(DriverError, "unsafe route") as caught:
+                    _route_for_pid(pid, "acme:")
+                self.assertEqual(len(str(caught.exception).splitlines()), 1)
+
+    def test_routing_preflight_reserves_static_edit_and_review_roots(self) -> None:
+        record = self.root / "metadata/records/Person/two.yaml"
+        output = Path(self.temporary.name) / "reserved"
+        output.mkdir()
+        sentinel = output / "existing.txt"
+        sentinel.write_text("preserved\n", encoding="utf-8")
+        for pid, expected in (
+            ("acme:EDIT/one", "/edit/"),
+            ("acme:review/nested", "/review/"),
+        ):
+            with self.subTest(pid=pid):
+                record.write_text(
+                    f"pid: {pid}\n"
+                    "schema_type: acme:Person\n"
+                    "display_label: Reserved\n",
+                    encoding="utf-8",
+                )
+                with patch(
+                    "orinoco_lite.projection.validate_semantics",
+                    return_value={
+                        "records": 3,
+                        "graph_nodes": 3,
+                        "graph_edges": 0,
+                    },
+                ):
+                    with self.assertRaisesRegex(
+                        DriverError,
+                        f"reserved static route {expected}",
+                    ):
+                        render_projection(self.workspace, self.runtime, output)
+                self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserved\n")
+
+    def test_routing_preflight_includes_homepage_and_file_ancestors(self) -> None:
+        record = self.root / "metadata/records/Person/two.yaml"
+        cases = (
+            (
+                "acme:_index.md/child",
+                "projection-content destination collision: "
+                "acme:. -> content/_index.md, acme:_index.md/child -> "
+                "content/_index.md/child/_index.md",
+            ),
+            (
+                "acme:index.html/child",
+                "Hugo-output destination collision: "
+                "acme:. -> index.html, acme:index.html/child -> "
+                "index.html/child/index.html",
+            ),
+            (
+                "acme:people/one/index.html/child",
+                "Hugo-output destination collision: "
+                "acme:people/one -> people/one/index.html, "
+                "acme:people/one/index.html/child -> "
+                "people/one/index.html/child/index.html",
+            ),
+        )
+        for pid, expected in cases:
+            with self.subTest(pid=pid):
+                record.write_text(
+                    f"pid: {pid}\n"
+                    "schema_type: acme:Person\n"
+                    "display_label: Collision\n",
+                    encoding="utf-8",
+                )
+                with patch(
+                    "orinoco_lite.projection.validate_semantics",
+                    return_value={
+                        "records": 3,
+                        "graph_nodes": 3,
+                        "graph_edges": 0,
+                    },
+                ):
+                    with self.assertRaisesRegex(DriverError, expected):
+                        render_projection(
+                            self.workspace,
+                            self.runtime,
+                            Path(self.temporary.name) / "ancestor",
+                        )
 
     def test_joined_annotations_reach_machine_projection_only(self) -> None:
         companion = self.root / (

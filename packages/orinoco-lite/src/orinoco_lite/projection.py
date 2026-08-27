@@ -37,6 +37,7 @@ from .schema_conversion import build_format_converters
 MANIFEST_HEADER = "# orinoco-lite projection manifest v4"
 PROJECTION_ALGORITHM = "orinoco-projection-v4"
 PROJECTION_CONTROL_SIDECAR = ".gitattributes"
+RESERVED_SITE_ROUTE_ROOTS = frozenset({"edit", "review"})
 FORBIDDEN_BRIDGE_PREDICATES = {
     "dcterms:contributor",
     "dcterms:creator",
@@ -113,6 +114,7 @@ class RouteRule:
 class ProjectionContract:
     path: Path
     route_rules: tuple[RouteRule, ...]
+    routing_policy: str
     homepage_pid: str
     homepage: RenderPolicy
     pages: Mapping[str, RenderPolicy]
@@ -139,11 +141,27 @@ def _relative(workspace: WorkspaceConfig, value: object, label: str) -> Path:
     return path
 
 
+def _has_unsafe_route_characters(value: str) -> bool:
+    return any(
+        character.isspace()
+        or ord(character) < 0x20
+        or ord(character) == 0x7F
+        for character in value
+    )
+
+
 def _route_rules(routing: Mapping[str, Any]) -> tuple[RouteRule, ...]:
     if set(routing) == {"strip_prefix"}:
         strip_prefix = routing.get("strip_prefix")
-        if not isinstance(strip_prefix, str) or not strip_prefix:
-            raise ConfigurationError("routing.strip_prefix must be a non-empty string")
+        if (
+            not isinstance(strip_prefix, str)
+            or not strip_prefix
+            or _has_unsafe_route_characters(strip_prefix)
+        ):
+            raise ConfigurationError(
+                "routing.strip_prefix must be a non-empty string without "
+                "whitespace or control characters"
+            )
         return (RouteRule(strip_prefix=strip_prefix, route_prefix=""),)
     if set(routing) != {"namespaces"}:
         raise ConfigurationError(
@@ -167,13 +185,24 @@ def _route_rules(routing: Mapping[str, Any]) -> tuple[RouteRule, ...]:
             )
         strip_prefix = item.get("strip_prefix")
         route_prefix = item.get("route_prefix")
-        if not isinstance(strip_prefix, str) or not strip_prefix:
-            raise ConfigurationError(f"{label}.strip_prefix must be non-empty")
+        if (
+            not isinstance(strip_prefix, str)
+            or not strip_prefix
+            or _has_unsafe_route_characters(strip_prefix)
+        ):
+            raise ConfigurationError(
+                f"{label}.strip_prefix must be non-empty and contain no "
+                "whitespace or control characters"
+            )
         if strip_prefix in seen:
             raise ConfigurationError(
                 f"routing.namespaces repeats strip_prefix: {strip_prefix}"
             )
-        if not isinstance(route_prefix, str) or "\\" in route_prefix:
+        if (
+            not isinstance(route_prefix, str)
+            or "\\" in route_prefix
+            or _has_unsafe_route_characters(route_prefix)
+        ):
             raise ConfigurationError(f"{label}.route_prefix must be a safe route")
         if route_prefix and (
             PurePosixPath(route_prefix).is_absolute()
@@ -220,6 +249,11 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     ):
         raise ConfigurationError("Projection contract sections are malformed")
     route_rules = _route_rules(routing)
+    routing_policy = (
+        "routing.strip_prefix"
+        if set(routing) == {"strip_prefix"}
+        else "routing.namespaces"
+    )
     homepage_pid = homepage.get("pid")
     node_classes = graph.get("node_classes")
     relationships = graph.get("relationship_fields")
@@ -302,6 +336,7 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
     contract = ProjectionContract(
         path=path,
         route_rules=route_rules,
+        routing_policy=routing_policy,
         homepage_pid=homepage_pid,
         homepage=policy(homepage, "homepage"),
         pages=page_policies,
@@ -893,32 +928,87 @@ def _schema_closure_digest(runtime_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _route_for_pid(pid: str, rules: Sequence[RouteRule] | str) -> str:
+def _route_for_pid(
+    pid: str,
+    rules: Sequence[RouteRule] | str,
+    *,
+    policy: str | None = None,
+) -> str:
     normalized = (
         (RouteRule(strip_prefix=rules, route_prefix=""),)
         if isinstance(rules, str)
         else rules
     )
+    if policy is None:
+        policy = (
+            "routing.strip_prefix"
+            if isinstance(rules, str)
+            else "routing.namespaces"
+        )
     for rule in normalized:
         if not pid.startswith(rule.strip_prefix):
             continue
-        suffix = pid.removeprefix(rule.strip_prefix).strip("/")
+        raw_suffix = pid.removeprefix(rule.strip_prefix)
+        if _has_unsafe_route_characters(raw_suffix):
+            raise DriverError(f"Renderable record has an unsafe route: {pid!r}")
+        # Retain the original single-prefix boundary-slash behavior. Internal
+        # empty segments remain invalid below.
+        suffix = raw_suffix.strip("/")
         route = "/".join(part for part in (rule.route_prefix, suffix) if part)
         if (
             not route
             or "\\" in route
+            or _has_unsafe_route_characters(route)
             or any(part in {"", ".", ".."} for part in route.split("/"))
         ):
-            raise DriverError(f"Renderable record has an unsafe route: {pid}")
+            raise DriverError(f"Renderable record has an unsafe route: {pid!r}")
         return route
-    policy = "routing.strip_prefix" if len(normalized) == 1 else "routing.namespaces"
-    raise DriverError(f"Renderable record PID is outside {policy}: {pid}")
+    raise DriverError(f"Renderable record PID is outside {policy}: {pid!r}")
 
 
-def _portable_route_key(route: str) -> str:
-    """Normalize routes that collide on supported consumer filesystems."""
+def _portable_path_key(path: PurePosixPath) -> tuple[str, ...]:
+    """Normalize paths that collide on supported consumer filesystems."""
 
-    return unicodedata.normalize("NFC", route).casefold()
+    return tuple(
+        unicodedata.normalize("NFC", part).casefold() for part in path.parts
+    )
+
+
+class _DestinationPreflight:
+    """Reject exact, portable, and file-as-ancestor destination conflicts."""
+
+    def __init__(self, label: str) -> None:
+        self.label = label
+        self.files: dict[tuple[str, ...], tuple[str, str]] = {}
+        self.directories: dict[tuple[str, ...], tuple[str, str]] = {}
+
+    def add(self, path: PurePosixPath, pid: str) -> None:
+        key = _portable_path_key(path)
+        owner = (pid, path.as_posix())
+        conflict = self.files.get(key) or self.directories.get(key)
+        if conflict is None:
+            for length in range(1, len(key)):
+                conflict = self.files.get(key[:length])
+                if conflict is not None:
+                    break
+        if conflict is not None:
+            previous_pid, previous_path = conflict
+            raise DriverError(
+                f"Portable {self.label} destination collision: "
+                f"{previous_pid} -> {previous_path}, {pid} -> {path.as_posix()}"
+            )
+        self.files[key] = owner
+        for length in range(1, len(key)):
+            self.directories.setdefault(key[:length], owner)
+
+
+def _hugo_route(route: str) -> str:
+    """Apply Hugo's default lowercase and whitespace-to-hyphen routing."""
+
+    return "/".join(
+        "-".join(part.split()).lower()
+        for part in route.split("/")
+    )
 
 
 def projection_manifest(
@@ -964,10 +1054,6 @@ def render_projection(
     if machine_pids != record_pids:
         raise DriverError("Joined projection changed the metadata record inventory")
     by_pid = {record["pid"]: record for record in records}
-    if output.exists():
-        shutil.rmtree(output)
-    (output / "content").mkdir(parents=True)
-    (output / "static").mkdir()
     public_jsonl = "".join(
         json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
         for record in sorted(
@@ -980,34 +1066,46 @@ def render_projection(
             machine_records, key=lambda item: (item["schema_type"], item["pid"])
         )
     )
-    (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
-    pages: list[tuple[dict[str, Any], RenderPolicy, Path]] = []
-    route_owners: dict[str, tuple[str, str]] = {}
+    pages: list[tuple[dict[str, Any], RenderPolicy, PurePosixPath]] = []
+    content_destinations = _DestinationPreflight("projection-content")
+    hugo_destinations = _DestinationPreflight("Hugo-output")
     for pid in sorted(record_pids):
         record = by_pid[pid]
         schema_type = record["schema_type"]
         if pid == contract.homepage_pid:
             policy = contract.homepage
-            destination = output / "content" / "_index.md"
+            destination = PurePosixPath("content/_index.md")
+            hugo_destination = PurePosixPath("index.html")
         elif schema_type in contract.pages:
             policy = contract.pages[schema_type]
             if not _matches_policy(record, policy, by_pid):
                 continue
-            route = _route_for_pid(pid, contract.route_rules)
-            route_key = _portable_route_key(route)
-            previous = route_owners.get(route_key)
-            if previous is not None:
-                previous_pid, previous_route = previous
+            route = _route_for_pid(
+                pid,
+                contract.route_rules,
+                policy=contract.routing_policy,
+            )
+            hugo_route = _hugo_route(route)
+            reserved_root = hugo_route.split("/", 1)[0].casefold()
+            if reserved_root in RESERVED_SITE_ROUTE_ROOTS:
                 raise DriverError(
-                    "Renderable records resolve to the same route: "
-                    f"{previous_pid} -> {previous_route}, {pid} -> {route}"
+                    "Renderable record conflicts with reserved static route "
+                    f"/{reserved_root}/: {pid} -> {route}"
                 )
-            route_owners[route_key] = (pid, route)
-            destination = output / "content" / route / "_index.md"
+            destination = PurePosixPath("content") / route / "_index.md"
+            hugo_destination = PurePosixPath(hugo_route) / "index.html"
         else:
             continue
+        content_destinations.add(destination, pid)
+        hugo_destinations.add(hugo_destination, pid)
         pages.append((record, policy, destination))
-    for record, policy, destination in pages:
+    if output.exists():
+        shutil.rmtree(output)
+    (output / "content").mkdir(parents=True)
+    (output / "static").mkdir()
+    (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
+    for record, policy, relative_destination in pages:
+        destination = output.joinpath(*relative_destination.parts)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             _render_record(record, policy, by_pid, records), encoding="utf-8"
