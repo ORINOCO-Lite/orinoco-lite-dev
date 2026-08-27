@@ -5,8 +5,8 @@ description: Deploy, migrate, verify, rotate, or roll back the stateless Orinoco
 
 # Orinoco Github App Deployment
 
-Deploy the browser application, lightweight SHACL bundle receiver, and authorization routes as one stateless, same-origin service.
-Keep the hosting choice separate from the application contract and keep SHACL Vue in the downstream static site.
+Deploy the lightweight SHACL bundle receiver, source-review transport, and authorization routes as one stateless, same-origin service.
+Keep the hosting choice separate from the application contract and keep both human-facing interfaces in the downstream static site: source review at `/review/` and SHACL Vue at `/edit/`.
 
 ## Workflow
 
@@ -21,7 +21,7 @@ Static `dist/` alone is not a backend deployment.
 If the request is only to evaluate a provider, return the completed capability matrix and unresolved gaps here; do not create an App, secrets, hosting resources, or a deployment.
 4. Read [github-app-configuration.md](references/github-app-configuration.md), then create or update the GitHub App and restrict its installation to the intended repositories.
 Keep the setup URL distinct from the OAuth callback.
-5. Build and check the browser application and Functions from the clean reviewed revision.
+5. Build and check the service browser application, downstream review shell, and Functions from the clean reviewed revision.
 Deploy `dist/` and the Functions adapter together; static `dist/` alone is not a backend deployment.
 6. Put public values in reviewed provider configuration, tracked when the provider supports configuration-as-code.
 Put secrets only in the encrypted hosting control plane.
@@ -41,8 +41,8 @@ Do not introduce a database, object store, artifact cache, queue, candidate stor
 - Preserve the exact external HTTPS origin in every request.
 Browser pages, APIs, and cookies must share that origin.
 - Do not weaken PKCE, OAuth state, expiring-token, cookie, redirect-host, exact-head, artifact, unchanged-bundle, or handoff origin/window/nonce checks to fit a provider.
-- Do not assemble, embed, proxy, or host SHACL Vue, its schema, or its record inputs in this service.
-The downstream static site is the only editor; the receiver accepts only its bounded, unchanged version 2 bundle.
+- Do not host the source-adapter decision interface or assemble, embed, proxy, or host SHACL Vue, its schema, or its record inputs in this service.
+The downstream static site owns both interfaces; the SHACL receiver accepts only its bounded, unchanged version 2 bundle.
 - Treat secret rotation, an origin change, a GitHub App ownership transfer, installation changes, and write-path verification as distinct external mutations.
 Resolve exact targets and obtain any required confirmation at the point of action.
 - Stop when provider limits cannot satisfy the accepted maxima or its adapter cannot preserve the response, cookie, redirect, and crypto semantics.

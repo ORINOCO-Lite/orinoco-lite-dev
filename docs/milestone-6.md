@@ -35,7 +35,7 @@ The real CON site, its remotes, its deployment, and its production domain remain
 | Released snapshot adoption | [Engineering pull request 54](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/54) merged as `c21b2cdaa85ed81ced65ed60ce842a87b4cc8ed7`, and [hosted run 33045450687](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33045450687) passed. [Pull request 55](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/55) then merged as `3d539514a9c126a6efb9e6dfae0200569335ebc6`; [hosted run 33047175981](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33047175981) passed after advancing only the exact accepted-consumer coordinate. Engineering CI now binds the final branded-fixture correction at `7f57c82468b7483bd6926435034a71013cbc9c89`; the adapted upstream gitlinks remain unchanged. |
 | Integration fixture | [Fixture pull request 44](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/pull/44) removed the inherited institutional branding and merged as `7f57c82468b7483bd6926435034a71013cbc9c89` without changing rc12/rc8 or any adapted pin. [Validation run 33055403225](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33055403225) and [Pages run 33055403267](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33055403267) passed. The publication chain is source `7f57c82468b7483bd6926435034a71013cbc9c89`, projection `c5ddd90c10b4d72f186170ec14cdada7a31dcc78`, and site `61c75c176a3efb555d0330c660f1dee33ad76e60`; deployment `6119486166` is current. Rollback evidence is source `b405b8853541baa19922dee474870a3b5dab9cd1`, projection `3882cd1afea82787a931b66403e71ec8d399e300`, site `e307bf5a2a5dfff3b5ed681980ceedbf991ea301`, and deployment `6117786815`. |
 | Personal demonstration | [Demo pull request 26](https://github.com/leej3/orinoco-lite-demo/pull/26) removed the same inherited branding and merged as `c6ec36cdc2ecc0c7fd1a229975ded4a31f642099` while retaining `leej3` custody and the existing rc12/rc8 locks. [Validation run 33055429036](https://github.com/leej3/orinoco-lite-demo/actions/runs/33055429036) and [Pages run 33055429000](https://github.com/leej3/orinoco-lite-demo/actions/runs/33055429000) passed. The publication chain is source `c6ec36cdc2ecc0c7fd1a229975ded4a31f642099`, projection `402b43fd89ec26f94a8f398ad29cb1b34e8f73c6`, and site `2148776c6139305a7f38c04fc8874267778e513f`; deployment `6119490439` is current. Rollback evidence is source `5f53d60d52b815ed2548e8055296d79f11bd4925`, projection `85da033b60287de69dd722509325844311346aa3`, site `ab2c4b857159eddfac9e4820164ada35349a8ca6`, and deployment `6117800895`. |
-| Current Zotero input and proposal | [Demo pull request 23](https://github.com/leej3/orinoco-lite-demo/pull/23) merged the read-only public-library evidence at version `668` with normalized payload SHA-256 `23aa443a248e9e1dfc73003cde76f3a93c533bf9e57cc5674539b80da52f17b8`. [Proposal run 33058621923](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058621923) opened current draft [demo pull request 27](https://github.com/leej3/orinoco-lite-demo/pull/27) from exact base `c6ec36cdc2ecc0c7fd1a229975ded4a31f642099` at proposal `3fb2d7b7a61ca218dfe1dd11855820309ad88290` with 126 modification candidates. [Cross-platform validation run 33058690211](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058690211) and [exact-head SHACL validation run 33058692028](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058692028) passed. No human dispositions are recorded; review, finalization, merge-commit acceptance, and the identical no-op rerun remain open. |
+| Current Zotero input and proposal | [Demo pull request 23](https://github.com/leej3/orinoco-lite-demo/pull/23) merged the read-only public-library evidence at version `668` with normalized payload SHA-256 `23aa443a248e9e1dfc73003cde76f3a93c533bf9e57cc5674539b80da52f17b8`. [Proposal run 33058621923](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058621923) opened current draft [demo pull request 27](https://github.com/leej3/orinoco-lite-demo/pull/27) from exact base `c6ec36cdc2ecc0c7fd1a229975ded4a31f642099` at proposal `3fb2d7b7a61ca218dfe1dd11855820309ad88290` with 126 modification candidates. One later compatibility commit at current head `2146a46bd598d152c4e40ac750c4023abf780f84` removes six retired identifiers, leaving 120 candidate dispositions unresolved. [Cross-platform validation run 33071391265](https://github.com/leej3/orinoco-lite-demo/actions/runs/33071391265) and [exact-head human-edit run 33071388848](https://github.com/leej3/orinoco-lite-demo/actions/runs/33071388848) pass at that head. No human dispositions are recorded; review, finalization, merge-commit acceptance, and the identical no-op rerun remain open. |
 | Retired engineering Pages | The unsupported Milestone 3 engineering Pages site was disabled and the repository homepage cleared on 2026-08-27. Its obsolete `codex/milestone-3` deployment policy, retired manual Pages workflow, and orphaned engineering Pages builder were removed from current configuration, while branch `codex/milestone-3`, deployment `5862443246`, and earlier workflow and builder copies remain preserved as historical evidence. Fixture and demo Pages remain the supported live surfaces. |
 | Remaining capability issues | [Issue 32](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/32) remains open because deterministic YAML sharding requires a reviewed storage and migration policy. [Issue 34](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/34) remains open as a separately designed multi-namespace routing capability. Neither permits replacing adapted component tips with older raw heads. |
 
@@ -107,8 +107,9 @@ The real CON site and its remotes remain read-only and outside this transfer unl
 The approved scope is the three core repositories, the GitHub App, and the nine mirrors still used by the retained static, service, runtime, editor, query, enrichment, snapshot, or consumer paths: `congo`, `dump-things-pyclient`, `dump-things-service`, `pool.psychoinformatics.de-ui`, `query-things`, `shacl-vue`, `things-enrichment-tools`, `things-schemas`, and `www-from-model`.
 Unused historical mirrors, including `dump-things-service-mirror`, remain with their existing owners.
 The repository and GitHub App ownership transfers completed on 2026-08-26.
-The App installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website`; authenticated discovery and the exact-head SHACL editor passed without creating a review comment, branch, or pull request.
-That installation scope does not presently include the personal demonstration targeted by the current Zotero operation; Open M6-Q002 records the authority choice that must be made before hosted Zotero review can complete.
+The organization installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website`; authenticated exact-proposal loading and the exact-head SHACL editor passed without creating a review comment, branch, or pull request.
+A separate personal installation currently covers all `leej3` repositories, including the demonstration.
+Open M6-Q002 records whether to narrow and accept that personal installation before the Zotero review completes.
 The custody audit also replaced the accidental query-things and things-enrichment-tools merge tips with the already accepted linear heads by exact lease, and fast-forwarded the Things Schemas mirror default ref to its accepted pin.
 The Congo mirror retains its upstream `stable` history plus two owned commits; its local Dependabot policy disables independent version-update pull requests, and the nine superseded bot pull requests were closed.
 The central backend then advanced from [engineering pull request 50](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50) at `b992e9788ee66572ca613cfa230cb2ecda40667e` with runtime `v0.2.0rc6`; its [final deployment evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) records that historical provider configuration, immutable deployment, authenticated read-only proof, and retained rollback.
@@ -127,6 +128,24 @@ The static site never receives a GitHub token, and the receiver applies the same
 This resolves M6-Q001 in favor of two actions in one static editor rather than two editor destinations.
 It supersedes only the central editor-input artifact and the central-wrapper-owned editor assembly and session portions of HR-213 and M5-D014.
 It retains the immutable released editor and schema, exact source binding, unchanged bundle, fixed-path temporary Git handoff, trusted Python conversion and replacement, and stateless GitHub App boundary accepted in Milestone 5.
+
+### M6-D006 — Keep source-adapter review in the downstream static site
+
+The downstream's deployed `/review/` route is the only source-adapter decision interface for that site.
+The generated static route contains the released, content-neutral review shell plus a build-bound repository and central-service origin.
+The workflow links directly to that route with the repository, pull-request number, and exact Actions artifact ID.
+
+The central service exposes no second decision-review page.
+Its hidden transport route performs GitHub authorization and verified reads, binds a short-lived session grant to the exact repository, pull request, artifact, downstream origin, and one-time nonce, and verifies the downstream coordinates from `orinoco.yaml` at the proposal's metadata base before releasing proposal data.
+The transport sends data only after an exact ready/request handshake.
+It shows the authenticated reviewer the complete repository, commit, path, and disposition summary on the central origin and posts only after an explicit confirmation.
+
+Browser messaging can authenticate an origin but not a path.
+A GitHub Pages project site therefore shares its browser trust boundary with other pages on that account's Pages hostname.
+Exact repository configuration, one-shot window and nonce checks, and the central confirmation remain mandatory; a downstream may use a unique origin when it needs a narrower browser boundary.
+
+This resolves the unintended second-page design without changing proposal, candidate, decision-cache, provenance, artifact, or finalization authority.
+It also leaves M6-D005's distinct `/edit/` SHACL Vue route unchanged.
 
 ## Workstream 1: reference and projection alignment
 
@@ -174,6 +193,9 @@ Automation still does not approve or merge the proposal.
 The obsolete demonstration pull request 7 was closed without merge as superseded rather than rebasing its source- and base-bound proposal.
 Acquire current Zotero data read-only, record its exact library/content coordinate, and generate a new proposal from the current demonstration default branch.
 
+The proposal link must open the demonstration site's deployed `/review/` route as specified by M6-D006.
+The central deployment is authentication and verified GitHub transport only and is not a review destination.
+
 Human review may use the existing bulk initializer, but every candidate still receives an explicit disposition before finalization.
 The accepted result must validate on both supported platforms.
 An identical rerun must create no branch or pull request, and a focused test must continue to prove that a later material source change reopens review.
@@ -208,11 +230,12 @@ It does not duplicate commit ancestry already enforced by Git and the workflow o
 
 ## Open questions
 
-### Open M6-Q002 — Where may the App review the current Zotero proposal?
+### Open M6-Q002 — What personal installation scope is accepted?
 
-The current Zotero operation is bound to the personal `leej3/orinoco-lite-demo` downstream, while the transferred GitHub App installation is deliberately limited to the organization fixture.
-Hosted review therefore requires one explicit authority decision: install the App on the personal demonstration as well, or revise the reviewed proposal target and its source/base bindings.
-Do not install the App, retarget the proposal, or broaden repository authority without John's explicit decision.
+The current Zotero operation is bound to the personal `leej3/orinoco-lite-demo` downstream.
+The observed personal GitHub App installation currently grants the App access to every `leej3` repository, while the separate organization installation is limited to the fixture.
+Completing hosted review requires an explicit authority decision: narrow and accept the personal installation for `leej3/orinoco-lite-demo`, retain its broader personal scope, or remove that access and revise the reviewed target and source/base bindings.
+Do not change installation scope or retarget the proposal without John's explicit decision.
 
 ## Resolved questions
 

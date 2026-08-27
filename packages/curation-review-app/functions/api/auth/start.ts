@@ -1,6 +1,6 @@
 import { randomToken, sha256Base64url } from "../../lib/encoding";
 import { HttpError, requireMethod } from "../../lib/http";
-import { reviewTarget } from "../../lib/input";
+import { reviewTransportTarget } from "../../lib/input";
 import type { EventContext } from "../../lib/pages";
 import { configuredOrigin, createOAuthCookie } from "../../lib/session";
 
@@ -15,7 +15,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
       "The request URL does not match PUBLIC_ORIGIN.",
     );
   }
-  const target = reviewTarget(requestUrl);
+  const target = reviewTransportTarget(requestUrl);
   const state = randomToken();
   const codeVerifier = randomToken();
   const redirectUri = `${origin}/api/auth/callback`;
@@ -36,10 +36,12 @@ export async function onRequest(context: EventContext): Promise<Response> {
       "Set-Cookie": await createOAuthCookie(context.env, {
         artifact_id: target.artifactId,
         code_verifier: codeVerifier,
+        handoff_nonce: target.handoffNonce,
         kind: "review",
         origin,
         pull_request: target.pullRequest,
         repository: target.repository,
+        review_origin: target.reviewOrigin,
         state,
       }),
     },

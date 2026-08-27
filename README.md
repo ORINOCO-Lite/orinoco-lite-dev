@@ -48,8 +48,8 @@ flowchart TB
 
 The arrows express release and update direction, not repository nesting.
 The engineering workspace may remain multi-repository; the template and every supported consumer are independently usable repositories.
-The editor shown in the downstream output is the only SHACL Vue editor for that site.
-It provides credential-free bundle download and an explicit GitHub proposal handoff; the optional central service handles only OAuth, confirmation, bundle receipt, and GitHub transport and does not host another editor.
+The downstream output owns both human-facing metadata routes: `/edit/` is the only SHACL Vue editor for that site, and `/review/` is the source-adapter decision review.
+The optional central service handles only OAuth, verified GitHub reads, explicit confirmation, bundle receipt, and GitHub transport; it does not host either review interface.
 
 ## Repository map
 
@@ -186,7 +186,7 @@ The former unqualified `build`, `serve`, and CON migration tasks belonged to the
 They remain recoverable from preserved history, but are not a supported `main` development facade: a downstream site uses its own ordinary-repository commands, while new engineering integration commands must name their scope and isolate their dependencies.
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
-That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.
+That workflow pins the build toolchain, builds the wheel and source archive twice, builds the editor and source-review shells with their dependency-license inventories twice, assembles the runtime twice, compares the results, verifies an installed wheel, attests the checksums, and publishes only immutable release candidates.
 Do not reproduce that release boundary with an ad hoc local archive.
 
 ## Ownership and safety boundaries

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -30,6 +31,65 @@ DOWNLOAD_AND_DISPATCH = (
 )
 POOL_UI_COMMIT = "668175a11e10f6f8f6eb1a9c9df25aaac58c5b83"
 SHACL_VUE_COMMIT = "2d3673e0a3bd1054f41c303bc7faa4111277c2d0"
+
+
+def _installed_dependency_manifests(node_modules: Path) -> list[Path]:
+    """Return manifests at actual package roots in an installed npm tree."""
+
+    manifests: list[Path] = []
+    pending = [node_modules]
+    while pending:
+        modules = pending.pop()
+        if modules.is_symlink() or not modules.is_dir():
+            continue
+        package_roots: list[Path] = []
+        for entry in sorted(modules.iterdir(), key=lambda path: path.name):
+            if entry.name.startswith(".") or entry.is_symlink() or not entry.is_dir():
+                continue
+            if entry.name.startswith("@"):
+                package_roots.extend(
+                    child
+                    for child in sorted(entry.iterdir(), key=lambda path: path.name)
+                    if not child.name.startswith(".")
+                    and not child.is_symlink()
+                    and child.is_dir()
+                )
+            else:
+                package_roots.append(entry)
+        for package_root in package_roots:
+            manifest = package_root / "package.json"
+            if not manifest.is_symlink() and manifest.is_file():
+                manifests.append(manifest)
+            nested = package_root / "node_modules"
+            if not nested.is_symlink() and nested.is_dir():
+                pending.append(nested)
+    return sorted(
+        manifests,
+        key=lambda path: path.relative_to(node_modules).as_posix(),
+    )
+
+
+def _safe_license_filename(name: str, version: str, source: Path) -> str:
+    """Name copied license text without collisions or path metacharacters."""
+
+    def safe(value: str) -> str:
+        normalized = "".join(
+            character if character.isalnum() or character in ".-_" else "-"
+            for character in value
+        )
+        return normalized or "package"
+
+    content = source.read_bytes()
+    identity = b"\0".join(
+        (
+            name.encode("utf-8"),
+            version.encode("utf-8"),
+            source.name.encode("utf-8"),
+            content,
+        )
+    )
+    digest = hashlib.sha256(identity).hexdigest()[:16]
+    return f"{safe(name)}-{safe(version)}-{digest}-{safe(source.name)}"
 
 
 def _run(
@@ -119,22 +179,29 @@ def _apply_submission_accessibility_patch(
         raise DriverError("Editor submission patch is incomplete")
 
 
-def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, Any]:
+def _dependency_inventory(
+    node_modules: Path,
+    destination: Path,
+    *,
+    component: str = "editor",
+) -> dict[str, Any]:
     packages: list[dict[str, Any]] = []
     licenses = destination / "texts"
     licenses.mkdir(parents=True, exist_ok=True)
-    for manifest in sorted(node_modules.glob("*/package.json")) + sorted(
-        node_modules.glob("@*/*/package.json")
-    ):
+    for manifest in _installed_dependency_manifests(node_modules):
         try:
             value = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise DriverError(f"Editor dependency manifest is invalid: {manifest}") from error
+            raise DriverError(
+                f"{component.title()} dependency manifest is invalid: {manifest}"
+            ) from error
         name = value.get("name")
         version = value.get("version")
         license_value = value.get("license") or value.get("licenses")
         if not isinstance(name, str) or not isinstance(version, str):
-            raise DriverError(f"Editor dependency lacks identity metadata: {manifest}")
+            raise DriverError(
+                f"{component.title()} dependency lacks identity metadata: {manifest}"
+            )
         package_licenses: list[str] = []
         for pattern in (
             "LICENSE*",
@@ -147,18 +214,21 @@ def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, An
             for source in sorted(manifest.parent.glob(pattern)):
                 if not source.is_file() or source.is_symlink():
                     continue
-                safe_name = "".join(
-                    character if character.isalnum() or character in ".-_" else "-"
-                    for character in name
-                )
-                target_name = f"{safe_name}-{version}-{source.name}"
+                target_name = _safe_license_filename(name, version, source)
                 target = licenses / target_name
-                if not target.exists():
+                if target.exists():
+                    if target.read_bytes() != source.read_bytes():
+                        raise DriverError(
+                            f"{component.title()} dependency license filename "
+                            f"collision: {source}"
+                        )
+                else:
                     shutil.copyfile(source, target)
                 package_licenses.append(f"texts/{target_name}")
         if not license_value and not package_licenses:
             raise DriverError(
-                f"Editor dependency has no declared license or license text: {manifest}"
+                f"{component.title()} dependency has no declared license or license text: "
+                f"{manifest}"
             )
         if not license_value:
             license_value = "SEE-LICENSE-FILE"
@@ -172,7 +242,7 @@ def _dependency_inventory(node_modules: Path, destination: Path) -> dict[str, An
         )
     packages.sort(key=lambda item: (item["name"], item["version"]))
     inventory = {
-        "format": "orinoco-editor-dependency-inventory",
+        "format": f"orinoco-{component}-dependency-inventory",
         "packages": packages,
         "version": 1,
     }

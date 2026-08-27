@@ -76,23 +76,34 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.assertIsNone(workspace.curation_service)
 
     def test_static_editor_github_handoff_coordinates_are_explicit(self) -> None:
-        (self.root / "orinoco.yaml").write_text(
-            CONFIG.replace(
-                "  base_url: https://example.invalid/test-site/\n",
-                "  base_url: https://example.invalid/test-site/\n"
-                "  repository: ORINOCO-Lite/example-site\n"
-                "  curation_service: https://review.example.test/\n",
+        origins = (
+            (
+                "HTTPS://Review.Example.Test:443/",
+                "https://review.example.test",
             ),
-            encoding="utf-8",
+            (
+                "https://Review.Example.Test:8443/",
+                "https://review.example.test:8443",
+            ),
+            ("http://LOCALHOST:80/", "http://localhost"),
+            ("https://[2001:0DB8::1]:443/", "https://[2001:db8::1]"),
         )
+        for configured, expected in origins:
+            with self.subTest(origin=configured):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG.replace(
+                        "  base_url: https://example.invalid/test-site/\n",
+                        "  base_url: https://example.invalid/test-site/\n"
+                        "  repository: ORINOCO-Lite/example-site\n"
+                        f"  curation_service: {configured}\n",
+                    ),
+                    encoding="utf-8",
+                )
 
-        workspace = load_workspace(self.root)
+                workspace = load_workspace(self.root)
 
-        self.assertEqual(workspace.repository, "ORINOCO-Lite/example-site")
-        self.assertEqual(
-            workspace.curation_service,
-            "https://review.example.test",
-        )
+                self.assertEqual(workspace.repository, "ORINOCO-Lite/example-site")
+                self.assertEqual(workspace.curation_service, expected)
 
     def test_static_editor_github_handoff_coordinates_fail_closed(self) -> None:
         invalid_sites = (
@@ -104,6 +115,18 @@ class WorkspaceConfigTests(unittest.TestCase):
             "  curation_service: http://review.example.test/\n",
             "  repository: ORINOCO-Lite/example-site\n"
             "  curation_service: https://review.example.test/edit/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://user@review.example.test/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://review.example.test/?mode=review\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://review.example.test/#review\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://127.1/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://0x7f000001/\n",
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://faß.example/\n",
         )
         for extra in invalid_sites:
             with self.subTest(extra=extra):
@@ -115,6 +138,46 @@ class WorkspaceConfigTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 with self.assertRaises(ConfigurationError):
+                    load_workspace(self.root)
+
+    def test_site_name_matches_the_static_review_browser_contract(self) -> None:
+        configured = (
+            "  repository: ORINOCO-Lite/example-site\n"
+            "  curation_service: https://review.example.test/\n"
+        )
+        exact_name = "r" * 233
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG.replace(
+                "  name: Test Orinoco downstream\n",
+                f"  name: {exact_name}\n",
+            ).replace(
+                "  base_url: https://example.invalid/test-site/\n",
+                "  base_url: https://example.invalid/test-site/\n" + configured,
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(load_workspace(self.root).site_name, exact_name)
+
+        invalid_names = (
+            "r" * 234,
+            '"review\\u007fname"',
+            '"review\\u0009name"',
+            '"' + ("\U0001f4da" * 117) + '"',
+        )
+        for invalid_name in invalid_names:
+            with self.subTest(name=invalid_name):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG.replace(
+                        "  name: Test Orinoco downstream\n",
+                        f"  name: {invalid_name}\n",
+                    ).replace(
+                        "  base_url: https://example.invalid/test-site/\n",
+                        "  base_url: https://example.invalid/test-site/\n"
+                        + configured,
+                    ),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ConfigurationError, "site.name"):
                     load_workspace(self.root)
 
     def test_nearest_ancestor_discovers_workspace(self) -> None:

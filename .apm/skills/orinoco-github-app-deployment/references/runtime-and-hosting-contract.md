@@ -22,6 +22,9 @@ npm run check
 Deploy `dist/`, `functions/`, the tracked route and header files, and public configuration together from the same clean revision.
 Uploading `dist/` without the Functions adapter is not a backend deployment.
 
+Also run `npm run build:review` and verify the unconfigured `dist-review/` shell.
+That shell belongs in the immutable Orinoco runtime and downstream static build; do not deploy it as a second central review page.
+
 The service does not consume an Orinoco Lite runtime archive.
 Do not stage SHACL Vue, a Things schema, downstream record input, an editor-input Actions artifact, `/editor-runtime/` assets, or a runtime-manifest digest.
 The immutable editor shell and schema belong in each downstream's static site build, which is the only SHACL Vue editor.
@@ -46,6 +49,8 @@ Each downstream that enables the SHACL proposal handoff separately declares:
 
 Both are required for **Propose via GitHub**.
 They are downstream site configuration, not service secrets, OAuth state, or a substitute for the App's selected-repository installation.
+The same pair enables the downstream's static source-review shell.
+Its `site.base_url` owns the canonical `review/` route, while `site.curation_service` names only this transport service.
 
 ## Provider capability gate
 
@@ -77,10 +82,12 @@ Rewriting production requests to an internal HTTP origin breaks origin validatio
 
 | Route | Required behavior |
 | --- | --- |
-| `/` | Serve the browser application and repository entry or discovery UI. |
-| `/review/` | Serve the source-adapter review UI. |
+| `/` | Serve a service-status and handoff landing page with no candidate-review UI. |
+| `/review/`, `/review` | Redirect to `/`; the central service is not a source-review destination. |
+| `/review-transport/` | Serve the exact downstream-opener-bound OAuth, verified-read, confirmation, and comment transport. |
+| `/review-auth-complete/` | Serve only the lightweight OAuth-completion window. |
 | `/edit/` | Serve only the lightweight sign-in, unchanged-bundle receiver or file selector, confirmation, and proposal UI. |
-| `/review`, `/edit` | Redirect once to the slash form. |
+| `/edit` | Redirect once to the slash form. |
 | `/api/*` | Route to the stateless Functions handlers. |
 
 The service must not register `/api/shacl/editor`, serve `/editor-runtime/`, or render, frame, or assemble SHACL Vue at `/edit/`.
@@ -90,15 +97,17 @@ The exact API paths and accepted methods are:
 | Accepted method and route | Source handler |
 | --- | --- |
 | `GET /api/auth/callback` | `functions/api/auth/callback.ts` |
-| `GET /api/auth/discovery-start` | `functions/api/auth/discovery-start.ts` |
 | `GET /api/auth/shacl-start` | `functions/api/auth/shacl-start.ts` |
 | `GET /api/auth/start` | `functions/api/auth/start.ts` |
-| `GET /api/discovery` | `functions/api/discovery.ts` |
 | `POST /api/logout` | `functions/api/logout.ts` |
 | `GET /api/proposal` | `functions/api/proposal.ts` |
 | `GET /api/session` | `functions/api/session.ts` |
 | `POST /api/shacl/propose` | `functions/api/shacl/propose.ts` |
 | `POST /api/submit` | `functions/api/submit.ts` |
+
+Keep `GET /api/discovery` and `GET /api/auth/discovery-start` registered only as compatibility tombstones.
+Both must return HTTP 410 `review_discovery_retired` without creating OAuth state, reading a session, or contacting GitHub.
+They must direct users to the deployed downstream `/review/` route rather than reconstructing a central discovery interface.
 
 Wrap every dispatched handler with `functions/api/_middleware.ts`; its `context.next()` must invoke the selected handler.
 Calling handlers directly loses standardized exception responses and the API security and `no-store` headers.
@@ -115,6 +124,25 @@ Cookies use the `__Host-` prefix, `HttpOnly`, `Secure`, `SameSite=Lax`, and `Pat
 OAuth state expires after ten minutes; a session is capped at eight hours.
 The callback clears the OAuth cookie and sets the session cookie in the same response, so an adapter that folds duplicate `Set-Cookie` fields is incompatible.
 Test the adapter's emitted HTTP response at byte or header-list level as well as through the browser runtime; two cookies represented as one comma-joined field are not equivalent.
+
+## Static source-review transport boundary
+
+The downstream static `review/` route generates a fresh 256-bit nonce and opens `/review-transport/` with its exact repository, pull-request, artifact, and origin coordinates.
+OAuth uses a separate window so the transport retains the downstream opener.
+The sealed session grant binds all coordinates.
+
+Before sending proposal data, the backend reads `orinoco.yaml` at the verified proposal metadata base, requires the declared repository and central service, and derives the exact downstream `site.base_url` plus `review/`.
+The transport and downstream complete a typed ready/request handshake and require exact window, origin, nonce, repository, pull request, and artifact matches.
+Never send a token or CSRF value through browser messaging and never use `*` as a message target.
+
+The downstream returns one complete in-memory submission.
+The central origin must display the login, repository, pull request, proposal and head commits, and every path and disposition.
+Only a user click there may post the GitHub comment.
+Reject duplicate, replayed, framed, timed-out, or mismatched channels.
+Send `post-started` before the authenticated request and classify every result as retry-safe or potentially uncertain.
+A downstream may reconnect while preserving decisions only for an explicitly retry-safe pre-write rejection.
+It must keep the submission locked and tell the curator to inspect the pull request when a network, server, or malformed-success response could conceal a completed comment.
+Because browser messaging authenticates an origin rather than a path, a shared Pages hostname is an origin-wide boundary; the explicit central confirmation is mandatory, and unique downstream origins remain preferable when isolation is required.
 
 ## Static-editor handoff boundary
 

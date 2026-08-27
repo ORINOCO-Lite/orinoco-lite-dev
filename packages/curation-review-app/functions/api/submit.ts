@@ -10,7 +10,7 @@ import {
 } from "../lib/http";
 import type { EventContext } from "../lib/pages";
 import { parseArtifactId } from "../lib/input";
-import { loadReviewProposal } from "../lib/proposal";
+import { loadReviewProposal, requireReviewTransport } from "../lib/proposal";
 import { configuredOrigin, readSessionCookie } from "../lib/session";
 import {
   parseSubmission,
@@ -21,7 +21,8 @@ import {
 export async function onRequest(context: EventContext): Promise<Response> {
   requireMethod(context.request, "POST");
   requireJsonContentType(context.request);
-  requireSameOrigin(context.request, configuredOrigin(context.env));
+  const serviceOrigin = configuredOrigin(context.env);
+  requireSameOrigin(context.request, serviceOrigin);
   const url = new URL(context.request.url);
   if (
     [...url.searchParams.keys()].some((key) => key !== "artifact_id") ||
@@ -40,6 +41,19 @@ export async function onRequest(context: EventContext): Promise<Response> {
     throw new HttpError(403, "invalid_csrf", "The request token is invalid.");
   }
   const submitted = parseSubmission(await readJsonBody(context.request));
+  const grant = session.review_grant;
+  if (
+    grant === null ||
+    grant.artifact_id !== artifactId ||
+    grant.pull_request !== submitted.pull_request ||
+    grant.repository.toLowerCase() !== submitted.repository.toLowerCase()
+  ) {
+    throw new HttpError(
+      403,
+      "review_grant_required",
+      "Sign in from this downstream review before posting its decisions.",
+    );
+  }
   const github = new GitHubClient(session.access_token);
   await github.requireCurator(submitted.repository, session.login);
   const proposal = await loadReviewProposal(
@@ -48,6 +62,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
     submitted.pull_request,
     artifactId,
   );
+  requireReviewTransport(proposal, grant, serviceOrigin);
   const verified = verifySubmission(submitted, proposal);
   const commentUrl = await github.postComment(
     proposal.repository,

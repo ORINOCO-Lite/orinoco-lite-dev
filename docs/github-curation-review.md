@@ -54,12 +54,12 @@ SHACL Vue proposal editing follows the separate normative [`GitHub SHACL Vue hum
 Decision-review operations use repository contents read access only.
 The shared App's contents-write permission is confined to the other profile's explicit, path-restricted human handoff operation.
 
-## Hosted review application
+## Downstream static review application
 
-The supported decision interface is a deployed web application backed by a minimal stateless GitHub App user-to-server authorization service.
+The supported decision interface is the downstream's deployed static `/review/` route, backed by a minimal stateless GitHub App user-to-server authorization and transport service.
 Native pull-request Markdown is an accessible summary and fallback, not a substitute for mutually exclusive controls or complete-submission validation.
 
-The application MUST:
+The static application and service together MUST:
 
 - accept or link directly to a repository, pull-request number, and artifact ID;
 - use the authenticated GitHub API to load the current pull request, proposal commit, metadata diff, workflow run, and exact Actions artifact;
@@ -71,19 +71,34 @@ The application MUST:
 - bind submission to the repository, pull-request number, proposal SHA, current head SHA, exact source coordinate including revision, and complete candidate mapping; and
 - post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
 
-The canonical exact-review route is `/review/` on the configured service origin.
-For repository entry points that do not already identify one proposal, the application MAY provide authenticated, repository-scoped discovery of relevant open curation pull requests and their unexpired, exactly named review artifacts.
-The repository remains an explicit link coordinate because one authenticated user or App installation can cover multiple repositories.
-Discovery is only a convenience: it does not parse the pull-request body, retain a catalog, or replace the complete verification performed when the curator opens a selected proposal.
+The canonical exact-review route is `review/` below the downstream's configured `site.base_url`.
+The workflow supplies the repository, pull-request number, and artifact ID directly; the central service is not a discovery or review destination.
 
-The application reads GitHub proposal and Actions objects produced by the trusted workflow.
-It MUST NOT run an adapter, reacquire an external source, execute pull-request code, or infer candidate facts that the trusted Action must regenerate.
-It is a review surface and authenticated comment transport, not another execution boundary.
+The service reads GitHub proposal and Actions objects produced by the trusted workflow and transports the verified proposal to the exact static opener.
+It MUST NOT run an adapter, reacquire an external source, execute pull-request code, infer candidate facts that the trusted Action must regenerate, or render a second candidate-review interface.
 The bulk initializer changes only in-browser decision state.
 It is not a disposition until the reviewer submits the complete authenticated decision comment, and it does not weaken exact-head, completeness, or trusted regeneration checks.
 
 The initial service accepts at most 225 candidates, 450 changed metadata paths, and 16 MiB of loaded record text per review.
 These are application resource-safety bounds, not pull-request Markdown or native-diff conformance limits.
+
+The static route generates a fresh 256-bit nonce and opens the service's `/review-transport/` route with exact repository, pull-request, artifact, and origin coordinates.
+OAuth runs in a separate window so navigation does not replace the transport's opener.
+The sealed, expiring session grant binds those coordinates.
+Before sending proposal data, the service verifies `site.repository`, `site.base_url`, and `site.curation_service` from `orinoco.yaml` at the proposal metadata base, then completes an exact ready/request handshake with the same window, origin, nonce, and coordinates.
+Neither tokens nor CSRF material cross that channel.
+
+The static application sends one complete decision submission back through the same one-shot channel.
+The service MUST display the authenticated login, repository, pull request, proposal and head commits, and every record path and disposition on its own origin.
+Only an explicit user confirmation there may post the comment.
+Replayed, mismatched, stale, framed, timed-out, or duplicate messages fail closed.
+
+The service sends a typed `post-started` message before the authenticated request and classifies its result.
+Only an explicit retry-safe pre-write rejection may unlock the static reviewer and replace its transport while preserving decisions.
+A network failure, server failure, malformed GitHub success response, timeout, or unknown result keeps the submission locked and instructs the curator to inspect the pull request before another action.
+
+Legacy central discovery routes return HTTP 410 `review_discovery_retired`.
+They do not start OAuth, inspect a session, or contact GitHub.
 
 ## Authenticated submission
 
@@ -159,13 +174,18 @@ Local execution MAY expose the same deterministic operations for development and
 
 ## Hosting boundary
 
-The central `https://orinoco-curation-review.pages.dev/` deployment is the default hosted option.
-A downstream selects its review-application origin independently, and that origin is not part of the PR-body or submission machine protocol.
-The same application code MAY be deployed elsewhere by setting `PUBLIC_ORIGIN`; the profile does not require a particular hosting provider.
-A conforming deployment MAY serve the static application and stateless authorization routes from one Cloudflare Pages or Workers deployment.
+The central `https://orinoco-curation-review.pages.dev/` deployment is the default authorization and verified GitHub-transport option.
+It is not the canonical review page.
+A downstream selects that service independently in `site.curation_service`, while its own `site.base_url` owns `/review/`.
+The same service code MAY be deployed elsewhere by setting `PUBLIC_ORIGIN`; the profile does not require a particular hosting provider.
 It MUST NOT require a durable database, object store, metadata service, candidate store, or decision store.
 For the separate SHACL Vue profile, that origin MAY also serve a lightweight sign-in, confirmation, and bundle-receiver page, but it MUST NOT assemble, embed, or host a SHACL Vue editor.
 The downstream static site remains that profile's only editor.
+
+Browser messaging binds an origin, not a URL path.
+A project site on a shared GitHub Pages hostname therefore shares its browser trust boundary with other pages on that hostname.
+The repository-derived route check, exact one-shot channel, and central-origin submission confirmation are required for that deployment shape.
+A custom or otherwise unique origin MAY narrow the boundary.
 
 Cloudflare project provisioning, GitHub App registration, secrets, and a live deployment are external operational changes.
 They require separately reviewed acceptance coordinates and are not implied by implementation of this profile.

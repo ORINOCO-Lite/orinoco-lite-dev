@@ -1,2 +1,5 @@
 /edit /edit/ 308
-/review /review/ 308
+/review / 308
+/review/ / 308
+/review-auth-complete /review-auth-complete/ 308
+/review-transport /review-transport/ 308

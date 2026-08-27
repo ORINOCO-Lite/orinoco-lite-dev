@@ -126,6 +126,13 @@ jobs:
             --source-root submodules/things-schemas/src \
             --entry submodules/things-schemas/src/demo-research-information/unreleased.yaml \
             --destination build/runtime-schema
+          npm install --global npm@11.6.0
+          test "$(npm --version)" = "11.6.0"
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite.release_review \
+            --application packages/curation-review-app \
+            --shell build/runtime-review-shell \
+            --licenses build/runtime-review-licenses
           PYTHONPATH=packages/orinoco-lite/src \
             python -m orinoco_lite.release_runtime \
             --spec "$spec" \
@@ -133,16 +140,29 @@ jobs:
             --output "release/dist/orinoco-runtime-$version.tar.gz"
           mv build/runtime-editor-shell build/runtime-editor-shell-first
           mv build/runtime-editor-licenses build/runtime-editor-licenses-first
+          mv build/runtime-review-shell build/runtime-review-shell-first
+          mv build/runtime-review-licenses build/runtime-review-licenses-first
           editor_source_repeat="$(mktemp -d)"
           cp -R submodules/pool.psychoinformatics.de-ui/. "$editor_source_repeat/"
+          npm install --global npm@10.9.4
+          test "$(npm --version)" = "10.9.4"
           PYTHONPATH=packages/orinoco-lite/src \
             python -m orinoco_lite.release_editor \
             --pool-ui "$editor_source_repeat" \
             --overlay release/editor-v2 \
             --shell build/runtime-editor-shell \
             --licenses build/runtime-editor-licenses
+          npm install --global npm@11.6.0
+          test "$(npm --version)" = "11.6.0"
+          PYTHONPATH=packages/orinoco-lite/src \
+            python -m orinoco_lite.release_review \
+            --application packages/curation-review-app \
+            --shell build/runtime-review-shell \
+            --licenses build/runtime-review-licenses
           diff -qr build/runtime-editor-shell-first build/runtime-editor-shell
           diff -qr build/runtime-editor-licenses-first build/runtime-editor-licenses
+          diff -qr build/runtime-review-shell-first build/runtime-review-shell
+          diff -qr build/runtime-review-licenses-first build/runtime-review-licenses
           PYTHONPATH=packages/orinoco-lite/src \
             python -m orinoco_lite.release_runtime \
             --spec "$spec" \

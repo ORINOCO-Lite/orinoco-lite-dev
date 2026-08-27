@@ -46,14 +46,14 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 | Execution provenance | DataLad run commit | Record each Pixi task that programmatically changes metadata. |
 | Review history | Git commits and host review history | Preserve prior record and decision-cache states. |
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
-| Hosted decision-review presentation | One expiring GitHub Actions artifact per proposal | Reproducibly present source and proposal coordinates plus per-record UI facts without becoming metadata, candidate, decision, or provenance authority. |
+| Source decision-review presentation | Proposal commit and metadata diff; one expiring GitHub Actions artifact is non-authoritative presentation input | Reproducibly present source and proposal coordinates plus per-record UI facts without letting the artifact become metadata, candidate, decision, or provenance authority. |
 | SHACL Vue presentation | Downstream static `edit/` output | Serve the exact-commit `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` with an immutable released editor shell and schema. The static site is the only SHACL Vue editor; its generated output is not metadata, a generated review bundle, provenance, or durable curation state. |
 | Hosted SHACL Vue handoff | Stateless GitHub authorization and receiver page | Authenticate, confirm, and transport the editor's unchanged bundle to the fixed-path Git handoff without assembling or hosting another editor or retaining curation state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.
-Generated projections, candidate plans, caches, diagnostics, hosted form renderings, and the expiring presentation artifacts are not canonical metadata.
-For hosted review, the proposal commit and its metadata diff remain authoritative for candidate membership and operations.
+Generated projections, candidate plans, caches, diagnostics, downstream form renderings, and the expiring presentation artifacts are not canonical metadata.
+For downstream review, the proposal commit and its metadata diff remain authoritative for candidate membership and operations.
 
 ## Core adapter contract
 
@@ -108,7 +108,7 @@ Each candidate contains at least:
 - the corresponding annotation-overlay changes; and
 - the claim content hash defined above.
 
-The plan drives proposal generation, hosted review rendering, and submission validation.
+The plan drives proposal generation, downstream review rendering, and submission validation.
 It MUST be reproducible and MUST NOT be tracked.
 Full records, opaque candidate IDs, transaction IDs, or copies of Git diffs MUST NOT be stored as review provenance.
 Internal digests MUST NOT be the primary human identifier.
@@ -410,7 +410,7 @@ The supported implementation MUST conform to the normative [`GitHub source-adapt
 That profile owns workflow, authentication, interface, comment, cache-reference, and hosting behavior.
 The canonicalizer, annotation join, candidate model, and finalizer remain shared repository behavior, but the durable v1 review cache and hosted profile are explicitly GitHub-specific.
 
-The trusted proposal workflow MUST publish exactly one untracked, expiring, reproducible GitHub Actions presentation bundle for the hosted application.
+The trusted proposal workflow MUST publish exactly one untracked, expiring, reproducible GitHub Actions presentation bundle for the downstream static review application.
 The bundle contains the identified source and proposal coordinates and the per-record facts required to render the review interface.
 The application MUST derive candidate membership and add, modify, or delete operations from the proposal commit's metadata diff and use the bundle only for presentation.
 It therefore requests GitHub Actions read access in addition to the permissions needed to read the proposal and post the authenticated comment.
@@ -422,7 +422,7 @@ Git commits, the authenticated submission comment, and the compact decision cach
 The separate SHACL Vue profile MUST preserve this exactly-one decision-review artifact contract.
 It adds no editor-input Actions artifact.
 For each exact commit exposed for editing, the downstream build emits `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` as ordinary static site output and combines them with the editor shell and schema from an immutable, digest-verified runtime release.
-The central application MUST NOT retrieve those files or assemble, embed, or host another editor.
+The central service MUST NOT retrieve those files or assemble, embed, or host another editor.
 The generated static input is not canonical metadata, a generated review bundle, candidate or decision state, provenance, or durable curation state, and it neither changes candidate membership nor enters the source-adapter finalizer.
 
 The shared GitHub App requests metadata read, Actions read, contents write, and pull requests write.
@@ -431,8 +431,9 @@ Actions read serves the source-adapter decision-review artifact and is not used 
 The receiver MUST require an explicit public-data and no-secrets acknowledgment before it creates the fixed-path bundle handoff.
 No second editor page, separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this path.
 
-The project MAY publish one central application origin by default.
-That origin MUST remain configurable, and a downstream MAY self-host the same stateless application without creating another host profile or durable authority.
+The project MAY publish one central authorization and GitHub-transport origin by default.
+That origin MUST remain configurable, and a downstream MAY self-host the same stateless service without creating another review interface, host profile, or durable authority.
+Source-adapter decisions are rendered by the downstream static `/review/` route; SHACL Vue remains at its separate static `/edit/` route.
 
 ## Security and complexity guardrails
 
@@ -466,7 +467,7 @@ Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter st
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
 A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things or metadata service for validation, review, build, or publication.
-The stateless GitHub authentication application is hosted decision and explicit human-handoff transport, not a metadata runtime dependency.
+The stateless GitHub authentication service provides verified decision data, authorization, and explicit human-handoff transport; it is not a review destination or metadata runtime dependency.
 
 Prefer released upstream acquisition, matching, serialization, and update helpers.
 In particular, reuse `things-enrichment-tools` ownership-aware update helpers when their data model and pinned runtime are compatible.
@@ -509,6 +510,6 @@ The local runtime remains pinned to the exact [Things Schema contract](explainin
 | `pav:importedFrom` may include source-version information | PAV uses the stable logical source record and DataLad records the exact revision | Separates semantic source identity from execution coordinates without losing reproducibility. |
 | Compact scalar PAV annotations | The ephemeral update view uses compact PAV, while the joined validation/RDF view uses expanded annotation objects | The pinned helper recognizes compact ownership and the pinned converter requires expanded annotations for lossless round trips. The conversion is transient and parity-tested. |
 | Query inlining preserves an unresolved PID as a scalar | Preserve every well-formed unresolved Thing reference and report graph edges whose targets cannot be materialized locally | Aligns Lite with upstream open-reference behavior while keeping deterministic, offline projection and permitting stricter site policy. |
-| Service curation API and authorization model | Hosted stateless review application and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
+| Service curation API and authorization model | Downstream static review plus stateless hosted authorization/transport and mechanical GitHub Action application | Required GitHub profile; GitHub remains authoritative and the human remains the decision authority. |
 
 Implementations MUST preserve commit history, attribute each bot commit to its triggering human, and avoid inventing semantic overlays beyond the defined annotation overlay.

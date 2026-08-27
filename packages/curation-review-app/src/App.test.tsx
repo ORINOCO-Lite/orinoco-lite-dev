@@ -10,15 +10,17 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_SHACL_BUNDLE_BYTES,
-  type ReviewDiscovery,
   type ReviewProposal,
   type ShaclReviewBundle,
 } from "../shared/contracts";
 import App from "./App";
-import { ARTIFACT_ID, proposal } from "../tests/fixtures";
+import { Review } from "./Review";
+import { ARTIFACT_ID, proposal, submission } from "../tests/fixtures";
 
 const EDITOR_ORIGIN = "https://site.example";
 const HANDOFF_NONCE = "d".repeat(64);
+const REVIEW_ORIGIN = "https://site.example";
+const REVIEW_HANDOFF_NONCE = "e".repeat(64);
 
 function liveHandoffTarget(extra = ""): string {
   const query = new URLSearchParams({
@@ -33,35 +35,35 @@ function json(value: unknown, status = 200): Response {
   return Response.json(value, { status });
 }
 
-function installFetch(
+function reviewTransportTarget(): string {
+  const query = new URLSearchParams({
+    artifact_id: String(ARTIFACT_ID),
+    handoff_nonce: REVIEW_HANDOFF_NONCE,
+    pull_request: "42",
+    repository: "example/site",
+    review_origin: REVIEW_ORIGIN,
+  });
+  return `/review-transport/?${query.toString()}`;
+}
+
+function transportProposal(): ReviewProposal {
+  return {
+    ...proposal(),
+    review_service_origin: window.location.origin,
+    review_site_url: `${REVIEW_ORIGIN}/review/`,
+  };
+}
+
+function renderReview(
   reviewProposal: ReviewProposal = proposal(),
 ): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn(
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/session") {
-        return json({
-          authenticated: true,
-          csrf_token: "csrf-token",
-          login: "octocat",
-        });
-      }
-      if (url.startsWith("/api/proposal?")) return json(reviewProposal);
-      if (url === `/api/submit?artifact_id=${ARTIFACT_ID}`) {
-        expect(init?.headers).toMatchObject({ "X-CSRF-Token": "csrf-token" });
-        return json(
-          {
-            comment_url:
-              "https://github.com/example/site/pull/42#issuecomment-99",
-          },
-          201,
-        );
-      }
-      throw new Error(`Unexpected fetch: ${url}`);
-    },
+  const onSubmit = vi.fn(async () => ({
+    comment_url: "https://github.com/example/site/pull/42#issuecomment-99",
+  }));
+  render(
+    <Review login="octocat" onSubmit={onSubmit} proposal={reviewProposal} />,
   );
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
+  return onSubmit;
 }
 
 function shaclBundle(): ShaclReviewBundle {
@@ -119,11 +121,7 @@ function installOpener(): Window & { postMessage: ReturnType<typeof vi.fn> } {
 }
 
 beforeEach(() => {
-  window.history.replaceState(
-    {},
-    "",
-    `/review/?artifact_id=${ARTIFACT_ID}&repository=example%2Fsite&pull_request=42`,
-  );
+  window.history.replaceState({}, "", "/");
 });
 
 afterEach(() => {
@@ -132,15 +130,15 @@ afterEach(() => {
     configurable: true,
     value: null,
   });
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("curation review interface", () => {
   it("shows responsive record diffs and one exclusive decision group per candidate", async () => {
-    installFetch();
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    renderReview();
+    const first = screen.getByRole("article", { name: "First record" });
     expect(
       within(first).getByText("Original first", { exact: false }),
     ).toBeInTheDocument();
@@ -158,18 +156,17 @@ describe("curation review interface", () => {
       screen.queryByRole("link", { name: "Edit in SHACL Vue" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Propose downloaded SHACL bundle" }),
-    ).toHaveAttribute(
-      "href",
-      `/edit/?expected_head_sha=${proposal().head_sha}&pull_request=42&repository=example%2Fsite`,
-    );
+      screen.queryByRole("link", { name: "Propose downloaded SHACL bundle" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open GitHub diff" }),
+    ).toHaveAttribute("href", "https://github.com/example/site/pull/42");
   });
 
   it("supports filtering, changed-only view, and keyboard decisions", async () => {
-    installFetch();
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    renderReview();
+    const first = screen.getByRole("article", { name: "First record" });
     const second = screen.getByRole("article", { name: "Second record" });
     first.focus();
     await user.keyboard("a");
@@ -194,10 +191,9 @@ describe("curation review interface", () => {
   });
 
   it("applies a bulk default only to unresolved records", async () => {
-    installFetch();
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    renderReview();
+    const first = screen.getByRole("article", { name: "First record" });
     const second = screen.getByRole("article", { name: "Second record" });
 
     await user.click(within(first).getByRole("radio", { name: "Reject" }));
@@ -232,10 +228,9 @@ describe("curation review interface", () => {
       record_path: "metadata/records/example/third.yaml",
       source_record_id: "item:GHI789",
     });
-    installFetch(reviewProposal);
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    renderReview(reviewProposal);
+    const first = screen.getByRole("article", { name: "First record" });
     const second = screen.getByRole("article", { name: "Second record" });
     const third = screen.getByRole("article", { name: "Third record" });
     await user.click(within(second).getByRole("radio", { name: "Reject" }));
@@ -249,10 +244,9 @@ describe("curation review interface", () => {
   });
 
   it("reveals and focuses the first unresolved record after incomplete submission", async () => {
-    installFetch();
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    renderReview();
+    const first = screen.getByRole("article", { name: "First record" });
     await user.click(within(first).getByRole("radio", { name: "Accept" }));
     const decisionFilter = screen.getByRole("combobox", { name: "Decision" });
     await user.selectOptions(decisionFilter, "accept");
@@ -270,11 +264,53 @@ describe("curation review interface", () => {
     );
   });
 
-  it("validates completion and posts the complete ordered decision payload", async () => {
-    const fetchMock = installFetch();
+  it("freezes the displayed decisions while a submission is pending", async () => {
+    let resolveSubmission:
+      ((result: { comment_url: string }) => void) | undefined;
+    const pendingSubmission = new Promise<{ comment_url: string }>(
+      (resolve) => {
+        resolveSubmission = resolve;
+      },
+    );
+    const onSubmit = vi.fn(() => pendingSubmission);
+    render(
+      <Review login="octocat" onSubmit={onSubmit} proposal={proposal()} />,
+    );
     const user = userEvent.setup();
-    render(<App />);
-    const first = await screen.findByRole("article", { name: "First record" });
+    const first = screen.getByRole("article", { name: "First record" });
+    const second = screen.getByRole("article", { name: "Second record" });
+    const accept = within(first).getByRole("radio", { name: "Accept" });
+    const defer = within(second).getByRole("radio", { name: "Defer" });
+    await user.click(accept);
+    await user.click(defer);
+    await user.click(
+      screen.getByRole("button", { name: "Post decisions to GitHub" }),
+    );
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+
+    expect(accept).toBeDisabled();
+    expect(defer).toBeDisabled();
+    first.focus();
+    await user.keyboard("r");
+    expect(accept).toBeChecked();
+    expect(
+      within(first).getByRole("radio", { name: "Reject" }),
+    ).not.toBeChecked();
+
+    resolveSubmission?.({
+      comment_url: "https://github.com/example/site/pull/42#issuecomment-99",
+    });
+    expect(
+      await screen.findByRole("link", { name: "View authenticated comment" }),
+    ).toBeVisible();
+    expect(accept).toBeDisabled();
+    expect(defer).toBeDisabled();
+  });
+
+  it("validates completion and posts the complete ordered decision payload", async () => {
+    const onSubmit = renderReview();
+    const user = userEvent.setup();
+    const first = screen.getByRole("article", { name: "First record" });
     await user.click(within(first).getByRole("radio", { name: "Accept" }));
     await user.click(
       screen.getByRole("button", { name: "Post decisions to GitHub" }),
@@ -288,14 +324,8 @@ describe("curation review interface", () => {
       screen.getByRole("button", { name: "Post decisions to GitHub" }),
     );
     await screen.findByRole("link", { name: "View authenticated comment" });
-    const call = fetchMock.mock.calls.find(
-      ([url]) => url === `/api/submit?artifact_id=${ARTIFACT_ID}`,
-    );
-    expect(call).toBeDefined();
-    const body = JSON.parse(String((call?.[1] as RequestInit).body)) as Record<
-      string,
-      unknown
-    >;
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const body = onSubmit.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(body).not.toHaveProperty("reviewer");
     expect(
       (body.decisions as Array<Record<string, unknown>>).map(
@@ -303,45 +333,26 @@ describe("curation review interface", () => {
       ),
     ).toEqual(["accept", "defer"]);
   });
+});
 
-  it("requires authentication without exposing repository data", async () => {
-    const fetchMock = vi.fn(async () => json({ authenticated: false }));
+describe("central authenticated transport", () => {
+  it("directs entry-point visitors back to the deployed review route", () => {
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     expect(
-      await screen.findByRole("link", { name: "Continue with GitHub" }),
-    ).toHaveAttribute(
-      "href",
-      `/api/auth/start?artifact_id=${ARTIFACT_ID}&pull_request=42&repository=example%2Fsite`,
-    );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      screen.getByRole("heading", {
+        name: "Open review from the deployed website",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not host a second review application/),
+    ).toBeVisible();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
-});
 
-describe("repository-scoped curation discovery", () => {
-  const discovery: ReviewDiscovery = {
-    pull_requests: [
-      {
-        artifacts: [
-          {
-            created_at: "2026-08-25T04:30:00Z",
-            expires_at: "2026-11-23T04:30:00Z",
-            id: ARTIFACT_ID,
-            name: `orinoco-curation-review-${"b".repeat(40)}`,
-          },
-        ],
-        draft: true,
-        head_sha: "a".repeat(40),
-        number: 42,
-        proposal_sha: "b".repeat(40),
-        title: "Review source metadata",
-      },
-    ],
-    repository: "example/site",
-  };
-
-  it("preserves the repository while asking an anonymous curator to sign in", async () => {
-    window.history.replaceState({}, "", "/?repository=example%2Fsite");
+  it("preserves the exact downstream handoff through GitHub sign-in", async () => {
+    window.history.replaceState({}, "", reviewTransportTarget());
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => json({ authenticated: false })),
@@ -351,67 +362,316 @@ describe("repository-scoped curation discovery", () => {
       await screen.findByRole("link", { name: "Continue with GitHub" }),
     ).toHaveAttribute(
       "href",
-      "/api/auth/discovery-start?repository=example%2Fsite",
+      `/api/auth/start?artifact_id=${ARTIFACT_ID}&pull_request=42&repository=example%2Fsite&review_origin=https%3A%2F%2Fsite.example&handoff_nonce=${REVIEW_HANDOFF_NONCE}`,
     );
-    expect(
-      screen.getByRole("heading", { name: /example\/site/ }),
-    ).toBeVisible();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
 
-  it("prefills the sole relevant pull request and artifact after sign-in", async () => {
-    window.history.replaceState({}, "", "/?repository=example%2Fsite");
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/session") {
-        return json({
-          authenticated: true,
-          csrf_token: "csrf-token",
-          login: "octocat",
-        });
-      }
-      if (String(input) === "/api/discovery?repository=example%2Fsite") {
-        return json(discovery);
-      }
-      throw new Error(`Unexpected fetch: ${String(input)}`);
+  it("handshakes once and gates one exact submission behind central confirmation", async () => {
+    window.history.replaceState({}, "", reviewTransportTarget());
+    const opener = installOpener();
+    const reviewProposal = transportProposal();
+    let resolveSubmit: ((response: Response) => void) | undefined;
+    const submitResponse = new Promise<Response>((resolve) => {
+      resolveSubmit = resolve;
     });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/session") {
+          return json({
+            authenticated: true,
+            csrf_token: "csrf-token",
+            login: "octocat",
+            review_grant: {
+              artifact_id: ARTIFACT_ID,
+              handoff_nonce: REVIEW_HANDOFF_NONCE,
+              pull_request: 42,
+              repository: "example/site",
+              review_origin: REVIEW_ORIGIN,
+            },
+          });
+        }
+        if (url.startsWith("/api/proposal?")) return json(reviewProposal);
+        if (url === `/api/submit?artifact_id=${ARTIFACT_ID}`) {
+          expect(init?.headers).toMatchObject({ "X-CSRF-Token": "csrf-token" });
+          expect(JSON.parse(String(init?.body))).toEqual(submission());
+          return submitResponse;
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
+
     await waitFor(() =>
-      expect(
-        screen.getByRole("combobox", {
-          name: "Open curation pull request",
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        {
+          artifact_id: ARTIFACT_ID,
+          format: "orinoco-lite-review-transport-ready-v1",
+          handoff_nonce: REVIEW_HANDOFF_NONCE,
+          pull_request: 42,
+          repository: "example/site",
+        },
+        REVIEW_ORIGIN,
+      ),
+    );
+
+    const proposalRequest = {
+      artifact_id: ARTIFACT_ID,
+      format: "orinoco-lite-review-proposal-request-v1",
+      handoff_nonce: REVIEW_HANDOFF_NONCE,
+      pull_request: 42,
+      repository: "example/site",
+    };
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: proposalRequest,
+          origin: "https://attacker.example",
+          source: opener,
         }),
-      ).toHaveValue("42"),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { ...proposalRequest, artifact_id: ARTIFACT_ID + 1 },
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { ...proposalRequest, extra: true },
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: proposalRequest,
+          origin: REVIEW_ORIGIN,
+          source: window,
+        }),
+      );
+    });
+    expect(
+      opener.postMessage.mock.calls.filter(
+        ([value]) =>
+          (value as Record<string, unknown>).format ===
+          "orinoco-lite-review-proposal-message-v1",
+      ),
+    ).toHaveLength(0);
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: proposalRequest,
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+    });
+    await waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        {
+          artifact_id: ARTIFACT_ID,
+          format: "orinoco-lite-review-proposal-message-v1",
+          handoff_nonce: REVIEW_HANDOFF_NONCE,
+          login: "octocat",
+          proposal: reviewProposal,
+          pull_request: 42,
+          repository: "example/site",
+        },
+        REVIEW_ORIGIN,
+      ),
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: proposalRequest,
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+    });
+    expect(
+      opener.postMessage.mock.calls.filter(
+        ([value]) =>
+          (value as Record<string, unknown>).format ===
+          "orinoco-lite-review-proposal-message-v1",
+      ),
+    ).toHaveLength(1);
+
+    const request = {
+      artifact_id: ARTIFACT_ID,
+      format: "orinoco-lite-review-submission-message-v1",
+      handoff_nonce: REVIEW_HANDOFF_NONCE,
+      pull_request: 42,
+      repository: "example/site",
+      submission: submission(),
+    };
+    act(() => {
+      for (const [data, origin, source] of [
+        [request, "https://attacker.example", opener],
+        [{ ...request, repository: "example/other" }, REVIEW_ORIGIN, opener],
+        [{ ...request, extra: true }, REVIEW_ORIGIN, opener],
+        [request, REVIEW_ORIGIN, window],
+      ] as const) {
+        window.dispatchEvent(
+          new MessageEvent("message", { data, origin, source }),
+        );
+      }
+    });
+    expect(
+      screen.queryByRole("heading", {
+        name: "Confirm decisions before posting",
+      }),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: request,
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: request,
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+    });
+    expect(
+      await screen.findByRole("heading", {
+        name: "Confirm decisions before posting",
+      }),
+    ).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      {
+        artifact_id: ARTIFACT_ID,
+        format: "orinoco-lite-review-confirmation-pending-v1",
+        handoff_nonce: REVIEW_HANDOFF_NONCE,
+        pull_request: 42,
+        repository: "example/site",
+      },
+      REVIEW_ORIGIN,
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Waiting for downstream acknowledgement…",
+      }),
+    ).toBeDisabled();
+    const confirmationReady = {
+      artifact_id: ARTIFACT_ID,
+      format: "orinoco-lite-review-confirmation-ready-v1",
+      handoff_nonce: REVIEW_HANDOFF_NONCE,
+      pull_request: 42,
+      repository: "example/site",
+    };
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: confirmationReady,
+          origin: REVIEW_ORIGIN,
+          source: opener,
+        }),
+      );
+    });
+    expect(screen.getByText("octocat")).toBeVisible();
+    expect(screen.getByText("example/site")).toBeVisible();
+    expect(screen.getByText("#42")).toBeVisible();
+    expect(screen.getByText(reviewProposal.proposal_sha)).toBeVisible();
+    expect(screen.getByText(reviewProposal.head_sha)).toBeVisible();
+    const confirmed = screen.getByRole("list", { name: "Confirmed decisions" });
+    expect(confirmed).toHaveTextContent(
+      "metadata/records/example/first.yaml (DRI-0001) → accept",
+    );
+    expect(confirmed).toHaveTextContent(
+      "metadata/records/example/second.yaml (DRI-0002) → defer",
+    );
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input]) => String(input) === `/api/submit?artifact_id=${ARTIFACT_ID}`,
+      ),
+    ).toHaveLength(0);
+
+    const confirm = await screen.findByRole("button", {
+      name: "Post these decisions to GitHub",
+    });
+    act(() => {
+      confirm.click();
+      confirm.click();
+    });
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      {
+        artifact_id: ARTIFACT_ID,
+        format: "orinoco-lite-review-post-started-v1",
+        handoff_nonce: REVIEW_HANDOFF_NONCE,
+        pull_request: 42,
+        repository: "example/site",
+      },
+      REVIEW_ORIGIN,
     );
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Review artifact" }),
-      ).toHaveValue(String(ARTIFACT_ID)),
+        fetchMock.mock.calls.filter(
+          ([input]) =>
+            String(input) === `/api/submit?artifact_id=${ARTIFACT_ID}`,
+        ),
+      ).toHaveLength(1),
     );
-    expect(screen.getByDisplayValue("example/site")).toHaveAttribute(
-      "readonly",
+    expect(
+      opener.postMessage.mock.calls.filter(
+        ([value]) =>
+          (value as Record<string, unknown>).format ===
+          "orinoco-lite-review-submission-result-v1",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      resolveSubmit?.(
+        json(
+          {
+            comment_url:
+              "https://github.com/example/site/pull/42#issuecomment-99",
+          },
+          201,
+        ),
+      );
+      await submitResponse;
+    });
+    await waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        {
+          artifact_id: ARTIFACT_ID,
+          comment_url:
+            "https://github.com/example/site/pull/42#issuecomment-99",
+          error: null,
+          format: "orinoco-lite-review-submission-result-v1",
+          handoff_nonce: REVIEW_HANDOFF_NONCE,
+          pull_request: 42,
+          repository: "example/site",
+          retry_safe: false,
+        },
+        REVIEW_ORIGIN,
+      ),
     );
-    expect(screen.getByRole("button", { name: "Open review" })).toBeEnabled();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      opener.postMessage.mock.calls.filter(
+        ([value]) =>
+          (value as Record<string, unknown>).format ===
+          "orinoco-lite-review-submission-result-v1",
+      ),
+    ).toHaveLength(1);
+    expect(confirm).toBeDisabled();
   });
 });
 
 describe("SHACL Vue browser-memory proposal handoff", () => {
-  it("starts a repository-bound curation journey", () => {
-    window.history.replaceState({}, "", "/");
-    render(<App />);
-    expect(
-      screen.getByRole("heading", {
-        name: "Review repository metadata",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("textbox", { name: "Repository" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Edit in SHACL Vue" }),
-    ).not.toBeInTheDocument();
-  });
-
   it("preserves exact existing-PR coordinates through user authentication", async () => {
     const source = "a".repeat(40);
     window.history.replaceState(

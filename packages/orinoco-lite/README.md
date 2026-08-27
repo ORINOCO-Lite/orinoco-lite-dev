@@ -102,7 +102,7 @@ The diagnosis and removal condition are recorded in [`docs/milestone-4-decisions
 
 ## Release and license boundary
 
-Releases contain a deterministic wheel and source archive, a checksummed runtime archive, a machine-readable source inventory, component license texts, and build provenance.
+Releases contain a deterministic wheel and source archive, a checksummed runtime archive with the static `/edit/` and `/review/` shells, machine-readable source and dependency inventories, component license texts, and build provenance.
 The runtime contains the localized schema closure, reviewed renderer, graph support, and static editor required by consumers; it does not expose component checkouts.
 
 The engine and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
