@@ -1,6 +1,6 @@
 # Milestone 6: metadata-path hardening
 
-Status: planned; begins after the bounded convergence and custody-transition work below
+Status: active; bounded convergence, aligned releases, and custody transition complete
 
 Predecessor: [`milestone-5.md`](milestone-5.md)
 
@@ -8,12 +8,12 @@ Normative source-adapter contract: [`source-adapters.md`](source-adapters.md)
 
 Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
 
-## Before Milestone 6
+## Completed prerequisite batch
 
 Upstream repinning, the compatibility fixes caused by that repinning, aligned Orinoco Lite releases, and the approved repository-custody move are ordinary maintenance prerequisites rather than a separate milestone.
-They may proceed now without an exhaustive milestone specification.
+That bounded batch is complete.
 
-The implementing pull requests must:
+The implementing pull requests were required to:
 
 1. compare every component used by the retained static, service, runtime, editor, query, enrichment, snapshot, or consumer paths with its authoritative upstream head;
 2. merge the focused compatibility corrections needed to make those current components pass together;
@@ -25,12 +25,28 @@ This work does not add a tracked upstream inventory or a second acceptance autho
 Exact coordinates and evidence belong in the implementing pull requests, commits, locks, and releases.
 The real CON site, its remotes, its deployment, and its production domain remain read-only and outside the transfer.
 
+## Current mechanical coordinates
+
+| Surface | Current evidence |
+| --- | --- |
+| Static editor and receiver | [Engineering pull request 52](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/52) merged as `e9ce410f711495070126beb80ec2a89f0225bb9c`. The receiver-only service is at [`https://orinoco-curation-review.pages.dev/`](https://orinoco-curation-review.pages.dev/) with immutable deployment `55ce9125-ea66-4f43-a28b-a0c51734125c` at [`https://55ce9125.orinoco-curation-review.pages.dev/`](https://55ce9125.orinoco-curation-review.pages.dev/). Deployment `9d2909c1-d75b-4de7-ba32-ae37f2d44dc4` remains the retained rollback at [`https://9d2909c1.orinoco-curation-review.pages.dev/`](https://9d2909c1.orinoco-curation-review.pages.dev/). Authenticated browser verification against the final fixture deployment showed both static-editor actions and a receiver waiting for the unchanged bundle, with no duplicate editor. |
+| Engine and runtime | [Engineering pull request 53](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/53) merged as `b7201b2e3fefe3e30f9145b597aba9e0c64bccb7`; [`v0.2.0rc8`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/releases/tag/v0.2.0rc8) is the immutable release, and [hosted run 33043289218](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33043289218) passed. |
+| Template | [Template pull request 26](https://github.com/ORINOCO-Lite/orinoco-lite-template/pull/26) merged as `88645022f7845ce2c99dd97015ed5538a5defe22`; [`v0.2.0rc12`](https://github.com/ORINOCO-Lite/orinoco-lite-template/releases/tag/v0.2.0rc12) published generated template commit `f855a8ed2442b399f0ae00ff684b16834d779026`, and [hosted run 33044087381](https://github.com/ORINOCO-Lite/orinoco-lite-template/actions/runs/33044087381) passed. |
+| Released snapshot adoption | [Engineering pull request 54](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/54) merged as `c21b2cdaa85ed81ced65ed60ce842a87b4cc8ed7`, and [hosted run 33045450687](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33045450687) passed. [Pull request 55](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/55) then merged as `3d539514a9c126a6efb9e6dfae0200569335ebc6`; [hosted run 33047175981](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33047175981) passed after advancing only the exact accepted-consumer coordinate to the final fixture while leaving the adapted upstream gitlinks unchanged. |
+| Integration fixture | [Fixture pull request 43](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/pull/43) merged rc12/rc8 as `b405b8853541baa19922dee474870a3b5dab9cd1`. [Validation run 33046225114](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33046225114) and [Pages run 33046225159](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33046225159) passed. The publication chain is source `b405b8853541baa19922dee474870a3b5dab9cd1`, projection `3882cd1afea82787a931b66403e71ec8d399e300`, and site `e307bf5a2a5dfff3b5ed681980ceedbf991ea301`; deployment `6117786815` is current. Rollback evidence remains source `4108568df2adc52d619d365e5dc735b30b7730b9`, projection `d265a65dfa7aade20a668f3ded4551585eebefdf`, site `aaf400ec362c9def44f368cc95321ec452ba682e`, and deployment `6117152594`. |
+| Personal demonstration | [Demo pull request 25](https://github.com/leej3/orinoco-lite-demo/pull/25) merged rc12/rc8 as `5f53d60d52b815ed2548e8055296d79f11bd4925` while retaining `leej3` custody. [Validation run 33046291553](https://github.com/leej3/orinoco-lite-demo/actions/runs/33046291553) and [Pages run 33046291533](https://github.com/leej3/orinoco-lite-demo/actions/runs/33046291533) passed. The publication chain is source `5f53d60d52b815ed2548e8055296d79f11bd4925`, projection `85da033b60287de69dd722509325844311346aa3`, and site `ab2c4b857159eddfac9e4820164ada35349a8ca6`; deployment `6117800895` is current. Rollback evidence remains source `d1e49f2e940119736d9f3e5f7b007674f7ce017c`, projection `173e258ead8e4578b37a5ce26bd1a804e6df7aba`, site `8a4af9ab88ec5b3a17117e4949105e86a2ae5ba5`, and deployment `6112517513`. |
+| Current Zotero input | [Demo pull request 23](https://github.com/leej3/orinoco-lite-demo/pull/23) merged the read-only public-library evidence at version `668` with normalized payload SHA-256 `23aa443a248e9e1dfc73003cde76f3a93c533bf9e57cc5674539b80da52f17b8`. Deterministic planning reports 126 modification candidates; their human dispositions, finalization, and identical no-op rerun remain open. |
+| Retired engineering Pages | The unsupported Milestone 3 engineering Pages site was disabled and the repository homepage cleared on 2026-08-27. Its obsolete `codex/milestone-3` deployment policy was removed, while branch `codex/milestone-3` and deployment `5862443246` remain preserved as historical evidence. Fixture and demo Pages remain the supported live surfaces. |
+
+These coordinates establish the mechanical release boundary but do not complete Milestone 6.
+The live SHACL Vue proposal and current Zotero review and no-op proof remain acceptance work below.
+
 ## Outcome
 
-Milestone 6 begins from the reviewed current stack produced by the prerequisite work above.
+Milestone 6 proceeds from the reviewed current stack produced by the completed prerequisite work above.
 It aligns open-reference behavior, makes compatibility tests explicit and dependable, and proves that the two human-facing metadata paths work from current state.
 
-The milestone will:
+The active milestone will:
 
 - preserve well-formed unresolved Things references by default while reporting references and graph edges that cannot be materialized locally;
 - remove environment-dependent compatibility tests and unexpected CI skips;
@@ -91,9 +107,11 @@ The approved scope is the three core repositories, the GitHub App, and the nine 
 Unused historical mirrors, including `dump-things-service-mirror`, remain with their existing owners.
 The repository and GitHub App ownership transfers completed on 2026-08-26.
 The App installation is limited to `ORINOCO-Lite/test-orinoco-downstream-website`; authenticated discovery and the exact-head SHACL editor passed without creating a review comment, branch, or pull request.
+That installation scope does not presently include the personal demonstration targeted by the current Zotero operation; Open M6-Q002 records the authority choice that must be made before hosted Zotero review can complete.
 The custody audit also replaced the accidental query-things and things-enrichment-tools merge tips with the already accepted linear heads by exact lease, and fast-forwarded the Things Schemas mirror default ref to its accepted pin.
 The Congo mirror retains its upstream `stable` history plus two owned commits; its local Dependabot policy disables independent version-update pull requests, and the nine superseded bot pull requests were closed.
-The central backend then advanced from [engineering pull request 50](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50) at `b992e9788ee66572ca613cfa230cb2ecda40667e` with runtime `v0.2.0rc6`; its [final deployment evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) records the provider configuration, immutable deployment, authenticated read-only proof, and retained rollback.
+The central backend then advanced from [engineering pull request 50](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50) at `b992e9788ee66572ca613cfa230cb2ecda40667e` with runtime `v0.2.0rc6`; its [final deployment evidence](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/50#issuecomment-5433725958) records that historical provider configuration, immutable deployment, authenticated read-only proof, and retained rollback.
+The receiver-only current boundary and deployment supersede that presentation surface and are recorded in the mechanical coordinates above.
 
 ### M6-D005 — Keep SHACL Vue in the downstream static site
 
@@ -186,6 +204,14 @@ Milestone 6 is complete when:
 
 Acceptance records representative commands, releases, pull requests, and runs.
 It does not duplicate commit ancestry already enforced by Git and the workflow or reproduce every transient artifact coordinate.
+
+## Open questions
+
+### Open M6-Q002 — Where may the App review the current Zotero proposal?
+
+The current Zotero operation is bound to the personal `leej3/orinoco-lite-demo` downstream, while the transferred GitHub App installation is deliberately limited to the organization fixture.
+Hosted review therefore requires one explicit authority decision: install the App on the personal demonstration as well, or revise the reviewed proposal target and its source/base bindings.
+Do not install the App, retarget the proposal, or broaden repository authority without John's explicit decision.
 
 ## Resolved questions
 
