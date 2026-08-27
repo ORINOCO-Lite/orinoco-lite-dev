@@ -49,7 +49,8 @@ flowchart TB
 The arrows express release and update direction, not repository nesting.
 The engineering workspace may remain multi-repository; the template and every supported consumer are independently usable repositories.
 The downstream output owns both human-facing metadata routes: `/edit/` is the only SHACL Vue editor for that site, and `/review/` is the source-adapter decision review.
-The optional central service handles only OAuth, verified GitHub reads, explicit confirmation, bundle receipt, and GitHub transport; it does not host either review interface.
+The default central service, or one optional self-hosted replacement, handles only OAuth, verified GitHub reads, and authenticated GitHub transport.
+All confirmation and bundle interaction remains in the downstream routes.
 
 ## Repository map
 

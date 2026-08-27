@@ -81,10 +81,11 @@ OAuth must return to a browser context, and that context must retain the service
 
 The accepted flow is:
 
-1. The downstream `/edit/` or `/review/` route creates a random one-time nonce and opens `/api/auth/start` at the configured service origin in a popup.
-2. The service binds the exact downstream origin, repository, operation, popup relationship, and nonce into expiring OAuth state, sets a host-only session cookie, and redirects the popup to GitHub.
+1. The downstream `/edit/` or `/review/` route creates a random one-time nonce and opens `/api/transport` at the configured service origin in a popup.
+2. The transport checks for a matching session and, when authentication is needed, starts `/api/auth/start` or `/api/auth/shacl-start`.
+The service binds the exact downstream origin, repository, operation, popup relationship, and nonce into expiring OAuth state, sets a host-only session cookie, and redirects the popup to GitHub.
 3. GitHub redirects the popup to `/api/auth/callback`.
-The backend exchanges the code and returns a tiny, generated, content-security-policy-locked transport document.
+The backend exchanges the code, redirects back to `/api/transport`, and returns a tiny, generated, content-security-policy-locked transport document there.
 This is a protocol endpoint, not a navigable application or landing page.
 4. The popup and its exact opener complete a nonce-bound `postMessage` or `MessageChannel` handshake.
 Tokens and CSRF material never cross it.

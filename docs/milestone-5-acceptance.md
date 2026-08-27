@@ -77,7 +77,8 @@ Being signed in did not add a GitHub button to the static page.
 
 Those two sentences preserve the accepted Milestone 5 deployment evidence; they are not the current presentation contract.
 HR-227 and M6-D005 subsequently supersede the duplicate central-editor surface.
-The downstream static site is now the only SHACL Vue editor and exposes both **Download bundle** and **Propose via GitHub**; the central service is limited to a lightweight sign-in, confirmation, and bundle-receiver page before the retained fixed-path handoff and trusted replacement.
+The downstream static site is now the only SHACL Vue editor and exposes both **Download bundle** and **Propose via GitHub**.
+M6-D007 further supersedes the interim receiver page: the central service now provides only backend authorization and a minimal popup transport, while bundle selection and confirmation remain downstream.
 
 ## Boundaries retained
 
