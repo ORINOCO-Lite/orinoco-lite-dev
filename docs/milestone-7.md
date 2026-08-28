@@ -1,24 +1,12 @@
 # Milestone 7: sustainable downstream ownership
 
-Status: planning; starts after Milestone 6 closes
-
-Predecessor: [`milestone-6.md`](milestone-6.md)
-
-Normative source-adapter contract: [`source-adapters.md`](source-adapters.md)
-
-GitHub review profiles: [`github-curation-review.md`](github-curation-review.md) and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+Status: planning
 
 Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
 
 ## Planning boundary
 
-Milestone 7 reduces the cost and risk of changing Orinoco Lite after the Milestone 6 metadata paths have been exercised end to end.
-It does not close, reinterpret, or add acceptance evidence to Milestone 6.
-Its implementation begins from the exact accepted Milestone 6 release and downstream coordinates.
-
-Small changes that do not alter metadata semantics, authority, provenance, repository ownership, or the new path contract may proceed as separate pull requests while this plan is reviewed.
-In particular, user-facing bot copy and the empty `/review/` fallback can be corrected independently.
-Validation-event classification, data relocation, generic-code relocation, and autonomous curation are not quick-copy changes and remain workstreams below.
+Milestone 7 reduces the cost and risk of changing Orinoco Lite.
 
 ## Outcome
 
@@ -87,7 +75,7 @@ The optional sandbox is useful evidence but neither a release gate nor a prerequ
 
 The dry-run harness and ownership extraction are the first blocking slice.
 Once they can prove the new contract, the data and template migration proceeds as one focused batch.
-Optional hosted exercise, richer `/review/` discovery, validation-event redesign, and unrelated visual polish do not delay that migration unless they expose a contract defect.
+
 
 ## Target ownership and layout
 
