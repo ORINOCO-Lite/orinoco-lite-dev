@@ -185,6 +185,20 @@ describe("deployed source-review route", () => {
     expect(isSharedGitHubPagesHostname(hostname)).toBe(expected);
   });
 
+  it("links an unbound route to this downstream's open curation proposals", async () => {
+    window.history.replaceState({}, "", "/review/");
+    installConfig();
+    render(<ReviewSiteLoader />);
+
+    const link = await screen.findByRole("link", {
+      name: "View open curation pull requests on GitHub",
+    });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/example/site/pulls?q=is%3Apr+is%3Aopen+label%3Acuration-review",
+    );
+  });
+
   it("loads strict site-owned configuration and opens only the transport popup", async () => {
     const fetchMock = installConfig();
     const { open, popup } = installPopup();

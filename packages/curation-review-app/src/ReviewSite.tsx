@@ -749,13 +749,26 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
   }
 
   if (target === null) {
+    const openPullRequests = new URL(
+      `/${config.repository}/pulls`,
+      "https://github.com",
+    );
+    openPullRequests.searchParams.set(
+      "q",
+      "is:pr is:open label:curation-review",
+    );
     return (
       <main className="landing" id="main-content">
         <p className="eyebrow">Source metadata review</p>
-        <h1>Open an exact proposal link</h1>
+        <h1>Open a curation proposal</h1>
         <p className="feedback">
           This route requires one repository, pull request, and review artifact.
           Use the link on the draft curation pull request.
+        </p>
+        <p>
+          <a href={openPullRequests.toString()}>
+            View open curation pull requests on GitHub
+          </a>
         </p>
       </main>
     );
