@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Iterable, Mapping, Sequence
+from urllib.parse import unquote
 
 from jinja2 import Environment, FileSystemLoader
 from linkml_runtime import SchemaView
@@ -837,13 +838,46 @@ def _schema_closure_digest(runtime_root: Path) -> str:
     return digest.hexdigest()
 
 
+def _unsafe_route_text(route: str) -> bool:
+    return (
+        any(ord(character) < 32 or ord(character) == 127 for character in route)
+        or any(character in route for character in '\\?#{}<>\"\'')
+        or any(part in {"", ".", ".."} for part in route.split("/"))
+    )
+
+
 def _route_for_pid(pid: str, prefix: str) -> str:
     if not pid.startswith(prefix):
         raise DriverError(f"Renderable record PID is outside routing.strip_prefix: {pid}")
-    route = pid.removeprefix(prefix).strip("/")
-    if not route or any(part in {"", ".", ".."} for part in route.split("/")):
+    route = pid.removeprefix(prefix)
+    decoded = route
+    while True:
+        expanded = unquote(decoded)
+        if expanded == decoded:
+            break
+        decoded = expanded
+    if not route or _unsafe_route_text(route) or _unsafe_route_text(decoded):
         raise DriverError(f"Renderable record has an unsafe route: {pid}")
     return route
+
+
+def rendered_record_route(
+    pid: str,
+    contract: ProjectionContract,
+    by_pid: Mapping[str, dict[str, Any]],
+) -> str:
+    """Return the canonical route for a record rendered by the projection."""
+
+    record = by_pid.get(pid)
+    if record is None:
+        raise DriverError(f"Projection route references an unknown PID: {pid}")
+    if pid == contract.homepage_pid:
+        return ""
+    schema_type = record.get("schema_type")
+    policy = contract.pages.get(schema_type) if isinstance(schema_type, str) else None
+    if policy is None or not _matches_policy(record, policy, by_pid):
+        raise DriverError(f"Projection route references an unrendered record: {pid}")
+    return _route_for_pid(pid, contract.route_prefix)
 
 
 def projection_manifest(
@@ -916,7 +950,7 @@ def render_projection(
             policy = contract.pages[schema_type]
             if not _matches_policy(record, policy, by_pid):
                 continue
-            route = _route_for_pid(pid, contract.route_prefix)
+            route = rendered_record_route(pid, contract, by_pid)
             destination = output / "content" / route / "_index.md"
         else:
             continue

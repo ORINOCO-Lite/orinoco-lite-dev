@@ -35,9 +35,11 @@ jobs:
         run: |
           git submodule sync -- \
             submodules/pool.psychoinformatics.de-ui \
+            submodules/query-things \
             submodules/things-schemas
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
+            submodules/query-things \
             submodules/things-schemas
           git -C submodules/pool.psychoinformatics.de-ui submodule sync -- \
             shacl-vue
@@ -188,7 +190,9 @@ jobs:
         run: cp "$ATTESTATION_BUNDLE" release/dist/orinoco-provenance-bundle.jsonl
 
       - name: Verify the installed wheel and hermetic package contracts
+        shell: bash
         run: |
+          set -o pipefail
           python -m venv build/release-test
           build/release-test/bin/pip install --disable-pip-version-check \
             release/dist/orinoco_lite-*.whl

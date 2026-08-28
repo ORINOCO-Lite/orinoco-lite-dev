@@ -28,6 +28,7 @@ from orinoco_lite.projection import (
     _route_for_pid,
     load_contract,
     projection_manifest,
+    rendered_record_route,
     render_projection,
     update_projection,
     validate_semantics,
@@ -429,6 +430,56 @@ class QueryInlineParityTests(unittest.TestCase):
             "projects/child",
         )
 
+    def test_shared_record_routes_reject_unrendered_and_unsafe_records(self) -> None:
+        policy = Mock(select={})
+        contract = Mock(
+            homepage_pid="acme:site",
+            route_prefix="acme:",
+            pages={"acme:Project": policy},
+        )
+        by_pid = {
+            "acme:site": {"pid": "acme:site", "schema_type": "acme:Site"},
+            "acme:projects/one": {
+                "pid": "acme:projects/one",
+                "schema_type": "acme:Project",
+            },
+            "acme:unrendered": {
+                "pid": "acme:unrendered",
+                "schema_type": "acme:Other",
+            },
+        }
+
+        self.assertEqual(rendered_record_route("acme:site", contract, by_pid), "")
+        self.assertEqual(
+            rendered_record_route("acme:projects/one", contract, by_pid),
+            "projects/one",
+        )
+        with self.assertRaisesRegex(DriverError, "unrendered record"):
+            rendered_record_route("acme:unrendered", contract, by_pid)
+        with self.assertRaisesRegex(DriverError, "unknown PID"):
+            rendered_record_route("acme:missing", contract, by_pid)
+
+        for pid in (
+            "acme:",
+            "acme:/projects/one",
+            "acme:projects/one/",
+            "acme://projects/one//",
+            "acme:.",
+            "acme:../escape",
+            "acme:%2e%2e/escape",
+            "acme:%252e%252e/escape",
+            "acme:projects\\escape",
+            "acme:projects/one?view=full",
+            "acme:projects/one#section",
+            'acme:projects/bad\" >}}injected{{< ref \"x',
+            "acme:projects/'quoted'",
+            "acme:projects/control\nvalue",
+            "other:one",
+        ):
+            unsafe = {"pid": pid, "schema_type": "acme:Project"}
+            with self.subTest(pid=pid), self.assertRaises(DriverError):
+                rendered_record_route(pid, contract, {pid: unsafe})
+
 
 class GenericProjectionContractTests(unittest.TestCase):
     """Keep core projection mechanics hermetic and independent of CON content."""
@@ -580,6 +631,27 @@ class GenericProjectionContractTests(unittest.TestCase):
         imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
             verify_projection(self.workspace, self.runtime)
+
+    def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
+        alias = self.root / "metadata/records/Person/alias.yaml"
+        alias.write_text(
+            "pid: acme:people/one/\n"
+            "schema_type: acme:Person\n"
+            "display_label: Alias\n",
+            encoding="utf-8",
+        )
+        output = Path(self.temporary.name) / "route-collision-projection"
+
+        with patch(
+            "orinoco_lite.projection.validate_semantics",
+            return_value={**self.semantic, "records": 3},
+        ), self.assertRaisesRegex(DriverError, "unsafe route"):
+            render_projection(self.workspace, self.runtime, output)
+
+        canonical = output / "content/people/one/_index.md"
+        self.assertTrue(canonical.is_file())
+        self.assertIn("One", canonical.read_text(encoding="utf-8"))
+        self.assertNotIn("Alias", canonical.read_text(encoding="utf-8"))
 
     def test_joined_annotations_reach_machine_projection_only(self) -> None:
         companion = self.root / (

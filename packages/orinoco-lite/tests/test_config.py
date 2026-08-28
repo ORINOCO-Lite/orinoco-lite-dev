@@ -56,6 +56,10 @@ class WorkspaceConfigTests(unittest.TestCase):
         )
         self.assertEqual(workspace.path("site").resolve(), (self.root / "site").resolve())
         self.assertEqual(
+            workspace.path("framework").resolve(),
+            (self.root / ".orinoco-lite/site").resolve(),
+        )
+        self.assertEqual(
             workspace.path("source_adapters").resolve(),
             (self.root / "source-adapters").resolve(),
         )
@@ -66,6 +70,10 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.assertEqual(
             workspace.environment()["ORINOCO_SOURCE_ADAPTERS_ROOT"],
             str((self.root / "source-adapters").resolve()),
+        )
+        self.assertEqual(
+            workspace.environment()["ORINOCO_FRAMEWORK_ROOT"],
+            str((self.root / ".orinoco-lite/site").resolve()),
         )
         self.assertNotIn("ORINOCO_CANONICAL_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_REFERENCE_ROOT", workspace.environment())
@@ -253,6 +261,40 @@ class WorkspaceConfigTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "distinct"):
+            load_workspace(self.root)
+
+    def test_paths_share_the_browser_service_normalization_contract(self) -> None:
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG + "paths:\n  records: metadata/records/\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            load_workspace(self.root).paths["records"],
+            "metadata/records",
+        )
+
+        invalid = (
+            " metadata/records",
+            "metadata/records ",
+            "a" * 1_025,
+        )
+        for value in invalid:
+            with self.subTest(value=value[:40]):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG + f"paths:\n  records: {value!r}\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "normalized relative",
+                ):
+                    load_workspace(self.root)
+
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG + 'paths:\n  records: "metadata/\\trecords"\n',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ConfigurationError, "normalized relative"):
             load_workspace(self.root)
 
     def test_removed_path_names_are_not_accepted_as_aliases(self) -> None:

@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 import hashlib
 import json
+import os
+from pathlib import Path
 from pathlib import PurePosixPath
 import re
 from typing import Any
@@ -22,6 +24,7 @@ from .annotations import (
     validate_stored_record,
 )
 from .canonical import canonical_json_bytes, canonical_yaml_bytes
+from .config import MAX_REPOSITORY_PATH_LENGTH
 from .errors import ConfigurationError
 
 
@@ -106,6 +109,75 @@ def _record_path(value: object) -> str:
             "Candidate record path must be a normalized relative YAML path"
         )
     return rendered
+
+
+def _repository_directory(value: object, label: str) -> PurePosixPath:
+    rendered = _line(value, label)
+    path = PurePosixPath(rendered)
+    if (
+        len(rendered) > MAX_REPOSITORY_PATH_LENGTH
+        or path.is_absolute()
+        or rendered != path.as_posix()
+        or "\\" in rendered
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in rendered
+        )
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ConfigurationError(f"{label} must be a normalized relative directory")
+    return path
+
+
+def _environment_record_root() -> PurePosixPath | None:
+    repository_value = os.environ.get("ORINOCO_ROOT")
+    records_value = os.environ.get("ORINOCO_RECORDS_ROOT")
+    if repository_value is None and records_value is None:
+        return None
+    if repository_value is None or records_value is None:
+        raise ConfigurationError(
+            "Configured candidate paths require both ORINOCO_ROOT and "
+            "ORINOCO_RECORDS_ROOT"
+        )
+    repository = Path(repository_value).resolve()
+    records = Path(records_value).resolve()
+    try:
+        relative = records.relative_to(repository)
+    except ValueError as error:
+        raise ConfigurationError(
+            "ORINOCO_RECORDS_ROOT must remain below ORINOCO_ROOT"
+        ) from error
+    return _repository_directory(
+        relative.as_posix(),
+        "Configured candidate record root",
+    )
+
+
+def _candidate_roots(
+    record_root: object | None,
+    annotation_root: object | None,
+) -> tuple[PurePosixPath, PurePosixPath]:
+    configured_records = _environment_record_root()
+    records = (
+        configured_records or RECORD_ROOT
+        if record_root is None
+        else _repository_directory(record_root, "Candidate record root")
+    )
+    if configured_records is not None and records != configured_records:
+        raise ConfigurationError(
+            "Candidate record root must match the configured workspace record root"
+        )
+    annotations = (
+        records.parent / "overlays/annotations"
+        if annotation_root is None
+        else _repository_directory(annotation_root, "Candidate annotation root")
+    )
+    expected = records.parent / "overlays/annotations"
+    if annotations != expected:
+        raise ConfigurationError(
+            "Candidate annotation root must mirror the configured record root"
+        )
+    return records, annotations
 
 
 def _json_mapping(value: object, label: str) -> dict[str, object]:
@@ -209,7 +281,9 @@ def _companion(
     return _ReadOnlyJsonMapping(companion)
 
 
-def _friendly_label(record: Mapping[str, object], pid: str) -> str:
+def friendly_record_label(record: Mapping[str, object], pid: str) -> str:
+    """Return the shared human label for one canonical record."""
+
     for field in ("display_label", "formatted_name", "title", "name", "short_name"):
         value = record.get(field)
         if isinstance(value, str):
@@ -242,6 +316,8 @@ class Candidate:
     proposed_companion: Mapping[str, object] | None
     source_claim: Mapping[str, object]
     blockers: Sequence[str] = ()
+    record_root: str | None = None
+    annotation_root: str | None = None
 
     def __post_init__(self) -> None:
         namespace = _line(self.source_namespace, "Candidate source namespace")
@@ -292,6 +368,10 @@ class Candidate:
         )
         if len(blockers) != len(set(blockers)):
             raise ConfigurationError("Candidate blockers must be unique")
+        record_root, annotation_root = _candidate_roots(
+            self.record_root,
+            self.annotation_root,
+        )
 
         object.__setattr__(self, "source_namespace", namespace)
         object.__setattr__(self, "source_record_id", source_id)
@@ -303,6 +383,8 @@ class Candidate:
         object.__setattr__(self, "proposed_companion", proposed_companion)
         object.__setattr__(self, "source_claim", source_claim)
         object.__setattr__(self, "blockers", blockers)
+        object.__setattr__(self, "record_root", record_root.as_posix())
+        object.__setattr__(self, "annotation_root", annotation_root.as_posix())
 
     @property
     def operation(self) -> CandidateOperation:
@@ -317,7 +399,7 @@ class Candidate:
         record = self.proposed_record or self.baseline_record
         if record is None:  # pragma: no cover - constructor invariant
             raise AssertionError("candidate has no record")
-        return _friendly_label(record, self.pid)
+        return friendly_record_label(record, self.pid)
 
     @property
     def claim_sha256(self) -> str:
@@ -339,11 +421,11 @@ class Candidate:
 
     @property
     def record_repository_path(self) -> str:
-        return (RECORD_ROOT / self.record_path).as_posix()
+        return (PurePosixPath(self.record_root) / self.record_path).as_posix()
 
     @property
     def companion_repository_path(self) -> str:
-        return (ANNOTATION_ROOT / self.record_path).as_posix()
+        return (PurePosixPath(self.annotation_root) / self.record_path).as_posix()
 
     def canonical_record_bytes(self, *, proposed: bool) -> bytes | None:
         """Serialize one side of the record proposal with the shared writer."""
@@ -451,6 +533,14 @@ class CandidatePlan:
             raise ConfigurationError(
                 "Candidate source namespace does not match its plan"
             )
+        roots = {
+            (candidate.record_root, candidate.annotation_root)
+            for candidate in candidates
+        }
+        if len(roots) > 1:
+            raise ConfigurationError(
+                "Candidate plan must use one configured metadata root pair"
+            )
         for candidate in candidates:
             baseline_assertions = {
                 _assertion_selector(assertion): canonical_json_bytes(assertion)
@@ -508,3 +598,15 @@ class CandidatePlan:
             for change in candidate.file_changes()
         ]
         return tuple(sorted(changes, key=lambda item: item.path))
+
+    @property
+    def metadata_roots(self) -> tuple[PurePosixPath, PurePosixPath]:
+        """Return the one repository-relative metadata root pair for the plan."""
+
+        if not self.candidates:
+            return RECORD_ROOT, ANNOTATION_ROOT
+        first = self.candidates[0]
+        return (
+            PurePosixPath(first.record_root),
+            PurePosixPath(first.annotation_root),
+        )

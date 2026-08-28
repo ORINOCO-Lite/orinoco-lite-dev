@@ -25,6 +25,7 @@ GITHUB_REPOSITORY = re.compile(
 REVIEW_APP_NAME_SUFFIX = " source metadata review"
 REVIEW_APP_NAME_MAXIMUM = 256
 DEFAULT_CURATION_SERVICE = "https://orinoco-curation-review.pages.dev"
+MAX_REPOSITORY_PATH_LENGTH = 1_024
 
 DEFAULT_PATHS: dict[str, str] = {
     "records": "metadata/records",
@@ -32,6 +33,7 @@ DEFAULT_PATHS: dict[str, str] = {
     "editorial": "editorial",
     "assets": "assets",
     "site": "site",
+    "framework": ".orinoco-lite/site",
     "source_adapters": "source-adapters",
     "generated": "generated",
     "extensions": "extensions",
@@ -44,6 +46,7 @@ DIRECTORY_PATHS = {
     "editorial",
     "assets",
     "site",
+    "framework",
     "source_adapters",
     "generated",
     "extensions",
@@ -70,6 +73,12 @@ def _load_mapping(path: Path, label: str) -> dict[str, Any]:
 def _relative_path(value: object, label: str) -> str:
     if not isinstance(value, str) or not value or "\\" in value:
         raise ConfigurationError(f"{label} must be a non-empty POSIX relative path")
+    if (
+        len(value) > MAX_REPOSITORY_PATH_LENGTH
+        or value != value.strip()
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+    ):
+        raise ConfigurationError(f"{label} must be a normalized relative path")
     path = PurePosixPath(value)
     if (
         path.is_absolute()
@@ -523,3 +532,31 @@ def development_runtime_allowed() -> bool:
     """
 
     return os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME") == "1"
+
+
+def development_engine_root() -> Path | None:
+    """Resolve the explicitly selected local engineering working tree."""
+
+    if not development_runtime_allowed():
+        return None
+    root_value = os.environ.get("ORINOCO_CANDIDATE_ENGINE_ROOT")
+    if root_value is None:
+        return None
+    root = Path(root_value).resolve()
+    source = root / "packages/orinoco-lite/src"
+    if not (source / "orinoco_lite/__init__.py").is_file():
+        raise ConfigurationError(
+            "ORINOCO_CANDIDATE_ENGINE_ROOT does not contain "
+            "packages/orinoco-lite/src/orinoco_lite"
+        )
+    return root
+
+
+def development_engine_source() -> Path | None:
+    """Resolve the explicitly selected local engine source for development."""
+
+    root = development_engine_root()
+    if root is None:
+        return None
+    source = root / "packages/orinoco-lite/src"
+    return source

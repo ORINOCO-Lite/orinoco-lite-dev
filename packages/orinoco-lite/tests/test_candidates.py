@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
+import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.candidates import (
     Candidate,
     CandidateOperation,
     CandidatePlan,
+    friendly_record_label,
     source_claim_sha256,
 )
 from orinoco_lite.canonical import (
@@ -70,6 +75,10 @@ def candidate(
     proposed_annotations: dict[str, object] | None = None,
     claim: dict[str, object] | None = None,
     blockers: tuple[str, ...] = (),
+    record_root: str | None = "site-specific/metadata/records",
+    annotation_root: str | None = (
+        "site-specific/metadata/overlays/annotations"
+    ),
 ) -> Candidate:
     return Candidate(
         source_namespace=NAMESPACE,
@@ -82,6 +91,8 @@ def candidate(
         proposed_companion=proposed_annotations,
         source_claim=claim or {"name": "source name"},
         blockers=blockers,
+        record_root=record_root,
+        annotation_root=annotation_root,
     )
 
 
@@ -243,6 +254,20 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(addition.label, "Friendly label")
         self.assertEqual(deletion.label, "Deleted label")
         self.assertEqual(pid_fallback.label, "xyzrins:records/two")
+        self.assertEqual(
+            friendly_record_label(
+                {
+                    "formatted_name": "Formatted person",
+                    "short_name": "Short",
+                },
+                pid,
+            ),
+            "Formatted person",
+        )
+        self.assertEqual(
+            friendly_record_label({"short_name": "Short"}, pid),
+            "Short",
+        )
 
     def test_inputs_and_exposed_nested_values_cannot_mutate_a_candidate(self) -> None:
         pid = "xyzrins:records/one"
@@ -288,8 +313,8 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(
             set(changes),
             {
-                "metadata/records/XYZOrganization/one.yaml",
-                "metadata/overlays/annotations/XYZOrganization/one.yaml",
+                "site-specific/metadata/records/XYZOrganization/one.yaml",
+                "site-specific/metadata/overlays/annotations/XYZOrganization/one.yaml",
             },
         )
         self.assertEqual(
@@ -314,6 +339,128 @@ class CandidateTests(unittest.TestCase):
         )
 
         self.assertTrue(all(change.proposed is None for change in item.file_changes()))
+
+    def test_configured_legacy_and_custom_metadata_roots_are_preserved(self) -> None:
+        pid = "xyzrins:records/one"
+        cases = (
+            (
+                "records",
+                "overlays/annotations",
+            ),
+            (
+                "metadata/records",
+                "metadata/overlays/annotations",
+            ),
+            (
+                "custom/library/records",
+                "custom/library/overlays/annotations",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for record_root, annotation_root in cases:
+                environment = {
+                    "ORINOCO_ROOT": os.fspath(root),
+                    "ORINOCO_RECORDS_ROOT": os.fspath(root / record_root),
+                }
+                with self.subTest(record_root=record_root), patch.dict(
+                    os.environ, environment, clear=True
+                ):
+                    item = candidate(
+                        "one",
+                        pid,
+                        "XYZOrganization/one.yaml",
+                        baseline=None,
+                        proposed=record(pid, "One"),
+                        record_root=None,
+                        annotation_root=None,
+                    )
+
+                self.assertEqual(
+                    item.record_repository_path,
+                    f"{record_root}/XYZOrganization/one.yaml",
+                )
+                self.assertEqual(
+                    item.companion_repository_path,
+                    f"{annotation_root}/XYZOrganization/one.yaml",
+                )
+
+    def test_unconfigured_candidate_preserves_the_legacy_default(self) -> None:
+        pid = "xyzrins:records/one"
+        with patch.dict(os.environ, {}, clear=True):
+            item = Candidate(
+                source_namespace=NAMESPACE,
+                source_record_id="one",
+                pid=pid,
+                record_path="XYZOrganization/one.yaml",
+                baseline_record=None,
+                proposed_record=record(pid, "One"),
+                baseline_companion=None,
+                proposed_companion=None,
+                source_claim={"name": "One"},
+            )
+
+        self.assertEqual(
+            item.record_repository_path,
+            "metadata/records/XYZOrganization/one.yaml",
+        )
+
+    def test_candidate_metadata_roots_fail_closed(self) -> None:
+        pid = "xyzrins:records/one"
+        common = {
+            "source_namespace": NAMESPACE,
+            "source_record_id": "one",
+            "pid": pid,
+            "record_path": "XYZOrganization/one.yaml",
+            "baseline_record": None,
+            "proposed_record": record(pid, "One"),
+            "baseline_companion": None,
+            "proposed_companion": None,
+            "source_claim": {"name": "One"},
+        }
+        for values in (
+            {"record_root": "../records"},
+            {"record_root": " padded/records"},
+            {"record_root": "a" * 1_025},
+            {
+                "record_root": "metadata/records",
+                "annotation_root": "other/annotations",
+            },
+        ):
+            with self.subTest(values=values), self.assertRaises(ConfigurationError):
+                Candidate(**common, **values)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cases = (
+                {"ORINOCO_ROOT": os.fspath(root)},
+                {"ORINOCO_RECORDS_ROOT": os.fspath(root / "metadata/records")},
+                {
+                    "ORINOCO_ROOT": os.fspath(root / "repository"),
+                    "ORINOCO_RECORDS_ROOT": os.fspath(root / "outside/records"),
+                },
+            )
+            for environment in cases:
+                with self.subTest(environment=environment), patch.dict(
+                    os.environ, environment, clear=True
+                ), self.assertRaises(ConfigurationError):
+                    Candidate(**common)
+
+            configured = root / "repository"
+            environment = {
+                "ORINOCO_ROOT": os.fspath(configured),
+                "ORINOCO_RECORDS_ROOT": os.fspath(
+                    configured / "site-specific/metadata/records"
+                ),
+            }
+            with patch.dict(os.environ, environment, clear=True), self.assertRaisesRegex(
+                ConfigurationError, "configured workspace record root"
+            ):
+                Candidate(
+                    **common,
+                    record_root="other/records",
+                    annotation_root="other/overlays/annotations",
+                )
 
     def test_invalid_identity_record_path_and_companion_fail_closed(self) -> None:
         pid = "xyzrins:records/one"
@@ -489,6 +636,21 @@ class CandidatePlanTests(unittest.TestCase):
         paths = [change.path for change in plan.file_changes()]
         self.assertEqual(paths, sorted(paths))
         self.assertEqual(len(paths), 3)
+
+    def test_plan_rejects_mixed_metadata_roots(self) -> None:
+        pid = "xyzrins:records/custom"
+        custom = candidate(
+            "custom",
+            pid,
+            "XYZOrganization/custom.yaml",
+            baseline=None,
+            proposed=record(pid, "Custom"),
+            record_root="custom/records",
+            annotation_root="custom/overlays/annotations",
+        )
+
+        with self.assertRaisesRegex(ConfigurationError, "metadata root pair"):
+            self.plan((self.first, custom))
 
     def test_source_coordinate_is_detached_and_read_only(self) -> None:
         coordinate = {"revision": "source-42", "nested": {"value": 1}}

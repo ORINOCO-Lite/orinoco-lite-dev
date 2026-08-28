@@ -1,0 +1,149 @@
+format: orinoco-lite-runtime-source
+spec_version: 1
+release: 0.2.0rc12
+compatibility:
+  config: [2]
+  minimum_python: "3.12"
+  hugo: ">=0.161,<0.162"
+  schema_profile: things-schemas/demo-research-information@cb6c791aec4c5309775437df4bd58e94e1bfcc3c
+
+commands:
+  validate:
+    - "{python}"
+    - -m
+    - orinoco_lite.runtime_validate
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+  projection-update:
+    - "{python}"
+    - -m
+    - orinoco_lite.projection_cli
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - update
+  projection-verify:
+    - "{python}"
+    - -m
+    - orinoco_lite.projection_cli
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - verify
+  build:
+    - "{python}"
+    - -m
+    - orinoco_lite.site
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - --destination
+    - "{destination}"
+    - --base-url
+    - "{base_url}"
+  editor-apply:
+    - "{python}"
+    - -m
+    - orinoco_lite.editor
+    - --config
+    - "{config}"
+    - --runtime
+    - "{runtime}"
+    - --bundle
+    - "{bundle}"
+  assets-hydrate:
+    - "{python}"
+    - -m
+    - orinoco_lite.asset_cli
+    - --config
+    - "{config}"
+    - hydrate
+  assets-verify:
+    - "{python}"
+    - -m
+    - orinoco_lite.asset_cli
+    - --config
+    - "{config}"
+    - verify
+
+licenses:
+  - licenses/README.md
+  - licenses/orinoco-lite-MIT.txt
+  - licenses/curation-review-app-MIT.txt
+  - licenses/pool-ui-MIT.txt
+  - licenses/things-schemas-MIT.txt
+  - licenses/editor-dependencies/inventory.json
+  - licenses/review-dependencies/inventory.json
+
+resources:
+  - source: packages/orinoco-lite/src/orinoco_lite
+    destination: engine/orinoco_lite
+  - source: tools/adapt_upstream_pages.py
+    destination: drivers/adapt_pages.py
+  - source: release/runtime-licenses/README.md
+    destination: licenses/README.md
+  - source: packages/orinoco-lite/LICENSE
+    destination: licenses/orinoco-lite-MIT.txt
+  - source: LICENSE
+    destination: licenses/curation-review-app-MIT.txt
+  - source: submodules/pool.psychoinformatics.de-ui/LICENSE
+    destination: licenses/pool-ui-MIT.txt
+  - source: submodules/things-schemas/LICENSE
+    destination: licenses/things-schemas-MIT.txt
+  - source: build/runtime-schema
+    destination: schema
+  - source: submodules/pool.psychoinformatics.de-ui/dlschemas_owl.ttl
+    destination: editor-schema/dlschemas_owl.ttl
+  - source: submodules/pool.psychoinformatics.de-ui/dlschemas_shacl.ttl
+    destination: editor-schema/dlschemas_shacl.ttl
+  - source: submodules/pool.psychoinformatics.de-ui/config_default_xyzri.yaml
+    destination: editor-schema/config_default_xyzri.yaml
+  - source: build/runtime-editor-shell
+    destination: editor-shell
+  - source: build/runtime-editor-licenses
+    destination: licenses/editor-dependencies
+  - source: build/runtime-review-shell
+    destination: review-shell
+  - source: build/runtime-review-licenses
+    destination: licenses/review-dependencies
+
+provenance:
+  source_repository: https://github.com/ORINOCO-Lite/orinoco-lite-dev
+  component_commits:
+    pool_ui: 668175a11e10f6f8f6eb1a9c9df25aaac58c5b83
+    things_schemas: cb6c791aec4c5309775437df4bd58e94e1bfcc3c
+  compatibility_change: >-
+    This release candidate introduces the Milestone 7 site-specific metadata
+    paths, structured site rendering, and explicit local candidate-engine seam.
+    It also publishes the downstream-owned bare review route and the matching
+    curation proposal path contract. The accepted schema and editor component
+    pins are unchanged.
+  source_inventory:
+    engine:
+      commit: release-source
+      license: MIT
+      license_path: licenses/orinoco-lite-MIT.txt
+    review_shell:
+      commit: release-source
+      license: MIT
+      license_path: licenses/curation-review-app-MIT.txt
+      dependencies: licenses/review-dependencies/inventory.json
+    editor_shell:
+      commit: 668175a11e10f6f8f6eb1a9c9df25aaac58c5b83
+      shacl_vue_commit: 2d3673e0a3bd1054f41c303bc7faa4111277c2d0
+      license: MIT
+      license_path: licenses/pool-ui-MIT.txt
+      overlays:
+        - release/editor-v2/review-bundle.js
+        - release/editor-v2/SubmitComp.vue.patch
+    schema:
+      commit: cb6c791aec4c5309775437df4bd58e94e1bfcc3c
+      profile: demo-research-information/unreleased
+      license: MIT
+      license_path: licenses/things-schemas-MIT.txt
+      closure_inventory: schema/source-inventory.json

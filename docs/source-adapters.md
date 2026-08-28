@@ -36,10 +36,14 @@ A proposal branch is the service-free equivalent of an upstream inbox.
 
 ## Authorities and state
 
+The **record root** is the normalized repository-relative directory selected by `paths.records`.
+The **annotation root** is the engine-derived `overlays/annotations` directory below the record root's parent.
+Current templates use `site-specific/metadata/records/` and `site-specific/metadata/overlays/annotations/`; existing and custom downstreams retain the corresponding roots selected by their configuration.
+
 | Concern | Authority | Rule |
 | --- | --- | --- |
-| Metadata records | `metadata/records/` | Store every reviewable semantic assertion object, including qualified `AttributeSpecification` and `Statement` objects, without inline machine-source annotations. |
-| Machine assertion provenance | `metadata/overlays/annotations/` | Store only PAV annotation companions for assertion objects already present in records; joining the two trees reattaches PAV without supplying assertion content. |
+| Metadata records | Configured record root (`paths.records`) | Store every reviewable semantic assertion object, including qualified `AttributeSpecification` and `Statement` objects, without inline machine-source annotations. |
+| Machine assertion provenance | Derived annotation root | Store only PAV annotation companions for assertion objects already present in records; joining the two trees reattaches PAV without supplying assertion content. |
 | Metadata change | Git diff | The proposal diff is the review payload; it MUST NOT be duplicated in a tracked inventory. |
 | Human decision | Adapter-owned compact decision cache | Preserve accepted, rejected, and deferred current decisions. |
 | Human modification | Attributed Git commit or host comment | Preserve the human actor and resulting metadata diff; an editor bundle is only ephemeral transport. |
@@ -119,7 +123,7 @@ Such output MUST remain untracked and non-authoritative, and its expiry or absen
 ### Proposal
 
 Given identical source, base, policy, and active decisions, proposal output MUST be deterministic and idempotent.
-It MUST change only proposed Things under `metadata/records/` and their matching PAV annotation companions under `metadata/overlays/annotations/`.
+It MUST change only proposed Things below the configured record root and their matching PAV annotation companions below the derived annotation root.
 
 The proposal MUST be created by one project-locked `datalad run --explicit` invocation.
 The run record MUST remain inline in a distinct commit; a DataLad sidecar is not used.
@@ -141,7 +145,7 @@ The system supports three dispositions for any proposed addition, modification, 
 Absence, an unchecked form, pull-request closure, workflow failure, or a missing cache entry is never a decision.
 
 The cache is current state, not an append-only event log.
-It MUST be owned by the adapter under `source-adapters/<adapter>/policy/curation-decisions.yaml`.
+It MUST be owned by the adapter under `site-specific/curation-records/<adapter>.yaml`.
 Git history is the history of prior cache states.
 
 The compact representation MUST store:
@@ -264,16 +268,16 @@ The compact PID-keyed cache does not represent multiple independent same-adapter
 
 Upstream stores PAV annotations inline in a Thing and therefore in the same RDF graph.
 Orinoco Lite stores the assertion content in the user-facing record and its machine assertion provenance separately to keep record diffs readable, then joins them into the same semantic Thing before validation or RDF export.
-The intended difference is only the location of PAV: the unannotated assertion content in `metadata/records/` plus its companion entry MUST produce the same joined assertion that the pinned enrichment helper produces inline.
+The intended difference is only the location of PAV: the unannotated assertion content below the configured record root plus its companion entry MUST produce the same joined assertion that the pinned enrichment helper produces inline.
 
-Adapter-generated PAV MUST be stored under `metadata/overlays/annotations/`, in a YAML companion that mirrors the record's relative path under `metadata/records/`.
+Adapter-generated PAV MUST be stored below the derived annotation root, in a YAML companion that mirrors the record's relative path below the configured record root.
 One companion covers one record and contains its PID plus only its current machine assertion provenance.
 It MUST NOT copy the record, retain prior states, or contain review decisions.
 The top-level mapping contains exactly `record` and `assertions`.
 `record` is the canonical PID and MUST match the mirrored record.
 
 Only the `annotations` overlay is defined by this specification.
-A new `metadata/overlays/<name>/` directory requires a focused specification change, a deterministic join rule, and validation of the resulting Thing.
+A new `<record-root-parent>/overlays/<name>/` directory requires a focused specification change, a deterministic join rule, and validation of the resulting Thing.
 
 Each item in `assertions` contains exactly:
 
@@ -380,7 +384,7 @@ A presentation feature that actually dereferences a target MAY also require that
 For the Milestone 5 `dump-research-info` source correction, the presentation dereferences the first-, senior-, and co-author role Things.
 The adapter MUST therefore obtain those roles from their authoritative `pool_psychoinformatics_de` source records rather than duplicate reduced versions under `con_site`.
 It MAY read multiple declared roots from one immutable source repository coordinate, but it MUST bind every root to that commit and exact tree, union selected records by PID, and stop on unequal duplicate PIDs rather than choose an input-order winner.
-The resulting downstream still has one ordinary `metadata/records/` pool; source roots do not create another downstream metadata class.
+The resulting downstream still has one ordinary configured record pool; source roots do not create another downstream metadata class.
 
 `Identifier.creator` has the pinned schema range `Thing`; an unresolved creator is therefore one ordinary case of the general reference policy above.
 It is not, by itself, a reason to add a GitHub, ORCID, ROR, or other provider identity stub.
@@ -466,11 +470,13 @@ Beyond that boundary:
 
 ## Repository and dependency boundaries
 
-Concrete adapters and their policy are site-owned under `source-adapters/<adapter>/`.
+Generic adapter executables distributed by the template live under `.orinoco-lite/source-adapters/<adapter>/`.
+Consumer-specific adapter executables live under `extensions/source-adapters/<adapter>/`.
+Both use site-owned configuration, captured source content, mapping policy, and evidence under `site-specific/sources/<adapter>/`, with current decisions under `site-specific/curation-records/<adapter>.yaml`.
 Scratch state belongs under ignored `build/`.
 The record and annotation-overlay trees are site-owned semantic metadata.
 The annotation-companion format and join operation are an engine contract; framework updates MUST NOT overwrite companion content.
-Adapters MUST NOT store decisions beneath `metadata/` or write source-adapter state beneath `.orinoco-lite/`.
+Adapters MUST NOT store decisions beneath the configured metadata record or annotation roots or write site-specific source state beneath `.orinoco-lite/`.
 
 An adapter MAY have its own locked environment when its acquisition or transformation dependencies differ from the site.
 A supported downstream remains one ordinary Git repository without submodules or gitlinks and does not require a persistent Dump Things or metadata service for validation, review, build, or publication.

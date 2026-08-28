@@ -23,6 +23,10 @@ RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
+DEVELOPER_SKILL = ROOT / ".apm" / "skills" / "develop-orinoco-lite"
+INSTALLED_DEVELOPER_SKILL = (
+    ROOT / ".agents" / "skills" / "develop-orinoco-lite"
+)
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 
@@ -107,6 +111,38 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             skills["apm-check"],
             "apm install --frozen && apm audit --ci",
         )
+
+    def test_developer_skill_is_installed_and_scoped(self) -> None:
+        for relative in ("SKILL.md", "agents/openai.yaml"):
+            source = DEVELOPER_SKILL / relative
+            installed = INSTALLED_DEVELOPER_SKILL / relative
+            self.assertTrue(source.is_file())
+            self.assertTrue(installed.is_file())
+            self.assertEqual(source.read_bytes(), installed.read_bytes())
+
+        skill = (DEVELOPER_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        for required in (
+            "test-downstream-candidate",
+            "--engine",
+            "--template",
+            "--mode quick",
+            "--mode full",
+            "leej3/orinoco-lite-demo",
+            "ORINOCO-Lite/test-orinoco-downstream-website",
+            "gh pr merge --merge",
+            "standing authority",
+            "human-gated",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, skill)
+
+        interface = yaml.safe_load(
+            (DEVELOPER_SKILL / "agents" / "openai.yaml").read_text(
+                encoding="utf-8"
+            )
+        )["interface"]
+        self.assertEqual(interface["display_name"], "Develop Orinoco Lite")
+        self.assertIn("$develop-orinoco-lite", interface["default_prompt"])
 
     def test_script_metadata_is_exact_and_platform_complete(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -384,6 +420,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("tools/run_unittests.py", release)
         self.assertIn("--fail-on-skip --discover packages/orinoco-lite/tests", release)
+        self.assertIn("submodules/query-things", release)
+        self.assertIn("set -o pipefail", release)
         self.assertNotIn("may report an intentional skip", release)
 
     def test_pages_workflow_records_only_successful_default_branch_deployments(

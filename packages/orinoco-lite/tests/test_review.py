@@ -40,6 +40,40 @@ EXPECTED_CONFIG = """\
 
 
 class StaticReviewBindingTests(unittest.TestCase):
+    def test_explicit_development_candidate_supplies_the_review_shell(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
+            runtime_shell = root / "runtime/review-shell"
+            runtime_shell.mkdir(parents=True)
+            (runtime_shell / "index.html").write_text(
+                "released\n", encoding="utf-8"
+            )
+            candidate = root / "candidate"
+            package = candidate / "packages/orinoco-lite/src/orinoco_lite"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            shell = candidate / "packages/curation-review-app/dist-review"
+            shell.mkdir(parents=True)
+            (shell / "index.html").write_text("candidate\n", encoding="utf-8")
+            environment = {
+                "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
+                "ORINOCO_CANDIDATE_ENGINE_ROOT": str(candidate),
+            }
+
+            with patch.dict("os.environ", environment, clear=True):
+                bind_review(
+                    load_workspace(root),
+                    root / "runtime",
+                    root / "build/site/review",
+                    repository="ORINOCO-Lite/example-site",
+                )
+
+            self.assertEqual(
+                "candidate\n",
+                (root / "build/site/review/index.html").read_text(encoding="utf-8"),
+            )
+
     def test_disabled_binding_removes_the_reserved_review_route(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

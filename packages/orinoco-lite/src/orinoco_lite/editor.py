@@ -367,7 +367,9 @@ def validate_bundle(
         seen.add(pid)
         source = by_pid.get(pid)
         if source is None:
-            raise DriverError(f"Review bundle PID is not in metadata/records: {pid}")
+            raise DriverError(
+                f"Review bundle PID is not in the configured record tree: {pid}"
+            )
         source_path = item.get("source_path")
         relative = PurePosixPath(source_path) if isinstance(source_path, str) else None
         if (

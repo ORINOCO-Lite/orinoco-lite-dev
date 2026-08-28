@@ -82,20 +82,22 @@ def _gitlinks(root: Path) -> list[str]:
     return links
 
 
-def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
-    """Allow only records and the specification-defined annotation overlay."""
+def _validate_metadata_namespace(
+    workspace: WorkspaceConfig,
+    namespace: Path,
+    allowed_roots: tuple[Path, ...],
+    allowed_labels: tuple[str, ...],
+) -> None:
+    """Reject undeclared content in one dedicated metadata namespace."""
 
-    metadata_root = workspace.root / "metadata"
-    if not metadata_root.exists():
+    if not namespace.exists():
         return
-    if metadata_root.is_symlink() or not metadata_root.is_dir():
+    if namespace.is_symlink() or not namespace.is_dir():
         raise ConfigurationError(
-            f"The metadata boundary must be a regular directory: {metadata_root}"
+            f"The metadata boundary must be a regular directory: {namespace}"
         )
-    records_root = workspace.path("records")
-    annotations_root = annotation_root(workspace)
-    allowed_roots = (records_root, annotations_root)
-    for candidate in sorted(metadata_root.rglob("*")):
+    namespace_label = namespace.relative_to(workspace.root).as_posix()
+    for candidate in sorted(namespace.rglob("*")):
         if candidate.is_symlink():
             raise ConfigurationError(
                 f"Site-owned paths cannot contain symlinks: {candidate}"
@@ -109,10 +111,37 @@ def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
                 )
             continue
         raise ConfigurationError(
-            "Everything below metadata must be part of paths.records or "
-            "metadata/overlays/annotations; "
+            f"Everything below {namespace_label} must be part of "
+            f"{' or '.join(allowed_labels)}; "
             f"found undeclared content: {candidate}"
         )
+
+
+def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
+    """Allow only records and the specification-defined annotation overlay."""
+
+    records_root = workspace.path("records")
+    metadata_root = records_root.parent
+    annotations_root = annotation_root(workspace)
+    annotations_label = annotations_root.relative_to(workspace.root).as_posix()
+    if metadata_root == workspace.root:
+        # A one-component record root has no dedicated common metadata
+        # namespace. The record loader fails closed within paths.records; keep
+        # the derived top-level overlays namespace equally strict without
+        # treating every ordinary repository path as metadata.
+        _validate_metadata_namespace(
+            workspace,
+            annotations_root.parent,
+            (annotations_root,),
+            (annotations_label,),
+        )
+        return
+    _validate_metadata_namespace(
+        workspace,
+        metadata_root,
+        (records_root, annotations_root),
+        ("paths.records", annotations_label),
+    )
 
 
 def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:

@@ -27,7 +27,7 @@ flowchart TB
 
     subgraph downstream["Downstream site — one ordinary Git repository"]
         facade["Template-owned facade<br/>Pixi tasks, workflows, update tools"]
-        content["Site-owned inputs<br/>metadata, editorial, assets, policy"]
+        content["Site-owned inputs<br/>site-specific data + extensions"]
         pipeline["validate → project → build → audit"]
         output["Static site + editor + project Pages"]
         update["Reviewable framework-update PR"]
@@ -56,17 +56,19 @@ All confirmation and bundle interaction remains in the downstream routes.
 
 | Layer | Repository | Owns | Start here |
 | --- | --- | --- | --- |
-| Engineering and release | this repository, [`ORINOCO-Lite/orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-6.md`](docs/milestone-6.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
+| Engineering and release | this repository, [`ORINOCO-Lite/orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Component review, engine/runtime assembly, release provenance, reusable CI, and cross-layer acceptance | [`docs/milestone-7.md`](docs/milestone-7.md), [`docs/source-adapters.md`](docs/source-adapters.md), and [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md) |
 | Distribution | [`ORINOCO-Lite/orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Copier source, generated GitHub-template tree, ownership rules, updates, and generic consumer guidance | [Template README](https://github.com/ORINOCO-Lite/orinoco-lite-template#readme) |
-| Acceptance fixture | [`ORINOCO-Lite/test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Complete accepted CON snapshot, site policy, presentation overrides, provenance, and point-in-time end-to-end release evidence | [Consumer README](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website#readme) |
+| Developer downstream | [`leej3/orinoco-lite-demo`](https://github.com/leej3/orinoco-lite-demo) | Retained metadata and source-adapter baseline plus fast end-to-end release exercises | [Consumer README](https://github.com/leej3/orinoco-lite-demo#readme) |
+| Human-gated reference | [`ORINOCO-Lite/test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | The same data and adapter baseline under ordinary downstream review and deployment policy | [Consumer README](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website#readme) |
 
 The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
 It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.
 
 ## Review now
 
-[`Milestone 6`](docs/milestone-6.md) is the accepted metadata-path-hardening record.
-It records the completed convergence, release, custody, open-reference, compatibility, and Zotero work, together with the explicit deferral of a discoverable and live-proven SHACL Vue direct-GitHub proposal flow.
+[`Milestone 7`](docs/milestone-7.md) is the active sustainable-downstream work.
+It adds the local candidate loop, consolidates site-owned data, moves generic behavior into the engine and template, and rebuilds the two development downstreams from the retained `leej3` baseline.
+[`Milestone 6`](docs/milestone-6.md) remains the accepted metadata-path-hardening record.
 The separate [`human-review decision queue`](docs/human-review-decisions.md) records the reviewed planning outcomes and unresolved production and strategic choices.
 
 Supporting records are:
@@ -104,6 +106,19 @@ The root environment is deliberately package-focused and contains no local depen
 pixi install --locked
 pixi run test
 ```
+
+Before pushing or releasing a change, exercise its working-tree bytes against an ordinary downstream clone:
+
+```console
+pixi run test-downstream-candidate -- \
+  --downstream /path/to/downstream \
+  --engine "$PWD" \
+  --template /path/to/orinoco-lite-template
+```
+
+Either candidate may be omitted to test an engine-only or template-only change.
+The default quick run stages a disposable copy, runs the fast adapter canary, validates, builds, and checks its browser routes; `--mode full` runs the downstream's full suite.
+Add `--keep` or `--output /new/path` to inspect the staged tree.
 
 Project-owned agent skills are canonical under `.apm/skills/`, locked by APM, and deployed as ordinary files under `.agents/skills/`.
 Verify the frozen installation and its deployment ledger without changing the engine environment:
@@ -194,7 +209,8 @@ Do not reproduce that release boundary with an ad hoc local archive.
 
 - Original Orinoco Lite software is MIT licensed; original documentation is CC BY 4.0, factual metadata is CC0 1.0, and media remains item-specific.
 See [`LICENSES.md`](LICENSES.md) and preserve every upstream notice.
-- Every record under `metadata/records/` and companion under `metadata/overlays/annotations/` is canonical semantic input; their joined Thing is the validation, RDF, and projection boundary.
+- Every record below configured `paths.records` and companion below its engine-derived annotation root is canonical semantic input; their joined Thing is the validation, RDF, and projection boundary.
+Current templates use `site-specific/metadata/records/` and `site-specific/metadata/overlays/annotations/`; existing and custom downstream roots remain configuration-bound.
 Declarative site policy determines pages and editor exposure.
 Projection output is regenerated during validation and build, remains ignored, and never obscures a source-metadata review diff.
 - When a downstream uses the current reusable publication workflow, a successful Pages deployment records the complete projection as the sole commit on `latest-hugo-projection` beyond the exact default-branch source, then records the complete deployed website as its child on `gh-pages`.

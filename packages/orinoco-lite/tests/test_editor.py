@@ -494,7 +494,7 @@ class EditorBundleTests(unittest.TestCase):
             return_value=(InlinePavConverter(), InlinePavConverter()),
         ):
             with self.assertRaisesRegex(
-                ConfigurationError, "metadata/overlays/annotations"
+                ConfigurationError, "configured annotation companion tree"
             ):
                 apply_bundle(self.workspace, self.runtime, bundle, write=False)
 

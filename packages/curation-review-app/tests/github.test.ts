@@ -58,7 +58,7 @@ describe("GitHub blob batching", () => {
     const client = new GitHubClient("ghu_test", fetchMock);
     const requests = Array.from({ length: 41 }, (_, index) => ({
       key: `record:${index}`,
-      path: `metadata/records/example/${index}.yaml`,
+      path: `site-specific/metadata/records/example/${index}.yaml`,
       ref: "a".repeat(40),
     }));
     const result = await client.contents("example/site", requests);
@@ -90,11 +90,42 @@ describe("GitHub blob batching", () => {
       new GitHubClient("ghu_test", fetchMock).contents("example/site", [
         {
           key: "record",
-          path: "metadata/records/example/one.yaml",
+          path: "site-specific/metadata/records/example/one.yaml",
           ref: "a".repeat(40),
         },
       ]),
     ).rejects.toThrow("binary, truncated, or too large");
+  });
+
+  it("applies a caller-supplied aggregate content budget", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        data: {
+          repository: {
+            blob0: {
+              __typename: "Blob",
+              byteSize: 2,
+              isBinary: false,
+              isTruncated: false,
+              text: "ok",
+            },
+          },
+        },
+      }),
+    );
+    await expect(
+      new GitHubClient("ghu_test", fetchMock).contents(
+        "example/site",
+        [
+          {
+            key: "record",
+            path: "site-specific/metadata/records/example/one.yaml",
+            ref: "a".repeat(40),
+          },
+        ],
+        1,
+      ),
+    ).rejects.toThrow("too much record content");
   });
 });
 
@@ -103,8 +134,8 @@ describe("GitHub commit bounds", () => {
     const fetchMock = vi.fn(async () =>
       Response.json({
         files: [
-          { filename: "metadata/records/example/one.yaml" },
-          { filename: "metadata/records/example/two.yaml" },
+          { filename: "site-specific/metadata/records/example/one.yaml" },
+          { filename: "site-specific/metadata/records/example/two.yaml" },
         ],
         sha: "a".repeat(40),
       }),
@@ -120,7 +151,7 @@ describe("GitHub commit bounds", () => {
 
   it("accepts 450 metadata paths across five API pages", async () => {
     const files = Array.from({ length: MAX_REVIEW_PATHS }, (_, index) => ({
-      filename: `metadata/records/example/${index}.yaml`,
+      filename: `site-specific/metadata/records/example/${index}.yaml`,
     }));
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const page = Number(new URL(String(input)).searchParams.get("page"));
@@ -142,7 +173,7 @@ describe("GitHub commit bounds", () => {
 
   it("rejects a 451st path beyond the service-resource bound", async () => {
     const files = Array.from({ length: MAX_REVIEW_PATHS + 1 }, (_, index) => ({
-      filename: `metadata/records/example/${index}.yaml`,
+      filename: `site-specific/metadata/records/example/${index}.yaml`,
     }));
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const page = Number(new URL(String(input)).searchParams.get("page"));

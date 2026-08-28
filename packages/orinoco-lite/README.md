@@ -60,15 +60,17 @@ The released central curation service is the default.
 A site may replace only that backend with an optional credential-free HTTPS `site.curation_service` origin.
 Legacy `site.repository` remains a compatibility fallback for nonstandard builds, but normal downstreams do not repeat their repository in site configuration.
 The **Download bundle** action remains credential-free even when no repository coordinate or reachable service is available.
-The semantic metadata interface comprises reviewed Things under `metadata/records/` and their machine-managed PAV companions under `metadata/overlays/annotations/`.
-`paths.records` defaults to `metadata/records`; the companion tree mirrors that fixed record path below its overlay namespace, and the deterministic join is the validation and RDF boundary.
+The semantic metadata interface comprises reviewed Things below configured `paths.records` and their machine-managed PAV companions below the engine-derived annotation root.
+Current templates set `paths.records` to `site-specific/metadata/records/`, which derives `site-specific/metadata/overlays/annotations/`; the engine retains the earlier `metadata/records` default only so an existing downstream can update in place.
+The companion tree mirrors the configured record path below the derived overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.
 Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
 Projection preserves well-formed unresolved references by default without network access.
 It also defaults an omitted `graph.missing_external_targets` policy to `drop`, so only graph-view edges whose selected target cannot materialize are omitted; deterministic projection reports count preserved references and dropped edges by field.
 Malformed or schema-invalid values still fail.
 Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
-Site-owned source adapters use `paths.source_adapters` (default `source-adapters`), while framework provenance defaults to `.orinoco-lite/provenance`.
+Current templates keep generic source-adapter executables under `.orinoco-lite/source-adapters/`, site-specific executable adapters under `extensions/source-adapters/`, source configuration and evidence under `site-specific/sources/`, and compact decisions under `site-specific/curation-records/`.
+The engine retains `paths.source_adapters` for existing downstreams and adapter hosts that need an explicit executable root.
 There are no legacy `canonical`, `reference`, or `integrations` path aliases.
 `orinoco.lock` binds:
 

@@ -15,6 +15,8 @@ site:
   base_url: https://site.example/
   repository: example/site
   curation_service: https://review.example/
+paths:
+  records: site-specific/metadata/records
 `;
 
 export function proposalCommitMessage(): string {
@@ -41,11 +43,11 @@ export function reviewBundle(): ReviewBundle {
         label: "First record",
         operation: "modify",
         paths: [
-          "metadata/records/example/first.yaml",
-          "metadata/overlays/annotations/example/first.yaml",
+          "site-specific/metadata/records/example/first.yaml",
+          "site-specific/metadata/overlays/annotations/example/first.yaml",
         ],
         pid: "example:first",
-        record_path: "metadata/records/example/first.yaml",
+        record_path: "site-specific/metadata/records/example/first.yaml",
         source_namespace: "zotero:group:6197458",
         source_record_id: "item:ABC123",
       },
@@ -56,11 +58,11 @@ export function reviewBundle(): ReviewBundle {
         label: "Second record",
         operation: "add",
         paths: [
-          "metadata/records/example/second.yaml",
-          "metadata/overlays/annotations/example/second.yaml",
+          "site-specific/metadata/records/example/second.yaml",
+          "site-specific/metadata/overlays/annotations/example/second.yaml",
         ],
         pid: "example:second",
-        record_path: "metadata/records/example/second.yaml",
+        record_path: "site-specific/metadata/records/example/second.yaml",
         source_namespace: "zotero:group:6197458",
         source_record_id: "item:DEF456",
       },
@@ -96,7 +98,7 @@ export function proposal(): ReviewProposal {
         label: "First record",
         operation: "modify",
         pid: "example:first",
-        record_path: "metadata/records/example/first.yaml",
+        record_path: "site-specific/metadata/records/example/first.yaml",
         source_namespace: "zotero:group:6197458",
         source_record_id: "item:ABC123",
       },
@@ -109,7 +111,7 @@ export function proposal(): ReviewProposal {
         label: "Second record",
         operation: "add",
         pid: "example:second",
-        record_path: "metadata/records/example/second.yaml",
+        record_path: "site-specific/metadata/records/example/second.yaml",
         source_namespace: "zotero:group:6197458",
         source_record_id: "item:DEF456",
       },
@@ -133,13 +135,13 @@ export function submission(): CurationSubmission {
         disposition: "accept",
         operation: "modify",
         pid: "example:first",
-        record_path: "metadata/records/example/first.yaml",
+        record_path: "site-specific/metadata/records/example/first.yaml",
       },
       {
         disposition: "defer",
         operation: "add",
         pid: "example:second",
-        record_path: "metadata/records/example/second.yaml",
+        record_path: "site-specific/metadata/records/example/second.yaml",
       },
     ],
     format: "orinoco-lite-curation-submission-v1",

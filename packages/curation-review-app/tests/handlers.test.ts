@@ -173,16 +173,21 @@ function proposalApi(
     return Response.json({
       files: [
         {
-          filename: "metadata/records/example/first.yaml",
+          filename: "site-specific/metadata/records/example/first.yaml",
           status: "modified",
         },
         {
-          filename: "metadata/overlays/annotations/example/first.yaml",
+          filename:
+            "site-specific/metadata/overlays/annotations/example/first.yaml",
           status: "modified",
         },
-        { filename: "metadata/records/example/second.yaml", status: "added" },
         {
-          filename: "metadata/overlays/annotations/example/second.yaml",
+          filename: "site-specific/metadata/records/example/second.yaml",
+          status: "added",
+        },
+        {
+          filename:
+            "site-specific/metadata/overlays/annotations/example/second.yaml",
           status: "added",
         },
       ],
@@ -201,31 +206,36 @@ function proposalApi(
         if (expression === `${BASE_SHA}:orinoco.yaml`) {
           repository[`blob${index}`] = blob(siteConfig);
         } else if (
-          expression === `${BASE_SHA}:metadata/records/example/first.yaml`
+          expression ===
+          `${BASE_SHA}:site-specific/metadata/records/example/first.yaml`
         ) {
           repository[`blob${index}`] = blob(
             "pid: example:first\ntitle: Original first\n",
           );
         } else if (
-          expression === `${PROPOSAL_SHA}:metadata/records/example/first.yaml`
+          expression ===
+          `${PROPOSAL_SHA}:site-specific/metadata/records/example/first.yaml`
         ) {
           repository[`blob${index}`] = blob(
             "pid: example:first\ntitle: Proposed first\n",
           );
         } else if (
-          expression === `${PROPOSAL_SHA}:metadata/records/example/second.yaml`
+          expression ===
+          `${PROPOSAL_SHA}:site-specific/metadata/records/example/second.yaml`
         ) {
           repository[`blob${index}`] = blob(
             "pid: example:second\ntitle: Proposed second\n",
           );
         } else if (
-          expression === `${HEAD_SHA}:metadata/records/example/first.yaml`
+          expression ===
+          `${HEAD_SHA}:site-specific/metadata/records/example/first.yaml`
         ) {
           repository[`blob${index}`] = blob(
             "pid: example:first\ntitle: Current first\n",
           );
         } else if (
-          expression === `${HEAD_SHA}:metadata/records/example/second.yaml`
+          expression ===
+          `${HEAD_SHA}:site-specific/metadata/records/example/second.yaml`
         ) {
           repository[`blob${index}`] = blob(
             "pid: example:second\ntitle: Second\n",

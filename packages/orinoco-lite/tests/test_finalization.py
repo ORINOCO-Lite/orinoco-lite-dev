@@ -76,6 +76,10 @@ def candidate(
     proposed: Mapping[str, object] | None,
     baseline_companion: Mapping[str, object] | None = None,
     proposed_companion: Mapping[str, object] | None = None,
+    record_root: str | None = "site-specific/metadata/records",
+    annotation_root: str | None = (
+        "site-specific/metadata/overlays/annotations"
+    ),
 ) -> Candidate:
     return Candidate(
         source_namespace=NAMESPACE,
@@ -87,6 +91,8 @@ def candidate(
         baseline_companion=baseline_companion,
         proposed_companion=proposed_companion,
         source_claim={"name": "source", "source_id": source_id},
+        record_root=record_root,
+        annotation_root=annotation_root,
     )
 
 
@@ -230,8 +236,8 @@ class FinalizationTests(unittest.TestCase):
             z_review_note="before review",
         )
         old_delete = record(delete_pid, "keep on rejection")
-        self.repo.write("metadata/records/XYZOrganization/modify.yaml", old_modify)
-        self.repo.write("metadata/records/XYZOrganization/delete.yaml", old_delete)
+        self.repo.write("site-specific/metadata/records/XYZOrganization/modify.yaml", old_modify)
+        self.repo.write("site-specific/metadata/records/XYZOrganization/delete.yaml", old_delete)
         self.repo.write_bytes("README.md", b"outside metadata\n")
         base = self.repo.commit("base")
         items = (
@@ -263,7 +269,7 @@ class FinalizationTests(unittest.TestCase):
         proposal = self.apply_plan(plan)
 
         self.repo.write(
-            "metadata/records/XYZOrganization/modify.yaml",
+            "site-specific/metadata/records/XYZOrganization/modify.yaml",
             record(
                 modify_pid,
                 "source modification",
@@ -280,10 +286,10 @@ class FinalizationTests(unittest.TestCase):
         )
 
         self.assertFalse(
-            (self.repo.path / "metadata/records/XYZOrganization/add.yaml").exists()
+            (self.repo.path / "site-specific/metadata/records/XYZOrganization/add.yaml").exists()
         )
         self.assertEqual(
-            (self.repo.path / "metadata/records/XYZOrganization/modify.yaml").read_bytes(),
+            (self.repo.path / "site-specific/metadata/records/XYZOrganization/modify.yaml").read_bytes(),
             canonical_yaml_bytes(
                 record(
                     modify_pid,
@@ -294,22 +300,22 @@ class FinalizationTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            (self.repo.path / "metadata/records/XYZOrganization/delete.yaml").read_bytes(),
+            (self.repo.path / "site-specific/metadata/records/XYZOrganization/delete.yaml").read_bytes(),
             canonical_yaml_bytes(old_delete),
         )
         self.assertEqual((self.repo.path / "README.md").read_bytes(), b"outside metadata\n")
         self.assertEqual(
             result.changed_paths,
             (
-                "metadata/records/XYZOrganization/add.yaml",
-                "metadata/records/XYZOrganization/delete.yaml",
-                "metadata/records/XYZOrganization/modify.yaml",
+                "site-specific/metadata/records/XYZOrganization/add.yaml",
+                "site-specific/metadata/records/XYZOrganization/delete.yaml",
+                "site-specific/metadata/records/XYZOrganization/modify.yaml",
             ),
         )
         self.assertTrue(result.metadata_changed)
         self.assertTrue(
             all(
-                path.startswith(("metadata/records/", "metadata/overlays/annotations/"))
+                path.startswith(("site-specific/metadata/records/", "site-specific/metadata/overlays/annotations/"))
                 for path in result.changed_paths
             )
         )
@@ -325,7 +331,7 @@ class FinalizationTests(unittest.TestCase):
             **stable_fields,
             z_review_note="before review",
         )
-        self.repo.write("metadata/records/XYZOrganization/defer.yaml", baseline)
+        self.repo.write("site-specific/metadata/records/XYZOrganization/defer.yaml", baseline)
         base = self.repo.commit("base")
         item = candidate(
             "defer",
@@ -369,7 +375,7 @@ class FinalizationTests(unittest.TestCase):
     def test_overlapping_rejection_fails_without_touching_the_worktree(self) -> None:
         pid = "xyzrins:records/overlap"
         baseline = record(pid, "old")
-        self.repo.write("metadata/records/XYZOrganization/overlap.yaml", baseline)
+        self.repo.write("site-specific/metadata/records/XYZOrganization/overlap.yaml", baseline)
         base = self.repo.commit("base")
         item = candidate(
             "overlap",
@@ -410,6 +416,32 @@ class FinalizationTests(unittest.TestCase):
         self.assertFalse(result.metadata_changed)
         self.assertEqual(self.repo.status(), b"")
         self.assertEqual((self.repo.path / "README.md").read_bytes(), b"sentinel\n")
+
+    def test_custom_metadata_root_survives_proposal_and_finalization(self) -> None:
+        pid = "xyzrins:records/custom-root"
+        item = candidate(
+            "custom-root",
+            pid,
+            baseline=None,
+            proposed=record(pid, "Custom root"),
+            record_root="custom/library/records",
+            annotation_root="custom/library/overlays/annotations",
+        )
+        base = self.repo.commit("base")
+        plan = self.plan(base, (item,))
+        proposal = self.apply_plan(plan)
+
+        result = self.finalize(plan, proposal, {pid: "accept"})
+
+        self.assertEqual(result.changed_paths, ())
+        self.assertFalse(result.metadata_changed)
+        self.assertTrue(
+            (
+                self.repo.path
+                / "custom/library/records/XYZOrganization/custom-root.yaml"
+            ).is_file()
+        )
+        self.assertEqual(self.repo.status(), b"")
 
     def test_accepted_human_correction_drops_only_stale_proposal_pav(self) -> None:
         pid = "xyzrins:records/corrected"
@@ -567,9 +599,9 @@ class FinalizationTests(unittest.TestCase):
         stale_repo = GitRepository(stale_root)
         old_record = record("xyzrins:records/stale", "old", description="old")
         old_companion = provenance("xyzrins:records/stale", "old")
-        stale_repo.write("metadata/records/XYZOrganization/stale.yaml", old_record)
+        stale_repo.write("site-specific/metadata/records/XYZOrganization/stale.yaml", old_record)
         stale_repo.write(
-            "metadata/overlays/annotations/XYZOrganization/stale.yaml",
+            "site-specific/metadata/overlays/annotations/XYZOrganization/stale.yaml",
             old_companion,
         )
         stale_base = stale_repo.commit("base")
@@ -721,7 +753,7 @@ class FinalizationTests(unittest.TestCase):
     def test_semantic_base_verification_allows_formatting_but_rejects_drift(self) -> None:
         pid = "xyzrins:records/base"
         baseline = record(pid, "old")
-        base_path = "metadata/records/XYZOrganization/base.yaml"
+        base_path = "site-specific/metadata/records/XYZOrganization/base.yaml"
         formatted_base = (
             b"schema_type: xyzri:XYZOrganization\n"
             b"pid: xyzrins:records/base\n"
@@ -853,7 +885,7 @@ class FinalizationTests(unittest.TestCase):
     def test_symlinked_candidate_parent_cannot_escape_reject_rehearsal(self) -> None:
         pid = "xyzrins:records/symlink"
         baseline = record(pid, "base")
-        path = "metadata/records/XYZOrganization/symlink.yaml"
+        path = "site-specific/metadata/records/XYZOrganization/symlink.yaml"
         self.repo.write(path, baseline)
         base = self.repo.commit("base")
         item = candidate(
@@ -864,7 +896,7 @@ class FinalizationTests(unittest.TestCase):
         )
         plan = self.plan(base, (item,))
         proposal = self.apply_plan(plan)
-        parent = self.repo.path / "metadata/records/XYZOrganization"
+        parent = self.repo.path / "site-specific/metadata/records/XYZOrganization"
         parent.rmdir()
         external = Path(self.temporary.name) / "external"
         external.mkdir()
@@ -885,10 +917,10 @@ class FinalizationTests(unittest.TestCase):
         rehearsal = Path(self.temporary.name) / "rehearsal"
         caller = Path(self.temporary.name) / "caller"
         external = Path(self.temporary.name) / "copy-external"
-        rehearsal_path = rehearsal / "metadata/records/Type/one.yaml"
+        rehearsal_path = rehearsal / "site-specific/metadata/records/Type/one.yaml"
         rehearsal_path.parent.mkdir(parents=True)
         rehearsal_path.write_bytes(b"finalized\n")
-        caller_parent = caller / "metadata/records"
+        caller_parent = caller / "site-specific/metadata/records"
         caller_parent.mkdir(parents=True)
         external.mkdir()
         external_file = external / "one.yaml"
@@ -899,7 +931,7 @@ class FinalizationTests(unittest.TestCase):
             _copy_finalized_paths(
                 rehearsal,
                 caller,
-                ("metadata/records/Type/one.yaml",),
+                ("site-specific/metadata/records/Type/one.yaml",),
             )
 
         self.assertEqual(external_file.read_bytes(), b"outside\n")

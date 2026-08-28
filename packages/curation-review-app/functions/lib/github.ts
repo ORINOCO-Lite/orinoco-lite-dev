@@ -7,7 +7,7 @@ const GITHUB_API = "https://api.github.com";
 const API_VERSION = "2022-11-28";
 const USER_AGENT = "orinoco-lite-curation-review";
 const MAX_RECORD_BYTES = 1_048_576;
-const MAX_REVIEW_BYTES = 16_777_216;
+export const MAX_REVIEW_BYTES = 16_777_216;
 const BLOBS_PER_QUERY = 20;
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 
@@ -611,7 +611,19 @@ export class GitHubClient {
   async contents(
     repository: string,
     requests: readonly ContentRequest[],
+    maximumBytes: number = MAX_REVIEW_BYTES,
   ): Promise<Map<string, string | null>> {
+    if (
+      !Number.isSafeInteger(maximumBytes) ||
+      maximumBytes < 0 ||
+      maximumBytes > MAX_REVIEW_BYTES
+    ) {
+      throw new HttpError(
+        500,
+        "invalid_content_limit",
+        "The record-content byte limit is invalid.",
+      );
+    }
     const [owner, name] = splitRepository(repository);
     const result = new Map<string, string | null>();
     let totalBytes = 0;
@@ -721,7 +733,7 @@ export class GitHubClient {
           );
         }
         totalBytes += observedBytes;
-        if (totalBytes > MAX_REVIEW_BYTES) {
+        if (totalBytes > maximumBytes) {
           throw new HttpError(
             422,
             "proposal_too_large",

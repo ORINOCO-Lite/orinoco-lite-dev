@@ -387,7 +387,9 @@ class JoinTests(unittest.TestCase):
             [assertion("/identifiers", stored["identifiers"][0])],
         )
 
-        with self.assertRaisesRegex(ConfigurationError, "overlays/annotations"):
+        with self.assertRaisesRegex(
+            ConfigurationError, "configured annotation companion tree"
+        ):
             join_annotations(stored, companion)
 
     def test_inline_machine_pav_curie_or_uri_is_rejected(self):
@@ -401,7 +403,7 @@ class JoinTests(unittest.TestCase):
                 stored = record()
                 stored["identifiers"][0]["annotations"] = {tag: AGENT}
                 with self.assertRaisesRegex(
-                    ConfigurationError, "metadata/overlays/annotations"
+                    ConfigurationError, "configured annotation companion tree"
                 ):
                     join_annotations(stored, None)
 

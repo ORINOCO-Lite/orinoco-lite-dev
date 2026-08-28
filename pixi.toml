@@ -11,7 +11,7 @@ python = ">=3.12,<3.13"
 test-engine = "python tools/run_unittests.py --discover packages/orinoco-lite/tests"
 test-engine-strict = "python tools/run_unittests.py --fail-on-skip --discover packages/orinoco-lite/tests"
 test-accepted-consumer = "python tools/run_unittests.py --fail-on-skip tests.accepted_consumer_compatibility"
-test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_pages_publication tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_upstream_orinoco tests.test_adapt_upstream_pages -v"
+test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_downstream_development tests.test_pages_publication tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_upstream_orinoco tests.test_adapt_upstream_pages -v"
 test = { depends-on = ["test-engine", "test-development"] }
 test-ci = { depends-on = ["test-engine-strict", "test-accepted-consumer", "test-development"] }
 checkout-submodules = "python tools/checkout_submodules.py"
@@ -24,6 +24,7 @@ serve-upstream-worktree = "python tools/upstream_full_launcher.py serve worktree
 check-upstream = "python tools/upstream_full_launcher.py check recorded"
 check-upstream-worktree = "python tools/upstream_full_launcher.py check worktree"
 test-upstream-full = "python tools/upstream_full_launcher.py test recorded"
+test-downstream-candidate = "python tools/downstream_development.py"
 diff-upstream-pool = "python tools/upstream_pool_diff.py"
 snapshot-upstream-records = "python tools/prepare_upstream_snapshot.py"
 refresh-upstream-records = "python tools/prepare_upstream_snapshot.py --refresh"

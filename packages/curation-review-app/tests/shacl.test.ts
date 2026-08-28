@@ -10,7 +10,9 @@ import {
   parseShaclProposalRequest,
   parseShaclReviewBundle,
   serializeShaclReviewBundle,
+  validateShaclRecordPaths,
 } from "../functions/lib/shacl";
+import { metadataRoots } from "../shared/metadata";
 
 const SOURCE = "a".repeat(40);
 const ORIGIN = "https://review.example";
@@ -70,7 +72,7 @@ function bundle(): ShaclReviewBundle {
         rdf_turtle:
           '<https://example.test/one> <https://example.test/p> "é" .\n',
         schema_type: "example:Thing",
-        source_path: "metadata/records/Thing/one.yaml",
+        source_path: "site-specific/metadata/records/Thing/one.yaml",
         source_sha256: "b".repeat(64),
       },
     ],
@@ -136,7 +138,7 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
     ).toThrow("pull-request target is invalid");
   });
 
-  it("rejects extra fields, duplicate coordinates, and non-record paths", () => {
+  it("rejects extra fields, duplicate coordinates, and unsafe paths", () => {
     expect(() =>
       parseShaclReviewBundle({ ...bundle(), retained_copy: true }),
     ).toThrow("missing or unexpected fields");
@@ -147,10 +149,26 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
       "duplicate record coordinates",
     );
 
-    const annotation = bundle();
-    annotation.records[0]!.source_path =
-      "metadata/overlays/annotations/Thing/one.yaml";
-    expect(() => parseShaclReviewBundle(annotation)).toThrow("source path");
+    const unsafe = bundle();
+    unsafe.records[0]!.source_path = "../metadata/records/Thing/one.yaml";
+    expect(() => parseShaclReviewBundle(unsafe)).toThrow("source path");
+  });
+
+  it.each([
+    ["current", "site-specific/metadata/records"],
+    ["legacy", "metadata/records"],
+    ["custom", ".site-data/catalog/records"],
+  ])("binds %s SHACL paths to configured records", (_label, recordRoot) => {
+    const value = bundle();
+    value.records[0]!.source_path = `${recordRoot}/Thing/one.yaml`;
+    const parsed = parseShaclReviewBundle(value);
+
+    expect(() =>
+      validateShaclRecordPaths(parsed, metadataRoots(recordRoot)),
+    ).not.toThrow();
+    expect(() =>
+      validateShaclRecordPaths(parsed, metadataRoots("other/metadata/records")),
+    ).toThrow("outside configured metadata records");
   });
 
   it("rejects a serialized normal bundle beyond the released 10 MiB bound", () => {

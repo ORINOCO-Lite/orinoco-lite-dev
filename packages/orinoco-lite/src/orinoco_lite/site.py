@@ -10,17 +10,22 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 from urllib.parse import unquote, urlsplit
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
+import yaml
 
 from .assets import hydrate_asset_cache, load_assets, verify_asset
+from .candidates import friendly_record_label
 from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
+from .projection import load_contract, rendered_record_route
+from .records import stored_records
 from .review import bind_review
 from .runtime import MANIFEST_NAME, load_runtime_manifest
 
@@ -31,9 +36,12 @@ HUGO_VERSION = re.compile(
     r"(?P<variants>(?:\+[A-Za-z0-9.-]+)*)(?:\s|$)",
     re.IGNORECASE,
 )
+SITE_DATA_VERSION = 1
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
+    if source.is_symlink():
+        raise DriverError(f"Static source cannot be a symlink: {source}")
     if not source.is_dir():
         return
     for candidate in sorted(source.rglob("*")):
@@ -48,6 +56,129 @@ def _copy_tree(source: Path, destination: Path) -> None:
             shutil.copyfile(candidate, target)
 
 
+def _site_data(workspace) -> dict[str, Any] | None:
+    """Load the optional structured site authority from the site-owned root."""
+
+    path = workspace.path("site") / "site.yaml"
+    if not path.exists():
+        return None
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
+        raise ConfigurationError(f"Structured site data is not a regular file: {path}")
+    try:
+        value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+        raise ConfigurationError(f"Structured site data is invalid: {path}") from error
+    if not isinstance(value, dict) or value.get("version") != SITE_DATA_VERSION:
+        raise ConfigurationError(
+            f"Structured site data must be a version {SITE_DATA_VERSION} mapping"
+        )
+    identity = value.get("identity")
+    if not isinstance(identity, dict):
+        raise ConfigurationError("Structured site data requires identity")
+    for field in ("title", "description"):
+        if not isinstance(identity.get(field), str) or not identity[field].strip():
+            raise ConfigurationError(
+                f"Structured site identity.{field} must be a non-empty string"
+            )
+    return value
+
+
+def _render_template_tree(
+    source: Path,
+    destination: Path,
+    *,
+    site_data: dict[str, Any],
+    records: dict[str, dict[str, Any]],
+    route_for_record: Callable[[str], str],
+) -> None:
+    """Render one template-owned tree from structured site data."""
+
+    if source.is_symlink():
+        raise DriverError(f"Framework template root cannot be a symlink: {source}")
+    if not source.is_dir():
+        return
+    environment = Environment(
+        loader=FileSystemLoader(source),
+        autoescape=False,
+        keep_trailing_newline=True,
+        undefined=StrictUndefined,
+    )
+    environment.filters["json_string"] = lambda value: json.dumps(
+        value, ensure_ascii=False
+    )
+
+    def record_label(pid: str) -> str:
+        value = records.get(pid)
+        if value is None:
+            raise DriverError(f"Structured site data references an unknown PID: {pid}")
+        return friendly_record_label(value, pid)
+
+    def record_route(pid: str) -> str:
+        route = route_for_record(pid)
+        return "/" if not route else f"/{route}"
+
+    def record_ref(pid: str) -> str:
+        return '{{< ref "' + record_route(pid) + '" >}}'
+
+    environment.globals.update(
+        record_label=record_label,
+        record_ref=record_ref,
+        record_route=record_route,
+    )
+    for path in sorted(source.rglob("*")):
+        if path.is_symlink():
+            raise DriverError(f"Framework template cannot be a symlink: {path}")
+        if path.is_dir():
+            continue
+        if not path.is_file() or path.suffix != ".j2":
+            raise DriverError(
+                f"Framework template tree contains unsupported content: {path}"
+            )
+        relative = path.relative_to(source)
+        target = destination / relative.with_suffix("")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            rendered = environment.get_template(relative.as_posix()).render(
+                site=site_data
+            )
+        except Exception as error:
+            raise DriverError(f"Could not render framework template {path}: {error}") from error
+        target.write_text(rendered, encoding="utf-8")
+
+
+def _render_site_surfaces(workspace, framework: Path, assembly: Path) -> None:
+    site_data = _site_data(workspace)
+    if site_data is None:
+        return
+    records = {
+        value["pid"]: value
+        for value in stored_records(workspace)
+        if isinstance(value, dict) and isinstance(value.get("pid"), str)
+    }
+    projection = load_contract(workspace)
+    record_prefix = site_data.get("record_prefix", projection.route_prefix)
+    if record_prefix != projection.route_prefix:
+        raise ConfigurationError(
+            "Structured site record_prefix must match projection routing.strip_prefix"
+        )
+
+    def route_for_record(pid: str) -> str:
+        return rendered_record_route(pid, projection, records)
+
+    for source_name, destination in (
+        ("config-templates", assembly / "config" / "con"),
+        ("content-templates", assembly / "content"),
+        ("static-templates", assembly / "static"),
+    ):
+        _render_template_tree(
+            framework / source_name,
+            destination,
+            site_data=site_data,
+            records=records,
+            route_for_record=route_for_record,
+        )
+
+
 def _safe_destination(workspace, destination: Path) -> Path:
     if not destination.is_absolute():
         destination = workspace.root / destination
@@ -59,26 +190,46 @@ def _safe_destination(workspace, destination: Path) -> Path:
 
 
 def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
-    framework = workspace.path("site") / "framework"
-    for name in ("archetypes", "assets", "config", "layouts", "static", "themes"):
+    framework = workspace.path("framework")
+    if not framework.is_dir():
+        framework = workspace.path("site") / "framework"
+    for name in (
+        "archetypes",
+        "assets",
+        "config",
+        "content",
+        "layouts",
+        "static",
+        "themes",
+    ):
         _copy_tree(framework / name, assembly / name)
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
     # Copying that topology-only file would disable Hugo's implicit mounts and
     # point at paths that no longer exist inside the assembly.
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
+    _render_site_surfaces(workspace, framework, assembly)
     _copy_tree(workspace.path("site") / "layouts", assembly / "layouts")
-    _copy_tree(workspace.path("site") / "static", assembly / "static")
     assets_root = workspace.path("assets")
+    site_static = workspace.path("site") / "static"
+    if site_static.resolve(strict=False) != assets_root.resolve(strict=False):
+        _copy_tree(site_static, assembly / "static")
     asset_source_prefix = (*PurePosixPath(workspace.paths["assets"]).parts, "files")
+    site_static_prefix = (
+        *PurePosixPath(workspace.paths["site"]).parts,
+        "static",
+    )
     _copy_tree(assets_root / "files", assembly / "assets")
     _copy_tree(workspace.path("editorial"), assembly / "content")
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
-    _copy_tree(workspace.path("extensions") / "layouts", assembly / "layouts")
-    _copy_tree(workspace.path("extensions") / "static", assembly / "static")
-    _copy_tree(workspace.path("extensions") / "assets", assembly / "assets")
+    extension_site = workspace.path("extensions") / "site"
+    if not extension_site.is_dir():
+        extension_site = workspace.path("extensions")
+    _copy_tree(extension_site / "layouts", assembly / "layouts")
+    _copy_tree(extension_site / "static", assembly / "static")
+    _copy_tree(extension_site / "assets", assembly / "assets")
     for name in (
         "android-chrome-192x192.png",
         "android-chrome-512x512.png",
@@ -118,13 +269,18 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
         for destination in sorted(destinations_by_source.get(source, [])):
             destination_path = assembly / "consumer" / destination
             # Consumer paths are re-rooted into the Hugo assembly. Generated
-            # content/static and site/static are mounted at their Hugo targets.
+            # Generated and configured site static trees are mounted at their
+            # Hugo targets. The legacy site/static spelling remains readable.
             destination_relative = PurePosixPath(destination)
             parts = destination_relative.parts
             if parts[:3] == ("generated", "projection", "content"):
                 destination_path = assembly / "content" / Path(*parts[3:])
             elif parts[:3] == ("generated", "projection", "static"):
                 destination_path = assembly / "static" / Path(*parts[3:])
+            elif parts[: len(site_static_prefix)] == site_static_prefix:
+                destination_path = assembly / "static" / Path(
+                    *parts[len(site_static_prefix) :]
+                )
             elif parts[:2] == ("site", "static"):
                 destination_path = assembly / "static" / Path(*parts[2:])
             elif parts[: len(asset_source_prefix)] == asset_source_prefix:

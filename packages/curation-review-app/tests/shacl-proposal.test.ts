@@ -27,7 +27,7 @@ function bundle(): ShaclReviewBundle {
         rdf_turtle:
           '<https://example.test/one> <https://example.test/p> "é" .\n',
         schema_type: "example:Thing",
-        source_path: "metadata/records/Thing/one.yaml",
+        source_path: "site-specific/metadata/records/Thing/one.yaml",
         source_sha256: "c".repeat(64),
       },
     ],

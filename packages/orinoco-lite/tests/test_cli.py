@@ -83,5 +83,33 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
         invoke.assert_not_called()
 
 
+class DevelopmentEngineVersionTests(unittest.TestCase):
+    def test_release_execution_rejects_an_engine_version_mismatch(self) -> None:
+        lock = SimpleNamespace(engine_version="0.1.0")
+        with (
+            patch.object(cli, "__version__", "0.2.0"),
+            patch.dict("os.environ", {}, clear=True),
+            self.assertRaisesRegex(ConfigurationError, "requires orinoco-lite"),
+        ):
+            cli._require_engine_version(lock)
+
+    def test_explicit_local_candidate_may_differ_from_release_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            package = root / "packages/orinoco-lite/src/orinoco_lite"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            lock = SimpleNamespace(engine_version="0.1.0")
+            environment = {
+                "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
+                "ORINOCO_CANDIDATE_ENGINE_ROOT": str(root),
+            }
+            with (
+                patch.object(cli, "__version__", "0.2.0"),
+                patch.dict("os.environ", environment, clear=True),
+            ):
+                cli._require_engine_version(lock)
+
+
 if __name__ == "__main__":
     unittest.main()
