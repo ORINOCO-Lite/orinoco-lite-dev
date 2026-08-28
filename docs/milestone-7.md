@@ -1,6 +1,6 @@
 # Milestone 7: sustainable downstream ownership
 
-Status: planning
+Status: implementation
 
 Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
 
@@ -48,8 +48,8 @@ extensions/
   site/
 ```
 
-`site-specific/site.yaml` is the editable authority for site identity, navigation, contact data, routes, and presentation groups.
-`site-specific/projection.yaml` contains site-specific record selection, graph, routing, and editor-scope policy.
+`site-specific/site.yaml` is the editable authority for site identity, contact data, navigation, presentation groups, and explicitly declared presentation or index routes.
+`site-specific/projection.yaml` contains site-specific record selection, graph, PID-derived record routing, and editor-scope policy.
 Copier metadata and generated configuration derive from these files.
 
 `curation-records/` contains compact current decision caches.

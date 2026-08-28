@@ -14,7 +14,7 @@ The initial supported profile MUST:
 
 - start from a default-branch `workflow_dispatch` and open one draft pull request;
 - create the proposal with one inline `datalad run --explicit` commit;
-- put the actual reviewable metadata changes under `metadata/records/` in the pull request's **Files changed** view, with machine PAV confined to mirrored companions under `metadata/overlays/annotations/`;
+- put the actual reviewable metadata changes below configured `paths.records` in the pull request's **Files changed** view, with machine PAV confined to the engine-derived mirrored annotation root (current templates use `site-specific/metadata/records/` and `site-specific/metadata/overlays/annotations/`);
 - render an accessible pull-request fallback and a review-application link containing the repository, pull-request number, and exact Actions artifact ID;
 - publish exactly one untracked, expiring, reproducible Actions presentation artifact for that proposal;
 - support normal GitHub collaboration on the same branch, including attributed comment suggestions and direct metadata commits;
@@ -72,7 +72,9 @@ The static application and service together MUST:
 - post the complete structured decision payload as an authenticated pull-request comment on behalf of the GitHub user.
 
 The canonical exact-review route is `review/` below the downstream's configured `site.base_url`.
-The workflow supplies the repository, pull-request number, and artifact ID directly; the central service is not a discovery or review destination.
+The workflow supplies the repository, pull-request number, and artifact ID directly.
+When those coordinates are absent, the same downstream route MUST provide a clear link to that repository's open `curation-review` pull requests so a human can find the exact proposal link.
+The central service is not a discovery or review destination.
 
 The service reads GitHub proposal and Actions objects produced by the trusted workflow and transports the verified proposal to the exact static opener.
 It MUST NOT run an adapter, reacquire an external source, execute pull-request code, infer candidate facts that the trusted Action must regenerate, or render a second candidate-review interface.

@@ -7,6 +7,14 @@ import type {
 } from "../../shared/contracts";
 import { DEFAULT_CURATION_SERVICE_ORIGIN } from "../../shared/contracts";
 import {
+  annotationPathForRecord,
+  DEFAULT_RECORD_ROOT,
+  metadataRoots,
+  type MetadataRoots,
+  normalizedRepositoryDirectory,
+  validYamlPathBelow,
+} from "../../shared/metadata";
+import {
   canonicalJson,
   MAX_ARTIFACT_ARCHIVE_BYTES,
   MAX_REVIEW_CANDIDATES,
@@ -15,11 +23,9 @@ import {
   type ReviewBundle,
   type ReviewBundleCandidate,
 } from "./bundle";
-import { GitHubClient } from "./github";
+import { GitHubClient, MAX_REVIEW_BYTES } from "./github";
 import { HttpError } from "./http";
 
-const RECORD_ROOT = "metadata/records/";
-const ANNOTATION_ROOT = "metadata/overlays/annotations/";
 const COMMIT = /^[0-9a-f]{40}$/;
 const SUPPORTED_ADAPTERS = new Set(["dump-research-info", "zotero"]);
 const DATALAD_MARKER = "\n=== Do not change lines below ===\n";
@@ -237,29 +243,11 @@ function operation(status: unknown): CandidateOperation {
   invalid("Proposal record files must be added, modified, or removed.");
 }
 
-function validMetadataPath(value: string): boolean {
-  const root = value.startsWith(RECORD_ROOT)
-    ? RECORD_ROOT
-    : value.startsWith(ANNOTATION_ROOT)
-      ? ANNOTATION_ROOT
-      : null;
-  if (
-    root === null ||
-    (!value.endsWith(".yaml") && !value.endsWith(".yml")) ||
-    /[\\\r\n\0]/.test(value)
-  ) {
-    return false;
-  }
-  return value
-    .slice(root.length)
-    .split("/")
-    .every(
-      (part) =>
-        part.length > 0 &&
-        part !== "." &&
-        part !== ".." &&
-        !part.startsWith("."),
-    );
+function validMetadataPath(value: string, roots: MetadataRoots): boolean {
+  return (
+    validYamlPathBelow(value, roots.records) ||
+    validYamlPathBelow(value, roots.annotations)
+  );
 }
 
 interface ProposalFiles {
@@ -270,6 +258,7 @@ interface ProposalFiles {
 function proposalFiles(
   value: Record<string, unknown>,
   proposalSha: string,
+  roots: MetadataRoots,
 ): ProposalFiles {
   if (value.sha !== proposalSha || !Array.isArray(value.files)) {
     throw new HttpError(
@@ -283,7 +272,7 @@ function proposalFiles(
   for (const fileValue of value.files) {
     const file = object(fileValue, "proposal file");
     const filename = text(file.filename, "proposal filename");
-    if (!validMetadataPath(filename)) {
+    if (!validMetadataPath(filename, roots)) {
       invalid("The proposal commit changes a path outside the metadata roots.");
     }
     if (file.previous_filename !== undefined || changedPaths.has(filename)) {
@@ -291,7 +280,9 @@ function proposalFiles(
     }
     const fileOperation = operation(file.status);
     changedPaths.add(filename);
-    if (filename.startsWith(RECORD_ROOT)) records.set(filename, fileOperation);
+    if (validYamlPathBelow(filename, roots.records)) {
+      records.set(filename, fileOperation);
+    }
   }
   if (
     records.size === 0 ||
@@ -301,8 +292,8 @@ function proposalFiles(
     invalid("The proposal has an unsupported number of candidate records.");
   }
   for (const path of changedPaths) {
-    if (!path.startsWith(ANNOTATION_ROOT)) continue;
-    const record = `${RECORD_ROOT}${path.slice(ANNOTATION_ROOT.length)}`;
+    if (!validYamlPathBelow(path, roots.annotations)) continue;
+    const record = `${roots.records}/${path.slice(roots.annotations.length + 1)}`;
     if (!records.has(record)) {
       invalid(
         "The proposal changes an annotation without its candidate record.",
@@ -345,6 +336,7 @@ function verifyBundleCoordinates(
 function bundleCandidates(
   bundle: ReviewBundle,
   files: ProposalFiles,
+  roots: MetadataRoots,
 ): Map<string, ReviewBundleCandidate> {
   const byPath = new Map(
     bundle.candidates.map((candidate) => [candidate.record_path, candidate]),
@@ -364,7 +356,7 @@ function bundleCandidates(
       invalid("A review artifact operation does not match the proposal diff.");
     }
     const expectedPaths = [path];
-    const companion = `${ANNOTATION_ROOT}${path.slice(RECORD_ROOT.length)}`;
+    const companion = annotationPathForRecord(path, roots);
     if (files.changedPaths.has(companion)) expectedPaths.push(companion);
     if (!sameSet(candidate.paths, expectedPaths)) {
       invalid("A review artifact candidate names incorrect metadata paths.");
@@ -403,6 +395,7 @@ function recordPid(value: string, label: string): string {
 
 export interface SiteCoordinates {
   editorSiteUrl: string;
+  metadataRoots: MetadataRoots;
   reviewServiceOrigin: string;
   reviewSiteUrl: string;
 }
@@ -471,6 +464,26 @@ export function siteCoordinates(value: string | null): SiteCoordinates {
     invalid("The proposal metadata-base orinoco.yaml site is not a mapping.");
   }
   const site = config.site as Record<string, unknown>;
+  let recordRoot = DEFAULT_RECORD_ROOT;
+  if (config.paths !== undefined) {
+    if (
+      config.paths === null ||
+      typeof config.paths !== "object" ||
+      Array.isArray(config.paths)
+    ) {
+      invalid(
+        "The proposal metadata-base orinoco.yaml paths is not a mapping.",
+      );
+    }
+    const paths = config.paths as Record<string, unknown>;
+    if (paths.records !== undefined) {
+      const configured = normalizedRepositoryDirectory(paths.records);
+      if (configured === null) {
+        invalid("The proposal metadata-base paths.records is unsafe.");
+      }
+      recordRoot = configured;
+    }
+  }
   const baseUrl = safeSiteUrl(site.base_url);
   if (baseUrl === null) {
     invalid("The proposal metadata-base site.base_url is unsafe.");
@@ -490,6 +503,7 @@ export function siteCoordinates(value: string | null): SiteCoordinates {
   if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
   return {
     editorSiteUrl: new URL("edit/", baseUrl).toString(),
+    metadataRoots: metadataRoots(recordRoot),
     reviewServiceOrigin: serviceUrl.origin,
     reviewSiteUrl: new URL("review/", baseUrl).toString(),
   };
@@ -548,27 +562,38 @@ export async function loadReviewProposal(
     artifact.runId,
     proposal.baseSha,
   );
+  const siteConfig = await github.contents(repository, [
+    { key: "site-config", path: "orinoco.yaml", ref: proposal.baseSha },
+  ]);
+  const siteConfigText = siteConfig.get("site-config") ?? null;
+  const review = siteCoordinates(siteConfigText);
+  const remainingContentBytes =
+    MAX_REVIEW_BYTES -
+    (siteConfigText === null
+      ? 0
+      : new TextEncoder().encode(siteConfigText).byteLength);
   const bundle = parseReviewBundle(
     await github.artifactArchive(repository, artifactId),
+    review.metadataRoots,
   );
   verifyBundleCoordinates(bundle, pull, pullRequest, proposal, artifact.runId);
   const files = proposalFiles(
     await github.commit(repository, proposal.proposalSha),
     proposal.proposalSha,
+    review.metadataRoots,
   );
-  const presentation = bundleCandidates(bundle, files);
+  const presentation = bundleCandidates(bundle, files, review.metadataRoots);
 
   const recordPaths = [...files.records.keys()].sort();
-  const requests = [
-    { key: "site-config", path: "orinoco.yaml", ref: proposal.baseSha },
-    ...recordPaths.flatMap((path, index) => [
+  const contents = await github.contents(
+    repository,
+    recordPaths.flatMap((path, index) => [
       { key: `before:${index}`, path, ref: proposal.baseSha },
       { key: `proposed:${index}`, path, ref: proposal.proposalSha },
       { key: `after:${index}`, path, ref: pull.headSha },
     ]),
-  ];
-  const contents = await github.contents(repository, requests);
-  const review = siteCoordinates(contents.get("site-config") ?? null);
+    remainingContentBytes,
+  );
   const candidates = recordPaths.map((path, index) => {
     const item = presentation.get(path);
     if (item === undefined) throw new Error("candidate alignment was lost");

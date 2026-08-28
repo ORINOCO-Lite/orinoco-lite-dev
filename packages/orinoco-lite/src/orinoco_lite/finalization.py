@@ -26,12 +26,7 @@ from .annotations import (
     validate_annotation_companion,
     validate_stored_record,
 )
-from .candidates import (
-    ANNOTATION_ROOT,
-    RECORD_ROOT,
-    Candidate,
-    CandidatePlan,
-)
+from .candidates import Candidate, CandidatePlan
 from .canonical import canonical_json_bytes, canonical_yaml_bytes
 from .decisions import Disposition
 from .errors import ConfigurationError
@@ -680,10 +675,16 @@ def _changed_paths(repository: Path, head: str) -> tuple[str, ...]:
         raise ConfigurationError("Finalized paths must be valid UTF-8") from error
 
 
-def _within_metadata_roots(path: str) -> bool:
+def _within_metadata_roots(
+    path: str,
+    roots: tuple[PurePosixPath, PurePosixPath],
+) -> bool:
     candidate = PurePosixPath(path)
-    roots = (RECORD_ROOT.parts, ANNOTATION_ROOT.parts)
-    return any(candidate.parts[: len(root)] == root for root in roots)
+    root_parts = tuple(root.parts for root in roots)
+    return any(
+        candidate.parts[: len(root)] == root
+        for root in root_parts
+    )
 
 
 def _require_safe_worktree_path(worktree: Path, path: str) -> Path:
@@ -784,7 +785,11 @@ def finalize_candidate_plan(
             candidate.companion_repository_path,
         )
     }
-    if any(not _within_metadata_roots(path) for path in allowed_paths):
+    metadata_roots = plan.metadata_roots
+    if any(
+        not _within_metadata_roots(path, metadata_roots)
+        for path in allowed_paths
+    ):
         raise ConfigurationError(
             "Candidate finalization paths must remain below the two metadata roots"
         )
@@ -805,7 +810,10 @@ def finalize_candidate_plan(
 
         changed_paths = _changed_paths(rehearsal, submitted)
         unexpected = sorted(set(changed_paths) - allowed_paths)
-        if unexpected or any(not _within_metadata_roots(path) for path in changed_paths):
+        if unexpected or any(
+            not _within_metadata_roots(path, metadata_roots)
+            for path in changed_paths
+        ):
             raise ConfigurationError(
                 "Finalization attempted to change a path outside candidate metadata: "
                 + ", ".join(unexpected or changed_paths)

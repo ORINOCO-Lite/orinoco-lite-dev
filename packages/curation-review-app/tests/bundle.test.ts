@@ -5,6 +5,7 @@ import {
   MAX_REVIEW_CANDIDATES,
   parseReviewBundle,
 } from "../functions/lib/bundle";
+import { metadataRoots } from "../shared/metadata";
 import { CLAIM_ONE, reviewBundle, reviewBundleArchive } from "./fixtures";
 
 function centralDirectory(archive: Uint8Array): number {
@@ -35,15 +36,40 @@ describe("ephemeral review bundle", () => {
     const bundle = reviewBundle();
     const first = bundle.candidates[0];
     if (first === undefined) throw new Error("missing fixture candidate");
-    first.record_path = "metadata/records/example/first.yml";
+    first.record_path = "site-specific/metadata/records/example/first.yml";
     first.paths = [
       first.record_path,
-      "metadata/overlays/annotations/example/first.yml",
+      "site-specific/metadata/overlays/annotations/example/first.yml",
     ];
 
     expect(
       parseReviewBundle(reviewBundleArchive(bundle)).candidates[0]?.record_path,
     ).toBe(first.record_path);
+  });
+
+  it("validates an unchanged legacy bundle against legacy roots", () => {
+    const bundle = reviewBundle();
+    for (const candidate of bundle.candidates) {
+      candidate.record_path = candidate.record_path.replace(
+        "site-specific/metadata/records/",
+        "metadata/records/",
+      );
+      candidate.paths = candidate.paths.map((path) =>
+        path
+          .replace("site-specific/metadata/records/", "metadata/records/")
+          .replace(
+            "site-specific/metadata/overlays/annotations/",
+            "metadata/overlays/annotations/",
+          ),
+      );
+    }
+
+    expect(
+      parseReviewBundle(
+        reviewBundleArchive(bundle),
+        metadataRoots("metadata/records"),
+      ),
+    ).toEqual(bundle);
   });
 
   it("requires exact object fields and rejects duplicate presentation identities", () => {
@@ -69,7 +95,7 @@ describe("ephemeral review bundle", () => {
       { length: MAX_REVIEW_CANDIDATES + 1 },
       (_, index) => {
         const id = String(index).padStart(4, "0");
-        const path = `metadata/records/example/${id}.yaml`;
+        const path = `site-specific/metadata/records/example/${id}.yaml`;
         return {
           ...template,
           claim_sha256: CLAIM_ONE,

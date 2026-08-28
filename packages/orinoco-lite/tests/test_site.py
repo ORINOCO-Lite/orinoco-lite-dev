@@ -22,6 +22,195 @@ site:
 
 
 class HugoCompatibilityTests(unittest.TestCase):
+    def test_framework_copy_and_template_roots_reject_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            external = root / "external"
+            external.mkdir()
+            (external / "secret.txt").write_text("secret\n", encoding="utf-8")
+
+            static_source = root / "static-source"
+            static_source.symlink_to(external, target_is_directory=True)
+            with self.assertRaisesRegex(DriverError, "cannot be a symlink"):
+                site._copy_tree(static_source, root / "static-output")
+            self.assertFalse((root / "static-output/secret.txt").exists())
+
+            template_source = root / "template-source"
+            template_source.symlink_to(external, target_is_directory=True)
+            with self.assertRaisesRegex(DriverError, "cannot be a symlink"):
+                site._render_template_tree(
+                    template_source,
+                    root / "template-output",
+                    site_data={},
+                    records={},
+                    route_for_record=lambda _pid: "",
+                )
+
+    def test_structured_site_data_renders_template_owned_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "orinoco.yaml"
+            config.write_text(
+                CONFIG
+                + "paths:\n"
+                + "  assets: site-specific/static\n"
+                + "  editorial: site-specific/content/pages\n"
+                + "  framework: .orinoco-lite/site\n"
+                + "  records: site-specific/metadata/records\n"
+                + "  site: site-specific\n",
+                encoding="utf-8",
+            )
+            site_root = root / "site-specific"
+            site_root.mkdir()
+            (site_root / "site.yaml").write_text(
+                "version: 1\n"
+                "record_prefix: 'example:'\n"
+                "identity:\n"
+                "  title: Example Site\n"
+                "  description: Structured example\n",
+                encoding="utf-8",
+            )
+            (site_root / "projection-templates").mkdir()
+            (site_root / "projection-tools").mkdir()
+            (site_root / "projection-templates/homepage.md.j2").write_text(
+                "homepage\n", encoding="utf-8"
+            )
+            (site_root / "projection-templates/project.md.j2").write_text(
+                "project\n", encoding="utf-8"
+            )
+            (site_root / "projection-tools/graph.py").write_text(
+                "print('{}')\n", encoding="utf-8"
+            )
+            (site_root / "projection.yaml").write_text(
+                "version: 2\n"
+                "routing:\n"
+                "  strip_prefix: 'example:'\n"
+                "homepage:\n"
+                "  pid: example:site-root\n"
+                "  template: site-specific/projection-templates/homepage.md.j2\n"
+                "pages:\n"
+                "  xyzri:XYZProject:\n"
+                "    template: site-specific/projection-templates/project.md.j2\n"
+                "unrendered_classes: []\n"
+                "graph:\n"
+                "  producer: site-specific/projection-tools/graph.py\n"
+                "  node_classes: []\n"
+                "  relationship_fields: []\n",
+                encoding="utf-8",
+            )
+            (site_root / "static/files").mkdir(parents=True)
+            (site_root / "static/manifest.yaml").write_text(
+                "version: 1\nassets: {}\n", encoding="utf-8"
+            )
+            records = site_root / "metadata/records/XYZProject"
+            records.mkdir(parents=True)
+            (records / "example.yaml").write_text(
+                "pid: example:projects/example\n"
+                "schema_type: xyzri:XYZProject\n"
+                "formatted_name: Example Project\n",
+                encoding="utf-8",
+            )
+            framework = root / ".orinoco-lite/site"
+            (framework / "config-templates").mkdir(parents=True)
+            (framework / "content-templates/section").mkdir(parents=True)
+            (framework / "static-templates").mkdir(parents=True)
+            (framework / "config-templates/hugo.toml.j2").write_text(
+                "title = {{ site.identity.title | json_string }}\n",
+                encoding="utf-8",
+            )
+            (framework / "content-templates/section/_index.md.j2").write_text(
+                "---\ntitle: {{ site.identity.title }}\n---\n"
+                "[{{ record_label('example:projects/example') }}]"
+                "({{ record_ref('example:projects/example') }})\n",
+                encoding="utf-8",
+            )
+            (framework / "static-templates/site.webmanifest.j2").write_text(
+                '{"name": {{ site.identity.title | json_string }}}\n',
+                encoding="utf-8",
+            )
+            assembly = root / "build/assembly"
+            workspace = load_config_path(config)
+
+            with patch.object(site, "load_assets", return_value=({}, {})):
+                site._assemble(workspace, root / "runtime", assembly)
+
+            self.assertEqual(
+                'title = "Example Site"\n',
+                (assembly / "config/con/hugo.toml").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "title: Example Site",
+                (assembly / "content/section/_index.md").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "[Example Project]({{< ref \"/projects/example\" >}})",
+                (assembly / "content/section/_index.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                '{"name": "Example Site"}\n',
+                (assembly / "static/site.webmanifest").read_text(encoding="utf-8"),
+            )
+
+    def test_structured_site_prefix_must_match_projection_routing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "orinoco.yaml"
+            config.write_text(
+                CONFIG
+                + "paths:\n"
+                + "  framework: .orinoco-lite/site\n"
+                + "  records: site-specific/metadata/records\n"
+                + "  site: site-specific\n",
+                encoding="utf-8",
+            )
+            site_root = root / "site-specific"
+            (site_root / "metadata/records").mkdir(parents=True)
+            (site_root / "projection-templates").mkdir()
+            (site_root / "projection-tools").mkdir()
+            (site_root / "site.yaml").write_text(
+                "version: 1\n"
+                "record_prefix: 'wrong:'\n"
+                "identity:\n"
+                "  title: Example Site\n"
+                "  description: Structured example\n",
+                encoding="utf-8",
+            )
+            for relative in ("homepage.md.j2", "project.md.j2"):
+                (site_root / "projection-templates" / relative).write_text(
+                    "fixture\n", encoding="utf-8"
+                )
+            (site_root / "projection-tools/graph.py").write_text(
+                "print('{}')\n", encoding="utf-8"
+            )
+            (site_root / "projection.yaml").write_text(
+                "version: 2\n"
+                "routing:\n"
+                "  strip_prefix: 'example:'\n"
+                "homepage:\n"
+                "  pid: example:site-root\n"
+                "  template: site-specific/projection-templates/homepage.md.j2\n"
+                "pages:\n"
+                "  xyzri:XYZProject:\n"
+                "    template: site-specific/projection-templates/project.md.j2\n"
+                "unrendered_classes: []\n"
+                "graph:\n"
+                "  producer: site-specific/projection-tools/graph.py\n"
+                "  node_classes: []\n"
+                "  relationship_fields: []\n",
+                encoding="utf-8",
+            )
+            framework = root / ".orinoco-lite/site/content-templates"
+            framework.mkdir(parents=True)
+            (framework / "_index.md.j2").write_text("home\n", encoding="utf-8")
+            workspace = load_config_path(config)
+
+            with self.assertRaisesRegex(ConfigurationError, "record_prefix"):
+                site._render_site_surfaces(
+                    workspace,
+                    root / ".orinoco-lite/site",
+                    root / "build/assembly",
+                )
+
     def test_assembly_respects_configured_asset_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -29,7 +218,8 @@ class HugoCompatibilityTests(unittest.TestCase):
             config.write_text(
                 CONFIG
                 + "paths:\n"
-                + "  assets: custom/assets\n",
+                + "  assets: custom/assets\n"
+                + "  site: site-specific\n",
                 encoding="utf-8",
             )
             source = root / "custom/assets/files/example.txt"
@@ -50,7 +240,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "load_assets",
                 return_value=(
                     {asset.source: asset},
-                    {"site/static/example.txt": asset.source},
+                    {"site-specific/static/example.txt": asset.source},
                 ),
             ):
                 report = site._assemble(workspace, root / "runtime", assembly)

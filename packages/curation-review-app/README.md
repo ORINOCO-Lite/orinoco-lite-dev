@@ -91,7 +91,7 @@ The service permits at most 8 MiB compressed, 16 MiB uncompressed, 225 candidate
 These are service-resource bounds, not pull-request Markdown or native-diff limits.
 The complete authenticated decision comment remains subject to GitHub's comment-size constraint.
 
-A successful maximum-size submission makes at most 47 outbound requests: one curator check, one pull-request read, one commit-list read, one artifact metadata read, one workflow-run read, one authenticated artifact redirect, one credential-free archive download, five commit-file pages, 34 batched GraphQL record reads, and one comment write.
+A successful maximum-size submission makes at most 48 outbound requests: one curator check, one pull-request read, one commit-list read, one artifact metadata read, one workflow-run read, one configured-site read, one authenticated artifact redirect, one credential-free archive download, five commit-file pages, 34 batched GraphQL record reads, and one comment write.
 This remains below the Cloudflare Free limit of 50 subrequests per invocation.
 Oversized artifacts, candidate sets, and proposal paths are rejected before record blobs are loaded.
 

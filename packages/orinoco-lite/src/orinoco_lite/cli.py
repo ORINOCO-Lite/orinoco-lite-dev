@@ -13,7 +13,12 @@ from typing import Any, Sequence
 
 from . import __version__
 from .asset_cli import manage_assets
-from .config import github_repository, load_workspace, load_workspace_lock
+from .config import (
+    development_engine_source,
+    github_repository,
+    load_workspace,
+    load_workspace_lock,
+)
 from .driver import invoke_driver
 from .errors import ConfigurationError, OrinocoError
 from .integrity import sha256_file
@@ -116,7 +121,7 @@ def _runtime_payload(report) -> dict[str, Any]:
 
 
 def _require_engine_version(lock) -> None:
-    if lock.engine_version != __version__:
+    if lock.engine_version != __version__ and development_engine_source() is None:
         raise ConfigurationError(
             f"orinoco.lock requires orinoco-lite {lock.engine_version}, "
             f"but {__version__} is installed"

@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from .config import WorkspaceConfig, _review_app_name
+from .config import WorkspaceConfig, _review_app_name, development_engine_root
 from .errors import ConfigurationError, DriverError
 
 
@@ -61,8 +61,18 @@ def bind_review(
         _remove_destination(destination)
         return {"enabled": False}
 
-    shell = runtime_root / "review-shell"
+    candidate_root = development_engine_root()
+    shell = (
+        candidate_root / "packages/curation-review-app/dist-review"
+        if candidate_root is not None
+        else runtime_root / "review-shell"
+    )
     if not shell.is_dir() or not (shell / "index.html").is_file():
+        if candidate_root is not None:
+            raise DriverError(
+                "Local engine candidate has no built static source-review shell; "
+                "run its curation-review build"
+            )
         raise DriverError("Runtime does not contain the static source-review shell")
 
     _remove_destination(destination)

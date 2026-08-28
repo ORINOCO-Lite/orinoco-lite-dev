@@ -10,6 +10,7 @@ import {
   type ReviewSubmissionMessage,
   type SubmitResult,
 } from "../shared/contracts";
+import { validRepositoryYamlPath } from "../shared/metadata";
 import { Review } from "./Review";
 
 const AUTHORIZATION_TIMEOUT_MS = 600_000;
@@ -176,7 +177,7 @@ function candidate(value: unknown): value is ReviewCandidate {
       item.operation === "modify") &&
     oneLine(item.pid) &&
     oneLine(item.record_path, 1_024) &&
-    item.record_path.startsWith("metadata/records/") &&
+    validRepositoryYamlPath(item.record_path) &&
     oneLine(item.source_namespace) &&
     oneLine(item.source_record_id)
   );

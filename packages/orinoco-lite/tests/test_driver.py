@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch, sentinel
 
 from orinoco_lite.config import WorkspaceConfig
+from orinoco_lite.errors import ConfigurationError
 from orinoco_lite.driver import driver_environment, invoke_driver
 from orinoco_lite.integrity import (
     canonical_json_bytes,
@@ -43,6 +44,85 @@ class DriverEnvironmentTests(unittest.TestCase):
                 environment = driver_environment(workspace, runtime)
             self.assertEqual(environment["PYTHONPATH"], str(runtime.root / "engine"))
             self.assertNotIn("hostile", environment["PYTHONPATH"])
+
+    def test_explicit_development_engine_precedes_verified_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate = root / "candidate"
+            package = candidate / "packages/orinoco-lite/src/orinoco_lite"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            workspace = WorkspaceConfig(
+                root=root,
+                config_path=root / "orinoco.yaml",
+                lock_path=root / "orinoco.lock",
+                site_name="fixture",
+                base_url="https://example.invalid/",
+                paths={"build": "build"},
+                command_aliases={},
+                raw={},
+            )
+            runtime = RuntimeReport(
+                root=root / "runtime",
+                release="0.1.0",
+                manifest_sha256="a" * 64,
+                tree_sha256="b" * 64,
+                files=1,
+                commands=("validate",),
+            )
+            enabled = {
+                "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
+                "ORINOCO_CANDIDATE_ENGINE_ROOT": str(candidate),
+            }
+            with patch.dict(os.environ, enabled, clear=False):
+                environment = driver_environment(workspace, runtime)
+
+            self.assertEqual(
+                os.pathsep.join(
+                    (
+                        str(candidate.resolve() / "packages/orinoco-lite/src"),
+                        str(runtime.root / "engine"),
+                    )
+                ),
+                environment["PYTHONPATH"],
+            )
+            self.assertEqual(
+                environment["ORINOCO_CANDIDATE_ENGINE_ROOT"],
+                str(candidate.resolve()),
+            )
+            self.assertEqual(
+                environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"],
+                "1",
+            )
+
+    def test_invalid_explicit_development_engine_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = WorkspaceConfig(
+                root=root,
+                config_path=root / "orinoco.yaml",
+                lock_path=root / "orinoco.lock",
+                site_name="fixture",
+                base_url="https://example.invalid/",
+                paths={"build": "build"},
+                command_aliases={},
+                raw={},
+            )
+            runtime = RuntimeReport(
+                root=root / "runtime",
+                release="0.1.0",
+                manifest_sha256="a" * 64,
+                tree_sha256="b" * 64,
+                files=1,
+                commands=("validate",),
+            )
+            enabled = {
+                "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
+                "ORINOCO_CANDIDATE_ENGINE_ROOT": str(root / "missing"),
+            }
+            with patch.dict(os.environ, enabled, clear=False):
+                with self.assertRaisesRegex(ConfigurationError, "does not contain"):
+                    driver_environment(workspace, runtime)
 
     def test_runtime_imports_do_not_write_bytecode_or_change_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

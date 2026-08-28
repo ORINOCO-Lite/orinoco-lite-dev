@@ -5,7 +5,11 @@ import subprocess
 import tempfile
 import unittest
 
-from orinoco_lite.annotations import annotation_companion, assertion_sha256
+from orinoco_lite.annotations import (
+    annotation_companion,
+    annotation_files,
+    assertion_sha256,
+)
 from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import load_workspace
 from orinoco_lite.errors import ConfigurationError
@@ -147,6 +151,71 @@ class DownstreamValidationTests(unittest.TestCase):
         ):
             validate_workspace(load_workspace(self.root))
 
+    def test_configured_site_specific_metadata_boundary_fails_closed(self) -> None:
+        config = self.root / "orinoco.yaml"
+        config.write_text(
+            CONFIG
+            + "paths:\n"
+            + "  records: site-specific/metadata/records\n",
+            encoding="utf-8",
+        )
+        destination = self.root / "site-specific/metadata/records"
+        destination.parent.mkdir(parents=True)
+        (self.root / "metadata/records").rename(destination)
+        unknown = self.root / "site-specific/metadata/private/state.yaml"
+        unknown.parent.mkdir(parents=True)
+        unknown.write_text("not: allowed\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ConfigurationError, "site-specific/metadata/private"):
+            validate_workspace(load_workspace(self.root))
+
+    def test_configured_annotation_diagnostic_names_derived_root(self) -> None:
+        config = self.root / "orinoco.yaml"
+        config.write_text(
+            CONFIG
+            + "paths:\n"
+            + "  records: site-specific/metadata/records\n",
+            encoding="utf-8",
+        )
+        unsupported = (
+            self.root
+            / "site-specific/metadata/overlays/annotations/README.md"
+        )
+        unsupported.parent.mkdir(parents=True)
+        unsupported.write_text("not a companion\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            ConfigurationError,
+            "Everything below site-specific/metadata/overlays/annotations",
+        ):
+            annotation_files(load_workspace(self.root))
+
+    def test_one_component_record_root_does_not_claim_the_repository_root(self) -> None:
+        config = self.root / "orinoco.yaml"
+        config.write_text(
+            CONFIG + "paths:\n  records: records\n",
+            encoding="utf-8",
+        )
+        (self.root / "metadata/records").rename(self.root / "records")
+
+        report = validate_workspace(load_workspace(self.root))
+
+        self.assertEqual(report["records"], 2)
+
+    def test_one_component_record_root_keeps_derived_overlays_strict(self) -> None:
+        config = self.root / "orinoco.yaml"
+        config.write_text(
+            CONFIG + "paths:\n  records: records\n",
+            encoding="utf-8",
+        )
+        (self.root / "metadata/records").rename(self.root / "records")
+        unknown = self.root / "overlays/private/state.yaml"
+        unknown.parent.mkdir(parents=True)
+        unknown.write_text("not: allowed\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ConfigurationError, "overlays/private"):
+            validate_workspace(load_workspace(self.root))
+
     def test_mirrored_canonical_annotation_companion_passes(self) -> None:
         companion_path = (
             self.root
@@ -233,7 +302,7 @@ class DownstreamValidationTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(
-            ConfigurationError, "metadata/overlays/annotations"
+            ConfigurationError, "configured annotation companion tree"
         ):
             validate_workspace(load_workspace(self.root))
 

@@ -115,7 +115,7 @@ Against the exact observed handoff head, the workflow MUST:
 
 1. verify the same-repository draft pull request, curator authority, authenticated event actor, handoff authorship, one-parent history, fixed path, file mode, format, bounds, and bundle source commit;
 2. run the pinned released Orinoco editor apply behavior with trusted code against an isolated checkout of the handoff parent;
-3. require every input digest, PID, schema type, and source path to match and permit output only under `metadata/records/` and the mirrored `metadata/overlays/annotations/` tree;
+3. require every input digest, PID, schema type, and source path to match and permit output only below configured `paths.records` and the engine-derived mirrored annotation root (current templates use `site-specific/metadata/records/` and `site-specific/metadata/overlays/annotations/`);
 4. validate every stored record and companion and the complete joined Things graph;
 5. create one ordinary human metadata commit with the same parent as the handoff, the verified curator as author, and automation as committer; and
 6. replace only the exact handoff head with that commit using a force-with-lease comparison against the observed head.

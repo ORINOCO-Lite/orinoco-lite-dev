@@ -4,6 +4,13 @@ import type {
   JsonObject,
   JsonValue,
 } from "../../shared/contracts";
+import {
+  annotationPathForRecord,
+  CURRENT_METADATA_ROOTS,
+  type MetadataRoots,
+  validRepositoryYamlPath,
+  validYamlPathBelow,
+} from "../../shared/metadata";
 import { HttpError } from "./http";
 
 export const MAX_ARTIFACT_ARCHIVE_BYTES = 8_388_608;
@@ -14,8 +21,6 @@ export const MAX_REVIEW_PATHS = MAX_REVIEW_CANDIDATES * 2;
 const BUNDLE_ENTRY = "review-bundle.json";
 const COMMIT = /^[0-9a-f]{40}$/;
 const CLAIM = /^sha256:[0-9a-f]{64}$/;
-const RECORD_ROOT = "metadata/records/";
-const ANNOTATION_ROOT = "metadata/overlays/annotations/";
 const SUPPORTED_ADAPTERS = new Set(["dump-research-info", "zotero"]);
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
@@ -129,29 +134,13 @@ function sourceCoordinate(value: unknown): JsonObject {
   return result;
 }
 
-function validRepositoryPath(value: string, root: string): boolean {
-  if (
-    !value.startsWith(root) ||
-    (!value.endsWith(".yaml") && !value.endsWith(".yml"))
-  ) {
-    return false;
-  }
-  if (/[\\\r\n\0]/.test(value)) return false;
-  return value
-    .slice(root.length)
-    .split("/")
-    .every(
-      (part) =>
-        part.length > 0 &&
-        part !== "." &&
-        part !== ".." &&
-        !part.startsWith("."),
-    );
-}
-
-function recordPath(value: unknown): string {
+function recordPath(value: unknown, roots: MetadataRoots | null): string {
   const result = line(value, "Candidate record_path");
-  if (!validRepositoryPath(result, RECORD_ROOT)) {
+  if (
+    roots === null
+      ? !validRepositoryYamlPath(result)
+      : !validYamlPathBelow(result, roots.records)
+  ) {
     invalid("Candidate record_path is invalid.");
   }
   return result;
@@ -173,7 +162,10 @@ function stringArray(value: unknown, label: string): string[] {
   return result;
 }
 
-function candidate(value: unknown): ReviewBundleCandidate {
+function candidate(
+  value: unknown,
+  roots: MetadataRoots | null,
+): ReviewBundleCandidate {
   exactKeys(
     value,
     [
@@ -190,14 +182,19 @@ function candidate(value: unknown): ReviewBundleCandidate {
     ],
     "Review candidate",
   );
-  const path = recordPath(value.record_path);
+  const path = recordPath(value.record_path, roots);
   const paths = stringArray(value.paths, "Candidate path");
-  const companion = `${ANNOTATION_ROOT}${path.slice(RECORD_ROOT.length)}`;
+  const companion =
+    roots === null ? null : annotationPathForRecord(path, roots);
   if (
     paths.length < 1 ||
     paths.length > 2 ||
     !paths.includes(path) ||
-    paths.some((item) => item !== path && item !== companion)
+    paths.some(
+      (item) =>
+        !validRepositoryYamlPath(item) ||
+        (companion !== null && item !== path && item !== companion),
+    )
   ) {
     invalid("Candidate paths must contain its record and optional companion.");
   }
@@ -374,7 +371,10 @@ function extractReviewBundle(bytes: Uint8Array): Uint8Array {
   return result;
 }
 
-export function parseReviewBundle(archive: Uint8Array): ReviewBundle {
+export function parseReviewBundle(
+  archive: Uint8Array,
+  roots: MetadataRoots | null = CURRENT_METADATA_ROOTS,
+): ReviewBundle {
   const bytes = extractReviewBundle(archive);
   let raw: unknown;
   try {
@@ -413,7 +413,7 @@ export function parseReviewBundle(archive: Uint8Array): ReviewBundle {
       `Review bundle candidates must contain 1 to ${MAX_REVIEW_CANDIDATES} records.`,
     );
   }
-  const candidates = raw.candidates.map(candidate);
+  const candidates = raw.candidates.map((value) => candidate(value, roots));
   const pids = candidates.map((item) => item.pid);
   const paths = candidates.map((item) => item.record_path);
   const friendlyIds = candidates.map((item) => item.friendly_id);
@@ -442,6 +442,22 @@ export function parseReviewBundle(archive: Uint8Array): ReviewBundle {
     source_coordinate: sourceCoordinate(raw.source_coordinate),
     workflow_run_id: positiveInteger(raw.workflow_run_id, "workflow_run_id"),
   };
+}
+
+export function validateReviewBundleMetadataRoots(
+  bundle: ReviewBundle,
+  roots: MetadataRoots,
+): void {
+  for (const candidate of bundle.candidates) {
+    const record = candidate.record_path;
+    const companion = annotationPathForRecord(record, roots);
+    if (
+      !validYamlPathBelow(record, roots.records) ||
+      candidate.paths.some((path) => path !== record && path !== companion)
+    ) {
+      invalid("Review bundle metadata paths do not match configured roots.");
+    }
+  }
 }
 
 export function canonicalJson(value: JsonValue): string {

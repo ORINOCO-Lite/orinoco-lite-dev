@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Mapping, Sequence
 
-from .config import EngineLock, WorkspaceConfig
+from .config import EngineLock, WorkspaceConfig, development_engine_root
 from .errors import DriverError, IntegrityError
 from .runtime import RuntimeReport, load_runtime_manifest
 
@@ -57,8 +57,14 @@ def driver_environment(
     }
     environment.update(workspace.environment())
     environment["ORINOCO_RUNTIME_ROOT"] = str(runtime.root)
-    engine_path = str(runtime.root / "engine")
-    environment["PYTHONPATH"] = engine_path
+    engine_paths = [str(runtime.root / "engine")]
+    development_root = development_engine_root()
+    if development_root is not None:
+        development_source = development_root / "packages/orinoco-lite/src"
+        engine_paths.insert(0, str(development_source))
+        environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"] = "1"
+        environment["ORINOCO_CANDIDATE_ENGINE_ROOT"] = str(development_root)
+    environment["PYTHONPATH"] = os.pathsep.join(engine_paths)
     if additions:
         environment.update(additions)
     environment.update(RUNTIME_SAFETY_ENVIRONMENT)

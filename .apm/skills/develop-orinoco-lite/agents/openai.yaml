@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Orinoco Lite"
+  short_description: "Exercise unreleased changes in a downstream"
+  default_prompt: "Use $develop-orinoco-lite to test this engine or template candidate in a selected downstream and complete the authorized developer-demo workflow."

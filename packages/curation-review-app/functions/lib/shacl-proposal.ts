@@ -5,8 +5,12 @@ import type {
 } from "../../shared/contracts";
 import { GitHubClient } from "./github";
 import { HttpError } from "./http";
-import { siteCoordinates } from "./proposal";
-import { SHACL_BUNDLE_PATH, serializeShaclReviewBundle } from "./shacl";
+import { siteCoordinates, type SiteCoordinates } from "./proposal";
+import {
+  SHACL_BUNDLE_PATH,
+  serializeShaclReviewBundle,
+  validateShaclRecordPaths,
+} from "./shacl";
 
 const COMMIT_HEADLINE = "chore(metadata): hand off SHACL Vue edit";
 const PULL_REQUEST_TITLE = "chore(metadata): propose SHACL Vue edit";
@@ -131,7 +135,7 @@ async function requireTrustedEditorDeployment(
   baseSha: string,
   grant: ShaclGrant,
   serviceOrigin: string,
-): Promise<void> {
+): Promise<SiteCoordinates> {
   const contents = await github.contents(repository, [
     { key: "site-config", path: "orinoco.yaml", ref: baseSha },
   ]);
@@ -146,6 +150,7 @@ async function requireTrustedEditorDeployment(
       "This editor does not match the repository's trusted deployment.",
     );
   }
+  return site;
 }
 
 export async function createShaclProposal(
@@ -196,13 +201,14 @@ export async function createShaclProposal(
         "The draft pull-request head no longer matches the SHACL bundle source commit.",
       );
     }
-    await requireTrustedEditorDeployment(
+    const site = await requireTrustedEditorDeployment(
       github,
       proposal.repository,
       pull.baseSha,
       grant,
       serviceOrigin,
     );
+    validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
     await requireEmptyHandoffPath(github, proposal.repository, pull.headSha);
     const commit = await github.commitFileAtHead(
       proposal.repository,
@@ -233,13 +239,14 @@ export async function createShaclProposal(
       "The repository default-branch head no longer matches the SHACL bundle source commit.",
     );
   }
-  await requireTrustedEditorDeployment(
+  const site = await requireTrustedEditorDeployment(
     github,
     proposal.repository,
     base.sha,
     grant,
     serviceOrigin,
   );
+  validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
   await requireEmptyHandoffPath(github, proposal.repository, base.sha);
   const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   await github.createBranch(proposal.repository, branch, base.sha);

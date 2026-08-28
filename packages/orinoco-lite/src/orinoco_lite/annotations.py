@@ -39,7 +39,7 @@ _MACHINE_PAV_ALIASES = {
     PAV_IMPORTED_FROM: (PAV_IMPORTED_FROM, PAV_IMPORTED_FROM_URI),
 }
 _ASSERTION_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
-ANNOTATION_ROOT = Path("metadata/overlays/annotations")
+ANNOTATION_RELATIVE = Path("overlays/annotations")
 
 
 @dataclass(frozen=True)
@@ -149,7 +149,7 @@ def validate_stored_record(record: Mapping[str, Any]) -> None:
                 ):
                     raise ConfigurationError(
                         "Machine pav:importedBy and pav:importedFrom annotations "
-                        "must be stored in metadata/overlays/annotations"
+                        "must be stored in the configured annotation companion tree"
                     )
                 inspect(item)
         elif isinstance(value, list):
@@ -186,13 +186,14 @@ def _validated_companion(value: object, record_pid: str) -> list[dict[str, str]]
 def annotation_root(workspace: WorkspaceConfig) -> Path:
     """Return the one specification-defined annotation overlay root."""
 
-    return workspace.root / ANNOTATION_ROOT
+    return workspace.path("records").parent / ANNOTATION_RELATIVE
 
 
 def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
     """Return every regular canonical companion, failing closed."""
 
     root = annotation_root(workspace)
+    root_label = root.relative_to(workspace.root).as_posix()
     if not root.exists():
         return []
     if root.is_symlink() or not root.is_dir():
@@ -217,7 +218,7 @@ def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
             or any(part.startswith(".") for part in relative.parts)
         ):
             raise ConfigurationError(
-                "Everything below metadata/overlays/annotations must be a Thing "
+                f"Everything below {root_label} must be a Thing "
                 f"annotation companion; found unsupported content: {candidate}"
             )
         companions.append(candidate)

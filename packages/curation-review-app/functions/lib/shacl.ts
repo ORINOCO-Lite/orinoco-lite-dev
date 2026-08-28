@@ -5,6 +5,11 @@ import type {
   ShaclReviewRecord,
 } from "../../shared/contracts";
 import { MAX_SHACL_BUNDLE_BYTES } from "../../shared/contracts";
+import {
+  type MetadataRoots,
+  validRepositoryYamlPath,
+  validYamlPathBelow,
+} from "../../shared/metadata";
 import { utf8 } from "./encoding";
 import { HttpError, requireExactKeys } from "./http";
 import { parseRepository } from "./input";
@@ -15,7 +20,6 @@ export const MAX_SHACL_PROPOSAL_BODY_BYTES = MAX_SHACL_BUNDLE_BYTES + 64 * 1024;
 
 const COMMIT = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
-const RECORD_ROOT = "metadata/records/";
 
 function invalid(message: string): never {
   throw new HttpError(400, "invalid_shacl_bundle", message);
@@ -34,24 +38,7 @@ function oneLine(value: unknown, label: string): string {
 }
 
 function validRecordPath(value: string): boolean {
-  if (
-    !value.startsWith(RECORD_ROOT) ||
-    (!value.endsWith(".yaml") && !value.endsWith(".yml")) ||
-    value.length > 1_024 ||
-    /[\\\u0000-\u001f\u007f]/.test(value)
-  ) {
-    return false;
-  }
-  return value
-    .slice(RECORD_ROOT.length)
-    .split("/")
-    .every(
-      (part) =>
-        part.length > 0 &&
-        part !== "." &&
-        part !== ".." &&
-        !part.startsWith("."),
-    );
+  return validRepositoryYamlPath(value);
 }
 
 function parseRecord(value: unknown): ShaclReviewRecord {
@@ -135,6 +122,21 @@ export function parseShaclReviewBundle(value: unknown): ShaclReviewBundle {
     );
   }
   return bundle;
+}
+
+export function validateShaclRecordPaths(
+  bundle: ShaclReviewBundle,
+  roots: MetadataRoots,
+): void {
+  if (
+    bundle.records.some(
+      (record) => !validYamlPathBelow(record.source_path, roots.records),
+    )
+  ) {
+    invalid(
+      "The SHACL review bundle contains a path outside configured metadata records.",
+    );
+  }
 }
 
 function parseTarget(value: unknown): ShaclProposalTarget {

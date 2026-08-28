@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewBundle } from "../functions/lib/bundle";
 import type { GitHubClient } from "../functions/lib/github";
-import { loadReviewProposal } from "../functions/lib/proposal";
+import {
+  loadReviewProposal,
+  MAX_REVIEW_CANDIDATES,
+  MAX_REVIEW_PATHS,
+} from "../functions/lib/proposal";
+import { metadataRoots } from "../shared/metadata";
 import {
   ARTIFACT_ID,
   BASE_SHA,
@@ -15,23 +20,36 @@ import {
 } from "./fixtures";
 
 const defaultFiles = [
-  { filename: "metadata/records/example/second.yaml", status: "added" },
   {
-    filename: "metadata/overlays/annotations/example/second.yaml",
+    filename: "site-specific/metadata/records/example/second.yaml",
     status: "added",
   },
-  { filename: "metadata/records/example/first.yaml", status: "modified" },
   {
-    filename: "metadata/overlays/annotations/example/first.yaml",
+    filename: "site-specific/metadata/overlays/annotations/example/second.yaml",
+    status: "added",
+  },
+  {
+    filename: "site-specific/metadata/records/example/first.yaml",
+    status: "modified",
+  },
+  {
+    filename: "site-specific/metadata/overlays/annotations/example/first.yaml",
     status: "modified",
   },
 ];
+
+interface ContentRequest {
+  key: string;
+  path: string;
+  ref: string;
+}
 
 interface ClientOptions {
   artifactHeadSha?: string;
   artifactName?: string;
   body?: unknown;
   bundle?: ReviewBundle;
+  contentRequests?: ContentRequest[][];
   contents?: Map<string, string>;
   files?: unknown[];
   message?: string;
@@ -46,26 +64,65 @@ interface ClientOptions {
 function contentFixture(): Map<string, string> {
   return new Map([
     [
-      `metadata/records/example/first.yaml@${BASE_SHA}`,
+      `site-specific/metadata/records/example/first.yaml@${BASE_SHA}`,
       "pid: example:first\ntitle: Original first\n",
     ],
     [
-      `metadata/records/example/first.yaml@${PROPOSAL_SHA}`,
+      `site-specific/metadata/records/example/first.yaml@${PROPOSAL_SHA}`,
       "pid: example:first\ntitle: Proposed first\n",
     ],
     [
-      `metadata/records/example/first.yaml@${HEAD_SHA}`,
+      `site-specific/metadata/records/example/first.yaml@${HEAD_SHA}`,
       "pid: example:first\ntitle: Current first\n",
     ],
     [
-      `metadata/records/example/second.yaml@${PROPOSAL_SHA}`,
+      `site-specific/metadata/records/example/second.yaml@${PROPOSAL_SHA}`,
       "pid: example:second\ntitle: Proposed second\n",
     ],
     [
-      `metadata/records/example/second.yaml@${HEAD_SHA}`,
+      `site-specific/metadata/records/example/second.yaml@${HEAD_SHA}`,
       "pid: example:second\ntitle: Current second\n",
     ],
   ]);
+}
+
+function rootedOptions(recordRoot: string): ClientOptions {
+  const current = metadataRoots("site-specific/metadata/records");
+  const selected = metadataRoots(recordRoot);
+  const rewrite = (path: string): string => {
+    if (path.startsWith(`${current.records}/`)) {
+      return `${selected.records}/${path.slice(current.records.length + 1)}`;
+    }
+    if (path.startsWith(`${current.annotations}/`)) {
+      return `${selected.annotations}/${path.slice(current.annotations.length + 1)}`;
+    }
+    return path;
+  };
+  const bundle = structuredClone(reviewBundle());
+  for (const candidate of bundle.candidates) {
+    candidate.record_path = rewrite(candidate.record_path);
+    candidate.paths = candidate.paths.map(rewrite);
+  }
+  return {
+    bundle,
+    contents: new Map(
+      [...contentFixture()].map(([coordinate, value]) => {
+        const separator = coordinate.lastIndexOf("@");
+        return [
+          `${rewrite(coordinate.slice(0, separator))}${coordinate.slice(separator)}`,
+          value,
+        ];
+      }),
+    ),
+    files: defaultFiles.map((file) => ({
+      ...file,
+      filename: rewrite(file.filename),
+    })),
+    siteConfig: ORINOCO_CONFIG.replace(
+      "site-specific/metadata/records",
+      recordRoot,
+    ),
+  };
 }
 
 function client(options: ClientOptions = {}): GitHubClient {
@@ -90,18 +147,19 @@ function client(options: ClientOptions = {}): GitHubClient {
       files: options.files ?? defaultFiles,
       sha: PROPOSAL_SHA,
     }),
-    contents: async (
-      _repository: string,
-      requests: Array<{ key: string; path: string; ref: string }>,
-    ) =>
-      new Map(
+    contents: async (_repository: string, requests: ContentRequest[]) => {
+      options.contentRequests?.push(
+        requests.map((request) => ({ ...request })),
+      );
+      return new Map(
         requests.map((request) => [
           request.key,
           request.path === "orinoco.yaml" && request.ref === BASE_SHA
             ? (siteConfig ?? null)
             : (content.get(`${request.path}@${request.ref}`) ?? null),
         ]),
-      ),
+      );
+    },
     firstPullRequestCommit: async () => ({
       commit: { message: options.message ?? proposalCommitMessage() },
       parents: [{ sha: BASE_SHA }],
@@ -131,6 +189,12 @@ function client(options: ClientOptions = {}): GitHubClient {
   } as unknown as GitHubClient;
 }
 
+function expectOnlySiteConfig(requests: ContentRequest[][]): void {
+  expect(requests).toEqual([
+    [{ key: "site-config", path: "orinoco.yaml", ref: BASE_SHA }],
+  ]);
+}
+
 describe("artifact-backed GitHub proposal loading", () => {
   it("derives candidate membership and operations from the proposal diff", async () => {
     const result = await loadReviewProposal(
@@ -143,8 +207,8 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(result.repository).toBe("Example/Site");
     expect(result.candidates.map((candidate) => candidate.record_path)).toEqual(
       [
-        "metadata/records/example/first.yaml",
-        "metadata/records/example/second.yaml",
+        "site-specific/metadata/records/example/first.yaml",
+        "site-specific/metadata/records/example/second.yaml",
       ],
     );
     expect(result.candidates[0]?.before).toContain("Original first");
@@ -152,6 +216,45 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(result.candidates[1]?.operation).toBe("add");
     expect(result.review_service_origin).toBe("https://review.example");
     expect(result.review_site_url).toBe("https://site.example/review/");
+  });
+
+  it.each([
+    ["legacy", "metadata/records"],
+    ["custom", ".site-data/catalog/records"],
+    ["trailing slash", ".site-data/catalog/records/"],
+  ])("accepts %s configured metadata roots", async (_label, recordRoot) => {
+    const result = await loadReviewProposal(
+      client(rootedOptions(recordRoot)),
+      "example/site",
+      42,
+      ARTIFACT_ID,
+    );
+
+    expect(result.candidates[0]?.record_path).toBe(
+      `${metadataRoots(recordRoot).records}/example/first.yaml`,
+    );
+  });
+
+  it("rejects out-of-root artifact paths before loading record blobs", async () => {
+    const bundle = reviewBundle();
+    const first = bundle.candidates[0];
+    if (first === undefined) throw new Error("missing fixture candidate");
+    first.record_path = "other/metadata/records/example/first.yaml";
+    first.paths = [
+      first.record_path,
+      "other/metadata/overlays/annotations/example/first.yaml",
+    ];
+    const contentRequests: ContentRequest[][] = [];
+
+    await expect(
+      loadReviewProposal(
+        client({ bundle, contentRequests }),
+        "example/site",
+        42,
+        ARTIFACT_ID,
+      ),
+    ).rejects.toThrow("Candidate record_path is invalid");
+    expectOnlySiteConfig(contentRequests);
   });
 
   it.each([
@@ -198,6 +301,22 @@ describe("artifact-backed GitHub proposal loading", () => {
       ),
       expected: "contract is unsupported",
       label: "an unsupported contract",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "paths:\n  records: site-specific/metadata/records",
+        "paths:\n  records: ../escape",
+      ),
+      expected: "paths.records is unsafe",
+      label: "an escaping metadata root",
+    },
+    {
+      config: ORINOCO_CONFIG.replace(
+        "paths:\n  records: site-specific/metadata/records",
+        "paths: []",
+      ),
+      expected: "paths is not a mapping",
+      label: "a non-mapping path configuration",
     },
     {
       config: ORINOCO_CONFIG.replace(
@@ -301,27 +420,52 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(result.candidates[0]?.before).toContain("Original first");
   });
 
-  it("rejects proposal writes outside the metadata roots, including its trusted config", async () => {
+  it("rejects proposal writes outside the metadata roots before loading record blobs", async () => {
+    for (const file of [
+      { filename: ".github/workflows/pwn.yml", status: "added" },
+      { filename: "orinoco.yaml", status: "modified" },
+    ]) {
+      const contentRequests: ContentRequest[][] = [];
+      await expect(
+        loadReviewProposal(
+          client({ contentRequests, files: [file] }),
+          "example/site",
+          42,
+          ARTIFACT_ID,
+        ),
+      ).rejects.toThrow("outside the metadata roots");
+      expectOnlySiteConfig(contentRequests);
+    }
+  });
+
+  it("rejects oversized proposal paths before loading record blobs", async () => {
+    const contentRequests: ContentRequest[][] = [];
+    const files = Array.from({ length: MAX_REVIEW_CANDIDATES }, (_, index) => [
+      {
+        filename: `site-specific/metadata/records/example/extra-${index}.yaml`,
+        status: "added",
+      },
+      {
+        filename: `site-specific/metadata/overlays/annotations/example/extra-${index}.yaml`,
+        status: "added",
+      },
+    ]).flat();
+    files.push({
+      filename:
+        "site-specific/metadata/overlays/annotations/example/overflow.yaml",
+      status: "added",
+    });
+    expect(files).toHaveLength(MAX_REVIEW_PATHS + 1);
+
     await expect(
       loadReviewProposal(
-        client({
-          files: [{ filename: ".github/workflows/pwn.yml", status: "added" }],
-        }),
+        client({ contentRequests, files }),
         "example/site",
         42,
         ARTIFACT_ID,
       ),
-    ).rejects.toThrow("outside the metadata roots");
-    await expect(
-      loadReviewProposal(
-        client({
-          files: [{ filename: "orinoco.yaml", status: "modified" }],
-        }),
-        "example/site",
-        42,
-        ARTIFACT_ID,
-      ),
-    ).rejects.toThrow("outside the metadata roots");
+    ).rejects.toThrow("unsupported number of candidate records");
+    expectOnlySiteConfig(contentRequests);
   });
 
   it("rejects incomplete or operation-mismatched presentation bundles", async () => {
@@ -421,7 +565,9 @@ describe("artifact-backed GitHub proposal loading", () => {
 
   it("presents later human deletion, restoration, and PID edits as head data", async () => {
     const deletedAddition = contentFixture();
-    deletedAddition.delete(`metadata/records/example/second.yaml@${HEAD_SHA}`);
+    deletedAddition.delete(
+      `site-specific/metadata/records/example/second.yaml@${HEAD_SHA}`,
+    );
     const deleted = await loadReviewProposal(
       client({ contents: deletedAddition }),
       "example/site",
@@ -433,7 +579,7 @@ describe("artifact-backed GitHub proposal loading", () => {
 
     const retargeted = contentFixture();
     retargeted.set(
-      `metadata/records/example/first.yaml@${HEAD_SHA}`,
+      `site-specific/metadata/records/example/first.yaml@${HEAD_SHA}`,
       "pid: example:human-edit\ntitle: Human retarget\n",
     );
     const edited = await loadReviewProposal(
@@ -452,11 +598,11 @@ describe("artifact-backed GitHub proposal loading", () => {
     deletion.operation = "delete";
     const restoredContents = new Map([
       [
-        `metadata/records/example/second.yaml@${BASE_SHA}`,
+        `site-specific/metadata/records/example/second.yaml@${BASE_SHA}`,
         "pid: example:second\ntitle: Initial second\n",
       ],
       [
-        `metadata/records/example/second.yaml@${HEAD_SHA}`,
+        `site-specific/metadata/records/example/second.yaml@${HEAD_SHA}`,
         "pid: example:restored\ntitle: Human restoration\n",
       ],
     ]);
@@ -478,29 +624,32 @@ describe("artifact-backed GitHub proposal loading", () => {
     expect(restored.candidates[0]?.after).toContain("example:restored");
   });
 
-  it("accepts .yml paths using the same candidate path policy", async () => {
-    const bundle = reviewBundle();
-    bundle.candidates = bundle.candidates.slice(0, 1);
-    const first = bundle.candidates[0];
-    if (first === undefined) throw new Error("missing fixture candidate");
-    first.record_path = "metadata/records/example/first.yml";
-    first.paths = [first.record_path];
-    const contents = new Map([
-      [`${first.record_path}@${BASE_SHA}`, "pid: example:first\n"],
-      [`${first.record_path}@${PROPOSAL_SHA}`, "pid: example:first\n"],
-      [`${first.record_path}@${HEAD_SHA}`, "pid: example:first\n"],
-    ]);
+  it.each(["yml", "YAML"])(
+    "accepts .%s paths using the same candidate path policy",
+    async (suffix) => {
+      const bundle = reviewBundle();
+      bundle.candidates = bundle.candidates.slice(0, 1);
+      const first = bundle.candidates[0];
+      if (first === undefined) throw new Error("missing fixture candidate");
+      first.record_path = `site-specific/metadata/records/example/first.${suffix}`;
+      first.paths = [first.record_path];
+      const contents = new Map([
+        [`${first.record_path}@${BASE_SHA}`, "pid: example:first\n"],
+        [`${first.record_path}@${PROPOSAL_SHA}`, "pid: example:first\n"],
+        [`${first.record_path}@${HEAD_SHA}`, "pid: example:first\n"],
+      ]);
 
-    const result = await loadReviewProposal(
-      client({
-        bundle,
-        contents,
-        files: [{ filename: first.record_path, status: "modified" }],
-      }),
-      "example/site",
-      42,
-      ARTIFACT_ID,
-    );
-    expect(result.candidates[0]?.record_path).toBe(first.record_path);
-  });
+      const result = await loadReviewProposal(
+        client({
+          bundle,
+          contents,
+          files: [{ filename: first.record_path, status: "modified" }],
+        }),
+        "example/site",
+        42,
+        ARTIFACT_ID,
+      );
+      expect(result.candidates[0]?.record_path).toBe(first.record_path);
+    },
+  );
 });

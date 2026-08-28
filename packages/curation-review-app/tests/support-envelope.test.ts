@@ -60,13 +60,13 @@ function identity(index: number): string {
 }
 
 function recordPath(index: number): string {
-  return `metadata/records/example/record-${identity(index)}.yaml`;
+  return `site-specific/metadata/records/example/record-${identity(index)}.yaml`;
 }
 
 function annotationPath(index: number): string {
   return recordPath(index).replace(
-    "metadata/records/",
-    "metadata/overlays/annotations/",
+    "site-specific/metadata/records/",
+    "site-specific/metadata/overlays/annotations/",
   );
 }
 
@@ -265,8 +265,8 @@ describe("hosted service-resource envelope", () => {
     const graphRequests = Math.ceil(
       (MAX_REVIEW_CANDIDATES * 3) / BLOBS_PER_GRAPHQL_REQUEST,
     );
-    const expectedRequests = 8 + commitPages + graphRequests;
-    expect(expectedRequests).toBe(47);
+    const expectedRequests = 9 + commitPages + graphRequests;
+    expect(expectedRequests).toBe(48);
     expect(fetchMock).toHaveBeenCalledTimes(expectedRequests);
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(
       CLOUDFLARE_FREE_SUBREQUEST_LIMIT,
