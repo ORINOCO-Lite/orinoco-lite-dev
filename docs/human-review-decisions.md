@@ -1,11 +1,11 @@
 # Orinoco Lite human-review decision queue
 
-Status: Milestone 6 active; convergence and the approved custody transfer are complete
+Status: Milestone 6 accepted; production and strategic decisions remain
 
-Review snapshot: 2026-08-27
+Review snapshot: 2026-08-28
 
 This file is the current human-decision entry point.
-It keeps the reviewed planning outcomes that opened Milestone 6 beside the unresolved choices that still require human judgment.
+It keeps the reviewed planning outcomes through accepted Milestone 6 beside the unresolved choices that still require human judgment.
 The custody transfer authorized by HR-226 is complete and is no longer an outstanding decision.
 Accepted Milestone 5 outcomes are in [`milestone-5-decisions.md`](milestone-5-decisions.md), and the detailed decision history through that milestone is archived in [`human-review-decisions-through-m5.md`](archived/human-review-decisions-through-m5.md).
 Release coordinates, CI results, documentation repairs, and other mechanical work do not belong in this queue.
@@ -31,6 +31,7 @@ Release coordinates, CI results, documentation repairs, and other mechanical wor
 | HR-228 | Serve source-adapter decision review from the downstream's deployed `/review/` route. Keep `/edit/` as the separate SHACL Vue route and use the central stateless service only for OAuth, verified GitHub reads, explicit submission confirmation, and authenticated GitHub transport. | M6-D006 | John Lee | 2026-08-27 |
 | HR-229 | Keep all editing, review, warning, upload fallback, and confirmation UI on the downstream site while the main browser remains there. Use the central backend-only GitHub App service by default, with one optional self-host override and repository identity derived from the trusted build. Give unique custom-domain origins the normal flow; on shared `github.io` origins explain the origin-wide trust boundary and require an explicit acknowledgment before enabling direct GitHub writes. Keep **Download bundle** credential-free and guide maintainers through adding and verifying a custom domain. | M6-D007 | John Lee | 2026-08-27 |
 | HR-230 | Limit the personal GitHub App installation to `leej3/orinoco-lite-demo` for the current Zotero operation. Keep the separate organization installation limited to `ORINOCO-Lite/test-orinoco-downstream-website`; do not grant either installation account-wide repository access. | M6-Q002 | John Lee | 2026-08-27 |
+| HR-231 | Accept Milestone 6 with the SHACL Vue direct-GitHub proposal action's discoverability correction and live trusted-replacement proof explicitly deferred. Preserve the deployed downstream-origin editor, backend-only central service, guarded proposal control, and credential-free bundle download without claiming the deferred flow is complete. | M6-D008 | John Lee | 2026-08-28 |
 
 ## Before production graduation
 

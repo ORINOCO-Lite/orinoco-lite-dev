@@ -1,6 +1,6 @@
 # Milestone 6: metadata-path hardening
 
-Status: active; Zotero acceptance complete, live SHACL replacement proof remains
+Status: accepted on 2026-08-28; discoverable, live-proven SHACL proposal flow deferred
 
 Predecessor: [`milestone-5.md`](milestone-5.md)
 
@@ -37,26 +37,26 @@ The real CON site, its remotes, its deployment, and its production domain remain
 | Integration fixture current evidence | [Fixture pull request 48](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/pull/48) merged the current Zotero evidence at version `668` and normalized payload SHA-256 `23aa443a248e9e1dfc73003cde76f3a93c533bf9e57cc5674539b80da52f17b8` as source `96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07`, tree `5cd83a3b6d298824462b9bb6264fd0e39fea1674`. [Pages run 33112748154](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33112748154) passed. [Validation run 33112748222](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33112748222) passed on the failed-job retry. The first Linux attempt had already passed every non-browser test and build before one Chromium project-path graph-route check reached its one-off 90-second timeout; the Linux retry and original macOS job passed. The publication chain is source `96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07`, projection `8d0a29a2e7a005579b2a715d6d87b586de49c868`, and site `fc23f9bc871881abed1739956586cc7f99c7bbe0`; deployment `6130395402` is current. The deployed root, `/edit/`, `/review/`, and both generated configurations return successfully and bind the fixture repository to the central backend. Deterministic planning still produces 126 modification candidates. The six retired Zotero identifiers were removed from current canonical records and proposal facts; they were fields within those records, not six candidate records, so all 126 candidate dispositions remain unresolved. |
 | Personal demonstration | Demo [framework pull request 28](https://github.com/leej3/orinoco-lite-demo/pull/28) merged the rc13 framework as `40f190a4922ae6b4bfe7c7fda7952883792c2ad0` after [pull request 29](https://github.com/leej3/orinoco-lite-demo/pull/29) added the downstream review-link correction at `9f5c324018a3a782a9f11d011bc09f83706a1ae3`. Later trusted-runtime corrections culminated in [pull request 31](https://github.com/leej3/orinoco-lite-demo/pull/31) at `68cae51cb721468b16c572dec2a07c7827787653`. Current source `bb4f833b5d57b9c3205f8cd15a13689dce301a5b` passed [Pages run 33168061909](https://github.com/leej3/orinoco-lite-demo/actions/runs/33168061909) and [validation run 33168061947](https://github.com/leej3/orinoco-lite-demo/actions/runs/33168061947) on Linux and on the failed-job macOS retry. The first macOS attempt passed all non-browser checks before one Chromium editor test reached its one-off 90-second timeout; attempt 2 passed the complete consumer facade. The current publication chain is source `bb4f833b5d57b9c3205f8cd15a13689dce301a5b`, projection `7b22a55c40ac9f6b20dfa2c540150c68ba596451`, and site `067c7e5526bd5555d4d127d64c2861d5b9c580ed`; deployment `6140515970` is current. |
 | Current demonstration Zotero acceptance | [Demo pull request 23](https://github.com/leej3/orinoco-lite-demo/pull/23) merged the read-only public-library evidence at version `668` with normalized payload SHA-256 `23aa443a248e9e1dfc73003cde76f3a93c533bf9e57cc5674539b80da52f17b8`. [Proposal run 33058621923](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058621923) opened [demo pull request 27](https://github.com/leej3/orinoco-lite-demo/pull/27) from exact base `c6ec36cdc2ecc0c7fd1a229975ded4a31f642099` at proposal `3fb2d7b7a61ca218dfe1dd11855820309ad88290` with 126 modification candidates. Compatibility commit `2146a46bd598d152c4e40ac750c4023abf780f84` removed six retired Zotero identifiers from those candidate records without removing candidates. [Finalization run 33166927923](https://github.com/leej3/orinoco-lite-demo/actions/runs/33166927923) applied the complete reviewed decision state as human-attributed commit `0f1a99f0bce5e2e19a270e863aaa1f94d38df5d6`; pull request 27 then merged with merge commit `bb4f833b5d57b9c3205f8cd15a13689dce301a5b`. The identical version-668 [rerun 33179419893](https://github.com/leej3/orinoco-lite-demo/actions/runs/33179419893) reported that the exact active candidate plan was empty and created no branch or pull request. |
-| Current SHACL acceptance status | The deployed downstream `/edit/` route exposes credential-free **Download bundle** and guarded **Propose via GitHub**, and the backend-only service retains no presentation surface. Recorded [run 33058692028](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058692028) and [run 33071388848](https://github.com/leej3/orinoco-lite-demo/actions/runs/33071388848) successfully resolved and validated canonical proposal heads. Neither run classified its head as a temporary handoff: bundle extraction, attributed canonical commit creation, and exact-head lease replacement were skipped. A live current bundle handoff and trusted replacement therefore remain the sole uncompleted acceptance proof. |
+| Current SHACL acceptance status | The deployed downstream `/edit/` route keeps the editor on the downstream origin and provides credential-free **Download review bundle**. After a user edits and saves a record, an unlabeled changed-record icon opens a submission drawer containing guarded **Propose via GitHub**. The control is therefore present but not a discoverable primary action. Recorded [run 33058692028](https://github.com/leej3/orinoco-lite-demo/actions/runs/33058692028) and [run 33071388848](https://github.com/leej3/orinoco-lite-demo/actions/runs/33071388848) resolved and validated canonical proposal heads, but neither executed temporary-bundle extraction, attributed canonical commit creation, or exact-head lease replacement. Improving the control's discoverability and completing one live trusted-replacement proof are deferred by M6-D008. The backend-only service retains no presentation surface. |
 | GitHub App installation scope | Organization installation `156883473` is limited to `ORINOCO-Lite/test-orinoco-downstream-website`. Personal installation `156987346` is limited to `leej3/orinoco-lite-demo`. Both exact selected-repository scopes were verified on 2026-08-27; neither installation grants the App access to other repositories in its account. |
 | Retired engineering Pages | The unsupported Milestone 3 engineering Pages site was disabled and the repository homepage cleared on 2026-08-27. Its obsolete `codex/milestone-3` deployment policy, retired manual Pages workflow, and orphaned engineering Pages builder were removed from current configuration, while branch `codex/milestone-3`, deployment `5862443246`, and earlier workflow and builder copies remain preserved as historical evidence. Fixture and demo Pages remain the supported live surfaces. |
 | Remaining capability issues | [Issue 32](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/32) remains open because deterministic YAML sharding requires a reviewed storage and migration policy. [Issue 34](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/34) and its open [engineering pull request 64](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/64) retain multi-namespace routing for human semantic review. Engineering `main` records the accepted adapted tips plus later custody and compatibility commits. Pull request 64 is based on that accepted pin state and preserves every pin; it does not replace adapted tips with older raw upstream heads. |
 
-These coordinates establish the mechanical release boundary and the completed Zotero acceptance path but do not complete Milestone 6.
-The live SHACL Vue bundle handoff and trusted replacement remain acceptance work below.
+These coordinates establish the mechanical release boundary and completed Zotero acceptance path.
+Together with the explicit SHACL proposal-flow exception in M6-D008, they complete Milestone 6.
 
 ## Outcome
 
-Milestone 6 proceeds from the reviewed current stack produced by the completed prerequisite work above.
-It aligns open-reference behavior, makes compatibility tests explicit and dependable, and proves that the two human-facing metadata paths work from current state.
+Milestone 6 proceeded from the reviewed current stack produced by the completed prerequisite work above.
+It aligns open-reference behavior, makes compatibility tests explicit and dependable, proves the current Zotero path, and records the deployed SHACL boundary plus its deferred direct-GitHub gaps.
 
-The active milestone will:
+The milestone:
 
-- preserve well-formed unresolved Things references by default while reporting references and graph edges that cannot be materialized locally;
-- remove environment-dependent compatibility tests and unexpected CI skips;
-- add **Propose via GitHub** to the downstream static SHACL Vue editing experience and exercise one real proposal;
-- regenerate and complete a current Zotero proposal rather than repair the obsolete Milestone 5 proposal;
-- and publish any follow-up immutable engine, runtime, and template release required by those Milestone 6 changes.
+- preserved well-formed unresolved Things references by default while reporting references and graph edges that cannot be materialized locally;
+- removed environment-dependent compatibility tests and unexpected CI skips;
+- added guarded **Propose via GitHub** to the downstream static SHACL Vue editing experience, while deferring its discoverability correction and one live trusted-replacement proof;
+- regenerated and completed a current Zotero proposal rather than repairing the obsolete Milestone 5 proposal;
+- and published the follow-up immutable engine, runtime, and template releases required by those Milestone 6 changes.
 
 The exact upstream commits and release coordinates belong in the implementing pull requests, gitlinks, locks, and releases.
 Milestone 6 does not add a tracked compatibility ledger or a file that attempts to describe mutable upstream head state.
@@ -95,9 +95,20 @@ Milestone 5 closes on its implemented and focused acceptance evidence.
 Its closed Zotero pull request is historical proposal evidence, not a current review entry point.
 Milestone 6 creates a fresh proposal from the current default branch and current read-only Zotero coordinate, completes review and finalization, and reruns the identical source to obtain an empty proposal.
 
-Milestone 6 also exercises the first live SHACL Vue GitHub proposal and trusted replacement.
+Milestone 6 originally required the first live SHACL Vue GitHub proposal and trusted replacement.
+M6-D008 accepts the implemented boundary while deferring that operational proof and the discoverability correction to later work.
 These operational proofs do not reopen the accepted Milestone 5 adapter, provenance, fixed-path handoff, trusted-replacement, or stateless-service boundaries.
 M6-D005 separately corrects only the editor-hosting and browser-session portion of the earlier SHACL presentation design.
+
+### M6-D008 — Close with the SHACL proposal flow deferred
+
+Milestone 6 accepts the deployed downstream editor and backend-only service boundary without claiming that the direct-GitHub SHACL proposal experience is complete.
+The guarded **Propose via GitHub** control exists only inside the changed-record submission drawer reached through an unlabeled top-bar icon after an edit is saved.
+That placement is not a discoverable primary action, and no current run proves the complete temporary-bundle extraction and trusted-replacement path.
+
+Making the action readily discoverable and recording one live end-to-end proposal and trusted replacement are deferred to a later milestone.
+**Download review bundle** remains the accepted credential-free path.
+This exception closes Milestone 6 without weakening the downstream-origin, backend-only-service, explicit-acknowledgment, repository-scope, or Git-history requirements already implemented.
 
 ### M6-D004 — Move repository custody before the milestone and after active work is merged
 
@@ -256,10 +267,11 @@ Milestone 6 is complete when:
 
 1. `pixi run test` is independent of sibling repositories and required hosted compatibility CI has no unexpected fixture skips;
 2. well-formed unresolved references survive validation and projection by default, an omitted graph-target policy drops and reports nonmaterialized edges, and explicit `reject` remains strict;
-3. the deployed downstream static editor exposes both actions, keeps its main page on the downstream origin, and completes one current SHACL Vue GitHub handoff and trusted replacement while the central service exposes no static presentation surface;
+3. the deployed downstream static editor keeps its main page on the downstream origin, provides credential-free bundle download, and keeps guarded direct-GitHub submission in the editing session while the central service exposes no static presentation surface; the discoverability correction and live trusted-replacement proof are accepted as the explicit M6-D008 deferral;
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 
-For the direct GitHub paths, acceptance also proves the normal flow on a custom or otherwise unique origin and the explanation plus explicit acknowledgment gate on a shared `github.io` origin.
+For the direct GitHub paths, the implemented contract retains the normal flow on a custom or otherwise unique origin and the explanation plus explicit acknowledgment gate on a shared `github.io` origin.
+Live end-to-end proof of the direct-GitHub SHACL path is part of the M6-D008 deferral.
 **Download bundle** remains usable there without GitHub authentication or acknowledgment.
 
 Acceptance records representative commands, releases, pull requests, and runs.
@@ -269,7 +281,9 @@ It does not duplicate commit ancestry already enforced by Git and the workflow o
 
 1. Accepted: [engineering pull request 42](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/42) removed sibling-worktree discovery and made compatibility inputs hermetic; the current accepted-consumer [post-merge run 33114421829](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33114421829) passed on macOS and Linux without unexpected skips.
 2. Accepted: immutable engine/runtime release [`v0.2.0rc8`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/releases/tag/v0.2.0rc8) records the general open-reference default and strict opt-in behavior; [release run 33043289218](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33043289218) passed.
-3. Open: the downstream and backend-only presentation boundaries are deployed and tested, but no recorded current run executed the temporary-bundle extraction, human-attributed canonical commit, and exact-head trusted replacement steps.
+3. Accepted with deferral: the downstream and backend-only presentation boundaries are deployed and tested.
+The guarded proposal control exists in the changed-record drawer but is not readily discoverable, and no recorded current run executed the temporary-bundle extraction, human-attributed canonical commit, and exact-head trusted replacement steps.
+M6-D008 defers those two gaps without claiming they are complete.
 4. Accepted: demo pull request 27 records the completed version-668 review and merge, and identical [rerun 33179419893](https://github.com/leej3/orinoco-lite-demo/actions/runs/33179419893) reported an empty active plan without creating a branch or pull request.
 
 ## Resolved questions
