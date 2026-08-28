@@ -55,7 +55,7 @@ Git remains the historical record.
 
 `dump-research-info` is site-specific executable code under `extensions/source-adapters/dump-research-info/`.
 Its configuration, source content, evidence, and policy belong under `site-specific/sources/dump-research-info/`; its decisions belong in `site-specific/curation-records/dump-research-info.yaml`.
-Generic adapters such as the Zotero adapter belong to the engine or template.
+Generic adapters such as the Zotero adapter belong to the engine or template but will still have their own site-specific configuration, source content, evidence, and policy.
 
 `site-specific/static/` owns site assets, including CSS.
 `extensions/site/` is available for site-specific templates or rendering code that cannot be expressed as data.
@@ -108,7 +108,7 @@ Trusted dispatch does not execute untrusted pull-request code, and concurrency d
 
 ## Workstream 4: agent workflows
 
-Add `.apm/skills/exercise-orinoco-ai-sandbox/SKILL.md` to the engineering repository and validate it with skills-workshop.
+Add `.apm/skills/exercise-orinoco-ai-sandbox/SKILL.md` to the engineering repository.
 It accepts a repository selected by the developer in that developer's account and treats the broad repository-local grant as standing authority.
 The agent may navigate, curate, merge, deploy, and recover without repeated approval; branches, pull requests, and checks remain useful practice rather than permission gates.
 Submission provenance records the authenticated GitHub principal and agent-mediated execution, with a dedicated bot identity optional.
