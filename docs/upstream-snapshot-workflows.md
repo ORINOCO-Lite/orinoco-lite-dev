@@ -138,7 +138,9 @@ Both are now handled explicitly and counted rather than silently discarded.
 The static comparison produced 986 upstream routes and 1,746 Orinoco routes, with 981 shared.
 The five upstream-only routes are annotation-selected friendly slugs for records that Orinoco currently renders at their PID-derived routes; Orinoco's 765 additional routes are primarily record pages plus the editor.
 Person records also span both `xyzrins` and `orcid` namespaces.
-Generic multi-namespace routing remains tracked in [`ORINOCO-Lite/orinoco-lite-dev#34`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/34), and annotation-selected route aliases remain a separate projection parity gap.
+The ordered multi-namespace routing implementation proposed in [`ORINOCO-Lite/orinoco-lite-dev#34`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/34) remains unreviewed and is not an accepted downstream contract.
+It is independent of this parity fixture, which deliberately retains upstream's single-namespace page selection and routes.
+Annotation-selected route aliases remain a separate projection parity gap.
 
 ## Engine issues exposed and covered
 

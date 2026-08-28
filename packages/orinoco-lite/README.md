@@ -93,6 +93,40 @@ That setting fails validation when a selected relationship target is not a selec
 It does not alter canonical metadata or invent a local Thing.
 For full local-reference closure, a site must separately set `references.missing_targets: reject`; omitting the `references` section preserves well-formed unresolved references.
 
+### PID routing proposal
+
+The original single-namespace policy remains supported and keeps the same routes:
+
+```yaml
+routing:
+  strip_prefix: "xyzrins:"
+```
+
+The following ordered multi-namespace form is implemented for review under [issue 34](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/34), but it is not yet an accepted downstream contract or template default:
+
+```yaml
+routing:
+  namespaces:
+    - strip_prefix: "xyzrins:"
+      route_prefix: ""
+    - strip_prefix: "CiTO:"
+      route_prefix: "vocab/cito"
+    - strip_prefix: "sio:"
+      route_prefix: "vocab/sio"
+```
+
+The first matching rule removes `strip_prefix`, trims boundary `/` characters from the remaining suffix as the original single-prefix behavior does, prepends the repository-relative `route_prefix`, and leaves the canonical PID unchanged.
+Every rendered non-homepage PID must match a rule; the declared homepage always owns the projection root and bypasses PID routing.
+Internal empty or traversal segments, whitespace, C0 or DEL controls, absolute or non-normalized route prefixes, and duplicate namespace prefixes are rejected.
+Whitespace is rejected before Hugo can normalize spaces to hyphens.
+Before writing pages, the engine checks complete projection-content and lowercased Hugo output paths for Unicode- and case-portable equality and file-as-ancestor conflicts, including the homepage.
+The final `/edit/` and `/review/` trees remain reserved for the released static interfaces.
+
+Projection algorithm v4 changes the `SHA256SUMS` header and algorithm pin even for an unchanged legacy `routing.strip_prefix` profile.
+After adopting a release containing v4, regenerate the ledger explicitly with `orinoco projection update` before verification or build.
+Ordinary legacy PID-derived paths and the existing boundary-slash trimming remain unchanged; only the generated ledger records the new algorithm when no new safety failure applies.
+The complete routing configuration remains a digested projection input.
+
 ## Schema conversion boundary
 
 The current runtime is content-neutral within the selected Things Schema profile; it does not claim arbitrary-schema compatibility.
