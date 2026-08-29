@@ -66,7 +66,7 @@ It remains read-only evidence until a separate, explicitly reviewed graduation p
 
 ## Review now
 
-[`Milestone 7`](docs/milestone-7.md) is the active sustainable-downstream work.
+[`Milestone 7`](docs/milestone-7.md) records the completed sustainable-downstream implementation and the open human-gated organization adoption.
 It adds the local candidate loop, consolidates site-owned data, moves generic behavior into the engine and template, and rebuilds the two development downstreams from the retained `leej3` baseline.
 [`Milestone 6`](docs/milestone-6.md) remains the accepted metadata-path-hardening record.
 The separate [`human-review decision queue`](docs/human-review-decisions.md) records the reviewed planning outcomes and unresolved production and strategic choices.

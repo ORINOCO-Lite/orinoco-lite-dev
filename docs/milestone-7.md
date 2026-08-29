@@ -1,6 +1,6 @@
 # Milestone 7: sustainable downstream ownership
 
-Status: implementation
+Status: implementation complete; organization adoption awaiting human review
 
 Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
 
@@ -136,3 +136,30 @@ Milestone 7 is complete when:
 5. the bare review route, curation messages, and validation triggers behave as described above;
 6. the engineering skill completes one end-to-end exercise in the developer-owned downstream, and the template distributes its downstream-maintenance skill; and
 7. the accepted release and deployment coordinates are recorded.
+
+### Current acceptance record
+
+1. The local candidate command exercised working-tree engine and template changes together against the retained downstream before either release.
+The final full run passed four adapter canaries, 155 consumer tests, validation of 224 records and 202 annotation companions, deterministic static builds, and five Chromium plus five WebKit route and editor checks.
+Unit coverage separately proves engine-only and template-only staging.
+2. [Engineering pull request 73](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/73) delivered the unified source contract, structured rendering, local candidate loop, review discovery, bot copy, and engineering skill at `6d268efac4ad6283103e9ff38f93780cbff9eb24`.
+Immutable engine/runtime release [`v0.2.0rc12`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/releases/tag/v0.2.0rc12) was produced by [release run 33218446554](https://github.com/ORINOCO-Lite/orinoco-lite-dev/actions/runs/33218446554).
+3. Immutable template release [`v0.2.0rc16`](https://github.com/ORINOCO-Lite/orinoco-lite-template/releases/tag/v0.2.0rc16) is based on `aa2428fd58fa1e0d2ffc2e57c0ada279f6c7e0d3`.
+Its published `github-template` commit is `60cfbc1f37d580e21ade08200ca47758e9ab3e94`, with exact tree `a3679dbb94ebf3b343063208c4e5602bae7fe220`.
+[Post-merge run 33222094866](https://github.com/ORINOCO-Lite/orinoco-lite-template/actions/runs/33222094866) passed on Linux and macOS.
+4. Developer-downstream [pull request 33](https://github.com/leej3/orinoco-lite-demo/pull/33) installed the new ownership layout, and [pull request 34](https://github.com/leej3/orinoco-lite-demo/pull/34) adopted the final validation scope.
+The current source is `f22c8f3dfa9c0942c523784868ecad84a8caaa49`; [Pages run 33222159712](https://github.com/leej3/orinoco-lite-demo/actions/runs/33222159712) deployed it at [`https://leej3.github.io/orinoco-lite-demo/`](https://leej3.github.io/orinoco-lite-demo/).
+[Validation run 33222159713](https://github.com/leej3/orinoco-lite-demo/actions/runs/33222159713) passed on Linux and macOS.
+The live `/edit/` and `/review/` routes are downstream-owned, and bare `/review/` links to the repository's filtered open curation pull requests.
+5. Source-curation branches use their existing exact-head dispatch once.
+Metadata changes receive full validation; decision-cache-only updates receive joined-graph validation; ordinary pull requests retain full validation.
+The final source-curation message reports the decision commit as ready for merging without a human-draft disclaimer.
+6. The organization reference is rebuilt from the same retained data and adapter baseline in [pull request 52](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/pull/52).
+The pull request remains open at the required human gate after local adapter, consumer, validation, deterministic-build, and browser checks plus [hosted validation run 33222244960](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website/actions/runs/33222244960) on Linux and macOS.
+7. The engineering `develop-orinoco-lite` skill drove the local-to-developer exercise, and template release `v0.2.0rc16` distributes the `maintain-orinoco-site` skill for ordinary downstream updates.
+8. The central backend-only service was deployed from the clean engineering commit `6d268efac4ad6283103e9ff38f93780cbff9eb24`, tree `8dc652dcc6832dada9eb3bd3890337f1b2320b31`, to Cloudflare Pages project `orinoco-curation-review` as immutable deployment `058c3cc9-8ebd-45ff-95a0-9acb903d57f6` at [`https://058c3cc9.orinoco-curation-review.pages.dev/`](https://058c3cc9.orinoco-curation-review.pages.dev/).
+The canonical origin remains [`https://orinoco-curation-review.pages.dev/`](https://orinoco-curation-review.pages.dev/) with public client ID `Iv23limCfUnRPCFcXx3H`; its configuration contains only `PUBLIC_ORIGIN`, `GITHUB_CLIENT_ID`, and the encrypted `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` values.
+The deployment uploaded no static files: it contains only the checked Functions bundle and route file.
+Anonymous probes confirmed the retired root and presentation routes return empty `404` responses, discovery tombstones return `410`, the anonymous session returns `authenticated: false`, and OAuth uses the exact callback plus PKCE without an OAuth scope.
+A live browser exercise against `leej3/orinoco-lite-demo` loaded 224 records in the downstream editor, exposed credential-free **Download review bundle**, enforced both shared-origin and public-data acknowledgments before enabling **Propose via GitHub**, completed GitHub authentication without a write, and confirmed the downstream's human-friendly filtered pull-request link.
+Deployment `8d448e3d-97e2-4054-b29d-b9ed88321b8b` remains the previously successful production rollback coordinate.
