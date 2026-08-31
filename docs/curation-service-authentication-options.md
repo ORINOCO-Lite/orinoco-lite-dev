@@ -2,7 +2,7 @@
 
 Status: accepted design rationale; normative requirements are in [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
 
-John Lee accepted this architecture on 2026-08-27 as M6-D007 and HR-229, then simplified the SHACL `/edit/` warning and removed its bundle acknowledgment on 2026-08-31 as M6-D009 and HR-232.
+John Lee accepted this architecture on 2026-08-27 as M6-D007 and HR-229, simplified the SHACL `/edit/` warning and removed its bundle acknowledgment on 2026-08-31 as M6-D009 and HR-232, then made its **Propose via GitHub** control the final authorizing click as M6-D010 and HR-233.
 This note preserves the authentication options and design rationale without creating a second normative contract.
 
 ## Accepted outcome
@@ -150,7 +150,7 @@ Implementation:
 
 1. make the central service origin a default with one downstream override;
 2. derive repository identity at trusted build time;
-3. move both confirmation experiences and SHACL file reselection downstream;
+3. move source-review confirmation, the final SHACL proposal action, and SHACL file reselection downstream;
 4. replace the central routes with API handlers and the minimal callback/transport response;
 5. remove root, `/edit/`, review, upload, and final-confirmation presentation routes and assets; and
 6. validate editor proposal creation and source review end to end while the browser's main URL remains on the deployed downstream site.

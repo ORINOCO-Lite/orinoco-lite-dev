@@ -64,7 +64,8 @@ OAuth state and the short-lived authentication session MAY preserve those non-se
 
 If authorization or browser policy severs the opener relationship, the curator MAY use **Download bundle**, select that unchanged file on the downstream `/edit/` route, and begin a new popup session.
 The service MUST apply the same coordinate, format, size, authorization, and exact-head checks regardless of whether the unchanged bundle remained in the editor session or was reselected there.
-The downstream MUST display the authenticated login, repository, source and head commits, changed paths, and public-history warnings and require an explicit confirmation before it instructs the popup to submit the proposal.
+The downstream MUST display the repository, selected records, and applicable public-history warning in the submission drawer.
+The curator's **Propose via GitHub** click is the final authorization for that one proposal: it opens the popup and the verified channel submits automatically after authentication without another confirmation control.
 The GitHub token, session cookie, and CSRF material MUST remain at the service origin and MUST NOT cross the browser channel.
 When the editor is framed, it MUST refuse direct GitHub proposal actions and explain why while preserving **Download bundle**.
 
@@ -104,6 +105,11 @@ The handoff is ephemeral transport, not a metadata proposal, review bundle, mani
 It MUST NOT be merged.
 The pull request MUST remain draft while a handoff is present.
 The downstream MUST warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement, but MUST NOT require a separate bundle acknowledgment.
+The service MUST open a new draft pull request without an explanatory body attributed to the curator.
+After verifying the exact handoff boundary, trusted workflow code MUST post this concise status as `github-actions[bot]`:
+
+> Metadata update from SHACL Vue.
+> > Please wait for the workflow to create the corresponding edit to the metadata records.
 
 ## Trusted replacement
 
@@ -113,7 +119,7 @@ It treats the pull-request tree and bundle only as data and never executes code 
 Against the exact observed handoff head, the workflow MUST:
 
 1. verify the same-repository draft pull request, curator authority, authenticated event actor, handoff authorship, one-parent history, fixed path, file mode, format, bounds, and bundle source commit;
-2. run the pinned released Orinoco editor apply behavior with trusted code against an isolated checkout of the handoff parent;
+2. run the pinned released Orinoco editor apply behavior with trusted code against an isolated checkout of the handoff parent, preserving source order for RDF multivalues whose members did not change;
 3. require every input digest, PID, schema type, and source path to match and permit output only below configured `paths.records` and the engine-derived mirrored annotation root (current templates use `site-specific/metadata/records/` and `site-specific/metadata/overlays/annotations/`);
 4. validate every stored record and companion and the complete joined Things graph;
 5. create one ordinary human metadata commit with the same parent as the handoff, the verified curator as author, and automation as committer; and
@@ -125,7 +131,7 @@ It MUST NOT rewrite a canonical metadata commit, silently retry against a new he
 Failure leaves the draft pull request visibly blocked at the handoff commit and does not create or modify metadata.
 
 The replacement is an ordinary attributed human commit, not a DataLad run: the Action deterministically materializes the curator's exact editor result and does not execute a source adapter or choose a semantic change.
-The normal trusted workflow validates the resulting joined graph and adds the configurable curation-service link idempotently.
+The normal trusted workflow validates the resulting joined graph.
 
 ## Permissions and prohibitions
 

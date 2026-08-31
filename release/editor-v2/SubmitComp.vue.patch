@@ -1,7 +1,11 @@
 .bashrc sourced.
 .bash_profile sourced
+.bashrc sourced.
+.bash_profile sourced
+.bashrc sourced.
+.bash_profile sourced
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
-index 9621e55..3299eaa 100644
+index 9621e55..b0787b0 100644
 --- a/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
 @@ -15,6 +15,7 @@
@@ -12,7 +16,7 @@ index 9621e55..3299eaa 100644
                                  :value="r.node_iri"
                                  align="start"
                                  class="align-start"
-@@ -55,12 +56,95 @@
+@@ -55,12 +56,66 @@
                              <em><h3>Nothing to submit</h3></em>
                          </div>
                      </span>
@@ -58,46 +62,12 @@ index 9621e55..3299eaa 100644
 +                            >Improve this with a custom domain</a>
 +                        </p>
 +                    </v-alert>
-+                    <v-card
-+                        v-if="pendingProposalBundle"
-+                        variant="outlined"
-+                        style="margin-top: 1em;"
-+                    >
-+                        <v-card-title>Confirm GitHub proposal</v-card-title>
-+                        <v-card-text>
-+                            <p>
-+                                Repository:
-+                                <strong>{{ config.review_bundle_proposal.repository }}</strong>
-+                            </p>
-+                            <p>
-+                                Source commit:
-+                                <code>{{ pendingProposalBundle.source_commit }}</code>
-+                            </p>
-+                            <p>
-+                                {{ pendingProposalBundle.records.length }} edited
-+                                {{ pendingProposalBundle.records.length === 1 ? 'record' : 'records' }}:
-+                            </p>
-+                            <ul>
-+                                <li v-for="record in pendingProposalBundle.records" :key="record.pid">
-+                                    <code>{{ record.source_path }}</code> ({{ record.pid }})
-+                                </li>
-+                            </ul>
-+                        </v-card-text>
-+                        <v-card-actions>
-+                            <v-btn
-+                                :disabled="
-+                                    framedContext ||
-+                                    proposing
-+                                "
-+                                @click="confirmProposal()"
-+                            >
-+                                Confirm and create draft pull request
-+                            </v-btn>
-+                            <v-btn :disabled="proposing" @click="cancelProposal()">
-+                                Return to editor
-+                            </v-btn>
-+                        </v-card-actions>
-+                    </v-card>
++                    <p v-if="proposalMode && !framedContext">
++                        <strong>GitHub repository:</strong>
++                        {{ config.review_bundle_proposal.repository }}.
++                        The button below submits the selected records above as a draft
++                        pull request.
++                    </p>
                  </span>
              </v-skeleton-loader>
              <span v-if="responseReceived">
@@ -113,7 +83,7 @@ index 9621e55..3299eaa 100644
                  <br />
                  <br />
                  <v-btn
-@@ -103,6 +187,20 @@
+@@ -103,6 +158,17 @@
              <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
                  <v-icon>mdi-check-circle-outline</v-icon> Submit
              </v-btn>
@@ -121,8 +91,7 @@ index 9621e55..3299eaa 100644
 +                v-if="proposalMode && !responseReceived && nodesToSubmit.length"
 +                :disabled="
 +                    framedContext ||
-+                    proposing ||
-+                    pendingProposalBundle
++                    proposing
 +                "
 +                @click="proposeRecords()"
 +            >
@@ -132,7 +101,7 @@ index 9621e55..3299eaa 100644
              <v-btn v-if="responseReceived" @click="clearSubmitErrors()">
                  <v-icon>mdi-check-circle-outline</v-icon> OK
              </v-btn>
-@@ -136,7 +234,15 @@
+@@ -136,7 +202,15 @@
  <script setup>
  import { computed, ref, inject } from 'vue';
  import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJSON, dlTTL} from '@/modules/utils';
@@ -149,17 +118,16 @@ index 9621e55..3299eaa 100644
 
  import { useToken } from '@/composables/tokens';
  import { DataFactory, Store } from 'n3';
-@@ -162,6 +268,11 @@ const awaitingResponse = ref(false);
+@@ -162,6 +236,8 @@ const awaitingResponse = ref(false);
  const responseReceived = ref(false);
  const responseSuccess = ref(false);
  const responseFailure = ref(false);
-+const pendingProposalBundle = ref(null);
 +const proposalResult = ref(null);
 +const proposing = ref(false);
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
-@@ -172,6 +283,34 @@ const copiedIndex = ref(null);
+@@ -172,6 +248,38 @@ const copiedIndex = ref(null);
  const patchDownloadMode = computed(
      () => config.value?.review_bundle_mode === 'patch-download'
  );
@@ -198,11 +166,10 @@ index 9621e55..3299eaa 100644
 
  function toggleFailureResponse() {
      showCompleteFailure.value = !showCompleteFailure.value;
-@@ -189,7 +328,93 @@ function clearSubmitErrors() {
+@@ -189,7 +297,68 @@ function clearSubmitErrors() {
      responseErrors.value = [];
      responseReceived.value = false;
      awaitingResponse.value = false;
-+    pendingProposalBundle.value = null;
 +    proposalResult.value = null;
 +    proposing.value = false;
 +
@@ -226,7 +193,7 @@ index 9621e55..3299eaa 100644
 +        selectedNodes: selected,
 +    });
 +}
-+
+
 +function reviewBundleFailure(error) {
 +    responseFailure.value = true;
 +    responseReceived.value = true;
@@ -235,45 +202,28 @@ index 9621e55..3299eaa 100644
 +
 +async function proposeRecords() {
 +    if (framedContext) return;
-+    try {
-+        const bundle = await buildSelectedReviewBundle();
-+        dispatchReviewBundle(bundle);
-+        pendingProposalBundle.value = bundle;
-+        proposalResult.value = null;
-+    } catch (error) {
-+        reviewBundleFailure(error);
-+    }
-+}
-
-+function cancelProposal() {
-+    if (proposing.value) return;
-+    pendingProposalBundle.value = null;
-+}
-+
-+async function confirmProposal() {
-+    if (
-+        framedContext ||
-+        !pendingProposalBundle.value ||
-+        proposing.value
-+    ) return;
 +    let handoff;
 +    proposing.value = true;
++    proposalResult.value = null;
 +    try {
++        // Open the transport synchronously from the authorizing click so
++        // popup blockers do not turn the normal flow into a retry.
 +        handoff = beginReviewBundleProposal(
 +            config.value.review_bundle_proposal
 +        );
++        const bundle = await buildSelectedReviewBundle();
++        dispatchReviewBundle(bundle);
 +        const result = await handoff.deliver({
-+            bundle: pendingProposalBundle.value,
++            bundle,
 +            format: 'orinoco-lite-shacl-proposal-v1',
 +            repository: config.value.review_bundle_proposal.repository,
 +            target: { kind: 'standalone' },
 +        });
 +        proposalResult.value = result;
-+        pendingProposalBundle.value = null;
 +        responseSuccess.value = true;
 +        responseFailure.value = false;
 +        responseReceived.value = true;
-+        responseText.value = 'GitHub created the attributed bundle commit and draft pull request.';
++        responseText.value = 'GitHub created the draft pull request.';
 +    } catch (error) {
 +        handoff?.cancel();
 +        responseFailure.value = true;
@@ -285,7 +235,7 @@ index 9621e55..3299eaa 100644
  }
 
  async function submit() {
-@@ -239,24 +464,11 @@ async function downloadRecords() {
+@@ -239,24 +408,11 @@ async function downloadRecords() {
      );
      if (patchDownloadMode.value) {
          try {

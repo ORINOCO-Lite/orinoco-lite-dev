@@ -121,6 +121,16 @@ Repository, source, exact-head, collaborator, fixed-path, and trusted-replacemen
 This decision completes M6-D008's deferred SHACL user-flow correction and supersedes the SHACL acknowledgment parts of M6-D005 and M6-D007.
 It does not change the source-adapter `/review/` acknowledgment.
 
+### M6-D010 — Make the SHACL proposal one click and keep automation messages automated
+
+The **Propose via GitHub** control is the final authorizing click for one proposal.
+Its drawer shows the repository and selected records before that click; the authenticated popup submits automatically and does not ask for a second confirmation.
+
+The service opens a new draft without placing explanatory text under the curator's identity.
+After verifying the handoff, trusted workflow code posts the concise `github-actions[bot]` status defined by the SHACL profile.
+Trusted editor application also preserves the original order of any RDF multivalue whose members are unchanged, so an unrelated scalar edit does not rewrite the rest of a YAML record.
+This decision completes M6-D009's submission interaction without changing the source-adapter `/review/` flow.
+
 ### M6-D004 — Move repository custody before the milestone and after active work is merged
 
 Creating the organization, transferring repositories or the GitHub App, and changing application installation or deployment configuration are external operations.

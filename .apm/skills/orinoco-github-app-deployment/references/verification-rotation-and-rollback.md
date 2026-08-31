@@ -48,8 +48,8 @@ Without submitting a review or proposing a handoff, verify:
 - the static editor exposes both **Download bundle** and **Propose via GitHub**;
 - opening **Propose via GitHub** carries only the expected operation, repository, exact static-editor origin, and one-time nonce, and the popup's readiness message is bound to the exact two windows, origins, operation, repository, and nonce;
 - focused origin-policy tests classify the actual browser origin, including terminal-dot spelling, and cover both the normal custom- or unique-origin flow and the shared-`github.io` flow;
-- on the exercised downstream, a shared `github.io` origin explains its origin-wide trust boundary and requires a fresh in-memory acknowledgment before either direct GitHub write action becomes usable, without writing local storage, a cookie, service state, or tracked configuration, while a custom or otherwise unique origin omits that additional warning;
-- **Download bundle** remains usable on a shared origin without the origin acknowledgment, GitHub sign-in, or a reachable service, and the separate public-history acknowledgment still appears before a SHACL Git write;
+- on the exercised downstream, a shared `github.io` origin explains its origin-wide trust boundary and links to custom-domain remediation without gating SHACL submission, while a custom or otherwise unique origin omits that additional warning;
+- **Download bundle** remains usable on a shared origin without GitHub sign-in or a reachable service, and **Propose via GitHub** is the only authorizing click for its one proposal;
 - a framed editor refuses direct GitHub proposal while **Download bundle** remains usable; and
 - logout clears the session.
 
@@ -76,9 +76,9 @@ For an authorized downstream:
 Follow the current provider-displayed DNS targets; do not copy historical IP addresses from logs or documentation.
 3. Wait for GitHub's domain and certificate checks, then enable and verify HTTPS using its [HTTPS guidance](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
 4. Confirm that the origin of `site.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
-5. Load `/edit/` and `/review/` from the final deployment, confirm the normal low-friction flow has no shared-origin acknowledgment, and complete the read-only OAuth proof before authorizing a write proof.
+5. Load `/edit/` and `/review/` from the final deployment, confirm the custom-domain flow omits the shared-origin warning, and complete the read-only OAuth proof before authorizing a write proof.
 
-If the custom domain is unavailable or not yet verified, retain the ordinary `github.io` deployment and its explicit in-memory acknowledgment gate.
+If the custom domain is unavailable or not yet verified, retain the ordinary `github.io` deployment and its informational warning and remediation link.
 Do not disable **Download bundle** while domain work is pending.
 
 ## Failure guide
@@ -89,7 +89,7 @@ Do not disable **Download bundle** while domain work is pending.
 | `missing_oauth_state` after login | Cookie lost through origin or proxy behavior, folded `Set-Cookie`, wrong callback origin, or ten-minute expiry. |
 | `invalid_oauth_callback` | Wrong callback or setup URL, stale application revision, duplicate or foreign fields, or unexpected issuer. |
 | Popup never becomes ready | Popup or opener was lost, browser policy intervened, or downstream origin, service origin, operation, repository, window identity, or nonce does not match. Keep the identical downloaded bundle and reselect it on downstream `/edit/` before starting a fresh popup rather than weakening the checks. |
-| Bundle is rejected | Wrong format or keys, more than 50 records, over 10 MiB, invalid record coordinates, repository mismatch, source commit mismatch, stale head, or missing public-data acknowledgment. |
+| Bundle is rejected | Wrong format or keys, more than 50 records, over 10 MiB, invalid record coordinates, repository mismatch, source commit mismatch, or stale head. |
 | GitHub 403/404 | App not installed, permission approval pending, user lacks write or admin, or session token expired. |
 | Artifact failure | Egress blocked, redirect auto-followed or rewritten, destination host rejected, or provider size limit exceeded. This applies to the source-adapter review artifact, not SHACL editor input. |
 | Downstream UI works but APIs 404 | The Worker, Functions, or provider backend adapter is absent or routed incorrectly. |

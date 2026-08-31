@@ -358,10 +358,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
       if (url.endsWith("/pulls") && init?.method === "POST") {
         if (options.pullFails) return Response.json({}, { status: 422 });
         const pull = body as Record<string, unknown>;
-        expect(String(pull.body)).toContain(
-          "Do not merge this pull request while the temporary path exists",
-        );
-        expect(String(pull.body)).toContain("may remain");
+        expect(pull.body).toBe("");
         return Response.json({
           base: { ref: "main", repo: { full_name: "example/site" } },
           draft: true,

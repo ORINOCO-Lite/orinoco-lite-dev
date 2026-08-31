@@ -213,7 +213,13 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
                 "Direct GitHub proposal unavailable while embedded",
                 source,
             )
-            self.assertEqual(source.count("framedContext ||"), 3)
+            self.assertEqual(source.count("framedContext ||"), 1)
+            self.assertNotIn("Confirm GitHub proposal", source)
+            self.assertNotIn("Confirm and create draft pull request", source)
+            self.assertLess(
+                source.index("handoff = beginReviewBundleProposal("),
+                source.index("await buildSelectedReviewBundle()"),
+            )
             self.assertIn(DOWNLOAD_AND_DISPATCH, source)
             self.assertIn(SHARED_ORIGIN_WARNING, source)
             self.assertIn(SHARED_ORIGIN_INFORMATION, source)

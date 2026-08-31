@@ -92,23 +92,6 @@ function commitBody(sourceCommit: string): string {
   ].join("\n");
 }
 
-function pullRequestBody(sourceCommit: string): string {
-  return [
-    "This draft contains an explicit human-authored SHACL Vue proposal.",
-    "The trusted default-branch workflow must validate the bundle and replace",
-    "the temporary handoff commit with equivalent canonical YAML.",
-    "",
-    "Warning: the temporary bundle is public while referenced and may remain",
-    "retrievable by commit ID after its branch becomes unreachable under GitHub",
-    "retention. Do not merge this pull request while the temporary path exists.",
-    "",
-    `Source commit: ${sourceCommit}`,
-    `Temporary path: ${SHACL_BUNDLE_PATH}`,
-    "",
-    "The service did not approve, merge, deploy, or write to a source system.",
-  ].join("\n");
-}
-
 function failureDiagnostic(error: unknown): string {
   return error instanceof HttpError
     ? `${error.code}: ${error.message}`
@@ -266,7 +249,7 @@ export async function createShaclProposal(
       repository.defaultBranch,
       commit.sha,
       PULL_REQUEST_TITLE,
-      pullRequestBody(base.sha),
+      "",
     );
     return {
       commit_sha: commit.sha,

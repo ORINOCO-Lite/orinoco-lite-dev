@@ -342,6 +342,52 @@ def _git_status(root: Path) -> set[str]:
     return changed
 
 
+def _rdf_value_fingerprint(value: Any) -> str:
+    """Return an order-insensitive fingerprint for RDF-derived JSON values."""
+
+    def normalized(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            return {
+                str(key): normalized(nested)
+                for key, nested in sorted(item.items(), key=lambda pair: str(pair[0]))
+            }
+        if isinstance(item, list):
+            members = [normalized(nested) for nested in item]
+            return sorted(
+                members,
+                key=lambda nested: json.dumps(
+                    nested,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+            )
+        return item
+
+    return json.dumps(
+        normalized(value),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _preserve_unchanged_rdf_list_order(converted: Any, source: Any) -> Any:
+    """Keep source order when RDF conversion only permuted a multivalue."""
+
+    if isinstance(converted, Mapping) and isinstance(source, Mapping):
+        return {
+            key: _preserve_unchanged_rdf_list_order(value, source[key])
+            if key in source
+            else value
+            for key, value in converted.items()
+        }
+    if isinstance(converted, list) and isinstance(source, list):
+        if _rdf_value_fingerprint(converted) == _rdf_value_fingerprint(source):
+            return source
+    return converted
+
+
 def validate_bundle(
     workspace: WorkspaceConfig,
     runtime_root: Path,
@@ -394,6 +440,7 @@ def validate_bundle(
             raise DriverError(f"Review bundle source digest is stale for {pid}")
         if item.get("schema_type") != source["schema_type"]:
             raise DriverError(f"Review bundle schema type does not match {pid}")
+        original = yaml.safe_load(path.read_text(encoding="utf-8"))
         rdf_turtle = item.get("rdf_turtle")
         if not isinstance(rdf_turtle, str) or not rdf_turtle.strip():
             raise DriverError(f"Review bundle RDF is missing for {pid}")
@@ -409,6 +456,7 @@ def validate_bundle(
             raise DriverError(f"Review bundle conversion failed for {pid}")
         if record.get("pid") != pid or record.get("schema_type") != source["schema_type"]:
             raise DriverError(f"Review bundle changed record identity: {pid}")
+        record = _preserve_unchanged_rdf_list_order(record, original)
         validate_stored_record(record)
         updates[path] = canonical_yaml(record)
 
