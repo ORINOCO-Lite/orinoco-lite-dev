@@ -16,7 +16,8 @@ Do not require per-file origins or before-and-after coordinate inventories for o
 
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
-- Detailed specifications, plans, decisions, and reports belong under `docs/agents/` only while active.
+- Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
+- Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
 Retire them at milestone boundaries.
 - Archived documents are historical context, not instructions or current policy.
 Do not link to them from active instructions or indexes.
@@ -25,6 +26,8 @@ Do not link to them from active instructions or indexes.
 
 - Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
+- Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
+- Keep the real CON site read-only unless the user explicitly includes it, and do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
 - Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
 - Treat `.agents/skills/` as the single canonical source for project-owned skills and edit those files directly.
 Do not add skill dependency infrastructure until this project consumes an independently maintained promoted skill.

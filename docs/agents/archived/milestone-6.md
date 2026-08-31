@@ -4,9 +4,9 @@ Status: accepted on 2026-08-28; discoverable, live-proven SHACL proposal flow de
 
 Predecessor: [`milestone-5.md`](milestone-5.md)
 
-Normative source-adapter contract: [`source-adapters.md`](source-adapters.md)
+Normative source-adapter contract: [`source-adapters.md`](../contract/source-adapters.md)
 
-Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
+Current human-policy queue: [`open-decisions.md`](../open-decisions.md)
 
 ## Completed prerequisite batch
 
@@ -118,8 +118,8 @@ It also removes the separate public-data bundle acknowledgment.
 
 The GitHub transport opens as a compact popup, tells the curator that it closes automatically, and remains open through authorization and the proposal result.
 Repository, source, exact-head, collaborator, fixed-path, and trusted-replacement checks remain unchanged.
-This decision completes M6-D008's deferred SHACL user-flow correction and supersedes the SHACL acknowledgment parts of M6-D005 and M6-D007.
-It does not change the source-adapter `/review/` acknowledgment.
+This decision completes M6-D008's deferred SHACL user-flow correction.
+The current shared-origin policy is warning-only for both `/edit/` and `/review/`.
 
 ### M6-D010 — Make the SHACL proposal one click and keep automation messages automated
 
@@ -180,7 +180,7 @@ Browser messaging can authenticate an origin but not a path.
 A GitHub Pages project site therefore shares its browser trust boundary with other pages on that account's Pages hostname.
 Exact build-derived repository binding and one-shot window and nonce checks remain mandatory.
 A shared `github.io` deployment also explains the origin-wide boundary.
-The `/review/` route retains an explicit in-memory acknowledgment before posting decisions; M6-D009 makes the `/edit/` explanation a warning without a gate.
+Both `/review/` and `/edit/` present that explanation as a warning without gating submission.
 A custom or otherwise unique origin receives the normal flow.
 
 M6-D007 supersedes M6-D006's originally accepted central confirmation while preserving its proposal, candidate, decision-cache, provenance, artifact, and finalization authority.
@@ -188,7 +188,7 @@ It also leaves M6-D005's distinct `/edit/` SHACL Vue route unchanged.
 
 ### M6-D007 — Keep presentation downstream and make the service backend-only
 
-The accepted authentication choices and rejected alternatives are explained in [`curation-service-authentication-options.md`](curation-service-authentication-options.md).
+The current authentication contract is in [`curation-service-authentication-options.md`](../contract/curation-service-authentication-options.md).
 
 The downstream's deployed `/edit/` and `/review/` routes own every user-facing editing, review, warning, and confirmation surface.
 The main browser remains on that downstream origin throughout GitHub authorization and submission.
@@ -203,8 +203,7 @@ Root and retired presentation routes fail closed with `404` or `410`.
 
 Browser messaging authenticates an origin rather than a path.
 A downstream on a shared `github.io` origin must therefore explain that another compromised page on the same origin could impersonate the intended `/edit/` or `/review/` path.
-The source-adapter `/review/` route requires an explicit, in-memory acknowledgment of that shared-origin limitation before posting decisions.
-M6-D009 makes the SHACL `/edit/` explanation a warning without a checkbox or acknowledgment gate.
+Both routes present that explanation as a warning without gating submission.
 Neither presentation is treated as an authorization or security proof.
 A custom or otherwise unique downstream origin receives the normal low-friction flow.
 **Download bundle** remains enabled and credential-free in both cases.
@@ -294,9 +293,9 @@ Milestone 6 is complete when:
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 
 For the direct GitHub paths, the implemented contract retains the normal flow on a custom or otherwise unique origin and an explanation on a shared `github.io` origin.
-The source-adapter `/review/` route retains its explicit acknowledgment gate; SHACL `/edit/` does not.
+Neither `/review/` nor `/edit/` gates submission on the shared-origin warning.
 Live end-to-end proof of the direct-GitHub SHACL path is part of the M6-D008 deferral.
-**Download bundle** remains usable there without GitHub authentication or acknowledgment.
+**Download bundle** remains usable there without GitHub authentication.
 
 Acceptance records representative commands, releases, pull requests, and runs.
 It does not duplicate commit ancestry already enforced by Git and the workflow or reproduce every transient artifact coordinate.

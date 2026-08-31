@@ -2,7 +2,7 @@
 
 Status: implementation complete; draft human review open
 
-Consolidated prioritized review queue: [`human-review-decisions.md`](human-review-decisions.md).
+Consolidated prioritized review queue: [`open-decisions.md`](../open-decisions.md).
 This file remains the authoritative source record for Milestone 3 decision IDs and evidence.
 
 This register distinguishes decisions already authorized by the user from questions that require human review.

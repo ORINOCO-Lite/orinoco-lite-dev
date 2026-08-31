@@ -4,7 +4,7 @@ Status: accepted on 2026-08-26
 
 Plan: [`milestone-5.md`](milestone-5.md)
 
-Normative contract: [`source-adapters.md`](source-adapters.md)
+Normative contract: [`source-adapters.md`](../contract/source-adapters.md)
 
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 

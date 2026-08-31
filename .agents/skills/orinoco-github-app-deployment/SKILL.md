@@ -27,7 +27,7 @@ Deploy only the checked API handlers, minimal generated OAuth callback/transport
 Put secrets only in the encrypted hosting control plane.
 Never put secret values in Git, command output, logs, evidence, or browser-visible configuration.
 Do not add durable storage.
-Keep provider-operator login separate from curator GitHub authorization as explained in the [authentication options](../../../docs/agents/curation-service-authentication-options.md).
+Keep provider-operator login separate from curator GitHub authorization as explained in the [authentication options](../../../docs/agents/contract/curation-service-authentication-options.md).
 For Cloudflare, prefer direct Cloudflare account authentication for an interactive operator and a narrowly scoped API token for CI.
 Cloudflare's GitHub social login is an optional operator choice that uses the primary GitHub email; the Orinoco GitHub App neither needs nor requests account email access.
 7. Deploy atomically from the clean reviewed revision.

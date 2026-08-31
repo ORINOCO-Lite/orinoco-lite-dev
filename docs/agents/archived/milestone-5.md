@@ -6,11 +6,11 @@ Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
 Predecessor: [`milestone-4.md`](milestone-4.md)
 
-Normative contract: [`source-adapters.md`](source-adapters.md)
+Normative contract: [`source-adapters.md`](../contract/source-adapters.md)
 
-GitHub review profile: [`github-curation-review.md`](github-curation-review.md)
+GitHub review profile: [`github-curation-review.md`](../contract/github-curation-review.md)
 
-GitHub human-edit profile: [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+GitHub human-edit profile: [`github-shacl-vue-edit.md`](../contract/github-shacl-vue-edit.md)
 
 Decision register: [`milestone-5-decisions.md`](milestone-5-decisions.md)
 
@@ -86,7 +86,7 @@ Gate: Zotero and `dump-research-info` independently satisfy the same observable 
 
 ### 3. Complete the GitHub profile
 
-Implement the separately reviewed normative [`GitHub source-adapter curation profile`](github-curation-review.md):
+Implement the separately reviewed normative [`GitHub source-adapter curation profile`](../contract/github-curation-review.md):
 
 - Start from a default-branch workflow dispatch and open one draft pull request containing the actual metadata proposal.
 - Create the proposal with one inline `datalad run --explicit` commit and render a friendly accessible fallback and review-application link in the pull-request body.
@@ -98,7 +98,7 @@ Implement the separately reviewed normative [`GitHub source-adapter curation pro
 - Provide a central application origin by default while keeping the origin configurable so a downstream can self-host the same stateless implementation.
 - Bind the authenticated comment submission to the repository, pull request, proposal commit, exact head, source coordinate, and complete candidate set without retaining a second proposal or decision copy in the service.
 - Support attributed comment suggestions and direct human metadata commits through ordinary GitHub collaboration.
-- Keep SHACL Vue proposal editing in the distinct [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) rather than making its bundle an input to this decision workflow.
+- Keep SHACL Vue proposal editing in the distinct [`GitHub SHACL Vue human-edit profile`](../contract/github-shacl-vue-edit.md) rather than making its bundle an input to this decision workflow.
 - Require a complete `/curation submit` decision state, mechanically apply it, update the compact cache, and validate the resulting graph.
 - Keep trusted workflow code separate from pull-request data, use exact-head compare-and-swap for automated commits, and require no local checkout from reviewers.
 - Preserve every proposal and human-review commit through a merge commit; never squash or rebase the reviewed lineage.

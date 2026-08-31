@@ -1,8 +1,8 @@
 # Curation service and authentication options
 
-Status: accepted design rationale; normative requirements are in [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
+Status: archived design rationale; current requirements are in [`github-curation-review.md`](../agents/contract/github-curation-review.md) and [`github-shacl-vue-edit.md`](../agents/contract/github-shacl-vue-edit.md)
 
-John Lee accepted this architecture on 2026-08-27 as M6-D007 and HR-229, simplified the SHACL `/edit/` warning and removed its bundle acknowledgment on 2026-08-31 as M6-D009 and HR-232, then made its **Propose via GitHub** control the final authorizing click as M6-D010 and HR-233.
+John Lee accepted this architecture on 2026-08-27, simplified the SHACL `/edit/` warning on 2026-08-31, then made its **Propose via GitHub** control the final authorizing click.
 This note preserves the authentication options and design rationale without creating a second normative contract.
 
 ## Accepted outcome
@@ -119,9 +119,7 @@ A unique downstream origin is the stronger option if path-level impersonation is
 A static secret embedded in the site cannot solve this because any script on the same origin can read it.
 
 A custom or otherwise unique downstream origin therefore receives the normal low-friction direct-GitHub flow.
-A shared `github.io` deployment shows a clear origin-wide security explanation.
-The source-adapter `/review/` route retains its visible in-memory acknowledgment before posting decisions.
-The SHACL `/edit/` route uses a warning and remediation link without an acknowledgment gate or separate public-data checkbox.
+A shared `github.io` deployment shows a clear origin-wide security explanation and remediation link on both `/review/` and `/edit/` without gating submission.
 The SHACL editor keeps **Download bundle** enabled without GitHub sign-in or a reachable service.
 It also refuses direct GitHub proposal while framed, because GitHub Pages cannot supply a reliable `frame-ancestors` response header; downloading remains available.
 

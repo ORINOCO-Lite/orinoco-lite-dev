@@ -3,8 +3,8 @@
 Status: normative specification
 
 This document defines the shared metadata behavior and supported GitHub review contract for Orinoco Lite source adapters.
-The hosted implementation is the separately specified normative [`GitHub source-adapter curation profile`](github-curation-review.md), which this contract incorporates by reference.
-The distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
+The hosted implementation is now defined by the [`GitHub source-adapter curation profile`](../agents/contract/github-curation-review.md).
+The distinct [`GitHub SHACL Vue human-edit profile`](../agents/contract/github-shacl-vue-edit.md) defines how a curator can turn the editor's normal bundle into an attributed metadata proposal without changing source-adapter decisions or SHACL Vue semantics.
 The two GitHub profiles reuse one small stateless authentication application.
 The source-adapter profile has one expiring GitHub Actions proposal-review bundle; the SHACL Vue profile uses the editor already generated and deployed with the downstream static site and does not add an editor-input artifact.
 Neither the proposal-review artifact nor the static editor output is a metadata service or durable curation store.
@@ -186,7 +186,7 @@ Supported inputs include:
 - attributed suggestions in review comments that automation applies;
 - one or more metadata commits pushed by authorized humans.
 
-SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md), not this decision-review and finalization profile.
+SHACL Vue proposal editing follows the distinct normative [`GitHub SHACL Vue human-edit profile`](../agents/contract/github-shacl-vue-edit.md), not this decision-review and finalization profile.
 Its existing generated bundle is exposed by the downstream static editor to a thin Orinoco GitHub handoff, but SHACL Vue itself does not acquire source-adapter, disposition, provenance, or decision-cache semantics.
 The downstream build combines exact-commit static editor data with the generic shell and schema from one immutable, digest-verified runtime release.
 That static site remains the only SHACL Vue editor and provides both **Download bundle** and **Propose via GitHub** for the same unchanged bundle.
@@ -411,7 +411,7 @@ A conforming host MUST provide:
 A conforming downstream MUST permit merge commits on its curated branch.
 A linear-history-only branch policy is not supported.
 
-The supported implementation MUST conform to the normative [`GitHub source-adapter curation profile`](github-curation-review.md).
+The supported implementation MUST conform to the normative [`GitHub source-adapter curation profile`](../agents/contract/github-curation-review.md).
 That profile owns workflow, authentication, interface, comment, cache-reference, and hosting behavior.
 The canonicalizer, annotation join, candidate model, and finalizer remain shared repository behavior, but the durable v1 review cache and hosted profile are explicitly GitHub-specific.
 
@@ -442,8 +442,7 @@ Source-adapter decisions are rendered by the downstream static `/review/` route;
 
 Custom or otherwise unique downstream origins use the normal direct-GitHub flow.
 A downstream on a shared `github.io` origin MUST explain that origin-wide browser trust.
-The source-adapter `/review/` route retains its explicit in-memory acknowledgment before a direct GitHub write.
-The SHACL Vue `/edit/` route presents the explanation as a warning without a checkbox or acknowledgment gate.
+The source-adapter `/review/` and SHACL Vue `/edit/` routes present that explanation as a warning without gating a direct GitHub write.
 Neither presentation weakens exact channel or server-side verification, and **Download bundle** remains credential-free.
 
 ## Security and complexity guardrails
@@ -496,11 +495,11 @@ Typed normalization must also be reversible in the ephemeral helper view so an u
 
 The pinned upstream reference points map directly onto this contract:
 
-- Dump Things [validation and curated storage](../submodules/dump-things-service/dump_things_service/curated.py) supply the schema-gated curated-state model;
-- Dump Things [`order_dict()` and `json2yaml()`](../submodules/dump-things-service/dump_things_service/utils.py) define canonical mapping and list ordering;
-- the [inbox/curation model](../submodules/dump-things-service/WHAT_IS_IT.md) supplies the proposal-versus-curated-state separation;
-- the [GitAudit backend](../submodules/dump-things-service/dump_things_service/audit/gitaudit.py) supplies record diff plus author/curator/time audit semantics; and
-- enrichment-tools [machine annotation rules](../submodules/things-enrichment-tools/docs/machine_annotations.md) and [ownership-aware updates](../submodules/things-enrichment-tools/things_enrichment_tools/__init__.py) supply PAV, idempotence, human priority, and multi-enricher behavior.
+- Dump Things [validation and curated storage](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/curated.py) supply the schema-gated curated-state model;
+- Dump Things [`order_dict()` and `json2yaml()`](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/utils.py) define canonical mapping and list ordering;
+- the [inbox/curation model](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/WHAT_IS_IT.md) supplies the proposal-versus-curated-state separation;
+- the [GitAudit backend](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/audit/gitaudit.py) supplies record diff plus author/curator/time audit semantics; and
+- enrichment-tools [machine annotation rules](https://github.com/ORINOCO-Lite/things-enrichment-tools/blob/9f036a4cdfb53f87346152f9cd4620aaef38bce2/docs/machine_annotations.md) and [ownership-aware updates](https://github.com/ORINOCO-Lite/things-enrichment-tools/blob/9f036a4cdfb53f87346152f9cd4620aaef38bce2/things_enrichment_tools/__init__.py) supply PAV, idempotence, human priority, and multi-enricher behavior.
 
 The local runtime remains pinned to the exact [Things Schema contract](explaining-schema-issues.md).
 

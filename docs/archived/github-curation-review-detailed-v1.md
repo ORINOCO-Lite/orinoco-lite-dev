@@ -1,8 +1,8 @@
 # GitHub source-adapter curation profile
 
-Status: normative profile incorporated by [`source-adapters.md`](source-adapters.md)
+Status: archived profile; current requirements are in [`source-adapters.md`](../agents/contract/source-adapters.md)
 
-This document defines the supported GitHub review implementation of the shared metadata and finalization behavior in [`source-adapters.md`](source-adapters.md).
+This document records the earlier GitHub review implementation of the shared metadata and finalization behavior now defined in [`source-adapters.md`](../agents/contract/source-adapters.md).
 The source-adapter specification remains authoritative for metadata semantics, candidate identity, decisions, provenance, finalization, and repository history.
 This profile owns only the GitHub workflow, authenticated review transport, and user interface.
 
@@ -50,7 +50,7 @@ Artifact expiry or absence makes the hosted presentation unavailable but cannot 
 Reviewers MAY inspect and edit the metadata diff through GitHub's browser tools or a local checkout.
 Neither path changes the candidate, provenance, validation, or finalization rules in the source-adapter specification.
 
-SHACL Vue proposal editing follows the separate normative [`GitHub SHACL Vue human-edit profile`](github-shacl-vue-edit.md) and is not a bundle input to this decision-review application or trusted finalizer.
+SHACL Vue proposal editing follows the separate normative [`GitHub SHACL Vue human-edit profile`](../agents/contract/github-shacl-vue-edit.md) and is not a bundle input to this decision-review application or trusted finalizer.
 Decision-review operations use repository contents read access only.
 The shared App's contents-write permission is confined to the other profile's explicit, path-restricted human handoff operation.
 
@@ -110,10 +110,8 @@ A custom domain or another origin dedicated to one downstream receives the norma
 The template MUST guide maintainers through adding and verifying that domain.
 
 On a shared `github.io` origin, the static application MUST explain that browser messaging authenticates the whole origin rather than its `/review/` path and that another compromised page on that hostname could impersonate the intended route.
-It MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; configured or link coordinates MUST NOT bypass the gate while the page is running on `github.io`.
-It MUST require an explicit in-memory acknowledgment of that limitation before enabling the direct GitHub submission action.
-The acknowledgment is informed consent, not authorization or proof of path identity.
-It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or weaken the exact-channel or server-side checks.
+It MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; configured or link coordinates MUST NOT suppress the warning while the page is running on `github.io`.
+The warning is informational and does not gate the direct GitHub submission action or weaken the exact-channel or server-side checks.
 Native pull-request review and the accessible Markdown summary remain available without using the hosted direct-submission flow.
 
 ## Authenticated submission
@@ -201,7 +199,7 @@ It MAY return a minimal backend-generated, restrictive-CSP OAuth callback and po
 
 Browser messaging binds an origin, not a URL path.
 A project site on a shared GitHub Pages hostname therefore shares its browser trust boundary with other pages on that hostname.
-The explanation and explicit acknowledgment above are required for that deployment shape in addition to the repository-derived checks, exact one-shot channel, selected-repository App installation, and complete server-side revalidation.
+The explanation is required for that deployment shape in addition to the repository-derived checks, exact one-shot channel, selected-repository App installation, and complete server-side revalidation.
 A custom or otherwise unique origin narrows that boundary and receives the normal low-friction flow.
 
 Cloudflare project provisioning, GitHub App registration, secrets, and a live deployment are external operational changes.

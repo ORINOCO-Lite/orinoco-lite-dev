@@ -74,6 +74,6 @@ Reverting a current commit and allowing the static website to redeploy is the no
 Local iteration is the default; a user-owned `<github-user>/orinoco-lite-demo` may extend that testing into an autonomous GitHub workflow.
 Propose the resulting downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for the deliberate human-review gate.
 
-Detailed implementation specifications and active plans live under `docs/agents/`.
+Normative engineering contracts live under `docs/agents/contract/`; active plans and open decisions live directly under `docs/agents/`.
 They may evolve as the design is implemented.
 Humans and agents should use this document as their concise shared interface for the project's core design, checking active work against it and discussing any proposed departure before that departure becomes implementation detail.

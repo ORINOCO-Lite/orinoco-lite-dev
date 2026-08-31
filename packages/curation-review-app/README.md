@@ -1,12 +1,12 @@
 # Curation review and GitHub transport
 
-This package implements both halves of the browser boundary in [`docs/agents/github-curation-review.md`](../../docs/agents/github-curation-review.md).
+This package implements both halves of the browser boundary in [`docs/agents/contract/github-curation-review.md`](../../docs/agents/contract/github-curation-review.md).
 Its content-neutral static review shell is released inside the Orinoco runtime and bound into each configured downstream at `/review/`.
 Its central deployment is backend-only: API handlers authenticate with the GitHub App, verify proposals, and perform authenticated GitHub transport.
 The only service-origin browser document is a generated, restrictive-CSP `/api/transport` popup that retains the host-only session cookie and exchanges nonce-bound messages with its exact downstream opener.
 It contains no landing, review, editor, upload, or confirmation application.
 
-The package also implements the thin GitHub handoff in [`docs/agents/github-shacl-vue-edit.md`](../../docs/agents/github-shacl-vue-edit.md).
+The package also implements the thin GitHub handoff in [`docs/agents/contract/github-shacl-vue-edit.md`](../../docs/agents/contract/github-shacl-vue-edit.md).
 It authenticates a curator and creates an explicit temporary Git handoff for the exact bundle confirmed in the downstream editor.
 It does not run adapters, convert metadata, apply decisions, or retain metadata, bundles, artifacts, or curation state.
 

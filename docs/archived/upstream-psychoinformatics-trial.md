@@ -190,7 +190,7 @@ It initializes the exact recorded site, theme, pool UI, SHACL Vue, Things Schema
 Both static and full scopes also expose `*-worktree` tasks.
 Recorded tasks reject modified submodules and restore the commits in the parent tree.
 Worktree tasks initialize missing repositories but preserve current commits, tracked edits, and untracked files, allowing coordinated upstream changes to be tested before their gitlinks are recorded.
-See [`../README.md`](../README.md) for the task matrix and update workflow.
+See the project [`README.md`](../../README.md) for the task matrix and update workflow.
 
 The isolated supervisor writes generated configuration, credentials, stores, snapshots, and logs below ignored `build/upstream-stack/` state; Ctrl-C stops the complete stack.
 The supervisor:

@@ -2,7 +2,7 @@
 
 Status: implementation complete; organization adoption awaiting human review
 
-Current human-policy queue: [`human-review-decisions.md`](human-review-decisions.md)
+Current human-policy queue: [`open-decisions.md`](../open-decisions.md)
 
 ## Objective
 
@@ -161,6 +161,6 @@ The pull request remains open at the required human gate after local adapter, co
 The canonical origin remains [`https://orinoco-curation-review.pages.dev/`](https://orinoco-curation-review.pages.dev/) with public client ID `Iv23limCfUnRPCFcXx3H`; its configuration contains only `PUBLIC_ORIGIN`, `GITHUB_CLIENT_ID`, and the encrypted `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` values.
 The deployment uploaded no static files: it contains only the checked Functions bundle and route file.
 Anonymous probes confirmed the retired root and presentation routes return empty `404` responses, discovery tombstones return `410`, the anonymous session returns `authenticated: false`, and OAuth uses the exact callback plus PKCE without an OAuth scope.
-A live browser exercise against `leej3/orinoco-lite-demo` loaded 224 records in the downstream editor, exposed credential-free **Download review bundle**, enforced the then-current shared-origin and public-data acknowledgments before enabling **Propose via GitHub**, completed GitHub authentication without a write, and confirmed the downstream's human-friendly filtered pull-request link.
-M6-D009 and HR-232 supersede those SHACL acknowledgment controls.
+A live browser exercise against `leej3/orinoco-lite-demo` loaded 224 records in the downstream editor, exposed credential-free **Download review bundle**, exercised the then-current shared-origin and public-data controls, completed GitHub authentication without a write, and confirmed the downstream's human-friendly filtered pull-request link.
+The current shared-origin policy is warning-only.
 Deployment `8d448e3d-97e2-4054-b29d-b9ed88321b8b` remains the previously successful production rollback coordinate.

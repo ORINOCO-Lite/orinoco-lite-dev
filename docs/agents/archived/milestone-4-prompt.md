@@ -2,7 +2,7 @@
 
 **Historical planning input.** The implemented review candidate supersedes this prompt where they differ.
 In particular, M4-D001 requires the complete accepted Milestone 3 content and test snapshot rather than a representative subset.
-Use [`milestone-4-decisions.md`](milestone-4-decisions.md) for accepted architecture and [`human-review-decisions.md`](human-review-decisions.md) for the current open review queue.
+Use [`milestone-4-decisions.md`](milestone-4-decisions.md) for accepted architecture and [`open-decisions.md`](../open-decisions.md) for the current open review queue.
 
 Use this prompt to begin a new planning-mode task.
 Do not implement the milestone until the plan and its human decisions have been reviewed.

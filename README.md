@@ -40,10 +40,10 @@ Validation, building, previewing, deployment, bundle download, and editing do no
 
 Detailed engineering contracts are maintained as agent coordination material:
 
-- [`source adapters`](docs/agents/source-adapters.md)
-- [`curation review`](docs/agents/github-curation-review.md)
-- [`SHACL Vue editing`](docs/agents/github-shacl-vue-edit.md)
-- [`curation-service authentication`](docs/agents/curation-service-authentication-options.md)
+- [`source adapters`](docs/agents/contract/source-adapters.md)
+- [`curation review`](docs/agents/contract/github-curation-review.md)
+- [`SHACL Vue editing`](docs/agents/contract/github-shacl-vue-edit.md)
+- [`curation-service authentication`](docs/agents/contract/curation-service-authentication-options.md)
 - [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md)
 
 ## Engineering workflow

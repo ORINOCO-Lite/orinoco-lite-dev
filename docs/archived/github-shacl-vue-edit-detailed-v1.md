@@ -1,8 +1,8 @@
 # GitHub SHACL Vue human-edit profile
 
-Status: normative profile incorporated by [`source-adapters.md`](source-adapters.md)
+Status: archived profile; current requirements are in [`source-adapters.md`](../agents/contract/source-adapters.md)
 
-This document defines a human-authored metadata-edit path that is separate from the [`GitHub source-adapter curation profile`](github-curation-review.md).
+This document records an earlier human-authored metadata-edit path that is separate from the current [`GitHub source-adapter curation profile`](../agents/contract/github-curation-review.md).
 SHACL Vue remains a schema-driven RDF editor and retains its normal **Download bundle** behavior.
 The downstream static site is the only SHACL Vue editing surface for that downstream.
 A thin Orinoco site integration and stateless service supply GitHub authentication, coordinates, and proposal transport without adding GitHub, source-adapter, disposition, provenance, or decision-cache semantics to SHACL Vue.

@@ -4,7 +4,7 @@ Status: historical decision and derivation record
 
 This snapshot preserves the detailed questions, outcomes, and crosswalk through Milestone 5.
 It is not the current review queue.
-Use [`human-review-decisions.md`](../human-review-decisions.md) for open decisions.
+Use [`open-decisions.md`](../open-decisions.md) for open decisions.
 
 Review snapshot: 2026-08-26
 
@@ -96,7 +96,7 @@ Technical success does not approve production content or grant reuse rights.
 **Recommended default:** Option 2, provided HR-003 records either an approved license matrix or an explicit interim “no reuse rights granted” posture.
 Keep technical distribution acceptance separate from content and production approval.
 
-**Evidence:** [`milestone-4.md`](../milestone-4.md), [`milestone-4-acceptance.md`](../milestone-4-acceptance.md), [`milestone-4-decisions.md`](../milestone-4-decisions.md), the [test consumer](https://github.com/con/test-orinoco-downstream-website), and its [public Pages site](https://con.github.io/test-orinoco-downstream-website/).
+**Evidence:** [`milestone-4.md`](milestone-4.md), [`milestone-4-acceptance.md`](milestone-4-acceptance.md), [`milestone-4-decisions.md`](milestone-4-decisions.md), the [test consumer](https://github.com/con/test-orinoco-downstream-website), and its [public Pages site](https://con.github.io/test-orinoco-downstream-website/).
 
 **Resolution:**
 
@@ -126,7 +126,7 @@ An interim answer may be the last option, but it must be stated rather than infe
 **Recommended default:** First record rightsholder/relicensing authority and all incompatible or unknown upstream terms, then approve an explicit matrix.
 Until then, do not publish to a general package index, invite third-party reuse, or describe public content as openly licensed.
 
-**Evidence:** [`packages/orinoco-lite/README.md`](../../packages/orinoco-lite/README.md), [`../release/runtime-licenses/README.md`](../../release/runtime-licenses/README.md), and the [consumer framework notice](https://github.com/con/test-orinoco-downstream-website/blob/main/site/framework/README.md).
+**Evidence:** [`packages/orinoco-lite/README.md`](../../../packages/orinoco-lite/README.md), [`release/runtime-licenses/README.md`](../../../release/runtime-licenses/README.md), and the [consumer framework notice](https://github.com/con/test-orinoco-downstream-website/blob/main/site/framework/README.md).
 
 **Resolution:**
 
@@ -162,7 +162,7 @@ Engineering validation therefore has three content layers:
 - the production-shaped corpus for messy real-world structures and representative rendering on pull requests or a scheduled engineering run; and
 - the complete downstream consumer for release-candidate, update, browser, rollback, and publication-boundary evidence.
 
-**Evidence:** M3-Q012 in [`milestone-3-decisions.md`](../milestone-3-decisions.md) and M4-I010 in [`milestone-4-decisions.md`](../milestone-4-decisions.md).
+**Evidence:** M3-Q012 in [`milestone-3-decisions.md`](milestone-3-decisions.md) and M4-I010 in [`milestone-4-decisions.md`](milestone-4-decisions.md).
 
 **Resolution:**
 
@@ -200,7 +200,7 @@ An unpublished candidate branch may use a reviewed ancestry-construction techniq
 **Recommended default:** Use a separately addressable production candidate before any domain switch.
 Require content, rights, presentation, artifact, deployment, and rollback approval before changing DNS or `CNAME`.
 
-**Evidence:** M3-Q009 in [`milestone-3-decisions.md`](../milestone-3-decisions.md) and the deferred boundary in [`milestone-4.md`](../milestone-4.md).
+**Evidence:** M3-Q009 in [`milestone-3-decisions.md`](milestone-3-decisions.md) and the deferred boundary in [`milestone-4.md`](milestone-4.md).
 
 **Resolution:** platform/workflow; branch; coexistence plan; DNS owner; rollback trigger; reviewer/date.
 
@@ -212,7 +212,7 @@ Require content, rights, presentation, artifact, deployment, and rollback approv
 
 **Recommended default:** Name people who explicitly accept the responsibility, separate content approval from framework release approval, and encode the result with `CODEOWNERS` only after the ownership scopes are agreed.
 
-**Evidence:** M3-Q010 in [`milestone-3-decisions.md`](../milestone-3-decisions.md).
+**Evidence:** M3-Q010 in [`milestone-3-decisions.md`](milestone-3-decisions.md).
 
 **Resolution:** metadata approvers; editorial/media approvers; presentation approvers; backups; enforcement; reviewer/date.
 
@@ -243,7 +243,7 @@ Make production bypass policy explicit rather than inheriting the test fixture's
 **Recommended default:** Require exact evidence and human identity review.
 Never create a public identity merely to make authorship counts complete.
 
-**Evidence:** M3-Q001 in [`milestone-3-decisions.md`](../milestone-3-decisions.md).
+**Evidence:** M3-Q001 in [`milestone-3-decisions.md`](milestone-3-decisions.md).
 
 **Resolution:** eligibility/evidence rule; approver; reviewer/date.
 
@@ -283,7 +283,7 @@ Never create a public identity merely to make authorship counts complete.
 
 **Recommended default:** Preserve authorship completeness visibly without inventing identity records, provided the source strings and presentation can be clearly distinguished from curated people.
 
-**Evidence:** M3-Q001 and the publication counts in [`milestone-3-acceptance.md`](../milestone-3-acceptance.md).
+**Evidence:** M3-Q001 and the publication counts in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
 
 **Resolution:** display rule; provenance requirements; approver/date.
 
@@ -297,7 +297,7 @@ Never create a public identity merely to make authorship counts complete.
 
 **Recommended default:** Review each ambiguous group and record a reusable rule only when the cases support one.
 
-**Evidence:** M3-Q002 and [`milestone-3-acceptance.md`](../milestone-3-acceptance.md).
+**Evidence:** M3-Q002 and [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
 
 **Resolution:** group outcomes; reusable rule; approver/date.
 
@@ -426,7 +426,7 @@ Whether the same findings still exist is an objective re-audit; the acceptable e
 Mark M3-Q017 superseded if the findings are gone.
 Otherwise accept only a time-bounded documented exception with a named owner and a zero-finding production dependency set.
 
-**Evidence:** M3-Q017 and the dependency evidence in [`milestone-3-acceptance.md`](../milestone-3-acceptance.md).
+**Evidence:** M3-Q017 and the dependency evidence in [`milestone-3-acceptance.md`](milestone-3-acceptance.md).
 
 **Resolution:** current findings; threshold; expiry; owner; reviewer/date.
 
@@ -458,7 +458,7 @@ The concrete template identity drift is an implementation defect, not itself the
 **Recommended default:** Name at least two release roles, require the existing deterministic and cross-platform evidence, define a minimum supported predecessor for rollback, give deprecations a documented migration window, and permit expedited security proposals without automatic merge.
 Keep GitHub Releases as the distribution channel until HR-003 permits broader publication.
 
-**Evidence:** M4-I007 and the release contracts in [`milestone-4.md`](../milestone-4.md) and [`packages/orinoco-lite/README.md`](../../packages/orinoco-lite/README.md).
+**Evidence:** M4-I007 and the release contracts in [`milestone-4.md`](milestone-4.md) and [`packages/orinoco-lite/README.md`](../../../packages/orinoco-lite/README.md).
 
 **Resolution:** approvers; required evidence; version/support lifetime; deprecation policy; security path; distribution channels; reviewer/date.
 
@@ -474,7 +474,7 @@ Presentation follow-ups have been reviewed separately, but no human has accepted
 **Recommended default:** Conduct a focused review at representative desktop and mobile widths across the homepage, core record types, graph, and editor.
 Accept intentional modernization rather than requiring pixel parity, but record any launch-blocking design defects explicitly.
 
-**Evidence:** The presentation deferrals in [`milestone-1-progress.md`](../milestone-1-progress.md), the full consumer, and M4 acceptance browser evidence.
+**Evidence:** The presentation deferrals in [`milestone-1-progress.md`](milestone-1-progress.md), the full consumer, and M4 acceptance browser evidence.
 
 **Resolution:** accepted surfaces; required changes; legacy-parity expectation; approver/date.
 
@@ -516,7 +516,7 @@ Local execution remains available for development and reproduction but is not a 
 
 **Decided and refined by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](../github-curation-review.md) under the host-neutral [`source-adapters.md`](../source-adapters.md) contract.
+**Follow-up:** Implement and accept the normative [`GitHub source-adapter curation profile`](../contract/github-curation-review.md) under the host-neutral [`source-adapters.md`](../contract/source-adapters.md) contract.
 Treat SHACL Vue's existing download and future GitHub proposal integration as a separate human-edit profile; it is not a bundle input or contents-write requirement for this decision-review profile.
 
 ### HR-207 — Define source-adapter decision defaults
@@ -533,7 +533,7 @@ Absence, pull-request closure, and workflow failure are never decisions.
 
 Adapters configure stable source identity and the normalized source facts that can affect generated metadata.
 Unused source fields and transport metadata do not enter the claim hash.
-The compact current-state cache and shared behavior are defined by the normative [`source-adapters.md`](../source-adapters.md) contract; source acquisition, transformation, and site policy remain adapter-owned.
+The compact current-state cache and shared behavior are defined by the normative [`source-adapters.md`](../contract/source-adapters.md) contract; source acquisition, transformation, and site policy remain adapter-owned.
 There is no separate permanent-exclusion, conditional-deferral, link, or supersede disposition.
 This decision does not settle identity, publication, venue, topic, or eligibility policy.
 
@@ -648,7 +648,7 @@ A public Git host can retain unreachable objects, so the path is limited to data
 
 **Decided and refined by/date:** John Lee, 2026-08-24.
 
-**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](../github-shacl-vue-edit.md), including the exact-head editor-input artifact and immutable released shell, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
+**Follow-up:** Implement and accept the normative [`GitHub SHACL Vue human-edit profile`](../contract/github-shacl-vue-edit.md), including the exact-head editor-input artifact and immutable released shell, handoff replacement, App permission evidence, and standalone and existing-pull-request tests.
 
 ### HR-214 — Use upstream-style instrument identities for adapters
 
@@ -921,5 +921,5 @@ The accepted graph-only organization behavior maps to deferred HR-211, and the t
 
 ## Source registers and operational evidence
 
-Authoritative derivation remains in [`milestone-3-decisions.md`](../milestone-3-decisions.md), [`milestone-3-acceptance.md`](../milestone-3-acceptance.md), [`milestone-4-decisions.md`](../milestone-4-decisions.md), [`milestone-4-acceptance.md`](../milestone-4-acceptance.md), [`milestone-5-decisions.md`](../milestone-5-decisions.md), [`milestone-5-acceptance.md`](../milestone-5-acceptance.md), and [`full-con-migration.md`](../full-con-migration.md).
+Authoritative derivation remains in [`milestone-3-decisions.md`](milestone-3-decisions.md), [`milestone-3-acceptance.md`](milestone-3-acceptance.md), [`milestone-4-decisions.md`](milestone-4-decisions.md), [`milestone-4-acceptance.md`](milestone-4-acceptance.md), [`milestone-5-decisions.md`](milestone-5-decisions.md), [`milestone-5-acceptance.md`](milestone-5-acceptance.md), and [`full-con-migration.md`](../../archived/full-con-migration.md).
 Objective implementation follow-ups and hosted evidence belong in the acceptance record or dedicated issues so this queue stays focused on human judgment.

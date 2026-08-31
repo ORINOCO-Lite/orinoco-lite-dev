@@ -3,7 +3,7 @@
 Status: implementation complete; draft human review open
 
 **Historical acceptance record.** Its counts and review evidence remain authoritative for Milestone 3, but its preview branch is not the current distribution interface.
-See [`milestone-4-acceptance.md`](milestone-4-acceptance.md) and [`human-review-decisions.md`](human-review-decisions.md).
+See [`milestone-4-acceptance.md`](milestone-4-acceptance.md) and the current [`open decisions`](../open-decisions.md).
 
 This report accepts the Milestone 3 implementation as the review candidate.
 It does not accept the site's content on behalf of its maintainers, merge the draft pull request, or authorize a production-domain cutover.

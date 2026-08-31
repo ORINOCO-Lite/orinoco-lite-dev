@@ -55,7 +55,7 @@ For an explicitly requested end-to-end exercise in a user-owned `<github-user>/o
 
 Standing authority covers the mechanics of the exercise, not invented metadata or curation decisions.
 Use supplied fixture decisions or retained reviewed state.
-Follow `docs/agents/github-curation-review.md` and `docs/agents/source-adapters.md` for the current curation contract rather than restating it in this skill.
+Follow `docs/agents/contract/github-curation-review.md` and `docs/agents/contract/source-adapters.md` for the current curation contract rather than restating it in this skill.
 
 ## Recover quickly
 

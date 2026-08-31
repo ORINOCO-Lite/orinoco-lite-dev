@@ -2,7 +2,7 @@
 
 Status: Milestone 4 accepted; production-graduation decisions remain open
 
-Consolidated prioritized review queue: [`human-review-decisions.md`](human-review-decisions.md).
+Consolidated prioritized review queue: [`open-decisions.md`](../open-decisions.md).
 This file remains the authoritative record of accepted Milestone 4 decisions and implementation defaults.
 
 ## Accepted decisions

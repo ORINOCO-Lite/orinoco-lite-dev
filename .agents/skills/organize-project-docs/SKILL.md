@@ -13,7 +13,8 @@ Keep active material short and move completed working context out of normal disc
 | Location | Purpose |
 | --- | --- |
 | `docs/project-design.md` | Concise, high-level human design and project direction |
-| `docs/agents/` | Detailed active specifications, plans, decisions, and agent context |
+| `docs/agents/contract/` | Normative active engineering contracts |
+| `docs/agents/` | Active plans, open decisions, and agent context |
 | `docs/archived/` | Retired human-facing explanations retained only for history |
 | `docs/agents/archived/` | Retired agent plans, milestone records, reports, and decision queues |
 
@@ -29,8 +30,9 @@ Do not point current instructions or indexes to archived documents.
 Keep `docs/project-design.md` readable without the detailed agent documents.
 It should say what the project is building, how its main parts fit together, and the principles that guide implementation.
 
-Files under `docs/agents/` may accumulate the detail needed to coordinate implementation.
-They are not automatically authoritative: link only the small current subset needed by an instruction entry point or active task.
+Files under `docs/agents/contract/` are normative for their named behavior.
+Other files under `docs/agents/` may accumulate the detail needed to coordinate active implementation, but are not automatically authoritative.
+Link only the small current subset needed by an instruction entry point or active task.
 
 ## Keep milestones bounded
 

@@ -12,7 +12,7 @@ Planning source: [`milestone-4-prompt.md`](milestone-4-prompt.md)
 
 Decision register: [`milestone-4-decisions.md`](milestone-4-decisions.md)
 
-Prioritized human-review queue: [`human-review-decisions.md`](human-review-decisions.md)
+Prioritized human-review queue: [`open-decisions.md`](../open-decisions.md)
 
 ## Outcome
 

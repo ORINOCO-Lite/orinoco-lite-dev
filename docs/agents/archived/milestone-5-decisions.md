@@ -4,9 +4,9 @@ Status: accepted and implemented
 
 Original planning parent: `68b0ec1e0d70b9247d94091ae0754550074ae14e`
 
-Normative contract: [`source-adapters.md`](source-adapters.md)
+Normative contract: [`source-adapters.md`](../contract/source-adapters.md)
 
-Human policy choices remain in [`human-review-decisions.md`](human-review-decisions.md).
+Human policy choices remain in [`open-decisions.md`](../open-decisions.md).
 Commands, hashes, releases, and pull-request evidence belong in [`milestone-5-acceptance.md`](milestone-5-acceptance.md).
 This register summarizes reviewed engineering outcomes without duplicating the normative specification.
 

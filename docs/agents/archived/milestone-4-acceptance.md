@@ -7,7 +7,7 @@ Replacement pull request 2 was reviewed and merged after correcting the three ba
 Pull request 3 then exercised a normal framework maintenance update, and pull request 4 applied a site-owned presentation change.
 Project Pages now serves the reviewed default branch at the public project path.
 
-The Milestone 4 distribution architecture, licensing matrix, and legacy-preview disposition are accepted in [`human-review-decisions.md`](human-review-decisions.md).
+The Milestone 4 distribution architecture, licensing matrix, and legacy-preview disposition were accepted in the [contemporaneous decision record](https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/c1f367d7e8f5fa4c5beb8b0a160c563c91a84524/docs/human-review-decisions.md).
 This acceptance remains distinct from approval of the content or a future production cutover.
 Updates still must not merge automatically.
 
@@ -324,7 +324,7 @@ Do not replace the sorted-ref digest above with a digest computed from a differe
 The test-consumer publication gates and all P0 decisions are complete.
 Engineering pull request 5 is accepted for merge, the project license matrix is recorded, and the legacy preview is retained only as frozen evidence with an explicit opt-in engineering-preview path.
 
-The P1 decisions in [`human-review-decisions.md`](human-review-decisions.md) remain required before production graduation.
+The current [`open decisions`](../open-decisions.md) remain required before production graduation.
 They do not reopen the accepted single-repository distribution mechanism or authorize a real-site operation.
 
 [engine-release]: https://github.com/con/orinoco-lite-dev/releases/tag/v0.1.10
