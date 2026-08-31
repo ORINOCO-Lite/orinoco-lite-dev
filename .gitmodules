@@ -1,86 +1,18 @@
-[submodule "submodules/artwork"]
-	path = submodules/artwork
-	url = https://github.com/leej3/artwork.git
-	branch = main
-[submodule "submodules/bids-things"]
-	path = submodules/bids-things
-	url = https://github.com/leej3/bids-things.git
-	branch = main
-[submodule "submodules/centerforopenneuroscience.org"]
-	path = submodules/centerforopenneuroscience.org
-	url = https://github.com/leej3/centerforopenneuroscience.org.git
-	branch = orinoco-lite
-[submodule "submodules/curatee-kit"]
-	path = submodules/curatee-kit
-	url = https://github.com/leej3/curatee-kit.git
-	branch = main
-[submodule "submodules/dump-research-info"]
-	path = submodules/dump-research-info
-	url = https://github.com/con/dump-research-info.git
-	branch = agent/git-native-con-metadata
 [submodule "submodules/dump-things-pyclient"]
 	path = submodules/dump-things-pyclient
 	url = https://github.com/ORINOCO-Lite/dump-things-pyclient.git
 [submodule "submodules/dump-things-service"]
 	path = submodules/dump-things-service
 	url = https://github.com/ORINOCO-Lite/dump-things-service.git
-[submodule "submodules/dump-things-service-mirror"]
-	path = submodules/dump-things-service-mirror
-	url = https://github.com/leej3/dump-things-service-mirror.git
-	branch = master
-[submodule "submodules/find-things"]
-	path = submodules/find-things
-	url = https://github.com/leej3/find-things.git
-	branch = main
-[submodule "submodules/flatson"]
-	path = submodules/flatson
-	url = https://github.com/leej3/flatson.git
-	branch = main
-[submodule "submodules/flatson-js"]
-	path = submodules/flatson-js
-	url = https://github.com/leej3/flatson-js.git
-	branch = main
-[submodule "submodules/flatsonpy"]
-	path = submodules/flatsonpy
-	url = https://github.com/leej3/flatsonpy.git
-	branch = main
-[submodule "submodules/flow"]
-	path = submodules/flow
-	url = https://github.com/leej3/flow.git
-	branch = main
-[submodule "submodules/psyinf-pool-files-public"]
-	path = submodules/psyinf-pool-files-public
-	url = https://github.com/leej3/psyinf-pool-files-public.git
-	branch = main
 [submodule "submodules/query-things"]
 	path = submodules/query-things
 	url = https://github.com/ORINOCO-Lite/query-things.git
-[submodule "submodules/research-information-ui-assets"]
-	path = submodules/research-information-ui-assets
-	url = https://github.com/leej3/research-information-ui-assets.git
-	branch = main
-[submodule "submodules/shacl-tulip"]
-	path = submodules/shacl-tulip
-	url = https://github.com/leej3/shacl-tulip.git
-	branch = main
-[submodule "submodules/some-things"]
-	path = submodules/some-things
-	url = https://github.com/leej3/some-things.git
-	branch = main
 [submodule "submodules/things-enrichment-tools"]
 	path = submodules/things-enrichment-tools
 	url = https://github.com/ORINOCO-Lite/things-enrichment-tools.git
-[submodule "submodules/things-graph-renderer"]
-	path = submodules/things-graph-renderer
-	url = https://github.com/leej3/things-graph-renderer.git
-	branch = main
 [submodule "submodules/things-schemas"]
 	path = submodules/things-schemas
 	url = https://github.com/ORINOCO-Lite/things-schemas.git
-[submodule "submodules/tools"]
-	path = submodules/tools
-	url = https://github.com/leej3/tools.git
-	branch = main
 [submodule "submodules/www-from-model"]
 	path = submodules/www-from-model
 	url = https://github.com/ORINOCO-Lite/www-from-model.git

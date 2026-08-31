@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import seed_local_pool as shared
+import upstream_service_helpers as shared
 import upstream_snapshot
 
 

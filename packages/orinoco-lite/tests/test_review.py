@@ -256,15 +256,7 @@ class StaticReviewBindingTests(unittest.TestCase):
 
             with (
                 patch.object(site, "_preflight_hugo"),
-                patch.object(
-                    site,
-                    "_assemble",
-                    return_value={
-                        "copied_assets": 0,
-                        "copied_links": 0,
-                        "hydrated_assets": 0,
-                    },
-                ),
+                patch.object(site, "_assemble"),
                 patch.object(site, "_run", side_effect=run),
                 patch.object(site, "bind_editor", return_value={"version": 2}),
             ):

@@ -31,7 +31,6 @@ DEFAULT_PATHS: dict[str, str] = {
     "records": "metadata/records",
     "provenance": ".orinoco-lite/provenance",
     "editorial": "editorial",
-    "assets": "assets",
     "site": "site",
     "framework": ".orinoco-lite/site",
     "source_adapters": "source-adapters",
@@ -44,7 +43,6 @@ DIRECTORY_PATHS = {
     "records",
     "provenance",
     "editorial",
-    "assets",
     "site",
     "framework",
     "source_adapters",
@@ -376,7 +374,7 @@ def load_workspace(
         isinstance(key, str) for key in path_values
     ):
         raise ConfigurationError("orinoco.yaml paths must be a mapping")
-    unknown_paths = sorted(set(path_values) - set(DEFAULT_PATHS))
+    unknown_paths = sorted(set(path_values) - set(DEFAULT_PATHS) - {"assets"})
     if unknown_paths:
         raise ConfigurationError(
             f"orinoco.yaml has unknown path keys: {', '.join(unknown_paths)}"
@@ -385,6 +383,14 @@ def load_workspace(
         name: _relative_path(path_values.get(name, default), f"paths.{name}")
         for name, default in DEFAULT_PATHS.items()
     }
+    if "assets" in path_values:
+        retired_assets = _relative_path(path_values["assets"], "paths.assets")
+        expected_static = f"{paths['site']}/static"
+        if retired_assets != expected_static:
+            raise ConfigurationError(
+                f"Retired paths.assets must equal {expected_static!r}; "
+                "remove the key after updating the downstream"
+            )
     duplicates: dict[str, list[str]] = {}
     for name, value in paths.items():
         duplicates.setdefault(value, []).append(name)

@@ -25,19 +25,6 @@ Keep component coordination and upstream-rebase history inside the engineering w
 - The test consumer contains all accepted Milestone 3 content and the complete test contract.
 Representative records are smoke checks, never a selection mechanism.
 
-## Real-site and preservation boundary
-
-- Treat `centerforopenneuroscience.org` and its remotes as read-only evidence.
-Do not modify its files, index, refs, branches, remotes, settings, workflows, Pages configuration, deployment, DNS, custom domain, or production site.
-- Preserve the accepted parent and site `codex/clean-migration` branches as immutable checkpoints.
-Do not amend, rebase, or move them.
-- Preserve the accepted parent and site `codex/full-con-migration` branches as immutable Milestone 2 checkpoints.
-Do not amend, rebase, or move them.
-- Preserve legacy CON history, preservation refs, and the completed historical `orinoco-lite` effort.
-- Direct upstream ancestry was a reviewed exception for the accepted migration branches.
-Do not apply it to unrelated branches.
-- Keep `submodules/www-from-model` `main` available to mirror `upstream/main`.
-
 ## Content and runtime contracts
 
 - Reviewed YAML under `metadata/records/` and `metadata/overlays/annotations/` is the canonical semantic metadata source; the joined Things graph is the validation and RDF boundary.

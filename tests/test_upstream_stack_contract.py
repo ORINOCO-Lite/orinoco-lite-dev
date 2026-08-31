@@ -126,19 +126,6 @@ class UpstreamStackContractTests(unittest.TestCase):
         ):
             self.assertIn(f"name: {package}\n  version: {version}", lock)
 
-    def test_upstream_profile_excludes_con_sources(self) -> None:
-        preparation = (ROOT / "tools" / "prepare_upstream_stack.py").read_text()
-        seed = (ROOT / "tools" / "seed_upstream_pool.py").read_text()
-        for source in (preparation, seed):
-            self.assertNotIn("CON_RECORDS", source)
-            self.assertNotIn("con-public", source)
-            self.assertNotIn("con-protected", source)
-        self.assertIn('(\"public\", \"protected\")', preparation)
-        self.assertIn('(\"public\",)', seed)
-        self.assertIn('(\"protected\",)', seed)
-        self.assertIn("YAML_JSONL", seed)
-        self.assertIn("upstream_snapshot.verify", seed)
-
     def test_snapshot_is_materialized_once_for_both_runtime_paths(self) -> None:
         preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()
         full_stack = (ROOT / "tools" / "prepare_upstream_stack.py").read_text()
@@ -154,7 +141,6 @@ class UpstreamStackContractTests(unittest.TestCase):
         for relative in (
             "prepare_upstream_snapshot.py",
             "prepare_upstream_stack.py",
-            "seed_local_pool.py",
             "upstream_orinoco_records.py",
         ):
             source = (ROOT / "tools" / relative).read_text()

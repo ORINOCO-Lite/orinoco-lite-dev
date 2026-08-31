@@ -41,7 +41,6 @@ class DownstreamValidationTests(unittest.TestCase):
             "metadata/records/XYZAgentRole",
             ".orinoco-lite/provenance",
             "editorial",
-            "assets/files",
             "site",
             "source-adapters/zotero",
             "generated",
@@ -65,9 +64,6 @@ class DownstreamValidationTests(unittest.TestCase):
         )
         (self.root / ".orinoco-lite/provenance/selection.yaml").write_text(
             "version: 1\n", encoding="utf-8"
-        )
-        (self.root / "assets/manifest.yaml").write_text(
-            "version: 1\nassets: []\n", encoding="utf-8"
         )
 
     def tearDown(self) -> None:
