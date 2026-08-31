@@ -37,14 +37,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": "packages/orinoco-lite", "editable": True},
         )
-        self.assertEqual(
-            manifest["feature"]["skills"]["dependencies"],
-            {"apm-cli": "==0.28.0"},
-        )
-        self.assertEqual(
-            manifest["environments"]["skills"],
-            {"features": ["skills"], "no-default-feature": True},
-        )
+        self.assertNotIn("feature", manifest)
+        self.assertNotIn("environments", manifest)
         serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
             'path = "submodules/',
@@ -101,13 +95,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             set(tasks["test-ci"]["depends-on"]),
             {"test-engine-strict", "test-accepted-consumer", "test-development"},
         )
-        skills = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["feature"][
-            "skills"
-        ]["tasks"]
-        self.assertEqual(
-            skills["agent-deps-check"],
-            "apm install --frozen && apm audit --ci --no-drift",
-        )
+        self.assertFalse((ROOT / "apm.yml").exists())
+        self.assertFalse((ROOT / "apm.lock.yaml").exists())
 
     def test_developer_skill_is_native_and_scoped(self) -> None:
         self.assertFalse((ROOT / ".apm" / "skills").exists())
@@ -381,13 +370,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "Initialize only release-authorized compatibility components"
         )
         install = workflow.index("frozen: true")
-        skills = workflow.index("run: pixi run -e skills agent-deps-check")
         tests = workflow.index("run: pixi run test-ci")
         build = workflow.index("run: pixi run build-upstream-static")
         self.assertLess(fixture, tests)
         self.assertLess(components, tests)
         self.assertLess(install, tests)
-        self.assertLess(skills, tests)
         self.assertLess(tests, build)
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("run: pixi run build-upstream-static-worktree", workflow)

@@ -70,16 +70,8 @@ Use `--mode full` before release or adoption, and `--keep` or `--output /new/pat
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.
 Edit them there directly; they do not require APM or a setup hook.
-APM is reserved for independently maintained agent dependencies that need a manifest, exact lock, update, and deployment lifecycle.
-The agent-agnostic Pixi bootstrap materializes any such pinned dependencies and verifies their deployment without changing the engine environment:
-
-```console
-pixi run -e skills agent-deps-bootstrap
-pixi run -e skills agent-deps-check
-```
-
-A downstream may call the bootstrap from its preferred workspace or agent setup hook, but the checked project skills remain available before that hook runs.
-The dependency check disables APM's whole-directory drift replay because native project skills intentionally share `.agents/skills/` with APM-managed dependencies; APM still verifies its manifest, lock, selected skills, deployment ownership, and recorded content hashes.
+Do not add a package manager, manifest, lock, bootstrap task, or agent hook while every skill is owned by this repository.
+Introduce dependency management only when the project first consumes an independently maintained promoted skill; the chosen setup mechanism remains a downstream preference.
 
 Initialize engineering submodules only when cross-component work needs them:
 
