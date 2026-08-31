@@ -19,8 +19,8 @@ Do not require per-file origins or before-and-after coordinate inventories for o
 - Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
 - Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
 Retire them at milestone boundaries.
-- Archived documents are historical context, not instructions or current policy.
-Do not link to them from active instructions or indexes.
+- Delete retired documents from the active tree after promoting any lasting guidance.
+Use Git when historical context is specifically needed.
 
 ## Boundaries
 
