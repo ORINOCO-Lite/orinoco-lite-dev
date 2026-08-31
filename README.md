@@ -11,12 +11,12 @@ The website framework belongs to [`orinoco-lite-template`](https://github.com/OR
 | Repository | Role |
 | --- | --- |
 | [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Engine, runtime assembly, engineering tests, and reusable CI |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Reusable website, downstream defaults, and update mechanism |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Complete reusable website and defaults |
 | `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
 | [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Human-gated reference downstream |
 
-Reusable behavior belongs in the engine or template.
-A downstream should mainly provide site-specific content, configuration, and custom source-adapter code.
+The template owns the complete website; the engine owns generic metadata and composition operations.
+A downstream provides declarative `site-specific/` inputs and optional overrides, plus site-specific executable metadata adapters under `extensions/`.
 
 The static website owns `/edit/` for SHACL Vue editing and `/review/` for source-adapter decisions.
 The central curation service, or an optional replacement, provides only GitHub authentication and verified transport.
@@ -31,11 +31,9 @@ pixi run validate
 pixi run build
 pixi run serve
 pixi run test-all
-pixi run update-check
 ```
 
-The template owns framework updates.
-Site-owned data and extensions remain in the downstream.
+The downstream selects its template version and upgrade timing.
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 
 Detailed engineering contracts are maintained as agent coordination material:
@@ -55,7 +53,7 @@ pixi install --locked
 pixi run test
 ```
 
-Test unreleased engine or template bytes against a disposable downstream before publishing them:
+Test unreleased engine and template bytes by injecting compact downstream inputs into a fresh disposable template instance before publishing them:
 
 ```console
 pixi run test-downstream-candidate -- \
