@@ -185,7 +185,6 @@ describe("minimal downstream OAuth transport", () => {
     );
 
     const proposal = {
-      acknowledge_public_data: true,
       bundle: {
         format: "orinoco-shacl-review-bundle",
         records: [],

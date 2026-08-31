@@ -146,7 +146,6 @@ describe('Orinoco review bundles', () => {
             setInterval: vi.fn(() => 18),
         };
         const proposal = {
-            acknowledge_public_data: true,
             bundle: {
                 format: 'orinoco-shacl-review-bundle',
                 records: [],
@@ -167,7 +166,8 @@ describe('Orinoco review bundles', () => {
         expect(target.open).toHaveBeenCalledWith(
             'https://review.example.test/api/transport?kind=shacl&repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
                 nonce,
-            `orinoco-lite-shacl-proposal-${nonce}`
+            `orinoco-lite-shacl-proposal-${nonce}`,
+            'popup,width=720,height=760,resizable=yes,scrollbars=yes'
         );
         const delivered = handoff.deliver(proposal);
         const receive = listeners.get('message');

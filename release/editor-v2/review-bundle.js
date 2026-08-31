@@ -295,7 +295,8 @@ export function beginReviewBundleProposal(value, target = window) {
     target.addEventListener('message', receive);
     popup = target.open(
         url.toString(),
-        `orinoco-lite-shacl-proposal-${nonce}`
+        `orinoco-lite-shacl-proposal-${nonce}`,
+        'popup,width=720,height=760,resizable=yes,scrollbars=yes'
     );
     if (!popup) {
         dispose();

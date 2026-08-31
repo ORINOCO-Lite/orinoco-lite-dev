@@ -2,7 +2,7 @@
 
 Status: accepted design rationale; normative requirements are in [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
 
-John Lee accepted this architecture and its shared-origin policy on 2026-08-27 as M6-D007 and HR-229.
+John Lee accepted this architecture on 2026-08-27 as M6-D007 and HR-229, then simplified the SHACL `/edit/` warning and removed its bundle acknowledgment on 2026-08-31 as M6-D009 and HR-232.
 This note preserves the authentication options and design rationale without creating a second normative contract.
 
 ## Accepted outcome
@@ -119,9 +119,10 @@ A unique downstream origin is the stronger option if path-level impersonation is
 A static secret embedded in the site cannot solve this because any script on the same origin can read it.
 
 A custom or otherwise unique downstream origin therefore receives the normal low-friction direct-GitHub flow.
-A shared `github.io` deployment shows a clear origin-wide security explanation and requires a visible, explicit, in-memory acknowledgment before enabling a direct GitHub write.
-The acknowledgment is not stored in local storage, a cookie, service state, or tracked configuration and is not treated as authorization or path proof.
-The SHACL editor keeps **Download bundle** enabled without that acknowledgment, GitHub sign-in, or a reachable service.
+A shared `github.io` deployment shows a clear origin-wide security explanation.
+The source-adapter `/review/` route retains its visible in-memory acknowledgment before posting decisions.
+The SHACL `/edit/` route uses a warning and remediation link without an acknowledgment gate or separate public-data checkbox.
+The SHACL editor keeps **Download bundle** enabled without GitHub sign-in or a reachable service.
 It also refuses direct GitHub proposal while framed, because GitHub Pages cannot supply a reliable `frame-ancestors` response header; downloading remains available.
 
 The backend has no durable transaction store, so it cannot serialize two truly simultaneous comment requests.
@@ -135,7 +136,7 @@ They do not freeze mutable DNS targets.
 
 | Option | Main URL | Token isolation | User-facing central page | Assessment |
 | --- | --- | --- | --- | --- |
-| Downstream UI plus minimal service popup transport | Remains downstream | Yes | No | Accepted, with the shared-origin acknowledgment or a unique downstream origin |
+| Downstream UI plus minimal service popup transport | Remains downstream | Yes | No | Accepted, with the shared-origin warning or a unique downstream origin |
 | Central confirmation or upload page | Remains downstream except for popup | Yes | Yes | Current direction; rejected because it duplicates the product interface |
 | Full-window OAuth redirect and return | Temporarily leaves downstream | Yes | Callback only | Avoids a popup but loses in-page state and violates the requested URL behavior |
 | Give a credential to downstream JavaScript and call GitHub or the service directly | Remains downstream | No | No | Reject: downstream XSS or another same-origin page could obtain the credential |

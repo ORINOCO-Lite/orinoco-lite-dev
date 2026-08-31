@@ -433,7 +433,6 @@ The generated static input is not canonical metadata, a generated review bundle,
 The shared GitHub App requests metadata read, Actions read, contents write, and pull requests write.
 Contents write is confined to an explicit SHACL Vue handoff at exact Git coordinates; the decision-review path only reads contents and posts the authenticated comment.
 Actions read serves the source-adapter decision-review artifact and is not used to assemble a SHACL Vue editor.
-The downstream `/edit/` route MUST require an explicit public-data and no-secrets acknowledgment before it requests the fixed-path bundle handoff.
 No second editor, receiver, upload, confirmation, or landing page, separate Worker, browser or hosted metadata converter, database, object store, artifact cache, or persistent service is introduced for this path.
 
 The project publishes one central backend-only authorization and GitHub-transport origin as the released default.
@@ -442,9 +441,10 @@ Repository identity MUST come from the trusted downstream build or general proje
 Source-adapter decisions are rendered by the downstream static `/review/` route; SHACL Vue remains at its separate static `/edit/` route.
 
 Custom or otherwise unique downstream origins use the normal direct-GitHub flow.
-A downstream on a shared `github.io` origin MUST explain that origin-wide browser trust and require an explicit in-memory acknowledgment before enabling either direct GitHub write path.
-The acknowledgment is not an authorization proof and does not weaken exact channel or server-side verification.
-The SHACL Vue **Download bundle** action remains credential-free and enabled without that acknowledgment.
+A downstream on a shared `github.io` origin MUST explain that origin-wide browser trust.
+The source-adapter `/review/` route retains its explicit in-memory acknowledgment before a direct GitHub write.
+The SHACL Vue `/edit/` route presents the explanation as a warning without a checkbox or acknowledgment gate.
+Neither presentation weakens exact channel or server-side verification, and **Download bundle** remains credential-free.
 
 ## Security and complexity guardrails
 

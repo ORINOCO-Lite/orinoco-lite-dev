@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -22,7 +23,7 @@ from .annotations import (
     validate_stored_record,
 )
 from .canonical import canonical_yaml
-from .config import WorkspaceConfig, load_config_path
+from .config import WorkspaceConfig, development_editor_shell, load_config_path
 from .errors import ConfigurationError, DriverError
 from .records import record_sources
 from .schema_conversion import build_format_converters
@@ -148,6 +149,9 @@ def _editor_config(
             "repository": resolved_repository,
             "service_origin": resolved_service,
         }
+        hostname = urlsplit(workspace.base_url).hostname or ""
+        if hostname.lower().endswith(".github.io"):
+            config["review_bundle_proposal"]["shared_github_pages_origin"] = True
     return config
 
 
@@ -226,7 +230,8 @@ def bind_editor(
 ) -> dict[str, Any]:
     from .projection import load_contract
 
-    shell = runtime_root / "editor-shell"
+    candidate_shell = development_editor_shell()
+    shell = candidate_shell or runtime_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
         raise DriverError("Runtime does not contain the generic static editor shell")
     if destination.exists():

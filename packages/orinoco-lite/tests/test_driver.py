@@ -73,6 +73,7 @@ class DriverEnvironmentTests(unittest.TestCase):
             enabled = {
                 "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
                 "ORINOCO_CANDIDATE_ENGINE_ROOT": str(candidate),
+                "ORINOCO_CANDIDATE_EDITOR_SHELL": str(root / "editor-shell"),
             }
             with patch.dict(os.environ, enabled, clear=False):
                 environment = driver_environment(workspace, runtime)
@@ -93,6 +94,10 @@ class DriverEnvironmentTests(unittest.TestCase):
             self.assertEqual(
                 environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"],
                 "1",
+            )
+            self.assertEqual(
+                environment["ORINOCO_CANDIDATE_EDITOR_SHELL"],
+                str(root / "editor-shell"),
             )
 
     def test_invalid_explicit_development_engine_is_rejected(self) -> None:

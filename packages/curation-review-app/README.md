@@ -74,7 +74,7 @@ It is not a source-adapter review destination.
 The SHACL Vue path reuses the same backend deployment.
 It does not add a separate Worker, hosted metadata converter, database, object store, artifact cache, or persistent service.
 The downstream site's own `/edit/` route is the sole editor and offers both **Download bundle** and **Propose via GitHub** for the same unchanged result.
-Bundle memory, downloaded-file reselection, public-data confirmation, and the shared-`github.io` acknowledgment all remain in that downstream route.
+Bundle memory, downloaded-file reselection, proposal confirmation, and the shared-`github.io` warning all remain in that downstream route.
 
 A canonical source-adapter review link belongs to the deployed downstream:
 
@@ -120,7 +120,7 @@ After authentication, the popup signals readiness to that exact opener; the stat
 The transport accepts only an exact credential-free HTTPS opener origin (or loopback HTTP for development).
 If navigation severs the opener relationship, the curator can select the identical downloaded JSON bundle again on the downstream `/edit/` route and start a fresh handoff.
 
-Before sending the unchanged version 2 bundle, the downstream **Propose via GitHub** action requires an explicit acknowledgment that it contains only public-approved data and no secrets.
+Before sending the unchanged version 2 bundle, the downstream **Propose via GitHub** action shows the exact repository, source commit, and edited paths for confirmation without a separate bundle acknowledgment.
 The service then creates the fixed `.orinoco-lite/shacl-vue-review-bundle.json` handoff commit at the exact head.
 Trusted default-branch Python validates and replaces that one commit with the equivalent attributed canonical YAML commit; the final branch contains no bundle.
 Pull-request Markdown is not parsed to locate or validate either artifact.

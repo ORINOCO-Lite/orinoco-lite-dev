@@ -34,23 +34,30 @@ index 9621e55..3299eaa 100644
 +                        variant="tonal"
 +                        style="margin-top: 1em;"
 +                    >
-+                        <strong>Shared github.io security boundary</strong>
 +                        <p>
-+                            Every project page on this github.io hostname shares one
-+                            browser origin. Another page on the hostname could impersonate
-+                            this path. A verified custom domain gives this site its own
-+                            origin and enables the normal low-friction flow.
++                            <span>
++                                This project shares one browser origin across the
++                                organization. This can be improved.
++                            </span>
++                            <v-tooltip location="bottom">
++                                <template v-slot:activator="{ props }">
++                                    <v-icon
++                                        v-bind="props"
++                                        aria-label="About shared GitHub Pages security"
++                                        role="img"
++                                    >mdi-information-outline</v-icon>
++                                </template>
++                                Another page could impersonate this path. A verified
++                                custom domain gives this site its own origin provides
++                                better security.
++                            </v-tooltip>
++                            <a
++                                href="https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site"
++                                rel="noreferrer"
++                                target="_blank"
++                            >Improve this with a custom domain</a>
 +                        </p>
-+                        <v-checkbox
-+                            v-model="sharedOriginAcknowledged"
-+                            label="I understand this shared-origin risk and want to enable direct GitHub submission for this page."
-+                        ></v-checkbox>
 +                    </v-alert>
-+                    <v-checkbox
-+                        v-if="proposalMode && !framedContext"
-+                        v-model="publicHistoryAcknowledged"
-+                        label="I confirm this review bundle contains no secrets and is approved for public Git history, including GitHub retention after a temporary ref becomes unreachable."
-+                    ></v-checkbox>
 +                    <v-card
 +                        v-if="pendingProposalBundle"
 +                        variant="outlined"
@@ -80,9 +87,7 @@ index 9621e55..3299eaa 100644
 +                            <v-btn
 +                                :disabled="
 +                                    framedContext ||
-+                                    proposing ||
-+                                    !publicHistoryAcknowledged ||
-+                                    (sharedGitHubPagesOrigin && !sharedOriginAcknowledged)
++                                    proposing
 +                                "
 +                                @click="confirmProposal()"
 +                            >
@@ -117,9 +122,7 @@ index 9621e55..3299eaa 100644
 +                :disabled="
 +                    framedContext ||
 +                    proposing ||
-+                    pendingProposalBundle ||
-+                    !publicHistoryAcknowledged ||
-+                    (sharedGitHubPagesOrigin && !sharedOriginAcknowledged)
++                    pendingProposalBundle
 +                "
 +                @click="proposeRecords()"
 +            >
@@ -153,8 +156,6 @@ index 9621e55..3299eaa 100644
 +const pendingProposalBundle = ref(null);
 +const proposalResult = ref(null);
 +const proposing = ref(false);
-+const publicHistoryAcknowledged = ref(false);
-+const sharedOriginAcknowledged = ref(false);
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
@@ -168,7 +169,11 @@ index 9621e55..3299eaa 100644
 +        typeof config.value?.review_bundle_proposal === 'object'
 +);
 +const framedContext = isFramedContext();
-+const sharedGitHubPagesOrigin = isSharedGithubPagesOrigin();
++const sharedGitHubPagesOrigin = computed(
++    () =>
++        config.value?.review_bundle_proposal?.shared_github_pages_origin === true ||
++        isSharedGithubPagesOrigin()
++);
 +
 +function accessibleRecordSubmissionLabel(record) {
 +    const classLabel = getDisplayName(
@@ -229,11 +234,7 @@ index 9621e55..3299eaa 100644
 +}
 +
 +async function proposeRecords() {
-+    if (
-+        framedContext ||
-+        !publicHistoryAcknowledged.value ||
-+        (sharedGitHubPagesOrigin && !sharedOriginAcknowledged.value)
-+    ) return;
++    if (framedContext) return;
 +    try {
 +        const bundle = await buildSelectedReviewBundle();
 +        dispatchReviewBundle(bundle);
@@ -253,9 +254,7 @@ index 9621e55..3299eaa 100644
 +    if (
 +        framedContext ||
 +        !pendingProposalBundle.value ||
-+        proposing.value ||
-+        !publicHistoryAcknowledged.value ||
-+        (sharedGitHubPagesOrigin && !sharedOriginAcknowledged.value)
++        proposing.value
 +    ) return;
 +    let handoff;
 +    proposing.value = true;
@@ -264,7 +263,6 @@ index 9621e55..3299eaa 100644
 +            config.value.review_bundle_proposal
 +        );
 +        const result = await handoff.deliver({
-+            acknowledge_public_data: true,
 +            bundle: pendingProposalBundle.value,
 +            format: 'orinoco-lite-shacl-proposal-v1',
 +            repository: config.value.review_bundle_proposal.repository,
