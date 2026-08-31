@@ -10,14 +10,13 @@ Keep generic fixes in the engine or template that owns them and keep site data a
 
 ## Establish the live scope
 
-1. Read the instructions, ownership contract, Copier answers, pins, and relevant tests in every selected working tree.
+1. Read the instructions, configuration, and relevant tests in every selected working tree.
 2. Identify the downstream plus an engine candidate, a template candidate, or both.
 Use `leej3/orinoco-lite-demo` as the Milestone 7 metadata, curation, source-evidence, and source-adapter baseline.
 Inspect the organization fixture only for useful unique material rather than treating it as a second baseline.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
 Resolve missing access early.
-4. Treat a release and organization-fixture merge as separate gates.
-Permission to test a working tree locally does not itself authorize either one.
+4. Treat a release and organization-fixture merge as separate user-visible actions.
 
 ## Exercise the temporary downstream
 
@@ -54,24 +53,23 @@ For an explicitly requested end-to-end exercise in `leej3/orinoco-lite-demo`, pr
 
 Standing authority covers the mechanics of the exercise, not invented metadata or curation decisions.
 Use supplied fixture decisions or retained reviewed state.
-For curation-message and lineage requirements, follow `docs/github-curation-review.md` and `docs/source-adapters.md`: identify the adapter, link the downstream review application, retain merge and artifact notes, place the source coordinate in closed details, and report the decision commit and validation state after finalization.
+For curation behavior, follow `docs/github-curation-review.md` and `docs/source-adapters.md`.
 
-## Recover quickly and preserve evidence
+## Recover quickly
 
 Use GitHub's current state rather than polling by guesswork:
 
 - watch pull-request checks with `gh pr checks --watch` and runs with `gh run watch <run-id> --exit-status`;
 - inspect a failure with `gh run view <run-id> --log-failed` before choosing a recovery;
-- rerun failed jobs only when the evidence indicates a transient runner, browser, or service failure; and
+- rerun failed jobs only for a likely transient runner, browser, or service failure; and
 - for a deterministic failure, repair the owning working tree, pass the local candidate again, push the repair, and watch the replacement checks.
 
-The full local candidate run may replace duplicate pull-request CI when speed is more valuable than a second copy of the same evidence.
-Merge a curation pull request with `gh pr merge --merge` so the proposal, decision, and finalization lineage survives.
-After merge, verify the exact default-branch validation and Pages runs and the relevant deployed routes.
+The full local candidate run may replace duplicate pull-request CI when speed is more valuable than running the same checks twice.
+After merge, verify default-branch validation, Pages, and the relevant routes.
 If a merged demo change breaks validation or deployment, recover through a checked repair or revert pull request and verify the replacement deployment before reporting completion.
 
 ## Keep the organization fixture human-gated
 
 `ORINOCO-Lite/test-orinoco-downstream-website` remains the organization-owned acceptance fixture.
-When adoption is in scope, an agent may generate the update, test it locally, push its branch, open or update the pull request, and report the exact candidate and check evidence.
+When adoption is in scope, an agent may generate the update, test it locally, push its branch, open or update the pull request, and report the checks.
 Leave approval and merge to the external human gate; the developer-demo standing authority does not cross into this repository.

@@ -1,9 +1,7 @@
 # Curation service and authentication options
 
-Status: accepted design rationale; normative requirements are in [`milestone-6.md`](milestone-6.md), [`github-curation-review.md`](github-curation-review.md), and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md)
-
-John Lee accepted this architecture and its shared-origin policy on 2026-08-27 as M6-D007 and HR-229.
-This note preserves the authentication options and design rationale without creating a second normative contract.
+This note explains the authentication options.
+Current behavior is specified in [`github-curation-review.md`](github-curation-review.md) and [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md).
 
 ## Accepted outcome
 
@@ -144,7 +142,7 @@ They do not freeze mutable DNS targets.
 ## Implementation consequences
 
 The central React presentation surface is not part of the final service.
-The normative profiles and human-decision register record the accepted policy.
+The current review and edit profiles define the policy.
 Implementation:
 
 1. make the central service origin a default with one downstream override;

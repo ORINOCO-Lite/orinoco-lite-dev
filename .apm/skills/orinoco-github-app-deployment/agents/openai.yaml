@@ -1,4 +1,0 @@
-interface:
-  display_name: "Orinoco GitHub App Deployment"
-  short_description: "Deploy the stateless review backend anywhere"
-  default_prompt: "Use $orinoco-github-app-deployment to deploy and verify an Orinoco Lite curation-review GitHub App backend without assuming a hosting provider."

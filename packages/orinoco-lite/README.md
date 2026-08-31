@@ -9,7 +9,7 @@ This package is one layer of the larger system:
 - the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
 - each downstream repository owns its metadata, editorial content, assets, policy, and extensions; projection output is ignored and regenerated.
 
-The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.
+The engineering workspace's submodules, upstream development history, and release fixtures are not part of the package interface.
 
 ## Responsibilities
 
@@ -101,13 +101,12 @@ The current runtime is content-neutral within the selected Things Schema profile
 The pinned schema has an intentional recursive relationship range and an acyclic inheritance graph.
 LinkML's current generated Pydantic representation expands the wide recursive descendant union deeply enough to exceed Python's default recursion limit during model rebuilding.
 
-Until LinkML emits a named recursive alias, the engine serializes converter construction, raises the limit to the already-proven value only inside that boundary, and restores the caller's exact value on success or failure.
+Until LinkML emits a named recursive alias, the engine serializes converter construction, raises the limit only inside that boundary, and restores the caller's value on success or failure.
 It does not change the schema, hide semantic errors, or leave a process-wide setting behind.
-The diagnosis and removal condition are recorded in [`docs/milestone-4-decisions.md`](../../docs/milestone-4-decisions.md).
 
 ## Release and license boundary
 
-Releases contain a deterministic wheel and source archive, a checksummed runtime archive with the static `/edit/` and `/review/` shells, machine-readable source and dependency inventories, component license texts, and build provenance.
+Releases contain a wheel and source archive, a checksummed runtime archive with the static `/edit/` and `/review/` shells, component license texts, and the information needed to use those artifacts.
 The runtime contains the localized schema closure, reviewed renderer, graph support, and static editor required by consumers; it does not expose component checkouts.
 
 The engine and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
