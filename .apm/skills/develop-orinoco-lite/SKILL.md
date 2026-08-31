@@ -66,6 +66,9 @@ Use GitHub's current state rather than polling by guesswork:
 - for a deterministic failure, repair the owning working tree, pass the local candidate again, push the repair, and watch the replacement checks.
 
 The full local candidate run may replace duplicate pull-request CI when speed is more valuable than a second copy of the same evidence.
+Exercise editor and popup behavior in the browser against a local transport that structured-clones the proposal and simulates the ready, started, and result messages.
+Create scratch exercise pull requests with `gh`, not through the browser.
+A live authenticated popup-to-pull-request run is a separate manual acceptance check and must not block the normal autonomous development loop.
 Merge a curation pull request with `gh pr merge --merge` so the proposal, decision, and finalization lineage survives.
 After merge, verify the exact default-branch validation and Pages runs and the relevant deployed routes.
 If a merged demo change breaks validation or deployment, recover through a checked repair or revert pull request and verify the replacement deployment before reporting completion.

@@ -19,7 +19,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:3d1d4b36b7c3087dd4a384f3b7254fac017b9fba6bdc391f5778faf50960fb4d
+  content_hash: sha256:671dba54b606df1f3c2a8364e9cdf72bd0f772a6333bd9391cfa630f1c8f3ad2
 - kind: project-relative
   target: agents
   value: .agents/skills/develop-orinoco-lite/agents/openai.yaml
@@ -134,7 +134,7 @@ local_deployed_files:
 - .agents/skills/upstream-convergence/agents/openai.yaml
 - .agents/skills/upstream-convergence/references/git-and-evidence.md
 local_deployed_file_hashes:
-  .agents/skills/develop-orinoco-lite/SKILL.md: sha256:3d1d4b36b7c3087dd4a384f3b7254fac017b9fba6bdc391f5778faf50960fb4d
+  .agents/skills/develop-orinoco-lite/SKILL.md: sha256:671dba54b606df1f3c2a8364e9cdf72bd0f772a6333bd9391cfa630f1c8f3ad2
   .agents/skills/develop-orinoco-lite/agents/openai.yaml: sha256:4d2ebd2ce1bd971d9b04a98a7260bfd1ae50ded3c1bf7a5a232d5666eb1971b8
   .agents/skills/orinoco-github-app-deployment/SKILL.md: sha256:48c5dfc3e26998243d8129451850b35379b49b984903dfb1d1f2187162c89771
   .agents/skills/orinoco-github-app-deployment/agents/openai.yaml: sha256:dea44d3fdba18d2feeccdbd6c08d1ccae70bef8f52b8918b5975c439b099ff0b

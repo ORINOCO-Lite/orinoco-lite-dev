@@ -125,7 +125,10 @@ describe('Orinoco review bundles', () => {
 
     it('sends a confirmed proposal only to the exact transport popup', async () => {
         const listeners = new Map();
-        const popup = { closed: false, postMessage: vi.fn() };
+        const popup = {
+            closed: false,
+            postMessage: vi.fn((message) => structuredClone(message)),
+        };
         const nonce = '0a'.repeat(32);
         const target = {
             addEventListener: vi.fn((type, listener) =>
@@ -169,7 +172,8 @@ describe('Orinoco review bundles', () => {
             `orinoco-lite-shacl-proposal-${nonce}`,
             'popup,width=720,height=760,resizable=yes,scrollbars=yes'
         );
-        const delivered = handoff.deliver(proposal);
+        const reactiveProposal = new Proxy(proposal, {});
+        const delivered = handoff.deliver(reactiveProposal);
         const receive = listeners.get('message');
         receive({
             data: {
@@ -208,6 +212,9 @@ describe('Orinoco review bundles', () => {
                 repository: 'ORINOCO-Lite/example-site',
             },
             'https://review.example.test'
+        );
+        expect(popup.postMessage.mock.calls[0][0].proposal).not.toBe(
+            reactiveProposal
         );
         receive({
             data: {
