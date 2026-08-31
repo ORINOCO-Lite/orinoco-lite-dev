@@ -23,10 +23,7 @@ RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
-DEVELOPER_SKILL = ROOT / ".apm" / "skills" / "develop-orinoco-lite"
-INSTALLED_DEVELOPER_SKILL = (
-    ROOT / ".agents" / "skills" / "develop-orinoco-lite"
-)
+DEVELOPER_SKILL = ROOT / ".agents" / "skills" / "develop-orinoco-lite"
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 
@@ -40,14 +37,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": "packages/orinoco-lite", "editable": True},
         )
-        self.assertEqual(
-            manifest["feature"]["skills"]["dependencies"],
-            {"apm-cli": "==0.28.0"},
-        )
-        self.assertEqual(
-            manifest["environments"]["skills"],
-            {"features": ["skills"], "no-default-feature": True},
-        )
+        self.assertNotIn("feature", manifest)
+        self.assertNotIn("environments", manifest)
         serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
             'path = "submodules/',
@@ -104,21 +95,14 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             set(tasks["test-ci"]["depends-on"]),
             {"test-engine-strict", "test-accepted-consumer", "test-development"},
         )
-        skills = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["feature"][
-            "skills"
-        ]["tasks"]
-        self.assertEqual(
-            skills["apm-check"],
-            "apm install --frozen && apm audit --ci",
-        )
+        self.assertFalse((ROOT / "apm.yml").exists())
+        self.assertFalse((ROOT / "apm.lock.yaml").exists())
 
-    def test_developer_skill_is_installed_and_scoped(self) -> None:
+    def test_developer_skill_is_native_and_scoped(self) -> None:
+        self.assertFalse((ROOT / ".apm" / "skills").exists())
         for relative in ("SKILL.md", "agents/openai.yaml"):
             source = DEVELOPER_SKILL / relative
-            installed = INSTALLED_DEVELOPER_SKILL / relative
             self.assertTrue(source.is_file())
-            self.assertTrue(installed.is_file())
-            self.assertEqual(source.read_bytes(), installed.read_bytes())
 
         skill = (DEVELOPER_SKILL / "SKILL.md").read_text(encoding="utf-8")
         for required in (
@@ -127,9 +111,9 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "--template",
             "--mode quick",
             "--mode full",
-            "leej3/orinoco-lite-demo",
+            "<github-user>/orinoco-lite-demo",
             "ORINOCO-Lite/test-orinoco-downstream-website",
-            "gh pr merge --merge",
+            "merge with a merge commit",
             "standing authority",
             "human-gated",
         ):
@@ -386,13 +370,11 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "Initialize only release-authorized compatibility components"
         )
         install = workflow.index("frozen: true")
-        skills = workflow.index("run: pixi run -e skills apm-check")
         tests = workflow.index("run: pixi run test-ci")
         build = workflow.index("run: pixi run build-upstream-static")
         self.assertLess(fixture, tests)
         self.assertLess(components, tests)
         self.assertLess(install, tests)
-        self.assertLess(skills, tests)
         self.assertLess(tests, build)
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("run: pixi run build-upstream-static-worktree", workflow)

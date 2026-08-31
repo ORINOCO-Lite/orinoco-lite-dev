@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Provenance"
+  short_description: "Resolve exact Codex commit provenance"
+  default_prompt: "Use $commit-provenance before creating this commit."

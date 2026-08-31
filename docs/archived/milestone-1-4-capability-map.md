@@ -4,7 +4,7 @@ Status: historical audit retained as derivation evidence
 
 This map records the transition into the accepted Milestone 4 distribution.
 It does not describe current work or downstream adoption.
-Current engineering work starts at [`milestone-6.md`](../milestone-6.md).
+The next historical engineering milestone is [`milestone-6.md`](../agents/archived/milestone-6.md).
 
 This map answers a narrow maintenance question: which Milestone 1–3 results are part of the supported Milestone 4 stack, which remain engineering checks, and which were intentionally superseded?
 It is an audit of carried behavior, not a replacement for the historical evidence.
@@ -34,7 +34,7 @@ This closes the engineering execution gap without making a metadata service a do
 | Local/offline operation | Digest-addressed asset hydration followed by OS-level denied-network validation, projection, build, and editor checks |
 
 The M4 traceability baseline maps 106 parent Python methods, five Playwright definitions with nine browser executions, 42 Zotero methods, and eight editor methods with no unmapped source assertion.
-The complete details and immutable coordinates remain in [`milestone-4-acceptance.md`](../milestone-4-acceptance.md).
+The complete details and immutable coordinates remain in [`milestone-4-acceptance.md`](../agents/archived/milestone-4-acceptance.md).
 Counts in that historical evidence use the former 186-canonical/13-reference filesystem vocabulary; configuration contract 2 supersedes it with one 199-record input tree without changing the accepted content.
 
 ## Retained as engineering capability
@@ -91,5 +91,5 @@ Under that rule the old CON-coupled root environment can remain historical, whil
 
 ## Next engineering goal
 
-The draft [`source-adapter specification`](../source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
+The current [`source-adapter specification`](../agents/contract/source-adapters.md) generalizes the cache-versus-live semantic comparison without moving source-specific policy into the engine or template prematurely.
 Its first reusable candidate is Zotero; the CON-specific `dump-research-info` experiment supplies design evidence but does not define a common host or a generic adapter.

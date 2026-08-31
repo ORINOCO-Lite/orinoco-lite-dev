@@ -353,8 +353,6 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
     useState<BoundReviewProposal | null>(null);
   const [login, setLogin] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [sharedOriginAcknowledged, setSharedOriginAcknowledged] =
-    useState(false);
 
   function clearHandoffTimers(state: HandoffState): void {
     if (state.handshakeTimeout !== null) {
@@ -614,12 +612,6 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
 
   function connect(): void {
     if (target === null || !listenerInstalled.current) return;
-    if (sharedGitHubPagesOrigin() && !sharedOriginAcknowledged) {
-      setFeedback(
-        "Acknowledge the shared github.io origin before connecting GitHub.",
-      );
-      return;
-    }
     const previous = handoff.current;
     if (previous !== null) {
       clearHandoffTimers(previous);
@@ -831,25 +823,10 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
             verified custom domain gives this site its own origin and enables
             the normal low-friction GitHub flow.
           </p>
-          <label>
-            <input
-              checked={sharedOriginAcknowledged}
-              onChange={(event) =>
-                setSharedOriginAcknowledged(event.target.checked)
-              }
-              type="checkbox"
-            />
-            I understand this shared-origin risk and want to enable direct
-            GitHub submission for this page.
-          </label>
         </section>
       )}
       {listenerReady && (
-        <button
-          disabled={sharedGitHubPagesOrigin() && !sharedOriginAcknowledged}
-          onClick={connect}
-          type="button"
-        >
+        <button onClick={connect} type="button">
           {nonce === null ? "Connect with GitHub" : "Reopen GitHub transport"}
         </button>
       )}

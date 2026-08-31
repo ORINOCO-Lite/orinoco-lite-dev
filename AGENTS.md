@@ -1,65 +1,34 @@
 # Agent instructions
 
-## Current work
+## Current direction
 
-- The active effort is the bounded pre-Milestone 6 upstream convergence, release, and custody-transition batch in `docs/milestone-6.md`.
-- Read `README.md`, `docs/milestone-6.md`, `docs/source-adapters.md`, `docs/github-curation-review.md`, `docs/github-shacl-vue-edit.md`, `docs/milestone-5-decisions.md`, `docs/milestone-5-acceptance.md`, and `docs/human-review-decisions.md` before changing current architecture or acceptance documentation.
-- Read Milestone 1–5 plans and historical acceptance records only when their derivation or preserved evidence is relevant.
-Their old operating commands and branch descriptions are not the downstream interface.
-- Do not silently infer an answer to an open human decision.
-Record resolutions in `docs/human-review-decisions.md` and the corresponding source decision register in the same reviewed change.
-- Stop and request clarification when ambiguity would change metadata semantics, provenance, review behavior, repository history, authority, or durable state.
-Do not resolve ambiguity by broadening the threat model or inventing another artifact or authority.
-- Do not begin Milestone 6 implementation or a deferred human decision unless the user expands scope.
-- Do not create a tracked upstream-head inventory or compatibility ledger.
-Compare authoritative heads only during a deliberate update, then record the accepted result in gitlinks, direct pins, locks, and the reviewed pull request.
-- Repository and GitHub App transfers wait until current pull requests merge and Pre-M6-Q001 records their exact scope.
+- Keep reusable website behavior in the engine or template.
+Keep site content, configuration, and custom source-adapter code in downstream repositories.
+- Test unreleased engine or template work locally with `pixi run test-downstream-candidate` when practical.
+A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
+Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
+- Prefer one source of truth.
+Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.
+- Use commit identifiers where software requires them, such as dependency locks, release inputs, and concurrency checks.
+Do not require per-file origins or before-and-after coordinate inventories for ordinary work.
 
-## Repository boundaries
+## Documentation
 
-- This repository owns engineering integration, the `orinoco-lite` engine, runtime assembly, immutable release evidence, reusable CI, and cross-layer acceptance.
-- `ORINOCO-Lite/orinoco-lite-template` owns Copier source, generated template output, framework ownership, and update mechanics.
-- `ORINOCO-Lite/test-orinoco-downstream-website` owns the complete accepted content, site policy, presentation overrides, provenance, and consumer acceptance.
-- A supported downstream is one ordinary Git repository with no submodules or gitlinks.
-Keep component coordination and upstream-rebase history inside the engineering workspace.
-- The test consumer contains all accepted Milestone 3 content and the complete test contract.
-Representative records are smoke checks, never a selection mechanism.
+- Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
+- Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
+- Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
+- Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
+Retire them at milestone boundaries.
+- Archived documents are historical context, not instructions or current policy.
+Do not link to them from active instructions or indexes.
 
-## Content and runtime contracts
+## Boundaries
 
-- Reviewed YAML under `metadata/records/` and `metadata/overlays/annotations/` is the canonical semantic metadata source; the joined Things graph is the validation and RDF boundary.
-Zotero ingestion remains repeatable, read-only source evidence and never a normal production runtime dependency.
-- Preserve well-formed unresolved Things references by default without network lookup.
-Report references and graph edges that cannot be materialized locally; stricter local closure is site policy, not the engine's definition of valid upstream-compatible metadata.
-- Keep source capture, transformation, human review, and site promotion distinct.
-Do not write to Zotero or invent identities, publication semantics, venues, topics, licensing, asset custody, or cutover policy.
-- Use the pinned source Things Schema and exact `dlthings:*` CURIE contract in `docs/explaining-schema-issues.md`.
-Do not substitute the vendored resolved schema, an unreviewed LinkML trial, or a later schema candidate.
-- Do not require a continuously running metadata service for static validation, builds, preview, Pages, or review-bundle editing.
-- Keep credentials, tokens, caches, stores, downloaded assets, browser output, and generated build artifacts outside tracked repository state.
-
-## Change and publication rules
-
-- Work in isolated engineering, template, and consumer worktrees appropriate to the repository being changed.
-Do not use the real site as a worktree target.
-- Framework updates may create a branch and pull request but never approve or merge themselves or deploy pull-request code to the shared Pages environment.
-- Preserve exact immutable release coordinates, ownership classifications, site-owned before/after hashes, and rollback evidence.
-- Keep the implementing pull-request summaries current without duplicating Git ancestry or transient artifact inventories.
-Do not leave a superseded proposal as the current review entry point.
-
-## User preferences
-
-- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for every commit subject and body.
-- Keep commit subjects and body lines wrapped to approximately 80 columns.
-- Use the Snapper pre-commit hook to format prose and minimize documentation diffs.
-
-## Commit co-authorship
-
-Every Codex-authored commit must include:
-
-```text
-Co-Authored-By: <tool name> <tool version> / <model name> <model version> <codex@openai.com>
-```
-
-Discover both versions from the active tool and session immediately before the commit.
-Do not guess.
+- Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
+- Do not invent metadata semantics, identities, rights, or curation decisions.
+- Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
+- Keep the real CON site read-only unless the user explicitly includes it, and do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
+- Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
+- Treat `.agents/skills/` as the single canonical source for project-owned skills and edit those files directly.
+Do not add skill dependency infrastructure until this project consumes an independently maintained promoted skill.
+- Use Conventional Commits, keep commit text near 80 columns, and run the relevant formatting and tests for changed files.

@@ -1,6 +1,6 @@
 # Lightweight architecture roadmap through Milestone 5
 
-Status: historical planning record; superseded by [`milestone-6.md`](../milestone-6.md)
+Status: historical planning record; superseded by [`milestone-6.md`](../agents/archived/milestone-6.md)
 
 This document preserves the reasoning that led to configuration contract 2 and the Milestone 5 source-adapter architecture.
 Its delivery sequence and status language are not current operating instructions.
@@ -65,7 +65,7 @@ A content diff cannot explain why an absent candidate was rejected or deferred, 
 
 Proposal, human modification, and complete decisions remain on one pull-request branch and enter the curated branch through an exact-commit-preserving merge.
 The workflow requires neither a persistent service nor a follow-up pull request.
-The normative contract and its complexity guardrails are maintained in [`source-adapters.md`](../source-adapters.md).
+The normative contract and its complexity guardrails are maintained in [`source-adapters.md`](../agents/contract/source-adapters.md).
 
 ## Known compatibility seams
 
@@ -105,7 +105,7 @@ Until that choice is implemented, creation documentation must place the profile 
 
 ### 3. Exercise reusable upstream enrichment
 
-- Implement the identity, disposition, annotation-overlay, hosted-review, and verification contract defined in [`source-adapters.md`](../source-adapters.md).
+- Implement the identity, disposition, annotation-overlay, hosted-review, and verification contract defined in [`source-adapters.md`](../agents/contract/source-adapters.md).
 - Demonstrate the complete workflow with Zotero and the CON-specific `dump-research-info` importer, including all-rejected review and material-change re-review.
 - Use upstream PAV and enrichment/update helpers where their behavior matches a demonstrated mode, and test A Simple Standard for Sharing Ontological Mappings (SSSOM) only as a mapping interchange format.
 - Keep the core host-neutral without freezing a Python ABI or plugin protocol from two implementations.

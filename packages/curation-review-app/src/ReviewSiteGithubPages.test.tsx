@@ -4,7 +4,6 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReviewSiteLoader from "./ReviewSite";
 
@@ -34,10 +33,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("shared GitHub Pages acknowledgement", () => {
-  it("requires a visible in-memory acknowledgement before connecting", async () => {
-    const user = userEvent.setup();
-    const first = render(<ReviewSiteLoader />);
+describe("shared GitHub Pages warning", () => {
+  it("warns without gating GitHub connection", async () => {
+    render(<ReviewSiteLoader />);
     const connect = await screen.findByRole("button", {
       name: "Connect with GitHub",
     });
@@ -48,19 +46,7 @@ describe("shared GitHub Pages acknowledgement", () => {
       }),
     ).toBeVisible();
     expect(screen.getByText(/Every project page/)).toBeVisible();
-    expect(connect).toBeDisabled();
-
-    await user.click(
-      screen.getByRole("checkbox", {
-        name: /I understand this shared-origin risk/,
-      }),
-    );
     expect(connect).toBeEnabled();
-
-    first.unmount();
-    render(<ReviewSiteLoader />);
-    expect(
-      await screen.findByRole("button", { name: "Connect with GitHub" }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });

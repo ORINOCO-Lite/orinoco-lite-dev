@@ -1,6 +1,6 @@
 ---
 name: orinoco-github-app-deployment
-description: Deploy, migrate, verify, rotate, or roll back the stateless Orinoco Lite curation-review GitHub App backend on any suitable hosting provider. Use for self-hosting the review and edit-handoff service, evaluating a provider, configuring its GitHub App and secrets, moving an existing deployment, or recording deployment evidence. Do not use merely to point a downstream at the existing central service.
+description: Deploy, migrate, verify, rotate, or roll back the stateless Orinoco Lite curation-review GitHub App backend on any suitable hosting provider. Use for self-hosting the review and edit-handoff service, evaluating a provider, configuring its GitHub App and secrets, or moving an existing deployment. Do not use merely to point a downstream at the existing central service.
 ---
 
 # Orinoco Github App Deployment
@@ -27,18 +27,19 @@ Deploy only the checked API handlers, minimal generated OAuth callback/transport
 Put secrets only in the encrypted hosting control plane.
 Never put secret values in Git, command output, logs, evidence, or browser-visible configuration.
 Do not add durable storage.
-Keep provider-operator login separate from curator GitHub authorization as explained in the [authentication options](../../../docs/curation-service-authentication-options.md).
+Keep provider-operator login separate from curator GitHub authorization as explained in the [authentication options](../../../docs/agents/contract/curation-service-authentication-options.md).
 For Cloudflare, prefer direct Cloudflare account authentication for an interactive operator and a narrowly scoped API token for CI.
 Cloudflare's GitHub social login is an optional operator choice that uses the primary GitHub email; the Orinoco GitHub App neither needs nor requests account email access.
 7. Deploy atomically from the clean reviewed revision.
-Record an immutable deployment identifier and a previously working rollback coordinate.
+Use Git and the hosting provider's deployment history for recovery; do not create a separate deployment ledger or coordinate inventory.
 8. Follow [verification-rotation-and-rollback.md](references/verification-rotation-and-rollback.md): run non-mutating probes first, then a real authenticated read-only browser flow.
 Require explicit authorization before any comment, branch, commit, or pull-request write, and use only a disposable or designated integration repository for that proof.
 9. Only after the deployment and App installation pass verification, set `site.curation_service` in a downstream when it should override the released central default.
 Do not add a curation-specific repository setting; verify that the trusted build derives repository identity from its general project coordinate.
 10. Guide downstream maintainers through the custom-domain and shared-origin checks in [verification-rotation-and-rollback.md](references/verification-rotation-and-rollback.md).
 A custom or otherwise unique origin receives the normal flow; shared `github.io` deployments show the warning and remediation link without gating direct submission, while **Download bundle** remains credential-free.
-11. Record evidence without secrets: application commit/tree and clean state, public origin and client ID, App ID/owner and permission set, selected repositories, deployment ID, probe results, configuration-key inventory with secret values redacted, downstream effective origins, and rollback coordinate.
+11. Report the deployed public origin, selected GitHub App repositories, and verification outcome.
+Do not create a separate evidence manifest; Git, reviewed configuration, the provider, and GitHub remain the sources of current and historical state.
 
 ## Guardrails
 
