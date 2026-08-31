@@ -52,7 +52,7 @@ Current templates use `site-specific/metadata/records/` and `site-specific/metad
 | Hosted authentication | GitHub and short-lived service sessions | OAuth state and authentication sessions are operational state, never durable curation state. |
 | Source decision-review presentation | Proposal commit and metadata diff; one expiring GitHub Actions artifact is non-authoritative presentation input | Reproducibly present source and proposal coordinates plus per-record UI facts without letting the artifact become metadata, candidate, decision, or provenance authority. |
 | SHACL Vue presentation | Downstream static `edit/` output | Serve the exact-commit `edit/config.json`, `edit/records.ttl`, and `edit/data/record-sources.json` with an immutable released editor shell and schema. The static site is the only SHACL Vue editor; its generated output is not metadata, a generated review bundle, provenance, or durable curation state. |
-| Hosted SHACL Vue handoff | Downstream editor plus stateless GitHub authorization and transport | Keep selection, warnings, confirmation, and file reselection on downstream `/edit/`; transport the unchanged bundle to the fixed-path Git handoff without exposing a token, assembling another editor, or retaining curation state. |
+| Hosted SHACL Vue handoff | Downstream editor plus stateless GitHub authorization and transport | Keep selection, warnings, the final proposal action, and file reselection on downstream `/edit/`; transport the unchanged bundle to the fixed-path Git handoff without exposing a token, assembling another editor, or retaining curation state. |
 | Scratch state | Ignored `build/` content | Never determine or replace a human decision. |
 
 The record and annotation-overlay trees are canonical site-owned state.

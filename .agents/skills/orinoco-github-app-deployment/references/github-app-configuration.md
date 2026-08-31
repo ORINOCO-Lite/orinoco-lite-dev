@@ -74,7 +74,8 @@ Each downstream must have:
 
 For a downstream on a custom domain, verify the domain for the GitHub account or organization, configure it for the Pages site, verify its DNS and TLS, and confirm that the actual browser origin matches `site.base_url` before treating it as a unique origin.
 Use GitHub's current [domain-verification](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages), [custom-domain](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site), and [HTTPS](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https) instructions rather than copying mutable DNS targets into this skill.
-A downstream that remains on a shared `github.io` origin must expose the accepted explanation and explicit in-memory acknowledgment gate before either direct GitHub write path; **Download bundle** remains available without it.
+A downstream that remains on a shared `github.io` origin must expose the accepted explanation and custom-domain remediation link.
+That warning does not gate SHACL submission; the separate source-adapter `/review/` policy is unchanged, and **Download bundle** remains credential-free.
 
 Do not publish a SHACL editor-input Actions artifact for this path.
 The central service does not acquire either static interface's files, assemble an editor, or render source-adapter candidates.

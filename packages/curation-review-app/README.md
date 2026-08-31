@@ -120,9 +120,11 @@ After authentication, the popup signals readiness to that exact opener; the stat
 The transport accepts only an exact credential-free HTTPS opener origin (or loopback HTTP for development).
 If navigation severs the opener relationship, the curator can select the identical downloaded JSON bundle again on the downstream `/edit/` route and start a fresh handoff.
 
-Before sending the unchanged version 2 bundle, the downstream **Propose via GitHub** action shows the exact repository, source commit, and edited paths for confirmation without a separate bundle acknowledgment.
+The downstream submission drawer shows the repository and selected records before **Propose via GitHub**.
+That click authorizes one proposal; the popup submits through the verified channel after authentication without a second confirmation.
 The service then creates the fixed `.orinoco-lite/shacl-vue-review-bundle.json` handoff commit at the exact head.
 Trusted default-branch Python validates and replaces that one commit with the equivalent attributed canonical YAML commit; the final branch contains no bundle.
+New pull requests have no curator-attributed explanatory body; the trusted workflow posts the concise waiting status as `github-actions[bot]`.
 Pull-request Markdown is not parsed to locate or validate either artifact.
 
 Provisioning the Pages project, registering the GitHub App, setting secrets, and deploying are separately reviewed external operations.

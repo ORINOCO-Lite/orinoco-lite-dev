@@ -334,6 +334,60 @@ class EditorBundleTests(unittest.TestCase):
         apply_bundle(self.workspace, self.runtime, bundle, write=True)
         self.assertIn("display_label: Changed", self.first.read_text())
 
+    def test_bundle_preserves_unchanged_rdf_multivalue_order(self) -> None:
+        associated_with = [
+            {"object": f"xyzrins:projects/{slug}"}
+            for slug in ("first", "second", "third")
+        ]
+        self.first.write_text(
+            canonical_yaml(
+                {
+                    "associated_with": associated_with,
+                    "display_label": "First",
+                    "pid": "xyzrins:persons/first",
+                    "schema_type": "xyzri:XYZPerson",
+                }
+            ),
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.root), "commit", "-qm", "add multivalue"],
+            check=True,
+        )
+
+        class ReorderingConverter:
+            @staticmethod
+            def convert(_value, class_name):
+                return {
+                    "associated_with": list(reversed(associated_with)),
+                    "display_label": "Changed",
+                    "pid": "xyzrins:persons/first",
+                    "schema_type": f"xyzri:{class_name}",
+                }
+
+        bundle = self._bundle({"xyzrins:persons/first": "Changed"})
+        with patch(
+            "orinoco_lite.editor._converters",
+            return_value=(ReorderingConverter(), ReorderingConverter()),
+        ):
+            report = apply_bundle_report(
+                self.workspace, self.runtime, bundle, write=False
+            )
+            apply_bundle(self.workspace, self.runtime, bundle, write=True)
+
+        material = yaml.safe_load(self.first.read_text(encoding="utf-8"))
+        self.assertEqual(material["associated_with"], associated_with)
+        changed_lines = [
+            line
+            for line in report["diff"].splitlines()
+            if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+        ]
+        self.assertEqual(
+            changed_lines,
+            ["-display_label: First", "+display_label: Changed"],
+        )
+
     def test_bundle_rejects_traversal_duplicate_and_stale(self) -> None:
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
         value = json.loads(bundle.read_text())

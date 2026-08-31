@@ -271,7 +271,7 @@ async function startShacl(session) {
     ) return;
     requestAccepted = true;
     post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-started-v1" });
-    setStatus("Creating the confirmed downstream proposal on GitHub…");
+    setStatus("Creating the downstream proposal on GitHub…");
     let result;
     try {
       const created = await requestJson("/api/shacl/propose", {
@@ -297,7 +297,7 @@ async function startShacl(session) {
     }
     finished = true;
     post(result);
-    setStatus(result.error === null ? "GitHub created the confirmed proposal." : result.error);
+    setStatus(result.error === null ? "GitHub created the proposal." : result.error);
     window.setTimeout(() => window.close(), 250);
   };
   window.addEventListener("message", listener);

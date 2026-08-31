@@ -141,8 +141,7 @@ A downstream may reconnect while preserving decisions only for an explicitly ret
 It must keep the submission locked and tell the curator to inspect the pull request when a network, server, or malformed-success response could conceal a completed comment.
 
 Detect the actual downstream browser origin.
-When it is on a shared `github.io` hostname, explain that the entire origin is one browser principal and require a visible, explicit, in-memory curator acknowledgment before enabling the direct GitHub submission action.
-Do not store that acknowledgment in local storage, a cookie, service state, or tracked configuration, and do not treat it as authentication or path proof.
+When it is on a shared `github.io` hostname, explain that the entire origin is one browser principal and link to custom-domain remediation without adding an acknowledgment gate.
 A custom or otherwise unique origin receives the normal flow.
 
 ## Static-editor handoff boundary
@@ -157,10 +156,10 @@ Successful writes consume the relevant grant; standalone SHACL branches are dete
 The URL and OAuth state must not contain the bundle.
 Neither side may use cross-origin browser storage as bundle recovery state.
 If navigation or browser policy severs the opener relationship, the curator may select the identical downloaded JSON bundle on the downstream `/edit/` route and begin a new popup session.
-Both transports must receive the same format, size, repository, source-commit, exact-head, curator-authorization, and public-data acknowledgment checks.
+Both transports must receive the same format, size, repository, source-commit, exact-head, and curator-authorization checks.
 
-On a shared `github.io` origin, keep **Download bundle** enabled without GitHub authorization or the origin acknowledgment and gate **Propose via GitHub** on the same explicit in-memory acknowledgment used by `/review/`.
-Keep the origin acknowledgment separate from the bundle's public-history and no-secrets acknowledgment.
+On a shared `github.io` origin, keep **Download bundle** enabled without GitHub authorization and keep the warning informational rather than gating **Propose via GitHub**.
+The downstream's **Propose via GitHub** click is the final authorization for that one proposal; do not add another confirmation after authentication.
 When the editor is framed, refuse direct GitHub proposal at both the visible controls and the runtime helper while leaving **Download bundle** available.
 
 ## Capacity floor

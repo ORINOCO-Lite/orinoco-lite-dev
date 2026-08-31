@@ -6,7 +6,7 @@ description: Deploy, migrate, verify, rotate, or roll back the stateless Orinoco
 # Orinoco Github App Deployment
 
 Deploy the stateless Orinoco Lite GitHub App authorization and verified transport backend.
-Keep the hosting choice separate from the application contract and keep every human-facing interface, warning, file selector, and confirmation in the downstream static site: source review at `/review/` and SHACL Vue at `/edit/`.
+Keep the hosting choice separate from the application contract and keep every human-facing interface, warning, file selector, and authorizing action in the downstream static site: source review at `/review/` and SHACL Vue at `/edit/`.
 
 ## Workflow
 
@@ -37,7 +37,7 @@ Require explicit authorization before any comment, branch, commit, or pull-reque
 9. Only after the deployment and App installation pass verification, set `site.curation_service` in a downstream when it should override the released central default.
 Do not add a curation-specific repository setting; verify that the trusted build derives repository identity from its general project coordinate.
 10. Guide downstream maintainers through the custom-domain and shared-origin checks in [verification-rotation-and-rollback.md](references/verification-rotation-and-rollback.md).
-A custom or otherwise unique origin receives the normal flow; shared `github.io` deployments retain the visible in-memory acknowledgment gate and credential-free **Download bundle** option.
+A custom or otherwise unique origin receives the normal flow; shared `github.io` deployments show the warning and remediation link without gating direct submission, while **Download bundle** remains credential-free.
 11. Record evidence without secrets: application commit/tree and clean state, public origin and client ID, App ID/owner and permission set, selected repositories, deployment ID, probe results, configuration-key inventory with secret values redacted, downstream effective origins, and rollback coordinate.
 
 ## Guardrails
