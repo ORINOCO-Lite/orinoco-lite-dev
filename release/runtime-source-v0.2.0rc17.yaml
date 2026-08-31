@@ -1,6 +1,6 @@
 format: orinoco-lite-runtime-source
 spec_version: 1
-release: 0.2.0rc16
+release: 0.2.0rc17
 compatibility:
   config: [2]
   minimum_python: "3.12"
@@ -121,8 +121,8 @@ provenance:
     This release candidate makes the downstream proposal control the final
     authorizing click, removes curator-attributed explanatory pull-request
     text, and preserves unchanged RDF multivalue order during YAML
-    materialization. The accepted schema and editor component pins are
-    unchanged.
+    materialization. It supersedes the failed rc16 packaging attempt; accepted
+    schema and editor component pins are unchanged.
   source_inventory:
     engine:
       commit: release-source

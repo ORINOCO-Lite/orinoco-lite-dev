@@ -1,9 +1,3 @@
-.bashrc sourced.
-.bash_profile sourced
-.bashrc sourced.
-.bash_profile sourced
-.bashrc sourced.
-.bash_profile sourced
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
 index 9621e55..b0787b0 100644
 --- a/src/components/SubmitComp.vue
