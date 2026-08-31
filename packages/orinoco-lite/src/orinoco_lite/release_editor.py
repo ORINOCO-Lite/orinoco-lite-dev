@@ -167,6 +167,8 @@ def _apply_submission_accessibility_patch(
 
     if patch_path.is_symlink() or not patch_path.is_file():
         raise DriverError("Editor submission accessibility patch is missing")
+    if not patch_path.read_text(encoding="utf-8").startswith("diff --git "):
+        raise DriverError("Editor submission patch has an invalid preamble")
     _run(
         ["git", "apply", "--recount", "--unidiff-zero", "--check", patch_path],
         shacl,

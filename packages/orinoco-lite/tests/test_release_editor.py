@@ -258,6 +258,21 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
                     root / "missing.patch",
                 )
 
+    def test_accessibility_patch_rejects_a_non_diff_preamble(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            component = root / "src/components/SubmitComp.vue"
+            component.parent.mkdir(parents=True)
+            component.write_text("<template />\n", encoding="utf-8")
+            patch_path = root / "proposal.patch"
+            patch_path.write_text("unexpected output\ndiff --git a/x b/x\n", encoding="utf-8")
+            with self.assertRaisesRegex(DriverError, "invalid preamble"):
+                _apply_submission_accessibility_patch(
+                    root,
+                    component,
+                    patch_path,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
