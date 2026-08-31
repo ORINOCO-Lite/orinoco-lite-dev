@@ -272,7 +272,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertIn("site-specific/metadata/records/one.yaml", committed)
         self.assertNotIn("generated/stale.txt", committed)
 
-    def test_build_task_prepares_candidate_review_shell(self) -> None:
+    def test_build_task_prepares_candidate_shells(self) -> None:
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
@@ -285,6 +285,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
+            patch.object(development, "prepare_candidate_editor_shell") as editor,
             patch.object(development, "_run") as run,
         ):
             development.exercise_candidate(
@@ -297,7 +298,10 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             ("npm", "run", "build:review"),
             run.call_args_list[0].args[0],
         )
+        editor.assert_called_once()
         self.assertEqual("build", run.call_args_list[1].args[0][-1])
+        environment = run.call_args_list[1].kwargs["environment"]
+        self.assertIn("ORINOCO_CANDIDATE_EDITOR_SHELL", environment)
 
     def test_focused_indirect_build_task_prepares_candidate_review_shell(self) -> None:
         candidate = self.root / "candidate"
@@ -312,6 +316,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
+            patch.object(development, "prepare_candidate_editor_shell"),
             patch.object(development, "_run") as run,
         ):
             development.exercise_candidate(

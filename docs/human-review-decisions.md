@@ -32,6 +32,7 @@ Release coordinates, CI results, documentation repairs, and other mechanical wor
 | HR-229 | Keep all editing, review, warning, upload fallback, and confirmation UI on the downstream site while the main browser remains there. Use the central backend-only GitHub App service by default, with one optional self-host override and repository identity derived from the trusted build. Give unique custom-domain origins the normal flow; on shared `github.io` origins explain the origin-wide trust boundary and require an explicit acknowledgment before enabling direct GitHub writes. Keep **Download bundle** credential-free and guide maintainers through adding and verifying a custom domain. | M6-D007 | John Lee | 2026-08-27 |
 | HR-230 | Limit the personal GitHub App installation to `leej3/orinoco-lite-demo` for the current Zotero operation. Keep the separate organization installation limited to `ORINOCO-Lite/test-orinoco-downstream-website`; do not grant either installation account-wide repository access. | M6-Q002 | John Lee | 2026-08-27 |
 | HR-231 | Accept Milestone 6 with the SHACL Vue direct-GitHub proposal action's discoverability correction and live trusted-replacement proof explicitly deferred. Preserve the deployed downstream-origin editor, backend-only central service, guarded proposal control, and credential-free bundle download without claiming the deferred flow is complete. | M6-D008 | John Lee | 2026-08-28 |
+| HR-232 | Make the changed-record header action a submit control that opens the existing download-or-propose drawer. On shared `github.io`, show the origin warning, information text, and custom-domain remediation link without a checkbox. Remove the SHACL review-bundle acknowledgment and use a real auto-closing popup for GitHub transport. Keep the source-adapter `/review/` acknowledgment unchanged. | M6-D009 | John Lee | 2026-08-31 |
 
 ## Before production graduation
 
@@ -88,7 +89,9 @@ These remain dormant until a milestone proposes concrete work that needs them.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 - Milestone 5 source-adapter review uses GitHub, merge commits, and human decisions; it does not write to an external source.
 - The downstream `/edit/` and `/review/` routes own all product presentation; the central default or optional self-hosted curation service is backend-only.
-Shared `github.io` origins require an explicit in-memory acknowledgment before direct GitHub writes, while **Download bundle** remains credential-free.
+Shared `github.io` origins show the origin warning before direct GitHub writes.
+The source-adapter `/review/` route retains its explicit acknowledgment; SHACL `/edit/` does not gate submission on one.
+**Download bundle** remains credential-free.
 - No Milestone 5 or 6 decision authorizes changing the real site, its remotes, deployment, DNS, or production domain.
 
 ## Source records

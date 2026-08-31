@@ -1,0 +1,29 @@
+diff --git a/src/components/AppHeader.vue b/src/components/AppHeader.vue
+--- a/src/components/AppHeader.vue
++++ b/src/components/AppHeader.vue
+@@ -18,7 +18,7 @@
+         <template v-slot:append>
+             <span v-if="configVarsMain.useService || configVarsMain.reviewBundleMode === 'patch-download'">
+-                <v-tooltip :text="configVarsMain.reviewBundleMode === 'patch-download' ? 'Download review bundle' : 'Submit'" location="bottom">
++                <v-tooltip :text="configVarsMain.reviewBundleMode === 'patch-download' ? 'Submit changes' : 'Submit'" location="bottom">
+                     <template v-slot:activator="{ props }">
+                         <v-badge
+                             v-if="nodesToSubmit.length > 0 && !formOpen"
+@@ -29,7 +29,7 @@
+                             offset-y="12"
+                         >
+                             <v-btn
+-                                :icon="configVarsMain.reviewBundleMode === 'patch-download' ? 'mdi-download' : 'mdi-cloud-upload'"
++                                :icon="configVarsMain.reviewBundleMode === 'patch-download' ? 'mdi-send' : 'mdi-cloud-upload'"
+                                 @click="submitFn()"
+                                 v-bind="props"
+                                 :disabled="!canSubmit"
+@@ -39,7 +39,7 @@
+                         </v-badge>
+                         <v-btn
+                             v-else
+-                            :icon="configVarsMain.reviewBundleMode === 'patch-download' ? 'mdi-download' : 'mdi-cloud-upload'"
++                            :icon="configVarsMain.reviewBundleMode === 'patch-download' ? 'mdi-send' : 'mdi-cloud-upload'"
+                             @click="submitFn()"
+                             v-bind="props"
+                             :disabled="!canSubmit"

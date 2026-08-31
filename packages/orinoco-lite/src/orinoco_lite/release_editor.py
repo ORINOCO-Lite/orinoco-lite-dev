@@ -23,8 +23,12 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
 }
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
+SUBMISSION_HEADER_ICON = "'mdi-send' : 'mdi-cloud-upload'"
+SUBMISSION_HEADER_TOOLTIP = "'Submit changes' : 'Submit'"
 REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
 REVIEW_BUNDLE_PROPOSAL = "beginReviewBundleProposal("
+SHARED_ORIGIN_INFORMATION = "Another page could impersonate this path."
+SHARED_ORIGIN_WARNING = "This project shares one browser origin across the"
 DOWNLOAD_AND_DISPATCH = (
     "dlJSON(bundle, reviewBundleFilename(bundle.records));\n"
     "            dispatchReviewBundle(bundle);"
@@ -163,8 +167,11 @@ def _apply_submission_accessibility_patch(
 
     if patch_path.is_symlink() or not patch_path.is_file():
         raise DriverError("Editor submission accessibility patch is missing")
-    _run(["git", "apply", "--unidiff-zero", "--check", patch_path], shacl)
-    _run(["git", "apply", "--unidiff-zero", patch_path], shacl)
+    _run(
+        ["git", "apply", "--recount", "--unidiff-zero", "--check", patch_path],
+        shacl,
+    )
+    _run(["git", "apply", "--recount", "--unidiff-zero", patch_path], shacl)
     source = component.read_text(encoding="utf-8")
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
@@ -175,8 +182,35 @@ def _apply_submission_accessibility_patch(
         or "recordIri: record.node_iri" not in source
         or "prefixes: allPrefixes" not in source
         or DOWNLOAD_AND_DISPATCH not in source
+        or SHARED_ORIGIN_WARNING not in source
+        or "organization. This can be improved." not in source
+        or SHARED_ORIGIN_INFORMATION not in source
+        or "publicHistoryAcknowledged" in source
+        or "sharedOriginAcknowledged" in source
     ):
         raise DriverError("Editor submission patch is incomplete")
+
+
+def _apply_submission_header_patch(
+    shacl: Path,
+    component: Path,
+    patch_path: Path,
+) -> None:
+    """Apply and verify the changed-record submission header overlay."""
+
+    if patch_path.is_symlink() or not patch_path.is_file():
+        raise DriverError("Editor submission header patch is missing")
+    _run(
+        ["git", "apply", "--recount", "--unidiff-zero", "--check", patch_path],
+        shacl,
+    )
+    _run(["git", "apply", "--recount", "--unidiff-zero", patch_path], shacl)
+    source = component.read_text(encoding="utf-8")
+    if (
+        source.count(SUBMISSION_HEADER_ICON) != 2
+        or source.count(SUBMISSION_HEADER_TOOLTIP) != 1
+    ):
+        raise DriverError("Editor submission header patch is incomplete")
 
 
 def _dependency_inventory(
@@ -261,10 +295,12 @@ def build_editor(
     shacl = pool_ui / "shacl-vue"
     module = shacl / "src" / "modules" / "review-bundle.js"
     submit_component = shacl / "src" / "components" / "SubmitComp.vue"
+    header_component = shacl / "src" / "components" / "AppHeader.vue"
     test = shacl / "tests" / "orinoco-review-bundle-v2.test.js"
     if (
         not module.is_file()
         or not submit_component.is_file()
+        or not header_component.is_file()
         or not overlay.is_dir()
     ):
         raise DriverError("Pinned pool UI or Orinoco editor overlay is missing")
@@ -282,6 +318,11 @@ def build_editor(
         shacl,
         submit_component,
         overlay / "SubmitComp.vue.patch",
+    )
+    _apply_submission_header_patch(
+        shacl,
+        header_component,
+        overlay / "AppHeader.vue.patch",
     )
     _run(["npm", "ci"], shacl)
     _run(["npm", "run", "test", "--", "--run", test], shacl)

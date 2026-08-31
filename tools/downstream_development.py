@@ -361,6 +361,42 @@ def candidate_environment(
     return environment
 
 
+def prepare_candidate_editor_shell(
+    engine: Path,
+    destination: Path,
+    environment: Mapping[str, str],
+) -> None:
+    """Build the working-tree editor used by a downstream candidate."""
+
+    pool_ui = engine.resolve() / "submodules/pool.psychoinformatics.de-ui"
+    if not (pool_ui / "Makefile").is_file() or not (
+        pool_ui / "shacl-vue/package.json"
+    ).is_file():
+        raise DevelopmentError(
+            "Engine candidate editor sources are missing; initialize the "
+            "pool.psychoinformatics.de-ui submodule recursively"
+        )
+    source = destination.parent / "editor-source"
+    shutil.copytree(pool_ui, source)
+    _run(
+        (
+            sys.executable,
+            "-m",
+            "orinoco_lite.release_editor",
+            "--pool-ui",
+            source,
+            "--overlay",
+            engine.resolve() / "release/editor-v2",
+            "--shell",
+            destination,
+            "--licenses",
+            destination.parent / "editor-licenses",
+        ),
+        cwd=engine.resolve(),
+        environment=environment,
+    )
+
+
 def github_repository(downstream: Path, explicit: str | None = None) -> str:
     """Resolve the selected downstream's ordinary GitHub project identity."""
 
@@ -463,7 +499,6 @@ def exercise_candidate(
     pixi = shutil.which("pixi")
     if pixi is None:
         raise DevelopmentError("Pixi is unavailable")
-    environment = candidate_environment(engine, repository)
     available_tasks = _available_tasks(manifest)
     selected_tasks = tuple(
         task
@@ -476,24 +511,29 @@ def exercise_candidate(
                 f"Skipping optional task absent from candidate pixi.toml: {task}",
                 flush=True,
             )
-    if engine is not None and selected_tasks:
-        application = engine.resolve() / "packages/curation-review-app"
-        if not (application / "node_modules").is_dir():
-            _run(("npm", "ci", "--ignore-scripts"), cwd=application)
-        _run(("npm", "run", "build:review"), cwd=application)
-    for task in selected_tasks:
-        _run(
-            (
-                pixi,
-                "run",
-                "--frozen",
-                "--manifest-path",
-                manifest,
-                task,
-            ),
-            cwd=candidate,
-            environment=environment,
-        )
+    environment = candidate_environment(engine, repository)
+    with tempfile.TemporaryDirectory(prefix="orinoco-candidate-shells-") as temporary:
+        if engine is not None and selected_tasks:
+            application = engine.resolve() / "packages/curation-review-app"
+            if not (application / "node_modules").is_dir():
+                _run(("npm", "ci", "--ignore-scripts"), cwd=application)
+            _run(("npm", "run", "build:review"), cwd=application)
+            editor_shell = Path(temporary) / "editor-shell"
+            prepare_candidate_editor_shell(engine, editor_shell, environment)
+            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(editor_shell)
+        for task in selected_tasks:
+            _run(
+                (
+                    pixi,
+                    "run",
+                    "--frozen",
+                    "--manifest-path",
+                    manifest,
+                    task,
+                ),
+                cwd=candidate,
+                environment=environment,
+            )
 
 
 def parser() -> argparse.ArgumentParser:

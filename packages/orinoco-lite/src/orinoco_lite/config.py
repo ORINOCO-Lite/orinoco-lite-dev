@@ -560,3 +560,22 @@ def development_engine_source() -> Path | None:
         return None
     source = root / "packages/orinoco-lite/src"
     return source
+
+
+def development_editor_shell() -> Path | None:
+    """Resolve the editor shell built for a local engine candidate."""
+
+    if development_engine_root() is None:
+        return None
+    shell_value = os.environ.get("ORINOCO_CANDIDATE_EDITOR_SHELL")
+    if shell_value is None:
+        raise ConfigurationError(
+            "Local engine candidate has no editor shell; run it through the "
+            "downstream candidate command"
+        )
+    shell = Path(shell_value).resolve()
+    if not shell.is_dir() or not (shell / "index.html").is_file():
+        raise ConfigurationError(
+            "ORINOCO_CANDIDATE_EDITOR_SHELL does not contain a built editor"
+        )
+    return shell

@@ -64,6 +64,9 @@ def driver_environment(
         engine_paths.insert(0, str(development_source))
         environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"] = "1"
         environment["ORINOCO_CANDIDATE_ENGINE_ROOT"] = str(development_root)
+        editor_shell = os.environ.get("ORINOCO_CANDIDATE_EDITOR_SHELL")
+        if editor_shell is not None:
+            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = editor_shell
     environment["PYTHONPATH"] = os.pathsep.join(engine_paths)
     if additions:
         environment.update(additions)

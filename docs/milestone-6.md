@@ -108,7 +108,18 @@ That placement is not a discoverable primary action, and no current run proves t
 
 Making the action readily discoverable and recording one live end-to-end proposal and trusted replacement are deferred to a later milestone.
 **Download review bundle** remains the accepted credential-free path.
-This exception closes Milestone 6 without weakening the downstream-origin, backend-only-service, explicit-acknowledgment, repository-scope, or Git-history requirements already implemented.
+This exception closed Milestone 6 without changing the then-implemented downstream-origin, backend-only-service, repository-scope, or Git-history requirements.
+
+### M6-D009 — Complete the SHACL proposal control without acknowledgment gates
+
+The changed-record header uses a submit icon and opens the existing drawer containing **Download review bundle** and **Propose via GitHub**.
+On a shared `github.io` origin, `/edit/` shows the concise origin warning, information text, and custom-domain remediation link without requiring a checkbox.
+It also removes the separate public-data bundle acknowledgment.
+
+The GitHub transport opens as a compact popup, tells the curator that it closes automatically, and remains open through authorization and the proposal result.
+Repository, source, exact-head, collaborator, fixed-path, and trusted-replacement checks remain unchanged.
+This decision completes M6-D008's deferred SHACL user-flow correction and supersedes the SHACL acknowledgment parts of M6-D005 and M6-D007.
+It does not change the source-adapter `/review/` acknowledgment.
 
 ### M6-D004 — Move repository custody before the milestone and after active work is merged
 
@@ -133,12 +144,12 @@ The receiver-only current boundary and deployment supersede that presentation su
 
 The downstream static site is the only SHACL Vue editor for that downstream.
 Its editing session exposes two explicit actions for the same unchanged version 2 bundle: credential-free **Download bundle** and **Propose via GitHub**.
-The latter opens a stateless GitHub service popup only for backend sign-in and verified GitHub transport; the downstream owns public-data confirmation and bundle memory or file reselection.
+The latter opens a stateless GitHub service popup only for backend sign-in and verified GitHub transport; the downstream owns proposal confirmation and bundle memory or file reselection.
 The released central service is the default, with one optional self-host override, and the service does not assemble, embed, or host another editor.
 
 The live browser handoff validates the configured service origin, the exact static-site origin, both window identities, and a cryptographically random one-time nonce while keeping the bundle out of URLs, OAuth state, cross-origin storage, and durable service state.
 If OAuth or browser policy breaks the live window relationship, the curator may download the same bundle, select it again on downstream `/edit/`, and begin a fresh popup session.
-The static site never receives a GitHub token, and the service applies the same repository, source-commit, exact-head, format, size, authorization, and acknowledgment checks to either editor-memory or reselected-file transport.
+The static site never receives a GitHub token, and the service applies the same repository, source-commit, exact-head, format, size, and authorization checks to either editor-memory or reselected-file transport.
 
 This resolves M6-Q001 in favor of two actions in one static editor rather than two editor destinations.
 It supersedes only the central editor-input artifact and the central-wrapper-owned editor assembly and session portions of HR-213 and M5-D014.
@@ -158,7 +169,9 @@ The downstream shows the authenticated reviewer the complete repository, commit,
 Browser messaging can authenticate an origin but not a path.
 A GitHub Pages project site therefore shares its browser trust boundary with other pages on that account's Pages hostname.
 Exact build-derived repository binding and one-shot window and nonce checks remain mandatory.
-A shared `github.io` deployment also explains the origin-wide boundary and requires an explicit in-memory acknowledgment before direct GitHub submission; a custom or otherwise unique origin receives the normal flow.
+A shared `github.io` deployment also explains the origin-wide boundary.
+The `/review/` route retains an explicit in-memory acknowledgment before posting decisions; M6-D009 makes the `/edit/` explanation a warning without a gate.
+A custom or otherwise unique origin receives the normal flow.
 
 M6-D007 supersedes M6-D006's originally accepted central confirmation while preserving its proposal, candidate, decision-cache, provenance, artifact, and finalization authority.
 It also leaves M6-D005's distinct `/edit/` SHACL Vue route unchanged.
@@ -180,9 +193,9 @@ Root and retired presentation routes fail closed with `404` or `410`.
 
 Browser messaging authenticates an origin rather than a path.
 A downstream on a shared `github.io` origin must therefore explain that another compromised page on the same origin could impersonate the intended `/edit/` or `/review/` path.
-Before either route enables a direct GitHub write, it requires an explicit, in-memory acknowledgment of that shared-origin limitation.
-The acknowledgment informs the curator but is not treated as an authorization or security proof.
-It is not stored in local storage, a cookie, service state, or tracked configuration.
+The source-adapter `/review/` route requires an explicit, in-memory acknowledgment of that shared-origin limitation before posting decisions.
+M6-D009 makes the SHACL `/edit/` explanation a warning without a checkbox or acknowledgment gate.
+Neither presentation is treated as an authorization or security proof.
 A custom or otherwise unique downstream origin receives the normal low-friction flow.
 **Download bundle** remains enabled and credential-free in both cases.
 
@@ -270,7 +283,8 @@ Milestone 6 is complete when:
 3. the deployed downstream static editor keeps its main page on the downstream origin, provides credential-free bundle download, and keeps guarded direct-GitHub submission in the editing session while the central service exposes no static presentation surface; the discoverability correction and live trusted-replacement proof are accepted as the explicit M6-D008 deferral;
 4. one current Zotero proposal is reviewed and finalized, and its identical rerun reports an empty proposal.
 
-For the direct GitHub paths, the implemented contract retains the normal flow on a custom or otherwise unique origin and the explanation plus explicit acknowledgment gate on a shared `github.io` origin.
+For the direct GitHub paths, the implemented contract retains the normal flow on a custom or otherwise unique origin and an explanation on a shared `github.io` origin.
+The source-adapter `/review/` route retains its explicit acknowledgment gate; SHACL `/edit/` does not.
 Live end-to-end proof of the direct-GitHub SHACL path is part of the M6-D008 deferral.
 **Download bundle** remains usable there without GitHub authentication or acknowledgment.
 

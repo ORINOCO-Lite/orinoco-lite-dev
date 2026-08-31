@@ -38,7 +38,6 @@ function bundle(): ShaclReviewBundle {
 
 function request(target: ShaclProposalRequest["target"]): ShaclProposalRequest {
   return {
-    acknowledge_public_data: true,
     bundle: bundle(),
     format: "orinoco-lite-shacl-proposal-v1",
     repository: "example/site",

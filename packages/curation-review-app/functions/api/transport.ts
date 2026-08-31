@@ -302,7 +302,7 @@ async function startShacl(session) {
   };
   window.addEventListener("message", listener);
   post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-ready-v1" });
-  setStatus("Connected. Confirm the proposal in the downstream editor.");
+  setStatus("Connected. Return to the downstream editor. This window closes automatically after GitHub responds.");
 }
 
 async function main() {
@@ -331,7 +331,7 @@ function htmlResponse(target: BrowserTarget): Response {
 <title>Orinoco GitHub transport</title>
 </head>
 <body>
-<p id="status" role="status">Starting the secure GitHub transport…</p>
+<p id="status" role="status">Starting the secure GitHub transport. This window closes automatically after GitHub responds.</p>
 <script nonce="${nonce}">${transportScript(target)}</script>
 </body>
 </html>`;

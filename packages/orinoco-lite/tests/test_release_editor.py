@@ -14,8 +14,13 @@ from orinoco_lite.release_editor import (
     GIT_IDENTITY,
     REVIEW_BUNDLE_DISPATCH,
     REVIEW_BUNDLE_PROPOSAL,
+    SHARED_ORIGIN_INFORMATION,
+    SHARED_ORIGIN_WARNING,
     SUBMISSION_ARIA_BINDING,
+    SUBMISSION_HEADER_ICON,
+    SUBMISSION_HEADER_TOOLTIP,
     _apply_submission_accessibility_patch,
+    _apply_submission_header_patch,
     _dependency_inventory,
     _initialize_repository,
 )
@@ -173,6 +178,10 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
         )
         self.component = self.shacl / "src/components/SubmitComp.vue"
         self.patch = self.source_root / "release/editor-v2/SubmitComp.vue.patch"
+        self.header = self.shacl / "src/components/AppHeader.vue"
+        self.header_patch = (
+            self.source_root / "release/editor-v2/AppHeader.vue.patch"
+        )
 
     def require_source_fixture(self) -> None:
         if not self.component.is_file():
@@ -204,8 +213,31 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
                 "Direct GitHub proposal unavailable while embedded",
                 source,
             )
-            self.assertEqual(source.count("framedContext ||"), 4)
+            self.assertEqual(source.count("framedContext ||"), 3)
             self.assertIn(DOWNLOAD_AND_DISPATCH, source)
+            self.assertIn(SHARED_ORIGIN_WARNING, source)
+            self.assertIn(SHARED_ORIGIN_INFORMATION, source)
+            self.assertNotIn("publicHistoryAcknowledged", source)
+            self.assertNotIn("sharedOriginAcknowledged", source)
+
+    def test_reviewed_header_patch_uses_submit_copy_and_icon(self) -> None:
+        self.require_source_fixture()
+        with tempfile.TemporaryDirectory() as temporary:
+            copied = Path(temporary) / "shacl-vue"
+            target = copied / "src/components/AppHeader.vue"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(self.header.read_bytes())
+
+            _apply_submission_header_patch(
+                copied,
+                target,
+                self.header_patch,
+            )
+
+            source = target.read_text(encoding="utf-8")
+            self.assertEqual(source.count(SUBMISSION_HEADER_ICON), 2)
+            self.assertEqual(source.count(SUBMISSION_HEADER_TOOLTIP), 1)
+            self.assertNotIn("'Download review bundle' : 'Submit'", source)
 
     def test_missing_accessibility_patch_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

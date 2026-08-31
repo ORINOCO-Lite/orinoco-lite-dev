@@ -63,7 +63,7 @@ The editor MUST require that exact service origin and popup window, while the se
 OAuth state and the short-lived authentication session MAY preserve those non-secret channel coordinates across the sign-in redirect; the bundle MUST NOT be stored as OAuth recovery state or in cross-origin browser storage.
 
 If authorization or browser policy severs the opener relationship, the curator MAY use **Download bundle**, select that unchanged file on the downstream `/edit/` route, and begin a new popup session.
-The service MUST apply the same coordinate, format, size, authorization, acknowledgment, and exact-head checks regardless of whether the unchanged bundle remained in the editor session or was reselected there.
+The service MUST apply the same coordinate, format, size, authorization, and exact-head checks regardless of whether the unchanged bundle remained in the editor session or was reselected there.
 The downstream MUST display the authenticated login, repository, source and head commits, changed paths, and public-history warnings and require an explicit confirmation before it instructs the popup to submit the proposal.
 The GitHub token, session cookie, and CSRF material MUST remain at the service origin and MUST NOT cross the browser channel.
 When the editor is framed, it MUST refuse direct GitHub proposal actions and explain why while preserving **Download bundle**.
@@ -74,12 +74,12 @@ A custom domain or other origin dedicated to one downstream receives the normal 
 The template MUST guide maintainers through adding and verifying that domain before enabling direct GitHub submission.
 
 A project deployed below a shared `github.io` origin shares a browser security principal with every other path on that hostname.
-The integration MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; a configured custom-domain value MUST NOT bypass the gate while the page is running on `github.io`.
-The downstream MUST explain that another compromised page on the same origin could impersonate `/edit/`, and it MUST require an explicit in-memory acknowledgment of that limitation before enabling **Propose via GitHub**.
-That acknowledgment is informed consent, not authorization or proof of path identity; all exact-channel and server-side checks still apply.
-It MUST NOT be stored in local storage, a cookie, service state, or tracked configuration or used to weaken those checks.
-**Download bundle** MUST remain available without the acknowledgment, a GitHub sign-in, or a reachable curation service.
-The origin acknowledgment is separate from the public-history and no-secrets acknowledgment required immediately before a Git write.
+The integration MUST classify the actual browser origin at runtime, including DNS-equivalent terminal-dot spellings; a configured custom-domain value MUST NOT suppress the warning while the page is running on `github.io`.
+The downstream MUST warn: “This project shares one browser origin across the organization. This can be improved.”
+An adjacent information control MUST explain: “Another page could impersonate this path. A verified custom domain gives this site its own origin provides better security.” and link to custom-domain remediation.
+The warning is not an acknowledgment gate and MUST NOT disable **Propose via GitHub**.
+All exact-channel and server-side checks still apply.
+**Download bundle** MUST remain available without a GitHub sign-in or reachable curation service.
 
 ## Ephemeral Git handoff
 
@@ -103,8 +103,7 @@ The service MUST NOT create a pull request against another repository, write to 
 The handoff is ephemeral transport, not a metadata proposal, review bundle, manifest, provenance record, or durable curation authority.
 It MUST NOT be merged.
 The pull request MUST remain draft while a handoff is present.
-Before creating the handoff, the downstream MUST require the curator to acknowledge explicitly that the bundle contains only data approved for public repository history and contains no secrets.
-Because a public Git host can retain unreachable objects, the downstream MUST also warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement.
+The downstream MUST warn that the bundle is temporarily public and that its unreachable Git object may remain recoverable after replacement, but MUST NOT require a separate bundle acknowledgment.
 
 ## Trusted replacement
 
