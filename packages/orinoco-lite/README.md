@@ -6,8 +6,8 @@ It discovers the site through `orinoco.yaml`, enforces the exact release coordin
 This package is one layer of the larger system:
 
 - the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
-- the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
-- each downstream repository owns its metadata, editorial content, static files, policy, and extensions; projection output is ignored and regenerated.
+- the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) provides the complete versioned website; and
+- each downstream repository owns its declarative site inputs and site-specific executable metadata adapters; projection output is ignored and regenerated.
 
 The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.
 
@@ -24,8 +24,8 @@ The engine owns:
 - validation and optional application of static-editor review bundles; and
 - deterministic runtime assembly and release verification for engineering.
 
-It does not own site content, presentation policy, GitHub branch protection, template migrations, framework-update pull requests, or production cutover.
-Those belong respectively to the consumer, template, or repository operator.
+It does not own site content, website behavior, presentation policy, GitHub branch protection, or production cutover.
+Those belong respectively to the downstream, template, or repository operator.
 
 ## Public command surface
 
@@ -55,10 +55,10 @@ The current configuration contract is version 2; version 1 is intentionally reje
 Hosted builds obtain the exact GitHub `owner/repository` coordinate from the trusted build invocation; `orinoco build --github-repository` defaults to GitHub Actions' `GITHUB_REPOSITORY` value.
 The released central curation service is the default.
 A site may replace only that backend with an optional credential-free HTTPS `site.curation_service` origin.
-Legacy `site.repository` remains a compatibility fallback for nonstandard builds, but normal downstreams do not repeat their repository in site configuration.
+Nonstandard builds may supply `site.repository`; normal downstreams obtain their repository coordinate from the trusted build invocation.
 The **Download bundle** action remains credential-free even when no repository coordinate or reachable service is available.
 The semantic metadata interface comprises reviewed Things below configured `paths.records` and their machine-managed PAV companions below the engine-derived annotation root.
-Current templates set `paths.records` to `site-specific/metadata/records/`, which derives `site-specific/metadata/overlays/annotations/`; the engine retains the earlier `metadata/records` default only so an existing downstream can update in place.
+Templates set `paths.records` to `site-specific/metadata/records/`, which derives `site-specific/metadata/overlays/annotations/`.
 The companion tree mirrors the configured record path below the derived overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.
 Declarative site policy controls page generation and editor-catalog exposure without creating another record class.
@@ -66,9 +66,7 @@ Projection preserves well-formed unresolved references by default without networ
 It also defaults an omitted `graph.missing_external_targets` policy to `drop`, so only graph-view edges whose selected target cannot materialize are omitted; deterministic projection reports count preserved references and dropped edges by field.
 Malformed or schema-invalid values still fail.
 Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
-Current templates keep generic source-adapter executables under `.orinoco-lite/source-adapters/`, site-specific executable adapters under `extensions/source-adapters/`, source configuration and evidence under `site-specific/sources/`, and compact decisions under `site-specific/curation-records/`.
-The engine retains `paths.source_adapters` for existing downstreams and adapter hosts that need an explicit executable root.
-There are no legacy `canonical`, `reference`, or `integrations` path aliases.
+Site-specific executable metadata adapters live under `extensions/source-adapters/`; their configuration and evidence live under `site-specific/sources/`, and compact decisions under `site-specific/curation-records/`.
 `orinoco.lock` binds:
 
 - the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest;

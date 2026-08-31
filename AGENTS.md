@@ -2,9 +2,9 @@
 
 ## Current direction
 
-- Keep reusable website behavior in the engine or template.
-Keep site content, configuration, and custom source-adapter code in downstream repositories.
-- Test unreleased engine or template work locally with `pixi run test-downstream-candidate` when practical.
+- Keep the complete reusable website in the template and generic metadata and composition operations in the engine.
+Keep declarative site inputs under `site-specific/` and site-specific executable metadata adapters under `extensions/`.
+- Test unreleased engine and template work together by injecting compact mock site data into a fresh disposable template instance with `pixi run test-downstream-candidate` when practical.
 A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
 Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
 - Prefer one source of truth.
@@ -28,6 +28,7 @@ Use Git when historical context is specifically needed.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
 - Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
 - Keep the real CON site read-only unless the user explicitly includes it, and do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
+- Do not preserve copied framework files, workflows, tests, configuration, or updater machinery in downstreams as compatibility requirements.
 - Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
 - Treat `.agents/skills/` as the single canonical source for project-owned skills and edit those files directly.
 Do not add skill dependency infrastructure until this project consumes an independently maintained promoted skill.

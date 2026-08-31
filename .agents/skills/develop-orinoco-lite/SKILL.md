@@ -5,13 +5,13 @@ description: Develop and exercise unreleased Orinoco Lite engine or template cha
 
 # Develop Orinoco Lite
 
-Exercise cross-repository changes through an ordinary downstream before release.
-Keep generic fixes in the engine or template that owns them and keep site data and extensions in the downstream.
+Exercise engine and template changes through a disposable content-only downstream before release.
+Keep the complete website in the template, generic metadata and composition operations in the engine, declarative site inputs under `site-specific/`, and site-specific executable metadata adapters under `extensions/`.
 
 ## Establish the live scope
 
-1. Read the instructions, ownership contract, Copier answers, pins, and relevant tests in every selected working tree.
-2. Identify the downstream plus an engine candidate, a template candidate, or both.
+1. Read the instructions, ownership contract, dependency pins, and relevant tests in every selected working tree.
+2. Identify the engine and template candidates and any downstream inputs to inject.
 Local candidate testing is the default.
 When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
 Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
@@ -22,7 +22,8 @@ Permission to test a working tree locally does not itself authorize either one.
 
 ## Exercise the temporary downstream
 
-Run the engineering task from the `orinoco-lite-dev` working tree:
+Run the engineering task from the `orinoco-lite-dev` working tree.
+It must materialize the selected template afresh and inject only the downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
 
 ```console
 pixi run test-downstream-candidate \
@@ -33,16 +34,15 @@ pixi run test-downstream-candidate \
 ```
 
 Select at least one of `--engine` and `--template`; omit the other for an engine-only or template-only candidate.
-The task leaves the source downstream unchanged.
-It stages a disposable candidate, renders the template working-tree bytes when selected, overlays the downstream's declared site-owned data and extensions, and exposes the selected engine working tree to downstream tasks.
+The task leaves the source downstream unchanged and must not copy its framework files, workflows, framework tests, or duplicated template configuration.
 
 Use quick mode while iterating.
 Use `--mode full` before release or adoption.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
 
-When a downstream failure exposes generic behavior, fix the owning engine or template working tree and repeat the candidate run.
-Change the downstream only for its declared site data, policy, presentation, or executable extensions.
+When a candidate failure exposes website behavior, fix the template; when it exposes generic metadata or composition behavior, fix the engine.
+Change downstream inputs only for site data, policy, supported presentation choices or overrides, or executable metadata adapters.
 
 ## Complete the user-owned demo
 
