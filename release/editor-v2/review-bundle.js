@@ -330,7 +330,10 @@ export function beginReviewBundleProposal(value, target = window) {
                     new Error('The GitHub proposal was already delivered')
                 );
             }
-            proposal = reviewProposal;
+            // Vue exposes the editor state through reactive Proxy objects.
+            // Window.postMessage() cannot structured-clone a Proxy, so cross
+            // the transport boundary with the proposal's plain JSON value.
+            proposal = JSON.parse(JSON.stringify(reviewProposal));
             const result = new Promise((resolve, reject) => {
                 resolveProposal = resolve;
                 rejectProposal = reject;
