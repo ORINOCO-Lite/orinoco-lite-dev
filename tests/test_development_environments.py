@@ -87,13 +87,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "packages/orinoco-lite/tests",
         )
         self.assertEqual(
-            tasks["test-accepted-consumer"],
-            "python tools/run_unittests.py --fail-on-skip "
-            "tests.accepted_consumer_compatibility",
-        )
-        self.assertEqual(
             set(tasks["test-ci"]["depends-on"]),
-            {"test-engine-strict", "test-accepted-consumer", "test-development"},
+            {"test-engine-strict", "test-development"},
         )
         self.assertFalse((ROOT / "apm.yml").exists())
         self.assertFalse((ROOT / "apm.lock.yaml").exists())
@@ -333,23 +328,14 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertNotIn("submodules: recursive", workflow)
         self.assertIn("pixi-version: v0.76.2", workflow)
         self.assertIn(
-            "repository: ORINOCO-Lite/test-orinoco-downstream-website",
+            "repository: ORINOCO-Lite/orinoco-lite-template",
             workflow,
         )
-        self.assertIn(f"ref: {ACCEPTED_CONSUMER_COMMIT}", workflow)
-        self.assertIn("path: build/accepted-consumer", workflow)
-        self.assertIn("sparse-checkout-cone-mode: false", workflow)
-        for relative in (
-            "/.gitignore",
-            "/metadata/",
-            "/site/projection.yaml",
-            "/site/projection-templates/",
-            "/site/projection-tools/",
-        ):
-            self.assertIn(relative, workflow)
+        self.assertIn("ref: codex/milestone-8-template", workflow)
+        self.assertIn("path: build/orinoco-lite-template", workflow)
         self.assertIn(
-            "ORINOCO_TEST_ACCEPTED_CONSUMER: "
-            "${{ github.workspace }}/build/accepted-consumer",
+            "ORINOCO_TEMPLATE_CANDIDATE: "
+            "${{ github.workspace }}/build/orinoco-lite-template",
             workflow,
         )
         self.assertIn(
@@ -365,12 +351,12 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "tools/check_upstream_orinoco.py",
         ):
             self.assertIn(f"pixi lock --script {script} --check", workflow)
-        fixture = workflow.index("Check out the frozen accepted-consumer inputs")
+        fixture = workflow.index("Check out the template candidate")
         components = workflow.index(
             "Initialize only release-authorized compatibility components"
         )
         install = workflow.index("frozen: true")
-        tests = workflow.index("run: pixi run test-ci")
+        tests = workflow.index("run: pixi run test-template-candidate-quick")
         build = workflow.index("run: pixi run build-upstream-static")
         self.assertLess(fixture, tests)
         self.assertLess(components, tests)

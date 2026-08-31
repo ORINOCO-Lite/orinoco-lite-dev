@@ -489,17 +489,17 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.root = Path(self.temporary.name) / "consumer"
         self.runtime = Path(self.temporary.name) / "runtime"
         for relative in (
-            "metadata/records/Person",
-            "site/projection-templates",
-            "site/projection-tools",
+            "site-specific/metadata/records/Person",
+            "site-specific/projection-templates",
+            "site-specific/projection-tools",
             "generated",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
-        (self.root / "metadata/records/Person/home.yaml").write_text(
+        (self.root / "site-specific/metadata/records/Person/home.yaml").write_text(
             "pid: acme:.\nschema_type: acme:Person\ndisplay_label: Home\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/records/Person/one.yaml").write_text(
+        (self.root / "site-specific/metadata/records/Person/one.yaml").write_text(
             "pid: acme:people/one\n"
             "schema_type: acme:Person\n"
             "display_label: One\n"
@@ -509,23 +509,23 @@ class GenericProjectionContractTests(unittest.TestCase):
             "  value: One\n",
             encoding="utf-8",
         )
-        (self.root / "site/projection-templates/page.md.j2").write_text(
+        (self.root / "site-specific/projection-templates/page.md.j2").write_text(
             "---\npid: {{ pid }}\n---\n{{ display_label }}\n", encoding="utf-8"
         )
-        (self.root / "site/projection-tools/graph.py").write_text(
+        (self.root / "site-specific/projection-tools/graph.py").write_text(
             "import json,sys\n"
             "records=[json.loads(line) for line in sys.stdin if line.strip()]\n"
             "json.dump({'nodes':[{'id': r['pid']} for r in records], 'edges':[]},sys.stdout)\n",
             encoding="utf-8",
         )
-        (self.root / "site/projection.yaml").write_text(
+        (self.root / "site-specific/projection.yaml").write_text(
             "version: 2\n"
             "routing:\n  strip_prefix: 'acme:'\n"
-            "homepage:\n  pid: 'acme:.'\n  template: site/projection-templates/page.md.j2\n"
-            "pages:\n  'acme:Person':\n    template: site/projection-templates/page.md.j2\n"
+            "homepage:\n  pid: 'acme:.'\n  template: site-specific/projection-templates/page.md.j2\n"
+            "pages:\n  'acme:Person':\n    template: site-specific/projection-templates/page.md.j2\n"
             "    inline: [attributes::annotations::source::creator]\n"
             "unrendered_classes: []\n"
-            "graph:\n  producer: site/projection-tools/graph.py\n"
+            "graph:\n  producer: site-specific/projection-tools/graph.py\n"
             "  node_classes: ['acme:Person']\n  relationship_fields: []\n",
             encoding="utf-8",
         )
@@ -633,7 +633,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             verify_projection(self.workspace, self.runtime)
 
     def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
-        alias = self.root / "metadata/records/Person/alias.yaml"
+        alias = self.root / "site-specific/metadata/records/Person/alias.yaml"
         alias.write_text(
             "pid: acme:people/one/\n"
             "schema_type: acme:Person\n"
@@ -655,7 +655,7 @@ class GenericProjectionContractTests(unittest.TestCase):
 
     def test_joined_annotations_reach_machine_projection_only(self) -> None:
         companion = self.root / (
-            "metadata/overlays/annotations/Person/one.yaml"
+            "site-specific/metadata/overlays/annotations/Person/one.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(
@@ -706,17 +706,17 @@ class GenericProjectionContractTests(unittest.TestCase):
             "acme:source-adapters/example/v1",
         )
         stored = (
-            self.root / "metadata/records/Person/one.yaml"
+            self.root / "site-specific/metadata/records/Person/one.yaml"
         ).read_text(encoding="utf-8")
         self.assertNotIn("pav:imported", stored)
         manifest = (output / "SHA256SUMS").read_text(encoding="utf-8")
         self.assertIn(
-            "input:metadata/overlays/annotations/Person/one.yaml",
+            "input:site-specific/metadata/overlays/annotations/Person/one.yaml",
             manifest,
         )
 
     def test_default_open_reference_policy_reports_omissions(self) -> None:
-        projection = self.root / "site/projection.yaml"
+        projection = self.root / "site-specific/projection.yaml"
         projection.write_text(
             projection.read_text(encoding="utf-8")
             .replace(
@@ -784,7 +784,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             [],
         )
 
-        graph = self.root / "site/projection-tools/graph.py"
+        graph = self.root / "site-specific/projection-tools/graph.py"
         graph.write_text(
             graph.read_text(encoding="utf-8")
             + "print('Dropped non-materialized graph targets', file=sys.stderr)\n",
@@ -805,7 +805,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         )
 
     def test_explicit_graph_reject_policy_remains_strict(self) -> None:
-        projection = self.root / "site/projection.yaml"
+        projection = self.root / "site-specific/projection.yaml"
         projection.write_text(
             projection.read_text(encoding="utf-8").replace(
                 "relationship_fields: []",

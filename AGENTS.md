@@ -27,7 +27,7 @@ Use Git when historical context is specifically needed.
 - Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
 - Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
-- Keep the real CON site read-only unless the user explicitly includes it, and do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
+- Do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
 - Do not preserve copied framework files, workflows, tests, configuration, or updater machinery in downstreams as compatibility requirements.
 - Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
 - Treat `.agents/skills/` as the single canonical source for project-owned skills and edit those files directly.

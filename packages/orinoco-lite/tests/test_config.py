@@ -52,25 +52,21 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.assertEqual(workspace.site_name, "Test Orinoco downstream")
         self.assertEqual(
             workspace.path("records").resolve(),
-            (self.root / "metadata/records").resolve(),
+            (self.root / "site-specific/metadata/records").resolve(),
         )
-        self.assertEqual(workspace.path("site").resolve(), (self.root / "site").resolve())
+        self.assertEqual(
+            workspace.path("site").resolve(),
+            (self.root / "site-specific").resolve(),
+        )
         self.assertEqual(
             workspace.path("framework").resolve(),
             (self.root / ".orinoco-lite/site").resolve(),
         )
         self.assertEqual(
-            workspace.path("source_adapters").resolve(),
-            (self.root / "source-adapters").resolve(),
-        )
-        self.assertEqual(
             workspace.environment()["ORINOCO_RECORDS_ROOT"],
-            str((self.root / "metadata/records").resolve()),
+            str((self.root / "site-specific/metadata/records").resolve()),
         )
-        self.assertEqual(
-            workspace.environment()["ORINOCO_SOURCE_ADAPTERS_ROOT"],
-            str((self.root / "source-adapters").resolve()),
-        )
+        self.assertNotIn("ORINOCO_SOURCE_ADAPTERS_ROOT", workspace.environment())
         self.assertEqual(
             workspace.environment()["ORINOCO_FRAMEWORK_ROOT"],
             str((self.root / ".orinoco-lite/site").resolve()),

@@ -226,6 +226,30 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "static\n",
             )
 
+    def test_layout_override_applies_only_from_site_specific(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "orinoco.yaml"
+            config.write_text(CONFIG, encoding="utf-8")
+            framework = root / ".orinoco-lite/site/layouts"
+            framework.mkdir(parents=True)
+            (framework / "term.html").write_text("template\n", encoding="utf-8")
+            override = root / "site-specific/overrides/layouts/term.html"
+            override.parent.mkdir(parents=True)
+            override.write_text("downstream\n", encoding="utf-8")
+            forbidden = root / "extensions/layouts/term.html"
+            forbidden.parent.mkdir(parents=True)
+            forbidden.write_text("extension\n", encoding="utf-8")
+            assembly = root / "build/assembly"
+
+            site._assemble(load_config_path(config), root / "runtime", assembly)
+
+            self.assertEqual(
+                "downstream\n",
+                (assembly / "layouts/term.html").read_text(encoding="utf-8"),
+            )
+            self.assertNotIn("extension", (assembly / "layouts/term.html").read_text())
+
     def test_build_base_url_accepts_host_neutral_and_public_forms(self) -> None:
         cases = {
             "/": "/",

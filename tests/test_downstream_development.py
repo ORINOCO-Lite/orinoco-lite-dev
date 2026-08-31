@@ -230,7 +230,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
     def test_quick_and_full_modes_have_distinct_scopes(self) -> None:
         self.assertEqual(
             (
-                "source-adapter-canary",
                 "validate",
                 "build",
                 "test-browser-chromium",
@@ -334,7 +333,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             run.call_args_list[1].args[0][-1],
         )
 
-    def test_missing_optional_canary_is_skipped(self) -> None:
+    def test_selected_tasks_are_run(self) -> None:
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text(
@@ -348,7 +347,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             development.exercise_candidate(
                 candidate,
                 engine=None,
-                tasks=("source-adapter-canary", "validate"),
+                tasks=("validate",),
             )
 
         self.assertEqual(1, run.call_count)

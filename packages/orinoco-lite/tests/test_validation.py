@@ -37,18 +37,18 @@ class DownstreamValidationTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
         for relative in (
-            "metadata/records/XYZPerson",
-            "metadata/records/XYZAgentRole",
+            "site-specific/metadata/records/XYZPerson",
+            "site-specific/metadata/records/XYZAgentRole",
             ".orinoco-lite/provenance",
-            "editorial",
-            "site",
-            "source-adapters/zotero",
+            "site-specific/content",
+            "site-specific",
+            "extensions/adapters/zotero",
             "generated",
             "extensions",
             "build",
         ):
-            (self.root / relative).mkdir(parents=True)
-        (self.root / "metadata/records/XYZPerson/person.yaml").write_text(
+            (self.root / relative).mkdir(parents=True, exist_ok=True)
+        (self.root / "site-specific/metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: xyzri:XYZPerson\n"
             "display_label: Test person\n"
@@ -58,7 +58,7 @@ class DownstreamValidationTests(unittest.TestCase):
             "  value: Test person\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
+        (self.root / "site-specific/metadata/records/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:roles/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
@@ -80,7 +80,7 @@ class DownstreamValidationTests(unittest.TestCase):
         )
 
     def test_record_source_control_markers_are_not_records(self) -> None:
-        (self.root / "metadata/records/.dumpthings.yaml").write_text(
+        (self.root / "site-specific/metadata/records/.dumpthings.yaml").write_text(
             "type: records\nnamespace: fixture\n", encoding="utf-8"
         )
         report = validate_workspace(load_workspace(self.root))
@@ -88,13 +88,13 @@ class DownstreamValidationTests(unittest.TestCase):
 
     def test_other_yaml_at_or_below_record_source_remains_fail_closed(self) -> None:
         cases = (
-            ("metadata/records/ordinary.yaml", "pid and schema_type"),
+            ("site-specific/metadata/records/ordinary.yaml", "pid and schema_type"),
             (
-                "metadata/records/.review.yaml",
+                "site-specific/metadata/records/.review.yaml",
                 "Everything below paths.records must be a Thing YAML record",
             ),
             (
-                "metadata/records/XYZPerson/.dumpthings.yaml",
+                "site-specific/metadata/records/XYZPerson/.dumpthings.yaml",
                 "Everything below paths.records must be a Thing YAML record",
             ),
         )
@@ -108,9 +108,9 @@ class DownstreamValidationTests(unittest.TestCase):
 
     def test_non_record_content_below_record_source_fails_closed(self) -> None:
         for relative in (
-            "metadata/records/README.md",
-            "metadata/records/.DS_Store",
-            "metadata/records/XYZPerson/notes.txt",
+            "site-specific/metadata/records/README.md",
+            "site-specific/metadata/records/.DS_Store",
+            "site-specific/metadata/records/XYZPerson/notes.txt",
         ):
             with self.subTest(relative=relative):
                 path = self.root / relative
@@ -123,7 +123,7 @@ class DownstreamValidationTests(unittest.TestCase):
                 path.unlink()
 
     def test_yaml_suffix_matching_is_case_insensitive(self) -> None:
-        (self.root / "metadata/records/XYZPerson/second.YAML").write_text(
+        (self.root / "site-specific/metadata/records/XYZPerson/second.YAML").write_text(
             "pid: xyzrins:persons/second\nschema_type: xyzri:XYZPerson\n",
             encoding="utf-8",
         )
@@ -131,19 +131,46 @@ class DownstreamValidationTests(unittest.TestCase):
         self.assertEqual(3, report["records"])
 
     def test_duplicate_pid_in_record_inventory_fails(self) -> None:
-        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
+        (self.root / "site-specific/metadata/records/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:persons/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "duplicated"):
             validate_workspace(load_workspace(self.root))
 
+    def test_extensions_reject_website_functionality(self) -> None:
+        for relative in (
+            "layouts/term.html",
+            "static/app.js",
+            "assets/theme.css",
+            "workflows/pages.yaml",
+        ):
+            with self.subTest(relative=relative):
+                path = self.root / "extensions" / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("forbidden\n", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "Website functionality is forbidden under extensions",
+                ):
+                    validate_workspace(load_workspace(self.root))
+                path.unlink()
+
+    def test_extensions_accept_metadata_adapter_executables(self) -> None:
+        adapter = self.root / "extensions/adapters/example/adapter.py"
+        adapter.parent.mkdir(parents=True, exist_ok=True)
+        adapter.write_text("def acquire():\n    return []\n", encoding="utf-8")
+
+        report = validate_workspace(load_workspace(self.root))
+
+        self.assertEqual(1, report["files"]["extensions"])
+
     def test_metadata_outside_record_root_fails(self) -> None:
-        legacy = self.root / "metadata/reference"
+        legacy = self.root / "site-specific/metadata/reference"
         legacy.mkdir()
         with self.assertRaisesRegex(
             ConfigurationError,
-            "Everything below metadata must be part of paths.records or",
+            "Everything below site-specific/metadata must be part of paths.records or",
         ):
             validate_workspace(load_workspace(self.root))
 
@@ -152,17 +179,17 @@ class DownstreamValidationTests(unittest.TestCase):
         config.write_text(
             CONFIG
             + "paths:\n"
-            + "  records: site-specific/metadata/records\n",
+            + "  records: declared/metadata/records\n",
             encoding="utf-8",
         )
-        destination = self.root / "site-specific/metadata/records"
+        destination = self.root / "declared/metadata/records"
         destination.parent.mkdir(parents=True)
-        (self.root / "metadata/records").rename(destination)
-        unknown = self.root / "site-specific/metadata/private/state.yaml"
+        (self.root / "site-specific/metadata/records").rename(destination)
+        unknown = self.root / "declared/metadata/private/state.yaml"
         unknown.parent.mkdir(parents=True)
         unknown.write_text("not: allowed\n", encoding="utf-8")
 
-        with self.assertRaisesRegex(ConfigurationError, "site-specific/metadata/private"):
+        with self.assertRaisesRegex(ConfigurationError, "declared/metadata/private"):
             validate_workspace(load_workspace(self.root))
 
     def test_configured_annotation_diagnostic_names_derived_root(self) -> None:
@@ -192,7 +219,7 @@ class DownstreamValidationTests(unittest.TestCase):
             CONFIG + "paths:\n  records: records\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/records").rename(self.root / "records")
+        (self.root / "site-specific/metadata/records").rename(self.root / "records")
 
         report = validate_workspace(load_workspace(self.root))
 
@@ -204,7 +231,7 @@ class DownstreamValidationTests(unittest.TestCase):
             CONFIG + "paths:\n  records: records\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/records").rename(self.root / "records")
+        (self.root / "site-specific/metadata/records").rename(self.root / "records")
         unknown = self.root / "overlays/private/state.yaml"
         unknown.parent.mkdir(parents=True)
         unknown.write_text("not: allowed\n", encoding="utf-8")
@@ -215,7 +242,7 @@ class DownstreamValidationTests(unittest.TestCase):
     def test_mirrored_canonical_annotation_companion_passes(self) -> None:
         companion_path = (
             self.root
-            / "metadata/overlays/annotations/XYZPerson/person.yaml"
+            / "site-specific/metadata/overlays/annotations/XYZPerson/person.yaml"
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
@@ -237,7 +264,7 @@ class DownstreamValidationTests(unittest.TestCase):
         self.assertEqual(report["annotation_assertions"], 1)
 
     def test_annotation_tree_rejects_unknown_overlay_and_bad_mirror(self) -> None:
-        unknown = self.root / "metadata/overlays/private/state.yaml"
+        unknown = self.root / "site-specific/metadata/overlays/private/state.yaml"
         unknown.parent.mkdir(parents=True)
         unknown.write_text("not: allowed\n", encoding="utf-8")
         with self.assertRaisesRegex(ConfigurationError, "overlays/annotations"):
@@ -245,7 +272,7 @@ class DownstreamValidationTests(unittest.TestCase):
         unknown.unlink()
         unknown.parent.rmdir()
 
-        orphan = self.root / "metadata/overlays/annotations/orphan.yaml"
+        orphan = self.root / "site-specific/metadata/overlays/annotations/orphan.yaml"
         orphan.parent.mkdir(parents=True, exist_ok=True)
         orphan.write_text(
             canonical_yaml(
@@ -259,7 +286,7 @@ class DownstreamValidationTests(unittest.TestCase):
     def test_annotation_tree_rejects_noncanonical_and_stale_selector(self) -> None:
         companion_path = (
             self.root
-            / "metadata/overlays/annotations/XYZPerson/person.yaml"
+            / "site-specific/metadata/overlays/annotations/XYZPerson/person.yaml"
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
@@ -285,7 +312,7 @@ class DownstreamValidationTests(unittest.TestCase):
             validate_workspace(load_workspace(self.root))
 
     def test_inline_machine_pav_is_rejected_without_a_companion(self) -> None:
-        person = self.root / "metadata/records/XYZPerson/person.yaml"
+        person = self.root / "site-specific/metadata/records/XYZPerson/person.yaml"
         person.write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: xyzri:XYZPerson\n"
@@ -303,7 +330,7 @@ class DownstreamValidationTests(unittest.TestCase):
             validate_workspace(load_workspace(self.root))
 
     def test_full_uri_discriminator_fails_closed(self) -> None:
-        (self.root / "metadata/records/XYZPerson/person.yaml").write_text(
+        (self.root / "site-specific/metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: https://example.invalid/XYZPerson\n",
             encoding="utf-8",
