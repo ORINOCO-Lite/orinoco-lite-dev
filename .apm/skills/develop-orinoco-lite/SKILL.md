@@ -12,7 +12,7 @@ Keep generic fixes in the engine or template that owns them and keep site data a
 
 1. Read the instructions, ownership contract, Copier answers, pins, and relevant tests in every selected working tree.
 2. Identify the downstream plus an engine candidate, a template candidate, or both.
-Use `leej3/orinoco-lite-demo` as the Milestone 7 metadata, curation, source-evidence, and source-adapter baseline.
+When available, use a developer-owned `<github-user>/orinoco-lite-demo` as the fast metadata, curation, source-evidence, and source-adapter test baseline.
 Inspect the organization fixture only for useful unique material rather than treating it as a second baseline.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
 Resolve missing access early.
@@ -45,7 +45,7 @@ Change the downstream only for its declared site data, policy, presentation, or 
 
 ## Complete the developer-owned demo
 
-For an explicitly requested end-to-end exercise in `leej3/orinoco-lite-demo`, project policy grants standing authority for the normal repository-local cycle:
+For an explicitly requested end-to-end exercise in a developer-owned `<github-user>/orinoco-lite-demo`, project policy grants standing authority for the normal repository-local cycle:
 
 - run the existing curation and finalization workflows;
 - create and push exercise branches, open or update the pull request, and mark the agent's pull request ready for review;
@@ -54,7 +54,7 @@ For an explicitly requested end-to-end exercise in `leej3/orinoco-lite-demo`, pr
 
 Standing authority covers the mechanics of the exercise, not invented metadata or curation decisions.
 Use supplied fixture decisions or retained reviewed state.
-For curation-message and lineage requirements, follow `docs/github-curation-review.md` and `docs/source-adapters.md`: identify the adapter, link the downstream review application, retain merge and artifact notes, place the source coordinate in closed details, and report the decision commit and validation state after finalization.
+For curation-message and lineage requirements, follow `docs/agents/github-curation-review.md` and `docs/agents/source-adapters.md`: identify the adapter, link the downstream review application, retain merge and artifact notes, place the source coordinate in closed details, and report the decision commit and validation state after finalization.
 
 ## Recover quickly and preserve evidence
 

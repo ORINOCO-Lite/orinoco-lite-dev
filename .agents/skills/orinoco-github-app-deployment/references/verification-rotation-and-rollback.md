@@ -1,7 +1,7 @@
 # Verification, rotation, and rollback
 
 Verify in increasing order of authority.
-Record response codes and immutable coordinates, but do not record cookies, OAuth codes, access tokens, client secrets, or the session-seal key.
+Do not record cookies, OAuth codes, access tokens, client secrets, or the session-seal key.
 
 ## Deployment verification
 
@@ -13,7 +13,7 @@ Record response codes and immutable coordinates, but do not record cookies, OAut
 - Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the two encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available.
 - Confirm `EDITOR_RUNTIME_MANIFEST_SHA256`, staged editor files, editor-input artifacts, and durable storage bindings are absent.
 - Confirm there is no token, cookie, or received-bundle logging.
-- Confirm the deployment has an immutable identifier and a known successful production rollback target.
+- Confirm the provider exposes deployment history or that the checked Git revision can be redeployed.
 
 The backend has no runtime release or manifest coordinate.
 The downstream static-site release remains responsible for its immutable editor shell, schema, and exact-source inputs.
@@ -59,7 +59,7 @@ Also verify that a read-only user or uninstalled repository is rejected when suc
 ### 4. Explicitly authorized write proof
 
 Only after separate authorization, use a disposable or designated integration repository to test the source-adapter comment and/or fixed-path SHACL handoff.
-Record the exact test repository, static source commit, pull request, head, artifact when applicable, written refs, and cleanup.
+Report the test repository, pull request, outcome, and any cleanup still required.
 Verify trusted replacement and absence of the temporary bundle from the final branch.
 Verify that a successful write consumes its session grant, the standalone SHACL ref is deterministic for the source and nonce, and an ordinary sequential replay cannot produce another write.
 Never use the real production site as a write fixture.
@@ -131,7 +131,7 @@ After transfer, confirm the owner, App ID, public client ID, callback, expiring 
 Permission increases may remain pending until an installation owner approves them.
 Repeat authenticated verification even when the client ID and secret were retained.
 
-## Rollback and evidence
+## Rollback
 
 Treat these as one backend rollback unit:
 
@@ -140,27 +140,14 @@ Treat these as one backend rollback unit:
 - route and header configuration; and
 - compatible secret generation.
 
-Retain the prior immutable successful production deployment until the new deployment has passed authenticated verification.
-For Cloudflare Pages or Workers, rollback only to the previously verified production deployment through the provider's rollback control or deployment API; a preview is not a valid target.
-Read back the target's captured source revision, clean-trigger state, backend adapter presence, and public and secret configuration-key inventory before relying on it.
+Keep the previous production deployment available until the new deployment has passed authenticated verification.
+For Cloudflare Pages or Workers, use the provider's production rollback control or redeploy a checked Git revision; do not promote an unverified preview.
 
-A historical rollback target may contain the superseded hosted editor and its runtime-digest variable.
-That can be a valid emergency backend rollback, but record explicitly that it temporarily restores the duplicate-editor behavior and do not use its old configuration as the template for the next deployment.
+Do not roll back to a historical deployment that restores the superseded hosted editor unless emergency recovery explicitly requires that behavior.
+Repair forward or redeploy the last suitable Git revision when possible.
 
-Record:
-
-- timestamp and operator or agent attribution;
-- application commit, tree, and clean-state proof;
-- public origin and client ID;
-- App ID, owner, permissions, and selected repositories;
-- each exercised downstream's build-derived repository, `site.base_url`, effective central default or explicit `site.curation_service`, exact static source commit, deployed `/edit/` and `/review/` coordinates, and origin-policy verification result;
-- immutable deployment ID and URL, provider runtime class, source trigger, clean-trigger flag, backend-adapter presence, and configuration-key inventory with secret values redacted;
-- build and probe results, including absence of every hosted presentation route and static asset;
-- authorized write-test coordinates, if any; and
-- rollback deployment ID and URL plus rotation and duplicate-editor consequences.
-
-Do not record a runtime release, archive digest, manifest digest, or staging report as backend evidence because the transport-only service consumes none.
-Keep those coordinates with the downstream static-site release evidence.
+Report the current public origin, selected repositories, verification outcome, and any temporary limitation.
+Do not create a deployment manifest, coordinate inventory, or duplicate history already held by Git, GitHub, and the provider.
 
 Never record secret values, OAuth codes, cookies, access or refresh tokens, or raw provider logs that contain them.
-Historical deployments may be useful examples, but they are not defaults or substitutes for current evidence.
+Historical deployments may be useful recovery options, but they are not configuration defaults.

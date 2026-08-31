@@ -100,7 +100,6 @@ LinkML's current generated Pydantic representation expands the wide recursive de
 
 Until LinkML emits a named recursive alias, the engine serializes converter construction, raises the limit to the already-proven value only inside that boundary, and restores the caller's exact value on success or failure.
 It does not change the schema, hide semantic errors, or leave a process-wide setting behind.
-The diagnosis and removal condition are recorded in [`docs/milestone-4-decisions.md`](../../docs/milestone-4-decisions.md).
 
 ## Release and license boundary
 

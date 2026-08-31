@@ -3,12 +3,10 @@
 Use this checklist to evaluate any provider.
 Product names are examples of implementation environments, not requirements.
 
-## Immutable input and build
+## Input and build
 
-Select and record:
-
-- one clean reviewed application commit and tree; and
-- the provider's immutable deployment identifier or image digest.
+Deploy from one clean reviewed Git revision.
+Use Git and provider deployment history for recovery instead of recording a second coordinate inventory.
 
 Use the Node and npm versions declared by the package.
 From `packages/curation-review-app/`:
@@ -63,7 +61,7 @@ The deployment environment must provide all of these:
 - preservation of multiple `Set-Cookie` headers on one response;
 - outbound HTTPS to `github.com`, `api.github.com`, and GitHub's approved artifact-storage redirect hosts;
 - manual redirect handling without forwarding the bearer token to artifact storage;
-- atomic deployment and an immutable rollback coordinate;
+- atomic deployment and a way to redeploy a checked Git revision or select a prior production deployment;
 - encrypted secret storage separate from build artifacts and public variables;
 - log redaction and no caching of authenticated pages or API responses; and
 - the request, response, CPU, memory, duration, subrequest, and payload capacity described below.
