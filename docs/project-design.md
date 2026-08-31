@@ -20,48 +20,70 @@ The editing interface remains part of the deployed site in every case.
 ## Division of responsibility
 
 The engineering repository owns the engine, shared tests, release assembly, and local integration tooling.
-It maintains the minimal integration layer over the German upstream and provides the workspace for validating upstream updates and preparing contributions back.
-The template repository owns the website, defaults, and downstream update mechanism.
-A downstream repository owns only its site-specific data, configuration, assets, and custom source adapter code.
+The pinned German metadata-driven site in `submodules/www-from-model`, together with its pinned supporting submodules, is the website baseline.
+Its layouts, navigation, record and index pages, static components, and `page_templates/` projection templates should be reused directly where practical.
+Only behavior that must vary between sites should be generalized in `orinoco-lite-template`.
+
+The template provides a complete generic website: layouts, projection templates, navigation behavior, record and index pages, workflows, UI components, and useful defaults.
+The engine supplies metadata validation, projection, composition, and other generic operations without carrying a competing website implementation.
+A downstream supplies site-specific inputs and optional explicit overrides to the template.
 
 Site-specific material should converge on one clear tree:
 
 ```text
 site-specific/
-  static/
+  assets/
   curation-records/
+  editorial/
   metadata/
     overlays/
     records/
+  overrides/
+    layouts/
   sources/
     <adapter>/
 extensions/
   source-adapters/
-    <site-specific-adapter>/
 ```
 
-Content and presentation supplied by the template should be driven by this data.
-Downstreams may override the framework, but routine adoption should not require copying and maintaining template Markdown or application pages.
-Configuration, captured source content, mapping policy, and curation decisions for both reusable and site-specific adapters belong under `site-specific/`.
-Reusable adapter code belongs in the engine or template; site-specific adapter code belongs under `extensions/source-adapters/`.
+The `site-specific/` tree contains semantic metadata and curation records, editorial content, assets, site identity and limited presentation choices, source-adapter configuration and evidence, and declarative overrides such as custom layouts.
+The template must build a useful website without overrides, and ordinary downstreams should not need copied framework code, duplicated framework configuration, or site-specific copies of workflows and tests.
+The composition order is the generic template followed by declared `site-specific/` inputs and overrides.
+
+The separate `extensions/` surface is reserved exclusively for site-specific executable metadata acquisition and curation adapters.
+These programs may capture external evidence, transform it into metadata proposals, and support the review or application of curation decisions through declared metadata interfaces.
+They are not website extensions: `extensions/` must contain no website assets, layouts, presentation overrides, navigation, UI components, client-side code, workflows, or other website functionality.
+Extension code and runtime products are never copied into the generated website.
+Reusable metadata-adapter code belongs in the engine or template.
+Keeping all declarative website inputs and overrides in `site-specific/` gives website composition deterministic path and precedence rules instead of relying on subjective judgments about individual files.
+
+The engineering dependency state records one exact German upstream website pin.
+Local tooling builds the unmodified reference site and the generalized template from that same pin, checks reused surfaces for unintended drift, and exposes changes that require a deliberate template adaptation.
+The generic website is available as a versioned template dependency selected by each downstream.
+A downstream controls when to upgrade, may retain supported overrides, and may use a fork or alternative compatible template; it does not need a direct dependency on the German repository or Orinoco Lite's engineering checkout.
+The template contains no German metadata or editorial content, and an instantiated downstream includes only its supplied records and content.
 
 ## Workflow
 
 External sources are captured without changing them, transformed into metadata proposals, reviewed, and then promoted into canonical site data.
 These stages remain distinct so that automation is repeatable and editorial decisions are visible.
 
-The normal development loop tests unreleased engine or template changes against a temporary downstream locally.
-An agent may also use a user-owned `<github-user>/orinoco-lite-demo` for faster, less constrained experimentation with GitHub workflows without mandatory human review.
+Most development happens in `orinoco-lite-dev` and tests unreleased engine and template working trees locally by injecting compact mock site-specific data into a fresh template instantiation.
+A developer may additionally use a user-owned `<github-user>/orinoco-lite-demo` as a less constrained environment for end-to-end GitHub workflow experiments, reducing human-review blocking while iterating.
+The demo is optional; local engine and template development must not depend on one existing.
 The `ORINOCO-Lite/test-orinoco-downstream-website` repository deliberately requires human review so developers experience the frequency and severity of updates imposed on downstream users.
 
 ## Design principles
 
-- Maintain a minimal compatibility layer over the German upstream.
-Keep broadly useful changes suitable for contribution upstream, and keep Orinoco-specific adaptations small and clearly separated so updates can be rebased with little friction.
+- Start from the pinned German upstream website and its projection templates.
+Reuse upstream behavior directly, generalize only demonstrated downstream variability, and keep Orinoco-specific adaptations small and clearly separated.
+- Track upstream with executable checks.
+Use one exact engineering pin and compare the reference and generalized sites from that pin without creating a second provenance ledger.
 - Prefer one source of truth.
 Repository state, locks, Git, and GitHub should not be restated in additional manifests or ledgers.
-- Aim to keep downstreams small.
-The template should provide the website; a downstream should instantiate it for an organization by supplying site metadata, configuration, assets, and necessary extensions.
+- Enforce a compositional boundary.
+The template provides the complete default website, and a downstream supplies declared `site-specific/` inputs and overrides.
+Optional `extensions/` executables may prepare metadata through separate curation workflows but never extend or ship with the website.
 - Generate static output.
 Validation, building, browsing, editing, and bundle download must not depend on a continuously running metadata service.
 - Keep GitHub credentials out of the site.
@@ -70,8 +92,8 @@ Authentication and verified submission cross a narrow service boundary.
 Proposals are reviewable, direct submission is explicit, and a credential-free bundle remains available.
 - Use Git for recovery.
 Reverting a current commit and allowing the static website to redeploy is the normal rollback mechanism; additional session manifests or coordinate inventories are unnecessary.
-- Use the engineering repository's Pixi task to test engine and template changes against a temporary downstream before publishing them.
-Local iteration is the default; a user-owned `<github-user>/orinoco-lite-demo` may extend that testing into an autonomous GitHub workflow.
+- Use the engineering repository's Pixi task to test engine and template changes by injecting mock data into a fresh disposable template instantiation before publishing them.
+Local quick and full runs are the default; a developer-owned `<github-user>/orinoco-lite-demo` may extend them with autonomous GitHub-workflow acceptance.
 Propose the resulting downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for the deliberate human-review gate.
 
 Normative engineering contracts live under `docs/agents/contract/`; active plans and open decisions live directly under `docs/agents/`.
