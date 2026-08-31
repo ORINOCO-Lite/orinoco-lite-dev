@@ -22,7 +22,6 @@ REQUIRED_INPUT_PATHS = (
     "records",
     "provenance",
     "editorial",
-    "assets",
     "site",
     "source_adapters",
 )
@@ -184,11 +183,6 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
 
     companions = companion_sources(workspace)
 
-    asset_manifest = workspace.path("assets") / "manifest.yaml"
-    if not asset_manifest.is_file() or asset_manifest.is_symlink():
-        raise ConfigurationError(
-            f"Site asset ownership manifest is missing: {asset_manifest}"
-        )
     provenance_files = list(_files(workspace.path("provenance")))
     if not provenance_files:
         raise ConfigurationError("Metadata provenance inventory is empty")

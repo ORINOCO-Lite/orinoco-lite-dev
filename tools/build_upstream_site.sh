@@ -8,7 +8,7 @@ destination=${DESTINATION:-$repository_root/build/upstream-psychoinformatics}
 edit_url=${SHACL_VUE_URL:-https://pool.psychoinformatics.de/ui/}
 annex_commit=d18f512d1cd722a8300b656c330020739da05be6
 upstream_url=https://hub.psychoinformatics.de/www/www-from-model.git
-annex_remote_name=clean-migration-upstream-$$
+annex_remote_name=upstream-build-$$
 annex_remote_ref=refs/remotes/$annex_remote_name/git-annex
 status_snapshot=$(mktemp "${TMPDIR:-/tmp}/orinoco-annex-status.XXXXXX")
 

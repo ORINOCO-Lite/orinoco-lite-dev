@@ -53,7 +53,6 @@ class EditorBundleTests(unittest.TestCase):
             "metadata/records/XYZAgentRole",
             ".orinoco-lite/provenance",
             "editorial",
-            "assets",
             "site/projection-templates",
             "site/projection-tools",
             "source-adapters",
@@ -62,9 +61,6 @@ class EditorBundleTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
-        (self.root / "assets/manifest.yaml").write_text(
-            "version: 1\nassets: {}\n", encoding="utf-8"
-        )
         (self.root / "site/projection-templates/person.md.j2").write_text(
             "{{ display_label }}\n", encoding="utf-8"
         )

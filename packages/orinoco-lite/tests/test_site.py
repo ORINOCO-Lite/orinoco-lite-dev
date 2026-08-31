@@ -7,10 +7,8 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite import site
-from orinoco_lite.assets import Asset
 from orinoco_lite.config import load_config_path
 from orinoco_lite.errors import ConfigurationError, DriverError
-from orinoco_lite.integrity import sha256_file
 
 
 CONFIG = """\
@@ -53,7 +51,6 @@ class HugoCompatibilityTests(unittest.TestCase):
             config.write_text(
                 CONFIG
                 + "paths:\n"
-                + "  assets: site-specific/static\n"
                 + "  editorial: site-specific/content/pages\n"
                 + "  framework: .orinoco-lite/site\n"
                 + "  records: site-specific/metadata/records\n"
@@ -98,10 +95,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "  relationship_fields: []\n",
                 encoding="utf-8",
             )
-            (site_root / "static/files").mkdir(parents=True)
-            (site_root / "static/manifest.yaml").write_text(
-                "version: 1\nassets: {}\n", encoding="utf-8"
-            )
+            (site_root / "static").mkdir(parents=True)
             records = site_root / "metadata/records/XYZProject"
             records.mkdir(parents=True)
             (records / "example.yaml").write_text(
@@ -131,8 +125,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             assembly = root / "build/assembly"
             workspace = load_config_path(config)
 
-            with patch.object(site, "load_assets", return_value=({}, {})):
-                site._assemble(workspace, root / "runtime", assembly)
+            site._assemble(workspace, root / "runtime", assembly)
 
             self.assertEqual(
                 'title = "Example Site"\n',
@@ -211,48 +204,26 @@ class HugoCompatibilityTests(unittest.TestCase):
                     root / "build/assembly",
                 )
 
-    def test_assembly_respects_configured_asset_root(self) -> None:
+    def test_assembly_copies_site_static_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = root / "orinoco.yaml"
             config.write_text(
                 CONFIG
                 + "paths:\n"
-                + "  assets: custom/assets\n"
                 + "  site: site-specific\n",
                 encoding="utf-8",
             )
-            source = root / "custom/assets/files/example.txt"
+            source = root / "site-specific/static/example.txt"
             source.parent.mkdir(parents=True)
-            source.write_text("asset\n", encoding="utf-8")
+            source.write_text("static\n", encoding="utf-8")
             assembly = root / "build/assembly"
-            asset = Asset(
-                source="custom/assets/files/example.txt",
-                sha256=sha256_file(source),
-                size=source.stat().st_size,
-                availability="available",
-                object_url=None,
-            )
             workspace = load_config_path(config)
 
-            with patch.object(
-                site,
-                "load_assets",
-                return_value=(
-                    {asset.source: asset},
-                    {"site-specific/static/example.txt": asset.source},
-                ),
-            ):
-                report = site._assemble(workspace, root / "runtime", assembly)
-
-            self.assertEqual(report["copied_assets"], 1)
-            self.assertEqual(
-                (assembly / "assets/example.txt").read_text(encoding="utf-8"),
-                "asset\n",
-            )
+            site._assemble(workspace, root / "runtime", assembly)
             self.assertEqual(
                 (assembly / "static/example.txt").read_text(encoding="utf-8"),
-                "asset\n",
+                "static\n",
             )
 
     def test_build_base_url_accepts_host_neutral_and_public_forms(self) -> None:
@@ -323,15 +294,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     destination = root / "build" / name
                     with (
                         patch.object(site, "_preflight_hugo"),
-                        patch.object(
-                            site,
-                            "_assemble",
-                            return_value={
-                                "copied_assets": 0,
-                                "copied_links": 0,
-                                "hydrated_assets": 0,
-                            },
-                        ),
+                        patch.object(site, "_assemble"),
                         patch.object(site, "_run", side_effect=run),
                         patch.object(
                             site,

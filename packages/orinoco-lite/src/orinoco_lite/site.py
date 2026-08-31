@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -18,7 +18,6 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 import yaml
 
-from .assets import hydrate_asset_cache, load_assets, verify_asset
 from .candidates import friendly_record_label
 from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
@@ -189,7 +188,7 @@ def _safe_destination(workspace, destination: Path) -> Path:
     return resolved
 
 
-def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
+def _assemble(workspace, runtime_root: Path, assembly: Path) -> None:
     framework = workspace.path("framework")
     if not framework.is_dir():
         framework = workspace.path("site") / "framework"
@@ -210,16 +209,7 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
     _render_site_surfaces(workspace, framework, assembly)
     _copy_tree(workspace.path("site") / "layouts", assembly / "layouts")
-    assets_root = workspace.path("assets")
-    site_static = workspace.path("site") / "static"
-    if site_static.resolve(strict=False) != assets_root.resolve(strict=False):
-        _copy_tree(site_static, assembly / "static")
-    asset_source_prefix = (*PurePosixPath(workspace.paths["assets"]).parts, "files")
-    site_static_prefix = (
-        *PurePosixPath(workspace.paths["site"]).parts,
-        "static",
-    )
-    _copy_tree(assets_root / "files", assembly / "assets")
+    _copy_tree(workspace.path("site") / "static", assembly / "static")
     _copy_tree(workspace.path("editorial"), assembly / "content")
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
@@ -236,67 +226,6 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> dict[str, int]:
         "favicon.ico",
     ):
         (assembly / "static" / name).unlink(missing_ok=True)
-    assets, links = load_assets(workspace)
-    cache = workspace.path("build") / "asset-cache"
-    hydrated = 0
-    copied = 0
-    copied_sources = 0
-    destinations_by_source: dict[str, list[str]] = {}
-    for destination, source in links.items():
-        destinations_by_source.setdefault(source, []).append(destination)
-    for source, asset in sorted(assets.items()):
-        if asset.availability != "available":
-            continue
-        source_path = workspace.root.joinpath(*PurePosixPath(source).parts)
-        if not source_path.is_file():
-            source_path = cache / asset.sha256
-            if not source_path.is_file():
-                hydrate_asset_cache(source_path, asset)
-                hydrated += 1
-        verify_asset(source_path, asset)
-        source_relative = PurePosixPath(source)
-        if source_relative.parts[: len(asset_source_prefix)] != asset_source_prefix:
-            raise DriverError(
-                "Asset source is outside the configured assets/files contract: "
-                f"{source}"
-            )
-        assembled_source = assembly / "assets" / Path(
-            *source_relative.parts[len(asset_source_prefix) :]
-        )
-        assembled_source.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source_path, assembled_source)
-        copied_sources += 1
-        for destination in sorted(destinations_by_source.get(source, [])):
-            destination_path = assembly / "consumer" / destination
-            # Consumer paths are re-rooted into the Hugo assembly. Generated
-            # Generated and configured site static trees are mounted at their
-            # Hugo targets. The legacy site/static spelling remains readable.
-            destination_relative = PurePosixPath(destination)
-            parts = destination_relative.parts
-            if parts[:3] == ("generated", "projection", "content"):
-                destination_path = assembly / "content" / Path(*parts[3:])
-            elif parts[:3] == ("generated", "projection", "static"):
-                destination_path = assembly / "static" / Path(*parts[3:])
-            elif parts[: len(site_static_prefix)] == site_static_prefix:
-                destination_path = assembly / "static" / Path(
-                    *parts[len(site_static_prefix) :]
-                )
-            elif parts[:2] == ("site", "static"):
-                destination_path = assembly / "static" / Path(*parts[2:])
-            elif parts[: len(asset_source_prefix)] == asset_source_prefix:
-                destination_path = assembly / "assets" / Path(
-                    *parts[len(asset_source_prefix) :]
-                )
-            else:
-                raise DriverError(f"Unsupported asset link destination: {destination}")
-            destination_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source_path, destination_path)
-            copied += 1
-    return {
-        "copied_assets": copied_sources,
-        "copied_links": copied,
-        "hydrated_assets": hydrated,
-    }
 
 
 def _manifest(root: Path) -> list[str]:
@@ -418,7 +347,7 @@ def build_site(
     if assembly.exists():
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)
-    asset_report = _assemble(workspace, runtime_root, assembly)
+    _assemble(workspace, runtime_root, assembly)
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -481,7 +410,6 @@ def build_site(
     entries = _manifest(destination)
     digest = hashlib.sha256(("\n".join(entries) + "\n").encode()).hexdigest()
     report = {
-        "assets": asset_report,
         "base_url": base_url,
         "editor": editor_report,
         "files": len(entries),

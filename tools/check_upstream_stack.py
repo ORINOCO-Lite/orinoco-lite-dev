@@ -9,7 +9,7 @@ import sys
 import uuid
 from urllib.request import Request, urlopen
 
-import check_local_stack as shared
+import upstream_service_helpers as shared
 
 
 ROOT = Path(__file__).resolve().parents[1]

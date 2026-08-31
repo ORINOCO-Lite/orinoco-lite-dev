@@ -306,6 +306,20 @@ class WorkspaceConfigTests(unittest.TestCase):
                 with self.assertRaisesRegex(ConfigurationError, "unknown path keys"):
                     load_workspace(self.root)
 
+    def test_retired_assets_path_only_accepts_site_static(self) -> None:
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG + "paths:\n  site: site-specific\n  assets: site-specific/static\n",
+            encoding="utf-8",
+        )
+        self.assertNotIn("assets", load_workspace(self.root).paths)
+
+        (self.root / "orinoco.yaml").write_text(
+            CONFIG + "paths:\n  site: site-specific\n  assets: external-assets\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ConfigurationError, "Retired paths.assets"):
+            load_workspace(self.root)
+
     def test_version_one_contract_is_rejected(self) -> None:
         (self.root / "orinoco.yaml").write_text(
             CONFIG.replace("contract_version: 2", "contract_version: 1"),

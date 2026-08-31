@@ -268,7 +268,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         workflow = ROOT / ".github" / "workflows" / "upstream-pages-trial.yml"
         self.assertFalse(workflow.exists())
 
-    def test_release_pin_surfaces_match_reviewed_gitlinks(self) -> None:
+    def test_release_inputs_match_selected_dependencies(self) -> None:
         package = tomllib.loads(PACKAGE_MANIFEST.read_text(encoding="utf-8"))
         version = package["project"]["version"]
         package_metadata = ast.parse(
@@ -291,9 +291,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             and isinstance(node.value.value, str)
         ]
         release_spec = yaml.safe_load(
-            (ROOT / f"release/runtime-source-v{version}.yaml").read_text(
-                encoding="utf-8"
-            )
+            (ROOT / "release/runtime-source.yaml").read_text(encoding="utf-8")
         )
         pool_gitlink = subprocess.check_output(
             [
@@ -322,28 +320,13 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
 
         self.assertEqual(source_tree_versions, [version])
         self.assertEqual(release_spec["release"], version)
-        self.assertEqual(
-            release_spec["provenance"]["component_commits"]["pool_ui"],
-            pool_gitlink,
-        )
-        self.assertEqual(
-            release_spec["provenance"]["component_commits"]["things_schemas"],
-            things_schemas_gitlink,
-        )
-        self.assertEqual(
-            release_spec["provenance"]["source_inventory"]["schema"]["commit"],
-            things_schemas_gitlink,
-        )
+        self.assertNotIn("component_commits", release_spec["provenance"])
+        for component in release_spec["provenance"]["source_inventory"].values():
+            self.assertNotIn("commit", component)
         self.assertEqual(
             release_spec["compatibility"]["schema_profile"],
             "things-schemas/demo-research-information@"
             f"{things_schemas_gitlink}",
-        )
-        self.assertEqual(
-            release_spec["provenance"]["source_inventory"]["editor_shell"][
-                "shacl_vue_commit"
-            ],
-            shacl_gitlink,
         )
         self.assertEqual(POOL_UI_COMMIT, pool_gitlink)
         self.assertEqual(SHACL_VUE_COMMIT, shacl_gitlink)

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version matching release/runtime-source*.yaml
+        description: Release version matching release/runtime-source.yaml
         required: true
         type: string
       source-spec:
@@ -95,14 +95,7 @@ jobs:
             version="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$spec" ]; then
-            if [ "$version" = "0.1.0" ]; then
-              spec="release/runtime-source.yaml"
-            elif [ -f "release/runtime-source-v$version.yaml" ]; then
-              spec="release/runtime-source-v$version.yaml"
-            else
-              echo "No reviewed runtime source spec for $version" >&2
-              exit 2
-            fi
+            spec="release/runtime-source.yaml"
           fi
           SPEC="$spec" VERSION="$version" python - <<'PY'
           import os, pathlib, tomllib, yaml

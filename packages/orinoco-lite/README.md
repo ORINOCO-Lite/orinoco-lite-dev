@@ -7,7 +7,7 @@ This package is one layer of the larger system:
 
 - the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
 - the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) pins those releases and owns the downstream framework/update surface; and
-- each downstream repository owns its metadata, editorial content, assets, policy, and extensions; projection output is ignored and regenerated.
+- each downstream repository owns its metadata, editorial content, static files, policy, and extensions; projection output is ignored and regenerated.
 
 The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.
 
@@ -17,7 +17,6 @@ The engine owns:
 
 - structural validation of the single-repository workspace;
 - exact engine, runtime, manifest, and resource integrity checks;
-- verified asset hydration and fetch-free verification;
 - semantic validation and deterministic projection through released drivers;
 - canonical source-adapter serialization, annotation joining, candidate planning, compact decisions, and Git-based finalization primitives;
 - deterministic static builds for root-relative local preview or an explicit public project-path base;
@@ -36,8 +35,6 @@ The stable commands are:
 | Command | Purpose |
 | --- | --- |
 | `orinoco validate` | Validate structure and run the verified runtime's semantic contract. |
-| `orinoco assets hydrate` | Retrieve only manifest-declared payloads and verify their sizes and digests. |
-| `orinoco assets verify` | Verify declared local payloads without silently fetching them. |
 | `orinoco projection update` | Regenerate and atomically install projection output. |
 | `orinoco projection verify` | Prove existing projection output is current and deterministic. |
 | `orinoco build` | Validate and build a static site below the configured build root. |

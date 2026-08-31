@@ -380,11 +380,11 @@ class AdaptUpstreamPagesTests(unittest.TestCase):
             write_graph_site(project_site)
 
             adapt_site(root_site, "/")
-            adapt_site(project_site, "/clean-migration/")
+            adapt_site(project_site, "/project-site/")
 
             self.assertNotEqual(graph_version(root_site), graph_version(project_site))
             self.assertEqual(audit_site(root_site, "/"), [])
-            self.assertEqual(audit_site(project_site, "/clean-migration/"), [])
+            self.assertEqual(audit_site(project_site, "/project-site/"), [])
 
     def test_distinct_graph_bytes_produce_distinct_resource_urls(self) -> None:
         with (

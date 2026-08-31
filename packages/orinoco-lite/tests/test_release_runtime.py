@@ -32,8 +32,6 @@ blocked = (
     "linkml",
     "linkml_runtime",
     "orinoco_lite.annotations",
-    "orinoco_lite.asset_cli",
-    "orinoco_lite.assets",
     "orinoco_lite.canonical",
     "orinoco_lite.cli",
     "orinoco_lite.driver",

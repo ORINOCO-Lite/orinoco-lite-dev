@@ -229,7 +229,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                     sys.executable,
                     "-m",
                     "unittest",
-                    "tests.test_clean_local_stack",
                     "tests.test_upstream_stack_contract",
                     "-v",
                 ],

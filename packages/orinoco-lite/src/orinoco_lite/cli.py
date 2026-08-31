@@ -12,7 +12,6 @@ import sys
 from typing import Any, Sequence
 
 from . import __version__
-from .asset_cli import manage_assets
 from .config import (
     development_engine_source,
     github_repository,
@@ -62,9 +61,6 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help=argparse.SUPPRESS,
     )
-
-    assets = commands.add_parser("assets", help="manage verified payload cache")
-    assets.add_argument("assets_command", choices=("hydrate", "verify"))
 
     serve = commands.add_parser("serve", help="serve an already built static site")
     serve.add_argument("--directory", type=Path)
@@ -245,12 +241,6 @@ def _projection(args: argparse.Namespace) -> int:
     )
 
 
-def _assets(args: argparse.Namespace) -> int:
-    workspace = _workspace(args)
-    print(json.dumps(manage_assets(workspace.config_path, args.assets_command), sort_keys=True))
-    return 0
-
-
 def _runtime_command(args: argparse.Namespace) -> int:
     _, _, runtime = _resolve(args)
     payload = _runtime_payload(runtime)
@@ -311,8 +301,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _validate(args)
         if args.command == "build":
             return _build(args)
-        if args.command == "assets":
-            return _assets(args)
         if args.command == "serve":
             return _serve(args)
         if args.command == "editor":

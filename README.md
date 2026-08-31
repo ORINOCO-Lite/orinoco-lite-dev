@@ -61,9 +61,6 @@ All confirmation and bundle interaction remains in the downstream routes.
 | Developer downstream | [`leej3/orinoco-lite-demo`](https://github.com/leej3/orinoco-lite-demo) | Retained metadata and source-adapter baseline plus fast end-to-end release exercises | [Consumer README](https://github.com/leej3/orinoco-lite-demo#readme) |
 | Human-gated reference | [`ORINOCO-Lite/test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | The same data and adapter baseline under ordinary downstream review and deployment policy | [Consumer README](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website#readme) |
 
-The production `centerforopenneuroscience.org` repository is not a fourth implementation layer in Milestone 4.
-It remains read-only evidence until a separate, explicitly reviewed graduation plan is accepted.
-
 ## Review now
 
 [`Milestone 7`](docs/milestone-7.md) records the completed sustainable-downstream implementation and the open human-gated organization adoption.
@@ -218,21 +215,4 @@ The two generated refs are force-updated atomically and are debugging evidence, 
 - Static validation, building, previewing, Pages deployment, and review-bundle export do not require a continuously running metadata service.
 - The source Things Schema and exact `dlthings:*` CURIE contract remain pinned.
 See [`docs/explaining-schema-issues.md`](docs/explaining-schema-issues.md).
-- Credentials, stores, hydrated caches, browser downloads, and build output are local ignored state.
-- The real-site repository, its refs, settings, Pages configuration, DNS, and production domain remain outside this milestone.
-
-## Historical evidence
-
-Milestones 1–3 explain how the accepted content and behavior were derived.
-They are preserved as evidence, not as current operating instructions:
-
-- [`docs/orinoco-lite-plan.md`](docs/orinoco-lite-plan.md)
-- [`docs/clean-migration.md`](docs/clean-migration.md)
-- [`docs/full-con-migration.md`](docs/full-con-migration.md)
-- [`docs/milestone-2-acceptance.md`](docs/milestone-2-acceptance.md)
-- [`docs/milestone-3.md`](docs/milestone-3.md)
-- [`docs/milestone-3-acceptance.md`](docs/milestone-3-acceptance.md)
-- [`docs/archived/milestone-1-4-capability-map.md`](docs/archived/milestone-1-4-capability-map.md)
-
-Do not use their old submodule, collection, preview-branch, or full-stack commands as the downstream interface.
-The supported distribution follows immutable engine/runtime releases and the versioned template; metadata ingestion continues to follow the normative source-adapter specification.
+- Credentials, stores, browser downloads, and build output are local ignored state.
