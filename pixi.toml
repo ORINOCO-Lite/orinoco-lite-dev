@@ -48,7 +48,9 @@ apm-cli = "==0.28.0"
 apm-install = "apm install"
 apm-install-frozen = "apm install --frozen"
 apm-audit = "apm audit"
-apm-check = "apm install --frozen && apm audit --ci"
+apm-check = "apm install --frozen && apm audit --ci --no-drift"
+agent-deps-bootstrap = "apm install --frozen"
+agent-deps-check = "apm install --frozen && apm audit --ci --no-drift"
 
 [environments]
 skills = { features = ["skills"], no-default-feature = true }

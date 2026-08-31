@@ -77,7 +77,7 @@ jobs:
           pixi lock --script tools/check_upstream_orinoco.py --check
 
       - name: Verify project-owned agent skills
-        run: pixi run -e skills apm-check
+        run: pixi run -e skills agent-deps-check
 
       - name: Run strict engine and frozen-consumer compatibility tests
         env:

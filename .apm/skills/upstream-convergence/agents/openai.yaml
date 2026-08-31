@@ -1,4 +1,0 @@
-interface:
-  display_name: "Upstream Convergence"
-  short_description: "Rebase thin layers onto current upstream"
-  default_prompt: "Use $upstream-convergence to update this mirrored dependency stack to reviewed upstream heads while preserving linear local layers."

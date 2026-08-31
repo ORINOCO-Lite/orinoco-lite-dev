@@ -26,4 +26,6 @@ Do not link to them from active instructions or indexes.
 - Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
 - Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
+- Treat `.agents/skills/` as the single canonical source for project-owned skills and edit those files directly.
+Use APM only for independently maintained agent dependencies; materialize them with the project-visible Pixi bootstrap rather than copying their sources into this repository.
 - Use Conventional Commits, keep commit text near 80 columns, and run the relevant formatting and tests for changed files.

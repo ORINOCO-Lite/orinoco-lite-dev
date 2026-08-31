@@ -68,16 +68,23 @@ Either candidate may be omitted.
 Quick mode validates a compact adapter sample, builds the site, and checks browser routes.
 Use `--mode full` before release or adoption, and `--keep` or `--output /new/path` to inspect the staged downstream.
 
+Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.
+Edit them there directly; they do not require APM or a setup hook.
+APM is reserved for independently maintained agent dependencies that need a manifest, exact lock, update, and deployment lifecycle.
+The agent-agnostic Pixi bootstrap materializes any such pinned dependencies and verifies their deployment without changing the engine environment:
+
+```console
+pixi run -e skills agent-deps-bootstrap
+pixi run -e skills agent-deps-check
+```
+
+A downstream may call the bootstrap from its preferred workspace or agent setup hook, but the checked project skills remain available before that hook runs.
+The dependency check disables APM's whole-directory drift replay because native project skills intentionally share `.agents/skills/` with APM-managed dependencies; APM still verifies its manifest, lock, selected skills, deployment ownership, and recorded content hashes.
+
 Initialize engineering submodules only when cross-component work needs them:
 
 ```console
 pixi run checkout-submodules
-```
-
-Project-owned agent skills are canonical under `.apm/skills/` and deployed to `.agents/skills/`:
-
-```console
-pixi run -e skills apm-check
 ```
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).

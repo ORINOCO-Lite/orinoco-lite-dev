@@ -1,4 +1,0 @@
-interface:
-  display_name: "Organize Project Docs"
-  short_description: "Compress and retire project documentation"
-  default_prompt: "Use $organize-project-docs to organize active and archived project documentation by audience and lifecycle."

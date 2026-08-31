@@ -9,5 +9,4 @@ dependencies:
   apm: []
   mcp: []
 
-includes: auto
 scripts: {}
