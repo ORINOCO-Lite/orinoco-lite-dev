@@ -30,7 +30,6 @@ If browser policy breaks the opener relationship, the curator may download the b
 A framed editor refuses direct GitHub submission while retaining bundle download.
 
 Shared `github.io` deployments display a clear origin-wide security warning and custom-domain guidance.
-They do not require a SHACL-specific acknowledgment checkbox.
 Unique and custom origins use the normal flow.
 
 ## Git handoff

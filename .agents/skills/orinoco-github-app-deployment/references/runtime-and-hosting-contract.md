@@ -139,7 +139,7 @@ A downstream may reconnect while preserving decisions only for an explicitly ret
 It must keep the submission locked and tell the curator to inspect the pull request when a network, server, or malformed-success response could conceal a completed comment.
 
 Detect the actual downstream browser origin.
-When it is on a shared `github.io` hostname, explain that the entire origin is one browser principal and link to custom-domain remediation without adding an acknowledgment gate.
+When it is on a shared `github.io` hostname, explain that the entire origin is one browser principal and link to custom-domain remediation.
 A custom or otherwise unique origin receives the normal flow.
 
 ## Static-editor handoff boundary

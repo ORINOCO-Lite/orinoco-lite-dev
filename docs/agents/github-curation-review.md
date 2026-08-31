@@ -34,7 +34,7 @@ The page MUST display:
 The source coordinate is shown for inspection but is not duplicated into a new tracked manifest.
 Pull-request Markdown is an accessible summary, not a machine protocol.
 
-On a shared `github.io` origin, `/review/` explains the origin-wide browser trust boundary and requires a fresh in-memory acknowledgment before direct submission.
+On a shared `github.io` origin, `/review/` explains the origin-wide browser trust boundary and links to custom-domain guidance.
 A unique or custom origin uses the normal flow.
 
 ## Authentication and submission

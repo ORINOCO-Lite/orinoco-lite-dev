@@ -41,9 +41,8 @@ Browser-supplied values are hints; the service verifies the effective origin and
 Unique or custom-domain origins receive the normal direct-GitHub flow.
 Shared `github.io` origins explain that repositories under the same account share one browser origin.
 
-The source-adapter `/review/` flow requires a fresh in-memory acknowledgment on a shared origin.
-SHACL `/edit/` displays the warning without a checkbox.
-**Download bundle** remains available without GitHub sign-in, service access, or origin acknowledgment.
+SHACL `/edit/` displays the warning.
+**Download bundle** remains available without GitHub sign-in or service access.
 
 The custom-domain guide should lead maintainers through GitHub domain verification, Pages configuration, DNS, HTTPS, and a final `/edit/` and `/review/` check.
 
