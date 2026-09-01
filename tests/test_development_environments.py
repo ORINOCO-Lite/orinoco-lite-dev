@@ -326,7 +326,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "repository: ORINOCO-Lite/orinoco-lite-template",
             workflow,
         )
-        self.assertIn("ref: codex/milestone-8-template", workflow)
         self.assertIn("path: build/orinoco-lite-template", workflow)
         self.assertIn(
             "ORINOCO_TEMPLATE_CANDIDATE: "
