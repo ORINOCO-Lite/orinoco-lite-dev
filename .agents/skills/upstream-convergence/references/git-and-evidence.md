@@ -77,16 +77,20 @@ Preserve upstream commit identities and replay only owned commits.
 
 ## Git Annex and cache-cold validation
 
-Git content and Annex metadata are separate coordinates.
-Advancing a repository gitlink can introduce new Annex keys even when the previously pinned Annex branch still hydrates every older path.
+Git content identifies Annex keys, while Annex metadata records their availability.
+After advancing a repository gitlink, verify the Annex content referenced by the newly pinned commit: a path available at the previous pin may refer to a different key, and the new pin may add Annex-backed paths.
 
 After updating an Annex-backed source:
 
-- resolve and pin the authoritative `git-annex` ref independently;
+- resolve the authoritative `git-annex` state used for the operation and report it as review evidence;
 - hydrate from the intended remote in a fresh clone;
-- require `git annex find --not --in=here` to produce no paths;
-- keep the build's Annex pin and any deployment-workflow pin synchronized; and
+- require every build-required key to be present and verified;
+- materialize any required, redistributable downstream-independent payload as an ordinary tracked artifact at the owning distribution boundary; and
 - add a focused invariant test when two current execution paths must share the same coordinate.
+
+Do not duplicate Annex refs, keys, or per-file digests into runtime, template, or downstream configuration when the selected Git repositories and tooling can derive them.
+A project Pixi task may print exact Git, Annex, key, and digest information for review without creating a tracked inventory.
+When software actually requires an Annex ref as an execution input, keep that one coordinate in its existing dependency or release surface.
 
 Git Annex can misinterpret a relative `core.worktree` when a submodule `.git` is a symlink.
 Prefer verified absolute worktree context for Annex commands and restore the caller's local configuration carefully.
@@ -127,7 +131,7 @@ Record the smallest useful evidence in the project's existing authority:
 - old and accepted parent/nested gitlinks;
 - owned commits replayed above upstream;
 - mirror PRs and final default-branch OIDs;
-- exact package, tool, runtime, assembly assertion, consumer-template, and Annex pins plus regenerated locks;
+- exact package, tool, runtime, assembly assertion, and consumer-template pins plus regenerated locks, with the observed Annex state when Annex was used;
 - focused leaf tests, parent builds, clean-clone builds, and cross-layer tests;
 - hosted CI run and immutable release coordinates when applicable; and
 - explicit unchanged components that were verified current.

@@ -2,8 +2,14 @@
 
 ## Current direction
 
-- Keep the complete reusable website in the template and generic metadata and composition operations in the engine.
-Keep declarative site inputs under `site-specific/` and site-specific executable metadata adapters under `extensions/`.
+- Reuse the exact German `www-from-model` revision selected by the controlled submodule gitlink as the presentation and projection source.
+Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in the runtime manifest.
+The engine owns generic source resolution, metadata, projection, and composition operations.
+Keep the template thin: it contains the Orinoco adaptation, bounded materialized presentation assets, Copier scaffold, workflows, and dependency locks, not a copied website.
+- Git Annex is maintainer-only repinning tooling.
+It may hydrate and verify Annex-backed content required by the selected upstream functionality before redistributable ordinary files are copied into the template overlay.
+Released engine and template tasks and downstream website builds must not invoke or depend on Git Annex.
+DataLad remains a downstream dependency for recording source-adapter run provenance; correctly configured downstream repositories keep those records in Git without requiring Git Annex.
 - Test unreleased engine and template work together by injecting compact mock site data into a fresh disposable template instance with `pixi run test-downstream-candidate` when practical.
 A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
 Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
@@ -25,6 +31,10 @@ Use Git when historical context is specifically needed.
 ## Boundaries
 
 - Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
+- Do not copy the German website or its dependency trees into an Orinoco Lite release.
+Required upstream functionality includes its required assets automatically, but an asset may be materialized into the template only when its independent redistribution basis and required notices are established.
+- Use Git and Git Annex state as the provenance for materialized assets.
+Do not add redundant per-asset coordinates or provenance inventories when tooling can derive precise information from the selected repositories.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
 - Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
 - Do not resolve the production choices in `docs/agents/open-decisions.md` by inference.

@@ -1,141 +1,115 @@
-# Milestone 8: template architecture
+# Milestone 8: upstream composition and thin template
 
 ## Outcome
 
-Establish and prove one compositional architecture:
+Establish and prove one maintainable composition:
 
 ```text
-optional metadata acquisition and curation executables
-                |
-                v
-      site-specific metadata
-
-generic template website
-+ site-specific declarative inputs and overrides
-= deployed downstream website
+controlled www-from-model gitlink
+        |
+        v
+exact www-from-model checkout
+        + upstream-declared dependency closure
+        + thin Orinoco template adaptation
+        + bounded materialized presentation overlay
+        + downstream site-specific inputs
+        |
+        v
+disposable static-site build
 ```
 
-The pinned German `www-from-model` site and its `page_templates/` are the behavioral and structural baseline.
-The template turns that baseline into a complete generic website that accepts downstream metadata and other site-specific inputs.
-The engine performs generic metadata and composition operations.
+The German `www-from-model` repository and its `page_templates/` are the authoritative presentation and projection source.
+The engine resolves the exact revision and performs generic metadata, projection, and composition operations.
+The template is a lightweight Copier scaffold with the Orinoco adaptation, required materialized presentation assets, workflows, and locks.
 
 This is a replacement implementation, not a migration.
-Do not preserve downstream framework files, copied tests, layouts in legacy locations, updater machinery, configuration structure, or repository history as compatibility requirements.
+Do not retain old framework copies, checked rendered trees, legacy paths, updater machinery, or backward compatibility as requirements.
 
 ## Boundary
 
-The boundary follows artifact type:
-
-- `orinoco-lite-template` contains the complete default website, including Hugo configuration, layouts, navigation, record and index pages, projection templates, workflows, UI components, tests, and useful defaults.
-- `site-specific/` contains all declarative downstream inputs: semantic metadata, curation records, editorial content, assets, site identity, limited presentation choices, source-adapter configuration and evidence, and supported overrides.
-- Custom layouts are declarative website overrides and therefore belong under `site-specific/overrides/layouts/`.
+- The controlled engineering gitlink selects the exact `www-from-model` revision.
+That revision's normal dependency mechanism selects Congo and other upstream dependencies; the runtime manifest, template, and downstream do not repeat those pins.
+- Git and Git Annex state are the provenance for an upstream Annex payload.
+Do not add per-asset coordinates, digests, or origin inventories to runtime, template, or downstream configuration.
+- Git Annex is used only by maintainer repinning tooling.
+The released engine, template tasks, and downstream validation, projection, build, test, and deployment paths do not invoke or depend on it.
+- DataLad remains in downstream source-adapter workflows to record run provenance in Git.
+Correct repository configuration keeps adapter inputs and outputs out of Annex, so these workflows do not require Git Annex.
+- The engine owns source resolution, integrity verification, metadata validation, projection, composition, and shared behavioral tests.
+- `orinoco-lite-template` owns the small Orinoco adaptation, bounded materialized presentation overlay, Copier scaffold, workflows, and dependency locks.
+It does not own a complete website.
+- `site-specific/` contains declarative downstream metadata, curation records, editorial content, assets, identity, limited presentation choices, source-adapter configuration and evidence, and supported small overrides.
 - `extensions/` contains only site-specific executable metadata acquisition and curation adapters.
-It contains no website assets, layouts, presentation overrides, navigation, UI components, client-side code, workflows, build hooks, or other website functionality.
-- Extension executables may capture evidence, create metadata proposals, and support curation review or application through declared metadata interfaces.
-They run separately from website composition, and neither their code nor their runtime products are copied into the deployed website.
-- The engine validates, projects, and composes these inputs but does not provide a second website implementation.
+Extension code and runtime products are neither loaded during website composition nor copied into the generated site.
+- Generated projections, static sites, caches, and Copier renderings remain untracked build products.
+The template publication branch may contain its exact rendered distribution tree because that branch is itself a distribution product.
 
-The template must produce a useful deployed website with no downstream overrides.
-Overrides are an escape hatch with explicit tests, not the ordinary way to construct a site.
+The German website currently states no explicit redistribution license.
+Do not copy it wholesale.
+A bounded artifact may enter the template overlay only when its independent redistribution basis and required notices have been established.
 
-## Upstream tracking
+## Implementation
 
-Use one exact `www-from-model` commit in the engineering repository's existing dependency state.
-Do not introduce a second provenance manifest or a downstream upstream pin.
+### Resolve and verify upstream
 
-The engineering workspace must:
+Use the controlled gitlink as the direct `www-from-model` coordinate and resolve its dependency closure through the selected revision's normal dependency declarations, nested gitlinks, and locks.
+Resolve the resulting exact state into an ignored cache and reject a checkout or dependency that does not match it.
 
-1. build the unmodified German reference website from the exact pin;
-2. build the generalized template website from the same pin;
-3. compare surfaces intended for direct reuse and fail on unintended drift;
-4. test deliberate generalizations with injected mock downstream data; and
-5. make the generic website available as a versioned template dependency without requiring downstreams to clone the German upstream or the engineering workspace.
+The first resolution may require network access.
+After declared dependencies are present, ordinary validation, projection, building, and browser use must work offline.
+Candidate development may use an explicit local exact checkout without changing the downstream contract or duplicating the pin.
 
-When the upstream pin advances, failures should identify the small template adaptation that needs review.
-Do not preserve a permanent file-by-file origin ledger; Git, the dependency pin, and executable comparison are the evidence.
-Each downstream chooses when to upgrade its template dependency and may use supported overrides, a fork, or another compatible template implementation.
+### Carry required upstream assets
 
-## Part 1: agree on the architecture
+Required assets are part of retained upstream functionality automatically; do not maintain a feature-specific allowlist.
+Maintainer repinning derives the required Annex-backed content from the selected upstream state, hydrates and verifies it, and copies redistributable payloads needed by downstream runtime into the template overlay as ordinary files.
+A Pixi task may report precise Git and Git Annex information when useful, but its output is derived evidence rather than another tracked source of truth.
 
-Complete and merge the Milestone 8 design pull request before changing agent guidance or implementation:
+Failure to hydrate, verify, license, or match any asset required by retained upstream functionality blocks the repin.
+Do not remove or replace upstream behavior, import upstream site data, or introduce Git Annex into a downstream to make the build pass.
 
-1. Update `docs/project-design.md` with the German upstream baseline and the compositional boundary.
-2. Record this Milestone 8 plan as the active implementation guide.
-3. Review the architecture, downstream independence, upstream tracking, test strategy, and acceptance criteria.
+### Keep the template thin
 
-Part 1 must not change agent instructions, skills, engine, template, downstream, workflow, or deployment behavior.
+Remove copied upstream layouts, projection templates, configuration, and other website framework files from the Copier source.
+Retain only files that intentionally adapt upstream behavior, materialize a required presentation asset, or create an ordinary downstream repository.
 
-## Part 2: align agent guidance
+Do not keep a rendered Copier result on the source branch.
+Render into temporary or ignored storage for local inspection and tests, then publish that validated ephemeral result directly to the template distribution branch.
 
-After Part 1 merges, review and update `AGENTS.md`, the `develop-orinoco-lite` skill, and any other active instructions in a separate documentation-only pull request.
-The guidance must direct agents to the agreed composition boundary and local test strategy without embedding transient milestone sequencing in universal instructions.
+### Compose downstream inputs
 
-Review and merge the guidance before implementation, then begin Part 3 in a clean agent task that reads the merged documentation and instructions.
+Build in this order:
 
-## Part 3: implement the architecture
+1. resolve and verify the controlled upstream revision and its declared dependency closure;
+2. compose the ordinary upstream presentation and projection surfaces;
+3. apply the template adaptation and materialized asset overlay;
+4. project and add declared `site-specific/` metadata, editorial content, assets, identity, and presentation choices; and
+5. apply supported `site-specific/overrides/` with explicit precedence.
 
-### Build the generic template from upstream
+Run executable metadata adapters under `extensions/` only through separate metadata acquisition and curation tasks before validation and projection.
+Those tasks use DataLad for run provenance but do not annex their inputs or outputs.
+Website composition must not import extension code or copy extension files, caches, captured evidence, proposals, or dependencies into its output.
 
-Use the pinned `submodules/www-from-model` website surfaces and projection templates directly where practical.
-Generalize only inputs demonstrated to vary between downstreams, including metadata, editorial content, assets, site identity, base URL, navigation choices, and limited theme choices.
+### Prove the composition
 
-The template must provide the website implementation as one coherent versioned dependency selected by the downstream.
-The downstream controls its version and upgrade timing and retains the ability to use supported overrides, a fork, or a compatible alternative.
-The implementation must not require downstream copies of framework internals, and the engine runtime must not carry a competing framework.
-
-### Reduce the downstream contract
-
-Create compact mock data and inject it into a fresh disposable template instantiation.
-Prefer representative metadata shapes from `ORINOCO-Lite/test-orinoco-downstream-website`; a subset of a developer-owned demo may be used when useful.
-
-Test the ordinary `site-specific/` contract without overrides, then test supported overrides separately.
-Reject accidental framework duplication, workflows, copied framework tests, and configuration that restates template defaults.
-
-### Make the engine compose the site
-
-Change the engine build path to combine the selected template website with declared `site-specific/` inputs in a documented order:
-
-1. materialize the generic template website;
-2. project downstream metadata using template-owned projection templates;
-3. add editorial content, assets, identity, and presentation choices;
-4. apply declared `site-specific/overrides/`, including custom layouts.
-
-Metadata acquisition and curation executables under `extensions/` run only through separate explicit metadata workflows before validation and projection.
-The website build must not load extension code or copy extension files or runtime products into its output.
-
-During development, select engine and template working trees explicitly.
-Choose the simplest distribution mechanism that preserves downstream control of the template version and does not require the German upstream or engineering checkout at build time.
-Do not begin with updater or backward-compatibility work.
-
-### Make local proof comprehensive and routine
-
-Confirm that Part 2 guidance describes the implemented command and test contract; update it in the implementation pull request if concrete interfaces change.
-
-Add named Pixi tasks in `orinoco-lite-dev` that create a fresh template instantiation and inject the mock fixture:
-
-- a quick candidate run for metadata validation, projection, build, and a Chromium route smoke test;
-- a full candidate run for clean-room setup, engine and template tests, projection repeatability, deterministic builds, link and asset validation, Chromium and WebKit behavior, editor and curation-review behavior, project base paths, supported layout overrides, separate metadata-adapter execution, extension-isolation checks, and an offline build; and
-- an optional end-to-end developer-demo run for GitHub validation, curation proposal, default-branch build, and Pages deployment.
-
-CI must construct a minimal content-only downstream for boundary enforcement and test the engine and template working trees together.
-A developer-owned `<github-user>/orinoco-lite-demo` may provide real-data and GitHub-workflow proof without becoming a prerequisite or canonical fixture.
-The organization-owned reference downstream remains the human-gated adoption check.
+The engineering candidate task creates a fresh disposable Copier instance, injects compact mock downstream inputs, and tests selected engine and template working trees together.
+Assertions cover contracts and observable behavior rather than comparison with a checked-in rendered website.
+The proof must exercise the maintainer materialization boundary, DataLad-recorded source-adapter execution, downstream builds without Git Annex, and retained upstream behavior with its required assets.
 
 ## Acceptance criteria
 
 Milestone 8 is complete when:
 
-- a fresh template instantiation with only permitted mock `site-specific/` inputs builds a useful website retaining the German upstream's information architecture and record presentation;
-- the instantiated site, projection, graph, search data, editor catalog, and generated routes contain no German records, identifiers, editorial content, or assets unless a downstream explicitly supplies them;
-- the template builds a complete website without custom layouts or other downstream overrides;
-- a custom layout under `site-specific/overrides/layouts/` is applied and tested without copying or modifying the template framework;
-- `extensions/` accepts only metadata acquisition and curation executables through explicit stable metadata hooks;
-- validation rejects website assets, layouts, presentation overrides, navigation, UI components, client-side code, workflows, build hooks, and other website functionality under `extensions/`;
-- the website build does not execute extension code or contain extension source, dependencies, caches, captured evidence, proposals, or other extension runtime products;
-- quick, full, and CI tasks pass against the engine and template working trees;
-- local builds are deterministic, work offline after declared dependencies are present, and pass browser, editor, curation-review, link, asset, and project-path checks;
-- the downstream selects its template version and can upgrade deliberately, retain supported overrides, or select a fork without depending on the German upstream or the Orinoco Lite engineering checkout;
-- a developer-owned `<github-user>/orinoco-lite-demo` is deployed successfully as a working website through its normal GitHub and Pages workflows; and
-- the organization-owned reference downstream can be proposed for adoption through its normal human-review gate.
+- a fresh downstream reuses the exact upstream presentation and projection behavior without copying the website framework;
+- the template source is a small reviewable adaptation and scaffold containing only required materialized assets rather than a complete website;
+- retained upstream functionality works with its required assets without a feature-specific allowlist;
+- Git and Git Annex tooling can reconstruct materialization provenance without a redundant coordinate inventory;
+- DataLad records source-adapter run provenance while downstream website and adapter tasks require no Git Annex;
+- a missing required asset blocks repinning rather than removing upstream behavior or publishing an Annex pointer;
+- downstream metadata builds the expected static website without German records, identifiers, editorial content, or site-specific assets leaking into it;
+- quick, full, and CI candidate runs pass against the engine and template working trees using disposable renders and behavioral assertions;
+- a verified cached dependency supports an offline repeat build;
+- the template publication branch is produced directly from the validated ephemeral render; and
+- after reviewed engine and template releases, the reference downstream update is proposed through its normal human-review gate.
 
 Do not delay acceptance for migration, historical reconstruction, updater compatibility, or preservation of prior downstream framework structure.
