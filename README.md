@@ -4,18 +4,19 @@ Orinoco Lite turns schema-backed records and editorial inputs into a static webs
 See the concise [`project design`](docs/project-design.md) for the intended product and division of responsibilities.
 
 This repository contains the engine, engineering tests, release assembly, and reusable CI.
-The website framework belongs to [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template), and each deployed website is configured by one ordinary downstream repository.
+The engine reuses an exact upstream website revision, [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) supplies a thin adaptation and scaffold, and each deployed website is configured by one ordinary downstream repository.
 
 ## Repository roles
 
 | Repository | Role |
 | --- | --- |
 | [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Engine, runtime assembly, engineering tests, and reusable CI |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Complete reusable website and defaults |
+| [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Submodule-pinned presentation and projection source |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks |
 | `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
 | [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Human-gated reference downstream |
 
-The template owns the complete website; the engine owns generic metadata and composition operations.
+The engine resolves and composes the upstream website, while the template owns only the Orinoco-specific adaptation and downstream scaffold.
 A downstream provides declarative `site-specific/` inputs and optional overrides, plus site-specific executable metadata adapters under `extensions/`.
 
 The static website owns `/edit/` for SHACL Vue editing and `/review/` for source-adapter decisions.
@@ -35,6 +36,8 @@ pixi run test-all
 
 The downstream selects its template version and upgrade timing.
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
+Source-adapter tasks use DataLad to record run provenance in Git.
+They do not require Git Annex, and ordinary website builds never invoke it.
 
 Detailed engineering contracts are maintained as agent coordination material:
 
@@ -86,4 +89,6 @@ Dependency locks and release inputs contain the versions required by the build; 
 See [`LICENSES.md`](LICENSES.md).
 - Canonical site metadata is the YAML below the configured records and annotation roots.
 Generated projection and website output are ignored.
+- The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in the runtime manifest.
+Maintainer repinning hydrates and verifies required Annex-backed content and may place the redistributable assets required by retained functionality in the template as ordinary files; downstreams do not hydrate them.
 - Credentials, stores, caches, browser downloads, and build output are local state.

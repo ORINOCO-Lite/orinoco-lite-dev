@@ -6,7 +6,8 @@ It discovers the site through `orinoco.yaml`, enforces the exact release coordin
 This package is one layer of the larger system:
 
 - the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
-- the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) provides the complete versioned website; and
+- the submodule-selected `www-from-model` revision and its declared dependency closure provide the presentation and projection source;
+- the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) provides the thin Orinoco adaptation, materialized presentation overlay, and downstream scaffold; and
 - each downstream repository owns its declarative site inputs and site-specific executable metadata adapters; projection output is ignored and regenerated.
 
 The engineering workspace's submodules, upstream-rebase history, release fixtures, and preservation refs are not part of the package interface.
@@ -24,8 +25,8 @@ The engine owns:
 - validation and optional application of static-editor review bundles; and
 - deterministic runtime assembly and release verification for engineering.
 
-It does not own site content, website behavior, presentation policy, GitHub branch protection, or production cutover.
-Those belong respectively to the downstream, template, or repository operator.
+It does not own site content, upstream website behavior, site-specific presentation policy, GitHub branch protection, or production cutover.
+Those belong respectively to the downstream, selected upstream source, template and downstream overrides, or repository operator.
 
 ## Public command surface
 

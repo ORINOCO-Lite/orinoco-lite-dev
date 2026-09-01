@@ -6,11 +6,14 @@ description: Develop and exercise unreleased Orinoco Lite engine or template cha
 # Develop Orinoco Lite
 
 Exercise engine and template changes through a disposable content-only downstream before release.
-Keep the complete website in the template, generic metadata and composition operations in the engine, declarative site inputs under `site-specific/`, and site-specific executable metadata adapters under `extensions/`.
+Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
+Keep generic source resolution, metadata, projection, and composition in the engine; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
 ## Establish the live scope
 
-1. Read the instructions, ownership contract, dependency pins, and relevant tests in every selected working tree.
+1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
+Git Annex is permitted only in the engineering repinning path.
+Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
 2. Identify the engine and template candidates and any downstream inputs to inject.
 Local candidate testing is the default.
 When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
@@ -41,7 +44,9 @@ Use `--mode full` before release or adoption.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
 
-When a candidate failure exposes website behavior, fix the template; when it exposes generic metadata or composition behavior, fix the engine.
+When a candidate failure exposes generic source resolution, metadata, projection, or composition behavior, fix the engine.
+When it exposes an Orinoco adaptation or scaffold, fix the template.
+When required Annex-backed upstream content is missing, repair the maintainer dependency-closure hydration and materialization path; do not remove upstream functionality or add Git Annex to the downstream.
 Change downstream inputs only for site data, policy, supported presentation choices or overrides, or executable metadata adapters.
 
 ## Complete the user-owned demo
