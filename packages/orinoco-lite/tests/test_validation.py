@@ -44,7 +44,6 @@ class DownstreamValidationTests(unittest.TestCase):
         for relative in (
             "site-specific/metadata/records/XYZPerson",
             "site-specific/metadata/records/XYZAgentRole",
-            ".orinoco-lite/provenance",
             "site-specific/content",
             "site-specific",
             "extensions/adapters/zotero",
@@ -70,10 +69,6 @@ class DownstreamValidationTests(unittest.TestCase):
             "pid: xyzrins:roles/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
-        (self.root / ".orinoco-lite/provenance/selection.yaml").write_text(
-            "version: 1\n", encoding="utf-8"
-        )
-
     def tearDown(self) -> None:
         self.temporary.cleanup()
 

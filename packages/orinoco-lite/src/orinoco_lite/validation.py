@@ -20,7 +20,6 @@ from .records import record_files
 MAX_RECORD_BYTES = 10 * 1024 * 1024
 REQUIRED_INPUT_PATHS = (
     "records",
-    "provenance",
     "editorial",
     "site",
     "extensions",
@@ -222,10 +221,6 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         classes[record["schema_type"]] += 1
 
     companions = companion_sources(workspace)
-
-    provenance_files = list(_files(workspace.path("provenance")))
-    if not provenance_files:
-        raise ConfigurationError("Metadata provenance inventory is empty")
 
     file_counts = {
         name: sum(1 for _ in _files(workspace.path(name)))

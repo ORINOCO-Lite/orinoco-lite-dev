@@ -30,7 +30,6 @@ MAX_REPOSITORY_PATH_LENGTH = 1_024
 
 DEFAULT_PATHS: dict[str, str] = {
     "records": "site-specific/metadata/records",
-    "provenance": ".orinoco-lite/provenance",
     "editorial": "site-specific/content",
     "site": "site-specific",
     "generated": "generated",
@@ -40,7 +39,6 @@ DEFAULT_PATHS: dict[str, str] = {
 
 DIRECTORY_PATHS = {
     "records",
-    "provenance",
     "editorial",
     "site",
     "generated",

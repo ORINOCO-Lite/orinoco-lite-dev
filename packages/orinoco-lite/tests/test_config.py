@@ -83,10 +83,6 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.assertNotIn("ORINOCO_CANONICAL_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_REFERENCE_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_INTEGRATIONS_ROOT", workspace.environment())
-        self.assertEqual(
-            workspace.path("provenance").resolve(),
-            (self.root / ".orinoco-lite/provenance").resolve(),
-        )
         self.assertIsNone(workspace.repository)
         self.assertEqual(workspace.curation_service, DEFAULT_CURATION_SERVICE)
 
@@ -271,7 +267,7 @@ class WorkspaceConfigTests(unittest.TestCase):
             CONFIG
             + "paths:\n"
             + "  records: metadata\n"
-            + "  provenance: metadata\n",
+            + "  generated: metadata\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "distinct"):
@@ -312,7 +308,13 @@ class WorkspaceConfigTests(unittest.TestCase):
             load_workspace(self.root)
 
     def test_removed_path_names_are_not_accepted_as_aliases(self) -> None:
-        for name in ("assets", "canonical", "reference", "integrations"):
+        for name in (
+            "assets",
+            "canonical",
+            "reference",
+            "integrations",
+            "provenance",
+        ):
             with self.subTest(name=name):
                 (self.root / "orinoco.yaml").write_text(
                     CONFIG + f"paths:\n  {name}: legacy\n", encoding="utf-8"
