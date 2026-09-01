@@ -69,7 +69,10 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 {
                     "_src_path": "gh:old/template",
                     "_commit": "v0.1.0",
+                    "project_slug": "downstream-site",
                     "project_name": "Downstream name",
+                    "site_description": "Obsolete downstream description",
+                    "site_base_url": "https://obsolete.example.invalid/",
                     "engine_version": "0.1.0",
                     "template_source": "gh:old/template",
                     "template_version": "v0.1.0",
@@ -123,6 +126,22 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         )
         self.assertFalse((candidate / "generated").exists())
         self.assertFalse((candidate / "site-specific/stale.txt").exists())
+
+    def test_overlay_omits_nested_runtime_state(self) -> None:
+        cache = self.downstream / "extensions/source-adapters/example/.pixi/envs/bin"
+        cache.mkdir(parents=True)
+        (cache / "python").symlink_to("/usr/bin/python3")
+        candidate = self.root / "candidate"
+        candidate.mkdir()
+
+        development.overlay_site_owned(self.downstream, candidate)
+
+        self.assertTrue(
+            (candidate / "extensions/source-adapters/example/run.py").is_file()
+        )
+        self.assertFalse(
+            (candidate / "extensions/source-adapters/example/.pixi").exists()
+        )
 
     def test_engine_environment_prefers_candidate_source(self) -> None:
         engine = self.root / "engine"
@@ -182,16 +201,23 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             ),
         )
 
-    def test_template_answers_use_candidate_pins_and_downstream_site_data(self) -> None:
+    def test_template_answers_use_only_current_candidate_questions(self) -> None:
         template = self.root / "template"
         template.mkdir()
-        (template / ".github-template-answers.yml").write_text(
+        (template / "copier.yml").write_text(
             yaml.safe_dump(
                 {
-                    "project_name": "Template default",
-                    "engine_version": "0.2.0",
-                    "template_source": "gh:new/template",
-                    "template_version": "v0.2.0",
+                    "_subdirectory": "copier-template",
+                    "project_slug": {"type": "str", "default": "template-site"},
+                    "engine_version": {"type": "str", "default": "0.2.0"},
+                    "template_source": {
+                        "type": "str",
+                        "default": "gh:new/template",
+                    },
+                    "template_version": {
+                        "type": "str",
+                        "default": "v0.2.0",
+                    },
                 },
                 sort_keys=False,
             ),
@@ -200,10 +226,13 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         answers = development._template_answers(self.downstream, template)
 
-        self.assertEqual("Downstream name", answers["project_name"])
+        self.assertEqual("downstream-site", answers["project_slug"])
         self.assertEqual("0.2.0", answers["engine_version"])
         self.assertEqual("gh:new/template", answers["template_source"])
         self.assertEqual("v0.2.0", answers["template_version"])
+        self.assertNotIn("project_name", answers)
+        self.assertNotIn("site_description", answers)
+        self.assertNotIn("site_base_url", answers)
 
     def test_normalized_answers_use_candidate_release_identity(self) -> None:
         candidate = self.root / "candidate"

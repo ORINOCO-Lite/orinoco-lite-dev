@@ -90,5 +90,5 @@ See [`LICENSES.md`](LICENSES.md).
 - Canonical site metadata is the YAML below the configured records and annotation roots.
 Generated projection and website output are ignored.
 - The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in the runtime manifest.
-Maintainer repinning hydrates and verifies required Annex-backed content and may place the redistributable assets required by retained functionality in the template as ordinary files; downstreams do not hydrate them.
+Maintainer repinning hydrates and verifies required Annex-backed content and may place assets required by retained functionality in a bounded licensed template overlay as ordinary files; downstreams do not hydrate them.
 - Credentials, stores, caches, browser downloads, and build output are local state.

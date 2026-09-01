@@ -90,9 +90,15 @@ provenance:
         consumer = self.root / "consumer"
         consumer.mkdir()
         (consumer / "orinoco.yaml").write_text(
-            "contract_version: 2\n"
-            "site:\n"
-            "  name: Runtime cache fixture\n"
+            "contract_version: 2\n",
+            encoding="utf-8",
+        )
+        (consumer / "site-specific").mkdir()
+        (consumer / "site-specific/site.yaml").write_text(
+            "version: 1\n"
+            "identity:\n"
+            "  title: Runtime cache fixture\n"
+            "  description: A runtime cache fixture.\n"
             "  base_url: https://example.invalid/runtime-cache/\n",
             encoding="utf-8",
         )

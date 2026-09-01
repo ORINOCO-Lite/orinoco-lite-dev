@@ -890,7 +890,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             _native_fingerprint(second),
         )
 
-    def test_update_preserves_projection_control_sidecar_and_active_ledger(self) -> None:
+    def test_update_preserves_projection_control_sidecar_and_manifest(self) -> None:
         projection = self.root / "generated/projection"
         projection.mkdir()
         sidecar = projection / ".gitattributes"

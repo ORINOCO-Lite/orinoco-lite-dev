@@ -18,8 +18,13 @@ from orinoco_lite.validation import validate_workspace
 
 CONFIG = """\
 contract_version: 2
-site:
-  name: Complete fixture
+"""
+
+SITE_DATA = """\
+version: 1
+identity:
+  title: Complete fixture
+  description: A validation fixture.
   base_url: https://example.invalid/complete/
 """
 
@@ -39,7 +44,6 @@ class DownstreamValidationTests(unittest.TestCase):
         for relative in (
             "site-specific/metadata/records/XYZPerson",
             "site-specific/metadata/records/XYZAgentRole",
-            ".orinoco-lite/provenance",
             "site-specific/content",
             "site-specific",
             "extensions/adapters/zotero",
@@ -48,6 +52,9 @@ class DownstreamValidationTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
+        (self.root / "site-specific/site.yaml").write_text(
+            SITE_DATA, encoding="utf-8"
+        )
         (self.root / "site-specific/metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: xyzri:XYZPerson\n"
@@ -62,10 +69,6 @@ class DownstreamValidationTests(unittest.TestCase):
             "pid: xyzrins:roles/test\nschema_type: xyzri:XYZAgentRole\n",
             encoding="utf-8",
         )
-        (self.root / ".orinoco-lite/provenance/selection.yaml").write_text(
-            "version: 1\n", encoding="utf-8"
-        )
-
     def tearDown(self) -> None:
         self.temporary.cleanup()
 

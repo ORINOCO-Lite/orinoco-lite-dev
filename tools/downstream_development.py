@@ -102,6 +102,8 @@ def copy_working_tree(source: Path, destination: Path) -> None:
 
 
 def _copy_site_path(source: Path, destination: Path) -> None:
+    if source.name in IGNORED_WORKING_TREE_NAMES:
+        return
     if source.is_symlink():
         raise DevelopmentError(f"Site-owned input cannot be a symlink: {source}")
     if source.is_dir():
@@ -178,20 +180,25 @@ def _template_answers(downstream: Path, template: Path) -> dict[str, object]:
         downstream / ".copier-answers.yml",
         "Downstream Copier answers",
     )
-    candidate_defaults = _load_yaml(
-        template / ".github-template-answers.yml",
-        "Candidate template defaults",
+    configuration = _load_yaml(
+        template / "copier.yml",
+        "Candidate Copier configuration",
     )
-    selected = {
-        key: value
-        for key, value in candidate_defaults.items()
-        if not key.startswith("_")
-    }
+    selected: dict[str, object] = {}
+    for key, raw in configuration.items():
+        if key.startswith("_"):
+            continue
+        question = _mapping(raw, f"Candidate Copier question {key}")
+        if "default" not in question:
+            raise DevelopmentError(
+                f"Candidate Copier question {key} has no non-interactive default"
+            )
+        selected[key] = question["default"]
     selected.update(
         {
             key: value
             for key, value in downstream_answers.items()
-            if not key.startswith("_") and key not in RELEASE_COORDINATES
+            if key in selected and key not in RELEASE_COORDINATES
         }
     )
     if not selected:

@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORINOCO-Lite/orinoco-lite-template
-          ref: codex/milestone-8-template
+          ref: main
           path: build/orinoco-lite-template
           persist-credentials: false
           fetch-depth: 1
@@ -66,8 +66,7 @@ jobs:
           pixi lock --check
           pixi lock --script tools/upstream_static.py --check
           pixi lock --script tools/upstream_full.py --check
-          pixi lock --script tools/upstream_orinoco.py --check
-          pixi lock --script tools/check_upstream_orinoco.py --check
+          pixi lock --script tools/materialize_presentation_assets.py --check
 
       - name: Verify pre-commit formatting
         run: pixi run check-format

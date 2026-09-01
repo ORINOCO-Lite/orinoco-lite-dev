@@ -8,19 +8,69 @@ from unittest.mock import patch
 
 from orinoco_lite import site
 from orinoco_lite.config import load_config_path
-from orinoco_lite.errors import ConfigurationError, DriverError
+from orinoco_lite.errors import ConfigurationError, DriverError, IntegrityError
 
 
 CONFIG = """\
 contract_version: 2
-site:
-  name: Hugo compatibility fixture
-  base_url: https://example.invalid/orinoco/
 """
 
 
+def _write_site_data(
+    root: Path,
+    *,
+    title: str = "Hugo compatibility fixture",
+    prefix: str = "xyzrins:",
+    base_url: str = "https://example.invalid/orinoco/",
+) -> None:
+    site_root = root / "site-specific"
+    site_root.mkdir(exist_ok=True)
+    (site_root / "site.yaml").write_text(
+        "version: 1\n"
+        f"record_prefix: {prefix!r}\n"
+        "identity:\n"
+        f"  title: {title}\n"
+        "  description: A site-build fixture.\n"
+        f"  base_url: {base_url}\n",
+        encoding="utf-8",
+    )
+
+
+def _presentation(root: Path) -> Path:
+    upstream = root / "presentation" / "www-from-model"
+    theme = upstream / "themes" / "congo"
+    theme.mkdir(parents=True, exist_ok=True)
+    (theme / "LICENSE").write_text("Congo MIT\n", encoding="utf-8")
+    (theme / "theme.toml").write_text("name = 'Congo'\n", encoding="utf-8")
+    templates = upstream / "page_templates"
+    templates.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "dataset",
+        "homepage",
+        "instrument",
+        "objective",
+        "page",
+        "person",
+        "project",
+        "publication",
+        "topic",
+    ):
+        (templates / f"{name}.md.j2").write_text(
+            f"{name}\n", encoding="utf-8"
+        )
+    (upstream / "code").mkdir(exist_ok=True)
+    (upstream / "code" / "pool2graph.py").write_text(
+        "print('{\"nodes\": [], \"edges\": []}')\n",
+        encoding="utf-8",
+    )
+    materialized = root / ".orinoco-lite" / "materialized-presentation"
+    materialized.mkdir(parents=True, exist_ok=True)
+    (materialized / "LICENSE").write_text("Template MIT\n", encoding="utf-8")
+    return upstream
+
+
 class HugoCompatibilityTests(unittest.TestCase):
-    def test_framework_copy_and_template_roots_reject_symlinks(self) -> None:
+    def test_composition_and_template_roots_reject_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             external = root / "external"
@@ -40,11 +90,63 @@ class HugoCompatibilityTests(unittest.TestCase):
                     template_source,
                     root / "template-output",
                     site_data={},
-                    records={},
-                    route_for_record=lambda _pid: "",
                 )
 
-    def test_structured_site_data_renders_template_owned_surfaces(self) -> None:
+    def test_composition_uses_overlay_and_excludes_upstream_content_and_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+            _write_site_data(root)
+            presentation = _presentation(root)
+            for relative, value in (
+                ("content/german.md", "German editorial content\n"),
+                ("layouts/term.html", "upstream layout\n"),
+                ("static/upstream-identity.png", "branded image\n"),
+                ("static/graph.js", "/annex/objects/MD5E-s12--graph.js\n"),
+                ("layouts/.git/config", "must not ship\n"),
+            ):
+                path = presentation / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(value, encoding="utf-8")
+            materialized = (
+                root
+                / ".orinoco-lite/materialized-presentation/upstream/static/graph.js"
+            )
+            materialized.parent.mkdir(parents=True)
+            materialized.write_text("const graphClient = true;\n", encoding="utf-8")
+            assembly = root / "build/assembly"
+
+            site._assemble(
+                load_config_path(root / "orinoco.yaml"),
+                root / "runtime",
+                assembly,
+                presentation=presentation,
+            )
+
+            self.assertEqual(
+                (assembly / "layouts/term.html").read_text(encoding="utf-8"),
+                "upstream layout\n",
+            )
+            self.assertEqual(
+                (assembly / "static/graph.js").read_text(encoding="utf-8"),
+                "const graphClient = true;\n",
+            )
+            self.assertFalse((assembly / "content/german.md").exists())
+            self.assertFalse((assembly / "static/upstream-identity.png").exists())
+            self.assertFalse(any(path.name == ".git" for path in assembly.rglob("*")))
+
+            materialized.unlink()
+            with self.assertRaisesRegex(
+                DriverError, "Materialized presentation assets are missing"
+            ):
+                site._assemble(
+                    load_config_path(root / "orinoco.yaml"),
+                    root / "runtime",
+                    root / "build/unmaterialized",
+                    presentation=presentation,
+                )
+
+    def test_site_data_renders_adapters_and_upstream_section_policy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = root / "orinoco.yaml"
@@ -52,7 +154,6 @@ class HugoCompatibilityTests(unittest.TestCase):
                 CONFIG
                 + "paths:\n"
                 + "  editorial: site-specific/content/pages\n"
-                + "  framework: .orinoco-lite/site\n"
                 + "  records: site-specific/metadata/records\n"
                 + "  site: site-specific\n",
                 encoding="utf-8",
@@ -64,7 +165,8 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "record_prefix: 'example:'\n"
                 "identity:\n"
                 "  title: Example Site\n"
-                "  description: Structured example\n",
+                "  description: Structured example\n"
+                "  base_url: https://example.invalid/example/\n",
                 encoding="utf-8",
             )
             (site_root / "projection-templates").mkdir()
@@ -104,41 +206,48 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "formatted_name: Example Project\n",
                 encoding="utf-8",
             )
-            framework = root / ".orinoco-lite/site"
-            (framework / "config-templates").mkdir(parents=True)
-            (framework / "content-templates/section").mkdir(parents=True)
-            (framework / "static-templates").mkdir(parents=True)
-            (framework / "config-templates/hugo.toml.j2").write_text(
+            adapter = root / ".orinoco-lite/presentation"
+            (adapter / "config-templates").mkdir(parents=True)
+            (adapter / "static-templates").mkdir(parents=True)
+            (adapter / "config-templates/hugo.toml.j2").write_text(
                 "title = {{ site.identity.title | json_string }}\n",
                 encoding="utf-8",
             )
-            (framework / "content-templates/section/_index.md.j2").write_text(
-                "---\ntitle: {{ site.identity.title }}\n---\n"
-                "[{{ record_label('example:projects/example') }}]"
-                "({{ record_ref('example:projects/example') }})\n",
-                encoding="utf-8",
-            )
-            (framework / "static-templates/site.webmanifest.j2").write_text(
+            (adapter / "static-templates/site.webmanifest.j2").write_text(
                 '{"name": {{ site.identity.title | json_string }}}\n',
                 encoding="utf-8",
             )
             assembly = root / "build/assembly"
             workspace = load_config_path(config)
+            presentation = _presentation(root)
+            section = presentation / "content/section/_index.md"
+            section.parent.mkdir(parents=True)
+            section.write_text(
+                "---\n"
+                "title: Upstream Section\n"
+                "params:\n"
+                "  filter: true\n"
+                "---\n\n"
+                "German upstream editorial body.\n",
+                encoding="utf-8",
+            )
 
-            site._assemble(workspace, root / "runtime", assembly)
+            site._assemble(
+                workspace,
+                root / "runtime",
+                assembly,
+                presentation=presentation,
+            )
 
             self.assertEqual(
                 'title = "Example Site"\n',
                 (assembly / "config/con/hugo.toml").read_text(encoding="utf-8"),
             )
-            self.assertIn(
-                "title: Example Site",
-                (assembly / "content/section/_index.md").read_text(encoding="utf-8"),
+            section_output = (assembly / "content/section/_index.md").read_text(
+                encoding="utf-8"
             )
-            self.assertIn(
-                "[Example Project]({{< ref \"/projects/example\" >}})",
-                (assembly / "content/section/_index.md").read_text(encoding="utf-8"),
-            )
+            self.assertIn("filter: true", section_output)
+            self.assertNotIn("German upstream editorial body", section_output)
             self.assertEqual(
                 '{"name": "Example Site"}\n',
                 (assembly / "static/site.webmanifest").read_text(encoding="utf-8"),
@@ -151,7 +260,6 @@ class HugoCompatibilityTests(unittest.TestCase):
             config.write_text(
                 CONFIG
                 + "paths:\n"
-                + "  framework: .orinoco-lite/site\n"
                 + "  records: site-specific/metadata/records\n"
                 + "  site: site-specific\n",
                 encoding="utf-8",
@@ -165,7 +273,8 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "record_prefix: 'wrong:'\n"
                 "identity:\n"
                 "  title: Example Site\n"
-                "  description: Structured example\n",
+                "  description: Structured example\n"
+                "  base_url: https://example.invalid/example/\n",
                 encoding="utf-8",
             )
             for relative in ("homepage.md.j2", "project.md.j2"):
@@ -192,15 +301,17 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "  relationship_fields: []\n",
                 encoding="utf-8",
             )
-            framework = root / ".orinoco-lite/site/content-templates"
-            framework.mkdir(parents=True)
-            (framework / "_index.md.j2").write_text("home\n", encoding="utf-8")
+            adapter = root / ".orinoco-lite/presentation"
+            templates = adapter / "content-templates"
+            templates.mkdir(parents=True)
+            (templates / "_index.md.j2").write_text("home\n", encoding="utf-8")
             workspace = load_config_path(config)
 
             with self.assertRaisesRegex(ConfigurationError, "record_prefix"):
                 site._render_site_surfaces(
                     workspace,
-                    root / ".orinoco-lite/site",
+                    adapter,
+                    _presentation(root),
                     root / "build/assembly",
                 )
 
@@ -217,10 +328,16 @@ class HugoCompatibilityTests(unittest.TestCase):
             source = root / "site-specific/static/example.txt"
             source.parent.mkdir(parents=True)
             source.write_text("static\n", encoding="utf-8")
+            _write_site_data(root)
             assembly = root / "build/assembly"
             workspace = load_config_path(config)
 
-            site._assemble(workspace, root / "runtime", assembly)
+            site._assemble(
+                workspace,
+                root / "runtime",
+                assembly,
+                presentation=_presentation(root),
+            )
             self.assertEqual(
                 (assembly / "static/example.txt").read_text(encoding="utf-8"),
                 "static\n",
@@ -231,9 +348,10 @@ class HugoCompatibilityTests(unittest.TestCase):
             root = Path(temporary)
             config = root / "orinoco.yaml"
             config.write_text(CONFIG, encoding="utf-8")
-            framework = root / ".orinoco-lite/site/layouts"
-            framework.mkdir(parents=True)
-            (framework / "term.html").write_text("template\n", encoding="utf-8")
+            _write_site_data(root)
+            adapter = root / ".orinoco-lite/presentation/layouts"
+            adapter.mkdir(parents=True)
+            (adapter / "term.html").write_text("template\n", encoding="utf-8")
             override = root / "site-specific/overrides/layouts/term.html"
             override.parent.mkdir(parents=True)
             override.write_text("downstream\n", encoding="utf-8")
@@ -242,7 +360,12 @@ class HugoCompatibilityTests(unittest.TestCase):
             forbidden.write_text("extension\n", encoding="utf-8")
             assembly = root / "build/assembly"
 
-            site._assemble(load_config_path(config), root / "runtime", assembly)
+            site._assemble(
+                load_config_path(config),
+                root / "runtime",
+                assembly,
+                presentation=_presentation(root),
+            )
 
             self.assertEqual(
                 "downstream\n",
@@ -286,6 +409,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             root = Path(temporary)
             config = root / "orinoco.yaml"
             config.write_text(CONFIG, encoding="utf-8")
+            _write_site_data(root)
             runtime = root / "runtime"
             adapter = runtime / "drivers" / "adapt_pages.py"
             adapter.parent.mkdir(parents=True)
@@ -364,6 +488,36 @@ class HugoCompatibilityTests(unittest.TestCase):
                 )
                 self.assertEqual(str(version), "0.154.5")
 
+    def test_site_adapter_prefers_explicit_engine_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime_adapter = root / "runtime/drivers/adapt_pages.py"
+            runtime_adapter.parent.mkdir(parents=True)
+            runtime_adapter.write_text("# released\n", encoding="utf-8")
+            candidate_adapter = root / "engine/tools/adapt_upstream_pages.py"
+            candidate_adapter.parent.mkdir(parents=True)
+            candidate_adapter.write_text("# candidate\n", encoding="utf-8")
+
+            with patch.object(
+                site, "development_engine_root", return_value=root / "engine"
+            ):
+                self.assertEqual(
+                    site._site_adapter(root / "runtime"), candidate_adapter
+                )
+            with patch.object(site, "development_engine_root", return_value=None):
+                self.assertEqual(
+                    site._site_adapter(root / "runtime"), runtime_adapter
+                )
+
+    def test_site_adapter_requires_candidate_driver(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(
+                site, "development_engine_root", return_value=root / "engine"
+            ):
+                with self.assertRaisesRegex(IntegrityError, "no site adapter"):
+                    site._site_adapter(root / "runtime")
+
     def test_unsupported_or_malformed_hugo_is_rejected(self) -> None:
         cases = (
             (
@@ -400,6 +554,7 @@ class HugoCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+            _write_site_data(root)
             destination = root / "build" / "site"
             destination.mkdir(parents=True)
             (destination / "index.html").write_text("existing\n", encoding="utf-8")

@@ -71,7 +71,10 @@ def _git_commit(root: Path) -> str:
     return value
 
 
-def record_catalog(workspace: WorkspaceConfig) -> dict[str, Any]:
+def record_catalog(
+    workspace: WorkspaceConfig,
+    presentation_root: Path | None = None,
+) -> dict[str, Any]:
     """Return coordinates for records editable under the projection plan."""
 
     # Import here so projection and editor can share record loading without a
@@ -79,7 +82,7 @@ def record_catalog(workspace: WorkspaceConfig) -> dict[str, Any]:
     # filesystem category.
     from .projection import load_contract
 
-    contract = load_contract(workspace)
+    contract = load_contract(workspace, presentation_root)
     editable_classes = set(contract.pages) | set(contract.graph_node_classes)
 
     records = [
@@ -228,6 +231,7 @@ def bind_editor(
     repository: str | None = None,
     service_origin: str | None = None,
 ) -> dict[str, Any]:
+    from .presentation import resolve_presentation
     from .projection import load_contract
 
     candidate_shell = development_editor_shell()
@@ -247,9 +251,12 @@ def bind_editor(
             raise DriverError(f"Runtime editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    contract = load_contract(workspace)
+    presentation_root = None
+    if not (workspace.path("site") / "projection.yaml").is_file():
+        presentation_root = resolve_presentation(workspace.root, runtime_root)
+    contract = load_contract(workspace, presentation_root)
     all_sources = record_sources(workspace)
-    catalog = record_catalog(workspace)
+    catalog = record_catalog(workspace, presentation_root)
     if contract.editor_record_scope == "editable":
         editable_pids = {entry["pid"] for entry in catalog["records"]}
         sources = [source for source in all_sources if source["pid"] in editable_pids]
@@ -393,7 +400,12 @@ def validate_bundle(
     runtime_root: Path,
     bundle: Mapping[str, Any],
 ) -> dict[Path, str]:
-    catalog = record_catalog(workspace)
+    from .presentation import resolve_presentation
+
+    presentation_root = None
+    if not (workspace.path("site") / "projection.yaml").is_file():
+        presentation_root = resolve_presentation(workspace.root, runtime_root)
+    catalog = record_catalog(workspace, presentation_root)
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")
     by_pid = {entry["pid"]: entry for entry in catalog["records"]}
