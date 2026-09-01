@@ -64,7 +64,7 @@ Keeping all declarative website inputs and overrides in `site-specific/` gives w
 
 Git Annex is confined to maintainer repinning.
 Required assets are part of the selected upstream functionality rather than a feature-specific allowlist.
-The repinning workflow hydrates and verifies required Annex-backed content against the selected Git state and copies only the redistributable payloads needed by downstream runtime into the template overlay as ordinary files.
+The repinning workflow hydrates and verifies required Annex-backed content against the selected Git state and copies the payloads needed by downstream runtime into a bounded licensed template overlay as ordinary files.
 The selected repositories and their Git and Git Annex state are the provenance; runtime and template configuration do not duplicate information that tooling can derive from them.
 
 Downstream source-adapter tasks use DataLad to capture run-commit provenance.

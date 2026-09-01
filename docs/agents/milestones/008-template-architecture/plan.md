@@ -44,9 +44,8 @@ Extension code and runtime products are neither loaded during website compositio
 - Generated projections, static sites, caches, and Copier renderings remain untracked build products.
 The template publication branch may contain its exact rendered distribution tree because that branch is itself a distribution product.
 
-The German website currently states no explicit redistribution license.
 Do not copy it wholesale.
-A bounded artifact may enter the template overlay only when its independent redistribution basis and required notices have been established.
+Keep required materialized artifacts in a bounded template overlay that carries a license and applicable notices.
 
 ## Implementation
 
@@ -62,10 +61,10 @@ Candidate development may use an explicit local exact checkout without changing 
 ### Carry required upstream assets
 
 Required assets are part of retained upstream functionality automatically; do not maintain a feature-specific allowlist.
-Maintainer repinning derives the required Annex-backed content from the selected upstream state, hydrates and verifies it, and copies redistributable payloads needed by downstream runtime into the template overlay as ordinary files.
+Maintainer repinning derives the required Annex-backed content from the selected upstream state, hydrates and verifies it, and copies payloads needed by downstream runtime into the licensed template overlay as ordinary files.
 A Pixi task may report precise Git and Git Annex information when useful, but its output is derived evidence rather than another tracked source of truth.
 
-Failure to hydrate, verify, license, or match any asset required by retained upstream functionality blocks the repin.
+Failure to hydrate, verify, or match any asset required by retained upstream functionality blocks the repin.
 Do not remove or replace upstream behavior, import upstream site data, or introduce Git Annex into a downstream to make the build pass.
 
 ### Keep the template thin
@@ -92,9 +91,9 @@ Website composition must not import extension code or copy extension files, cach
 
 ### Prove the composition
 
+Use the smallest relevant check for each important boundary rather than creating a persistent proof framework.
 The engineering candidate task creates a fresh disposable Copier instance, injects compact mock downstream inputs, and tests selected engine and template working trees together.
-Assertions cover contracts and observable behavior rather than comparison with a checked-in rendered website.
-The proof must exercise the maintainer materialization boundary, DataLad-recorded source-adapter execution, downstream builds without Git Annex, and retained upstream behavior with its required assets.
+Focused checks cover observable behavior and major failure boundaries rather than comparison with a checked-in rendered website or exhaustive restatement of this plan.
 
 ## Acceptance criteria
 
@@ -107,7 +106,7 @@ Milestone 8 is complete when:
 - DataLad records source-adapter run provenance while downstream website and adapter tasks require no Git Annex;
 - a missing required asset blocks repinning rather than removing upstream behavior or publishing an Annex pointer;
 - downstream metadata builds the expected static website without German records, identifiers, editorial content, or site-specific assets leaking into it;
-- quick, full, and CI candidate runs pass against the engine and template working trees using disposable renders and behavioral assertions;
+- a fresh candidate run passes against the engine and template working trees using a disposable render and focused behavioral assertions;
 - a verified cached dependency supports an offline repeat build;
 - the template publication branch is produced directly from the validated ephemeral render; and
 - after reviewed engine and template releases, the reference downstream update is proposed through its normal human-review gate.

@@ -16,8 +16,14 @@ from orinoco_lite.config import (
 
 CONFIG = """\
 contract_version: 2
-site:
-  name: Test Orinoco downstream
+"""
+
+
+SITE_DATA = """\
+version: 1
+identity:
+  title: Test Orinoco downstream
+  description: A configuration fixture.
   base_url: https://example.invalid/test-site/
 """
 
@@ -43,6 +49,10 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
         (self.root / "orinoco.lock").write_text(LOCK, encoding="utf-8")
+        (self.root / "site-specific").mkdir()
+        (self.root / "site-specific/site.yaml").write_text(
+            SITE_DATA, encoding="utf-8"
+        )
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -50,6 +60,12 @@ class WorkspaceConfigTests(unittest.TestCase):
     def test_defaults_resolve_relative_to_consumer(self) -> None:
         workspace = load_workspace(self.root)
         self.assertEqual(workspace.site_name, "Test Orinoco downstream")
+        self.assertEqual(workspace.base_url, "https://example.invalid/test-site/")
+        self.assertEqual(
+            workspace.site_data["identity"]["description"],
+            "A configuration fixture.",
+        )
+        self.assertNotIn("site", workspace.raw)
         self.assertEqual(
             workspace.path("records").resolve(),
             (self.root / "site-specific/metadata/records").resolve(),
@@ -59,18 +75,11 @@ class WorkspaceConfigTests(unittest.TestCase):
             (self.root / "site-specific").resolve(),
         )
         self.assertEqual(
-            workspace.path("framework").resolve(),
-            (self.root / ".orinoco-lite/site").resolve(),
-        )
-        self.assertEqual(
             workspace.environment()["ORINOCO_RECORDS_ROOT"],
             str((self.root / "site-specific/metadata/records").resolve()),
         )
         self.assertNotIn("ORINOCO_SOURCE_ADAPTERS_ROOT", workspace.environment())
-        self.assertEqual(
-            workspace.environment()["ORINOCO_FRAMEWORK_ROOT"],
-            str((self.root / ".orinoco-lite/site").resolve()),
-        )
+        self.assertNotIn("ORINOCO_FRAMEWORK_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_CANONICAL_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_REFERENCE_ROOT", workspace.environment())
         self.assertNotIn("ORINOCO_INTEGRATIONS_ROOT", workspace.environment())
@@ -99,10 +108,7 @@ class WorkspaceConfigTests(unittest.TestCase):
         for extra, repository, service in sites:
             with self.subTest(extra=extra):
                 (self.root / "orinoco.yaml").write_text(
-                    CONFIG.replace(
-                        "  base_url: https://example.invalid/test-site/\n",
-                        "  base_url: https://example.invalid/test-site/\n" + extra,
-                    ),
+                    CONFIG + "site:\n" + extra,
                     encoding="utf-8",
                 )
 
@@ -151,12 +157,10 @@ class WorkspaceConfigTests(unittest.TestCase):
         for configured, expected in origins:
             with self.subTest(origin=configured):
                 (self.root / "orinoco.yaml").write_text(
-                    CONFIG.replace(
-                        "  base_url: https://example.invalid/test-site/\n",
-                        "  base_url: https://example.invalid/test-site/\n"
-                        "  repository: ORINOCO-Lite/example-site\n"
-                        f"  curation_service: {configured}\n",
-                    ),
+                    CONFIG
+                    + "site:\n"
+                    + "  repository: ORINOCO-Lite/example-site\n"
+                    + f"  curation_service: {configured}\n",
                     encoding="utf-8",
                 )
 
@@ -189,10 +193,7 @@ class WorkspaceConfigTests(unittest.TestCase):
         for extra in invalid_sites:
             with self.subTest(extra=extra):
                 (self.root / "orinoco.yaml").write_text(
-                    CONFIG.replace(
-                        "  base_url: https://example.invalid/test-site/\n",
-                        "  base_url: https://example.invalid/test-site/\n" + extra,
-                    ),
+                    CONFIG + "site:\n" + extra,
                     encoding="utf-8",
                 )
                 with self.assertRaises(ConfigurationError):
@@ -205,12 +206,13 @@ class WorkspaceConfigTests(unittest.TestCase):
         )
         exact_name = "r" * 233
         (self.root / "orinoco.yaml").write_text(
-            CONFIG.replace(
-                "  name: Test Orinoco downstream\n",
-                f"  name: {exact_name}\n",
-            ).replace(
-                "  base_url: https://example.invalid/test-site/\n",
-                "  base_url: https://example.invalid/test-site/\n" + configured,
+            CONFIG + "site:\n" + configured,
+            encoding="utf-8",
+        )
+        (self.root / "site-specific/site.yaml").write_text(
+            SITE_DATA.replace(
+                "  title: Test Orinoco downstream\n",
+                f"  title: {exact_name}\n",
             ),
             encoding="utf-8",
         )
@@ -224,24 +226,40 @@ class WorkspaceConfigTests(unittest.TestCase):
         )
         for invalid_name in invalid_names:
             with self.subTest(name=invalid_name):
-                (self.root / "orinoco.yaml").write_text(
-                    CONFIG.replace(
-                        "  name: Test Orinoco downstream\n",
-                        f"  name: {invalid_name}\n",
-                    ).replace(
-                        "  base_url: https://example.invalid/test-site/\n",
-                        "  base_url: https://example.invalid/test-site/\n"
-                        + configured,
+                (self.root / "site-specific/site.yaml").write_text(
+                    SITE_DATA.replace(
+                        "  title: Test Orinoco downstream\n",
+                        f"  title: {invalid_name}\n",
                     ),
                     encoding="utf-8",
                 )
-                with self.assertRaisesRegex(ConfigurationError, "site.name"):
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    r"site-specific/site\.yaml identity\.title",
+                ):
                     load_workspace(self.root)
 
     def test_nearest_ancestor_discovers_workspace(self) -> None:
         nested = self.root / "metadata" / "records"
         nested.mkdir(parents=True)
         self.assertEqual(find_workspace_root(nested), self.root.resolve())
+
+    def test_public_identity_is_owned_only_by_site_specific_data(self) -> None:
+        for field, value in (
+            ("name", "Legacy name"),
+            ("description", "Legacy description"),
+            ("base_url", "https://example.invalid/legacy/"),
+        ):
+            with self.subTest(field=field):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG + f"site:\n  {field}: {value}\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    r"public site identity.*site-specific/site\.yaml",
+                ):
+                    load_workspace(self.root)
 
     def test_paths_cannot_escape_or_collide(self) -> None:
         (self.root / "orinoco.yaml").write_text(
@@ -294,27 +312,13 @@ class WorkspaceConfigTests(unittest.TestCase):
             load_workspace(self.root)
 
     def test_removed_path_names_are_not_accepted_as_aliases(self) -> None:
-        for name in ("canonical", "reference", "integrations"):
+        for name in ("assets", "canonical", "reference", "integrations"):
             with self.subTest(name=name):
                 (self.root / "orinoco.yaml").write_text(
                     CONFIG + f"paths:\n  {name}: legacy\n", encoding="utf-8"
                 )
                 with self.assertRaisesRegex(ConfigurationError, "unknown path keys"):
                     load_workspace(self.root)
-
-    def test_retired_assets_path_only_accepts_site_static(self) -> None:
-        (self.root / "orinoco.yaml").write_text(
-            CONFIG + "paths:\n  site: site-specific\n  assets: site-specific/static\n",
-            encoding="utf-8",
-        )
-        self.assertNotIn("assets", load_workspace(self.root).paths)
-
-        (self.root / "orinoco.yaml").write_text(
-            CONFIG + "paths:\n  site: site-specific\n  assets: external-assets\n",
-            encoding="utf-8",
-        )
-        with self.assertRaisesRegex(ConfigurationError, "Retired paths.assets"):
-            load_workspace(self.root)
 
     def test_version_one_contract_is_rejected(self) -> None:
         (self.root / "orinoco.yaml").write_text(

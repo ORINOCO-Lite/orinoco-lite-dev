@@ -29,8 +29,13 @@ from orinoco_lite.errors import ConfigurationError, DriverError
 
 CONFIG = """\
 contract_version: 2
-site:
-  name: Editor fixture
+"""
+
+SITE_DATA = """\
+version: 1
+identity:
+  title: Editor fixture
+  description: An editor fixture.
   base_url: https://example.invalid/editor/
 """
 
@@ -61,6 +66,9 @@ class EditorBundleTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
+        (self.root / "site-specific/site.yaml").write_text(
+            SITE_DATA, encoding="utf-8"
+        )
         (self.root / "site-specific/projection-templates/person.md.j2").write_text(
             "{{ display_label }}\n", encoding="utf-8"
         )

@@ -101,14 +101,6 @@ class UpstreamStackContractTests(unittest.TestCase):
             tasks["refresh-upstream-records"],
             "python tools/prepare_upstream_snapshot.py --refresh",
         )
-        self.assertEqual(
-            tasks["instantiate-upstream-orinoco"]["depends-on"],
-            ["prepare-upstream-orinoco-presentation"],
-        )
-        self.assertEqual(
-            tasks["check-upstream-orinoco"]["depends-on"],
-            ["instantiate-upstream-orinoco"],
-        )
         source = (ROOT / "tools" / "upstream_full.py").read_text()
         self.assertIn("[tool.pixi.pypi-dependencies]", source)
         self.assertIn(
@@ -126,16 +118,12 @@ class UpstreamStackContractTests(unittest.TestCase):
         ):
             self.assertIn(f"name: {package}\n  version: {version}", lock)
 
-    def test_snapshot_is_materialized_once_for_both_runtime_paths(self) -> None:
+    def test_snapshot_is_materialized_for_snapshot_and_full_stack_tasks(self) -> None:
         preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()
         full_stack = (ROOT / "tools" / "prepare_upstream_stack.py").read_text()
-        fixture = (ROOT / "tools" / "upstream_orinoco.py").read_text()
         for source in (preparation, full_stack):
             self.assertIn("upstream_snapshot.materialize", source)
             self.assertIn("upstream_snapshot.export_records", source)
-        self.assertIn("ORINOCO_RECORDS", fixture)
-        self.assertIn("copy_regular_tree(ORINOCO_RECORDS", fixture)
-        self.assertIn('git\", \"init\", \"--initial-branch\", \"main\"', fixture)
 
     def test_direct_scripts_do_not_depend_on_the_tools_namespace(self) -> None:
         for relative in (

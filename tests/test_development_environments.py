@@ -16,8 +16,6 @@ MANIFEST = ROOT / "pixi.toml"
 SCRIPT = ROOT / "tools" / "upstream_static.py"
 SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
-ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "upstream_orinoco.py.pixi.lock"
-CHECK_ORINOCO_SCRIPT_LOCK = ROOT / "tools" / "check_upstream_orinoco.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
@@ -76,10 +74,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(lock["version"], 7)
         self.assertEqual(set(lock["environments"]), {"default"})
         self.assertTrue(FULL_SCRIPT_LOCK.is_file())
-        self.assertTrue(ORINOCO_SCRIPT_LOCK.is_file())
-        self.assertTrue(CHECK_ORINOCO_SCRIPT_LOCK.is_file())
 
-    def test_ci_tasks_require_every_compatibility_fixture(self) -> None:
+    def test_ci_tasks_require_engine_and_development_contracts(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
         self.assertEqual(
             tasks["test-engine-strict"],
@@ -316,11 +312,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             if item.startswith("things-enrichment-tools @ ")
         )
         self.assertTrue(dependency.endswith(f"@{enrichment_gitlink}"))
-        for lock_path in (ROOT / "pixi.lock", CHECK_ORINOCO_SCRIPT_LOCK):
-            self.assertIn(
-                enrichment_gitlink,
-                lock_path.read_text(encoding="utf-8"),
-            )
+        self.assertIn(
+            enrichment_gitlink,
+            (ROOT / "pixi.lock").read_text(encoding="utf-8"),
+        )
 
     def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -347,8 +342,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         for script in (
             "tools/upstream_static.py",
             "tools/upstream_full.py",
-            "tools/upstream_orinoco.py",
-            "tools/check_upstream_orinoco.py",
         ):
             self.assertIn(f"pixi lock --script {script} --check", workflow)
         fixture = workflow.index("Check out the template candidate")

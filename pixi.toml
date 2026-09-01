@@ -10,7 +10,7 @@ python = ">=3.12,<3.13"
 [tasks]
 test-engine = "python tools/run_unittests.py --discover packages/orinoco-lite/tests"
 test-engine-strict = "python tools/run_unittests.py --fail-on-skip --discover packages/orinoco-lite/tests"
-test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_downstream_development tests.test_pages_publication tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_upstream_orinoco tests.test_adapt_upstream_pages -v"
+test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_downstream_development tests.test_materialize_presentation_assets tests.test_pages_publication tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_adapt_upstream_pages -v"
 test = { depends-on = ["test-engine", "test-development"] }
 test-ci = { depends-on = ["test-engine-strict", "test-development"] }
 checkout-submodules = "python tools/checkout_submodules.py"
@@ -29,10 +29,7 @@ test-template-candidate-full = "python tools/run_template_candidate.py full"
 diff-upstream-pool = "python tools/upstream_pool_diff.py"
 snapshot-upstream-records = "python tools/prepare_upstream_snapshot.py"
 refresh-upstream-records = "python tools/prepare_upstream_snapshot.py --refresh"
-prepare-upstream-orinoco-presentation = { depends-on = ["snapshot-upstream-records"], cmd = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build' }
-instantiate-upstream-orinoco = { depends-on = ["prepare-upstream-orinoco-presentation"], cmd = '"$PIXI_EXE" run --frozen --script tools/upstream_orinoco.py instantiate --replace' }
-check-upstream-orinoco = { depends-on = ["instantiate-upstream-orinoco"], cmd = '"$PIXI_EXE" run --frozen --script tools/check_upstream_orinoco.py' }
-serve-upstream-orinoco = { depends-on = ["check-upstream-orinoco"], cmd = '"$PIXI_EXE" run --frozen --manifest-path build/upstream-orinoco-site/pixi.toml serve' }
+materialize-presentation-assets = '"$PIXI_EXE" run --frozen --script tools/materialize_presentation_assets.py'
 format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
 install-hooks = { cmd = "git config core.hooksPath .githooks" }
 check-format = { cmd = "pre-commit run --all-files" }

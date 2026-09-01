@@ -10,21 +10,19 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
-import yaml
 
-from .candidates import friendly_record_label
-from .config import github_repository, load_config_path
+from .config import development_engine_root, github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
-from .projection import load_contract, rendered_record_route
-from .records import stored_records
+from .projection import load_contract
+from .presentation import resolve_presentation
 from .review import bind_review
 from .runtime import MANIFEST_NAME, load_runtime_manifest
 
@@ -35,7 +33,24 @@ HUGO_VERSION = re.compile(
     r"(?P<variants>(?:\+[A-Za-z0-9.-]+)*)(?:\s|$)",
     re.IGNORECASE,
 )
-SITE_DATA_VERSION = 1
+PRESENTATION_SURFACES = (
+    "archetypes",
+    "assets",
+    "config",
+    "data",
+    "i18n",
+    "layouts",
+    "static",
+)
+SITE_IDENTITY_IMAGE_SUFFIXES = {
+    ".gif",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".svg",
+    ".webp",
+}
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
@@ -45,6 +60,8 @@ def _copy_tree(source: Path, destination: Path) -> None:
         return
     for candidate in sorted(source.rglob("*")):
         relative = candidate.relative_to(source)
+        if ".git" in relative.parts:
+            continue
         target = destination / relative
         if candidate.is_symlink():
             raise DriverError(f"Static source cannot contain symlinks: {candidate}")
@@ -55,31 +72,73 @@ def _copy_tree(source: Path, destination: Path) -> None:
             shutil.copyfile(candidate, target)
 
 
-def _site_data(workspace) -> dict[str, Any] | None:
-    """Load the optional structured site authority from the site-owned root."""
+def _copy_file(source: Path, destination: Path) -> None:
+    if not source.exists():
+        return
+    if source.is_symlink() or not source.is_file():
+        raise DriverError(f"Presentation source is not a regular file: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, destination)
 
-    path = workspace.path("site") / "site.yaml"
-    if not path.exists():
-        return None
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
-        raise ConfigurationError(f"Structured site data is not a regular file: {path}")
+
+def _is_annex_pointer(path: Path) -> bool:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
+        return False
     try:
-        value = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
-        raise ConfigurationError(f"Structured site data is invalid: {path}") from error
-    if not isinstance(value, dict) or value.get("version") != SITE_DATA_VERSION:
-        raise ConfigurationError(
-            f"Structured site data must be a version {SITE_DATA_VERSION} mapping"
+        value = path.read_text(encoding="utf-8").strip()
+    except UnicodeDecodeError:
+        return False
+    return value.startswith("/annex/objects/")
+
+
+def _reject_annex_pointers(root: Path) -> None:
+    pointers = [
+        path.relative_to(root).as_posix()
+        for path in sorted(root.rglob("*"))
+        if _is_annex_pointer(path)
+    ]
+    if pointers:
+        raise DriverError(
+            "Materialized presentation assets are missing for upstream Annex "
+            "content: " + ", ".join(pointers[:10])
         )
-    identity = value.get("identity")
-    if not isinstance(identity, dict):
-        raise ConfigurationError("Structured site data requires identity")
-    for field in ("title", "description"):
-        if not isinstance(identity.get(field), str) or not identity[field].strip():
-            raise ConfigurationError(
-                f"Structured site identity.{field} must be a non-empty string"
-            )
-    return value
+
+
+def _remove_upstream_identity_images(static_root: Path) -> None:
+    """Leave root-level site identity images to the theme or downstream."""
+
+    if not static_root.is_dir():
+        return
+    for path in static_root.iterdir():
+        if path.is_file() and path.suffix.lower() in SITE_IDENTITY_IMAGE_SUFFIXES:
+            path.unlink()
+
+
+def _copy_upstream_section_frontmatter(source: Path, destination: Path) -> None:
+    """Retain section presentation parameters without importing editorial bodies."""
+
+    if source.is_symlink():
+        raise DriverError(f"Upstream content root cannot be a symlink: {source}")
+    if not source.is_dir():
+        return
+    for path in sorted(source.glob("*/_index.md")):
+        if path.is_symlink() or not path.is_file():
+            raise DriverError(f"Upstream section metadata is not a file: {path}")
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        except UnicodeDecodeError as error:
+            raise DriverError(f"Upstream section metadata is not UTF-8: {path}") from error
+        if not lines or lines[0].strip() != "---":
+            raise DriverError(f"Upstream section has no YAML front matter: {path}")
+        closing = next(
+            (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
+            None,
+        )
+        if closing is None:
+            raise DriverError(f"Upstream section front matter is unclosed: {path}")
+        target = destination / path.parent.name / "_index.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("".join(lines[: closing + 1]).rstrip() + "\n", encoding="utf-8")
 
 
 def _render_template_tree(
@@ -87,13 +146,11 @@ def _render_template_tree(
     destination: Path,
     *,
     site_data: dict[str, Any],
-    records: dict[str, dict[str, Any]],
-    route_for_record: Callable[[str], str],
 ) -> None:
-    """Render one template-owned tree from structured site data."""
+    """Render one small presentation-adapter tree from structured site data."""
 
     if source.is_symlink():
-        raise DriverError(f"Framework template root cannot be a symlink: {source}")
+        raise DriverError(f"Presentation template root cannot be a symlink: {source}")
     if not source.is_dir():
         return
     environment = Environment(
@@ -106,32 +163,14 @@ def _render_template_tree(
         value, ensure_ascii=False
     )
 
-    def record_label(pid: str) -> str:
-        value = records.get(pid)
-        if value is None:
-            raise DriverError(f"Structured site data references an unknown PID: {pid}")
-        return friendly_record_label(value, pid)
-
-    def record_route(pid: str) -> str:
-        route = route_for_record(pid)
-        return "/" if not route else f"/{route}"
-
-    def record_ref(pid: str) -> str:
-        return '{{< ref "' + record_route(pid) + '" >}}'
-
-    environment.globals.update(
-        record_label=record_label,
-        record_ref=record_ref,
-        record_route=record_route,
-    )
     for path in sorted(source.rglob("*")):
         if path.is_symlink():
-            raise DriverError(f"Framework template cannot be a symlink: {path}")
+            raise DriverError(f"Presentation template cannot be a symlink: {path}")
         if path.is_dir():
             continue
         if not path.is_file() or path.suffix != ".j2":
             raise DriverError(
-                f"Framework template tree contains unsupported content: {path}"
+                f"Presentation template tree contains unsupported content: {path}"
             )
         relative = path.relative_to(source)
         target = destination / relative.with_suffix("")
@@ -141,40 +180,34 @@ def _render_template_tree(
                 site=site_data
             )
         except Exception as error:
-            raise DriverError(f"Could not render framework template {path}: {error}") from error
+            raise DriverError(
+                f"Could not render presentation template {path}: {error}"
+            ) from error
         target.write_text(rendered, encoding="utf-8")
 
 
-def _render_site_surfaces(workspace, framework: Path, assembly: Path) -> None:
-    site_data = _site_data(workspace)
-    if site_data is None:
-        return
-    records = {
-        value["pid"]: value
-        for value in stored_records(workspace)
-        if isinstance(value, dict) and isinstance(value.get("pid"), str)
-    }
-    projection = load_contract(workspace)
+def _render_site_surfaces(
+    workspace,
+    adapter: Path,
+    presentation_root: Path,
+    assembly: Path,
+) -> None:
+    site_data = workspace.site_data
+    projection = load_contract(workspace, presentation_root)
     record_prefix = site_data.get("record_prefix", projection.route_prefix)
     if record_prefix != projection.route_prefix:
         raise ConfigurationError(
             "Structured site record_prefix must match projection routing.strip_prefix"
         )
 
-    def route_for_record(pid: str) -> str:
-        return rendered_record_route(pid, projection, records)
-
     for source_name, destination in (
         ("config-templates", assembly / "config" / "con"),
-        ("content-templates", assembly / "content"),
         ("static-templates", assembly / "static"),
     ):
         _render_template_tree(
-            framework / source_name,
+            adapter / source_name,
             destination,
             site_data=site_data,
-            records=records,
-            route_for_record=route_for_record,
         )
 
 
@@ -188,26 +221,57 @@ def _safe_destination(workspace, destination: Path) -> Path:
     return resolved
 
 
-def _assemble(workspace, runtime_root: Path, assembly: Path) -> None:
-    framework = workspace.path("framework")
-    if not framework.is_dir():
-        framework = workspace.path("site") / "framework"
-    for name in (
-        "archetypes",
-        "assets",
-        "config",
-        "content",
-        "layouts",
-        "static",
-        "themes",
-    ):
-        _copy_tree(framework / name, assembly / name)
+def _assemble(
+    workspace,
+    runtime_root: Path,
+    assembly: Path,
+    *,
+    presentation: Path | None = None,
+) -> None:
+    presentation = presentation or resolve_presentation(workspace.root, runtime_root)
+    upstream = presentation
+    theme = upstream / "themes" / "congo"
+    adapter = workspace.root / ".orinoco-lite" / "presentation"
+    materialized = (
+        workspace.root
+        / ".orinoco-lite"
+        / "materialized-presentation"
+        / "upstream"
+    )
+
+    for name in PRESENTATION_SURFACES:
+        _copy_tree(theme / name, assembly / "themes" / "congo" / name)
+    _copy_file(theme / "theme.toml", assembly / "themes" / "congo" / "theme.toml")
+    _copy_file(
+        theme / "LICENSE",
+        assembly / "static" / "LICENSES" / "congo-MIT.txt",
+    )
+
+    for name in PRESENTATION_SURFACES:
+        _copy_tree(upstream / name, assembly / name)
+        _copy_tree(materialized / name, assembly / name)
+        if name == "static":
+            _remove_upstream_identity_images(assembly / "static")
+        _copy_tree(adapter / name, assembly / name)
+    _copy_upstream_section_frontmatter(upstream / "content", assembly / "content")
+
+    materialized_license = materialized.parent / "LICENSE"
+    if not materialized_license.is_file():
+        raise DriverError(
+            "The materialized presentation overlay has no LICENSE: "
+            f"{materialized_license}"
+        )
+    _copy_file(
+        materialized_license,
+        assembly / "static" / "LICENSES" / "materialized-presentation.txt",
+    )
+
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
     # Copying that topology-only file would disable Hugo's implicit mounts and
     # point at paths that no longer exist inside the assembly.
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
-    _render_site_surfaces(workspace, framework, assembly)
+    _render_site_surfaces(workspace, adapter, upstream, assembly)
     overrides = workspace.path("site") / "overrides"
     _copy_tree(overrides / "config", assembly / "config" / "con")
     _copy_tree(overrides / "layouts", assembly / "layouts")
@@ -218,12 +282,15 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> None:
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
-    for name in (
-        "android-chrome-192x192.png",
-        "android-chrome-512x512.png",
-        "favicon.ico",
-    ):
-        (assembly / "static" / name).unlink(missing_ok=True)
+    _copy_file(
+        theme / "LICENSE",
+        assembly / "static" / "LICENSES" / "congo-MIT.txt",
+    )
+    _copy_file(
+        materialized_license,
+        assembly / "static" / "LICENSES" / "materialized-presentation.txt",
+    )
+    _reject_annex_pointers(assembly)
 
 
 def _manifest(root: Path) -> list[str]:
@@ -282,6 +349,18 @@ def _preflight_hugo(runtime_root: Path, *, cwd: Path) -> Version:
         str(manifest.compatibility["hugo"]),
         runtime_release=manifest.release,
     )
+
+
+def _site_adapter(runtime_root: Path) -> Path:
+    """Select the released adapter or explicitly enabled engine candidate."""
+
+    engine_root = development_engine_root()
+    if engine_root is None:
+        return runtime_root / "drivers" / "adapt_pages.py"
+    adapter = engine_root / "tools" / "adapt_upstream_pages.py"
+    if not adapter.is_file():
+        raise IntegrityError(f"Engine candidate has no site adapter: {adapter}")
+    return adapter
 
 
 def normalize_build_base_url(value: str) -> str:
@@ -365,20 +444,8 @@ def build_site(
         ],
         cwd=workspace.root,
     )
-    adapter = runtime_root / "drivers" / "adapt_pages.py"
+    adapter = _site_adapter(runtime_root)
     if adapter.is_file():
-        graph_script = destination / "graph.js"
-        # Historical annex pointers are not executable website resources.
-        # The generic fallback keeps graph pages functional without requiring
-        # git-annex and remains compatible with the adapter's fetch contract.
-        if graph_script.is_file():
-            graph_source = graph_script.read_text(encoding="utf-8").strip()
-            if graph_source.startswith("/annex/objects/"):
-                graph_script.write_text(
-                    "fetch('/graph.json').then(response => response.json())"
-                    ".then(data => { window.orinocoGraph = data; });\n",
-                    encoding="utf-8",
-                )
         _run(
             [
                 sys.executable,

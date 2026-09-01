@@ -30,6 +30,7 @@ from .annotations import (
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
 from .integrity import sha256_file
+from .presentation import resolve_presentation
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
 
@@ -119,9 +120,33 @@ class ProjectionContract:
     editor_record_scope: str
 
 
-def _relative(workspace: WorkspaceConfig, value: object, label: str) -> Path:
+def _relative(
+    workspace: WorkspaceConfig,
+    value: object,
+    label: str,
+    presentation_root: Path | None = None,
+) -> Path:
     if not isinstance(value, str) or not value or "\\" in value:
         raise ConfigurationError(f"{label} must be a repository-relative POSIX path")
+    if value.startswith("presentation:"):
+        if presentation_root is None:
+            raise ConfigurationError(
+                f"{label} requires the pinned presentation dependency"
+            )
+        value = value.removeprefix("presentation:")
+        relative = PurePosixPath(value)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.as_posix() != value
+        ):
+            raise ConfigurationError(f"{label} must be a normalized safe path")
+        path = presentation_root.joinpath(*relative.parts)
+        root = presentation_root.resolve()
+        resolved = path.resolve(strict=False)
+        if resolved != root and root not in resolved.parents:
+            raise ConfigurationError(f"{label} escapes the presentation root")
+        return path
     relative = PurePosixPath(value)
     if relative.is_absolute() or ".." in relative.parts or relative.as_posix() != value:
         raise ConfigurationError(f"{label} must be a normalized safe path")
@@ -133,8 +158,13 @@ def _relative(workspace: WorkspaceConfig, value: object, label: str) -> Path:
     return path
 
 
-def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
+def load_contract(
+    workspace: WorkspaceConfig,
+    presentation_root: Path | None = None,
+) -> ProjectionContract:
     path = workspace.path("site") / "projection.yaml"
+    if not path.exists():
+        path = Path(__file__).with_name("default_projection.yaml")
     try:
         value = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
@@ -233,7 +263,12 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
                 raise ConfigurationError(f"{label}.reverse_injections is malformed")
             normalized_reverse.append((item["from"], item["to"]))
         return RenderPolicy(
-            template=_relative(workspace, raw.get("template"), f"{label}.template"),
+            template=_relative(
+                workspace,
+                raw.get("template"),
+                f"{label}.template",
+                presentation_root,
+            ),
             select=select,
             inline=tuple(inline),
             reverse_injections=tuple(normalized_reverse),
@@ -251,7 +286,12 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         homepage=policy(homepage, "homepage"),
         pages=page_policies,
         unrendered_classes=frozenset(unrendered),
-        graph_producer=_relative(workspace, graph.get("producer"), "graph.producer"),
+        graph_producer=_relative(
+            workspace,
+            graph.get("producer"),
+            "graph.producer",
+            presentation_root,
+        ),
         graph_node_classes=frozenset(node_classes),
         relationship_fields=tuple(relationships),
         missing_reference_targets=references["missing_targets"],
@@ -266,6 +306,19 @@ def load_contract(workspace: WorkspaceConfig) -> ProjectionContract:
         if required.is_symlink() or not required.is_file():
             raise ConfigurationError(f"Projection input is missing: {required}")
     return contract
+
+
+def _presentation_root(
+    workspace: WorkspaceConfig,
+    runtime_root: Path,
+) -> Path | None:
+    """Resolve upstream only when the downstream uses the engine-owned contract."""
+
+    if not isinstance(workspace, WorkspaceConfig):
+        return None
+    if (workspace.path("site") / "projection.yaml").is_file():
+        return None
+    return resolve_presentation(workspace.root, runtime_root)
 
 
 def _nested_schema_types(value: Any) -> Iterable[str]:
@@ -516,8 +569,11 @@ def _records(
 def validate_semantics(
     workspace: WorkspaceConfig,
     runtime_root: Path,
+    presentation_root: Path | None = None,
 ) -> dict[str, Any]:
-    contract = load_contract(workspace)
+    if presentation_root is None:
+        presentation_root = _presentation_root(workspace, runtime_root)
+    contract = load_contract(workspace, presentation_root)
     schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
     records, record_pids = _records(workspace, schema)
     by_pid = {record["pid"]: record for record in records}
@@ -768,18 +824,26 @@ def _matches_policy(
     return links(record, {record["pid"]})
 
 
-def _projection_inputs(workspace: WorkspaceConfig, contract: ProjectionContract) -> list[Path]:
+def _projection_inputs(
+    workspace: WorkspaceConfig,
+    contract: ProjectionContract,
+) -> list[Path]:
     roots = [
         workspace.path("records"),
         contract.path,
-        workspace.path("site") / "projection-templates",
-        workspace.path("site") / "projection-tools",
+        contract.homepage.template.parent,
+        contract.graph_producer,
     ]
+    roots.extend(policy.template.parent for policy in contract.pages.values())
     annotations = annotation_root(workspace)
     if annotations.exists():
         roots.append(annotations)
+    workspace_root = workspace.root.resolve()
     paths: list[Path] = []
     for root in roots:
+        resolved_root = root.resolve()
+        if resolved_root != workspace_root and workspace_root not in resolved_root.parents:
+            continue
         if root.is_file():
             paths.append(root)
         elif root.is_dir():
@@ -885,12 +949,14 @@ def projection_manifest(
     runtime_root: Path,
     output: Path,
 ) -> str:
-    contract = load_contract(workspace)
+    presentation_root = _presentation_root(workspace, runtime_root)
+    contract = load_contract(workspace, presentation_root)
     lines: list[str] = []
     for path in _projection_inputs(workspace, contract):
-        lines.append(
-            f"{sha256_file(path)}  input:{path.relative_to(workspace.root).as_posix()}"
-        )
+        resolved = path.resolve()
+        workspace_root = workspace.root.resolve()
+        label = f"input:{resolved.relative_to(workspace_root).as_posix()}"
+        lines.append(f"{sha256_file(path)}  {label}")
     closure_digest = _schema_closure_digest(runtime_root)
     lines.append(f"{closure_digest}  pin:schema-closure@{closure_digest}")
     lines.append(
@@ -915,8 +981,9 @@ def render_projection(
     runtime_root: Path,
     output: Path,
 ) -> dict[str, Any]:
-    semantic = validate_semantics(workspace, runtime_root)
-    contract = load_contract(workspace)
+    presentation_root = _presentation_root(workspace, runtime_root)
+    semantic = validate_semantics(workspace, runtime_root, presentation_root)
+    contract = load_contract(workspace, presentation_root)
     records, record_pids = _records(workspace)
     schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
     machine_records, machine_pids = _records(workspace, schema)

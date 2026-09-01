@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import ipaddress
 from pathlib import Path, PurePosixPath
 import os
@@ -17,6 +17,7 @@ from .errors import ConfigurationError
 
 CONFIG_CONTRACT_VERSION = 2
 LOCK_CONTRACT_VERSION = 1
+SITE_DATA_VERSION = 1
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DRIVER_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$")
 GITHUB_REPOSITORY = re.compile(
@@ -32,7 +33,6 @@ DEFAULT_PATHS: dict[str, str] = {
     "provenance": ".orinoco-lite/provenance",
     "editorial": "site-specific/content",
     "site": "site-specific",
-    "framework": ".orinoco-lite/site",
     "generated": "generated",
     "extensions": "extensions",
     "build": "build",
@@ -43,7 +43,6 @@ DIRECTORY_PATHS = {
     "provenance",
     "editorial",
     "site",
-    "framework",
     "generated",
     "extensions",
     "build",
@@ -121,7 +120,8 @@ def _review_app_name(site_name: str) -> str:
 
     if not site_name or site_name != site_name.strip():
         raise ConfigurationError(
-            "orinoco.yaml site.name must be a non-empty unpadded string"
+            "site-specific/site.yaml identity.title must be a non-empty "
+            "unpadded string"
         )
     value = f"{site_name}{REVIEW_APP_NAME_SUFFIX}"
     if (
@@ -129,10 +129,52 @@ def _review_app_name(site_name: str) -> str:
         or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
     ):
         raise ConfigurationError(
-            "orinoco.yaml site.name must produce a one-line source-review "
-            "application name of at most 256 browser characters"
+            "site-specific/site.yaml identity.title must produce a one-line "
+            "source-review application name of at most 256 browser characters"
         )
     return value
+
+
+def _load_site_data(path: Path) -> dict[str, Any]:
+    """Load the declarative authority for public site identity."""
+
+    value = _load_mapping(path, "Site-specific data")
+    if value.get("version") != SITE_DATA_VERSION:
+        raise ConfigurationError(
+            f"site-specific/site.yaml version must be {SITE_DATA_VERSION}"
+        )
+    identity = value.get("identity")
+    if not isinstance(identity, dict):
+        raise ConfigurationError("site-specific/site.yaml requires identity")
+    normalized_identity = dict(identity)
+    for field in ("title", "description"):
+        item = identity.get(field)
+        if (
+            not isinstance(item, str)
+            or not item
+            or item != item.strip()
+            or any(ord(character) < 0x20 or ord(character) == 0x7F for character in item)
+        ):
+            raise ConfigurationError(
+                f"site-specific/site.yaml identity.{field} must be a non-empty "
+                "one-line string"
+            )
+        _browser_text_length(item)
+        normalized_identity[field] = item
+    base_url = _absolute_http_url(
+        identity.get("base_url"),
+        "site-specific/site.yaml identity.base_url",
+        https_only=False,
+    )
+    if urlsplit(base_url).query:
+        raise ConfigurationError(
+            "site-specific/site.yaml identity.base_url cannot contain a query"
+        )
+    normalized_identity["base_url"] = base_url.rstrip("/") + "/"
+    normalized = dict(value)
+    normalized["identity"] = normalized_identity
+    _review_app_name(normalized_identity["title"])
+    return normalized
 
 
 def _canonical_origin_host(hostname: str, label: str) -> str:
@@ -247,6 +289,7 @@ class WorkspaceConfig:
     paths: Mapping[str, str]
     command_aliases: Mapping[str, str]
     raw: Mapping[str, Any]
+    site_data: Mapping[str, Any] = field(default_factory=dict)
     repository: str | None = None
     curation_service: str = DEFAULT_CURATION_SERVICE
 
@@ -333,26 +376,48 @@ def load_workspace(
             f"orinoco.yaml contract_version must be {CONFIG_CONTRACT_VERSION}"
         )
 
-    site = raw.get("site")
+    path_values = raw.get("paths", {})
+    if not isinstance(path_values, dict) or not all(
+        isinstance(key, str) for key in path_values
+    ):
+        raise ConfigurationError("orinoco.yaml paths must be a mapping")
+    unknown_paths = sorted(set(path_values) - set(DEFAULT_PATHS))
+    if unknown_paths:
+        raise ConfigurationError(
+            f"orinoco.yaml has unknown path keys: {', '.join(unknown_paths)}"
+        )
+    paths = {
+        name: _relative_path(path_values.get(name, default), f"paths.{name}")
+        for name, default in DEFAULT_PATHS.items()
+    }
+    duplicates: dict[str, list[str]] = {}
+    for name, value in paths.items():
+        duplicates.setdefault(value, []).append(name)
+    collisions = [names for names in duplicates.values() if len(names) > 1]
+    if collisions:
+        raise ConfigurationError(
+            "orinoco.yaml paths must be distinct: "
+            + "; ".join(", ".join(names) for names in collisions)
+        )
+    for name, value in paths.items():
+        _inside(resolved_root, value, f"paths.{name}")
+
+    site_data = _load_site_data(
+        _inside(resolved_root, paths["site"], "paths.site") / "site.yaml"
+    )
+    identity = site_data["identity"]
+    site_name = identity["title"]
+    base_url = identity["base_url"]
+
+    site = raw.get("site", {})
     if not isinstance(site, dict):
         raise ConfigurationError("orinoco.yaml site must be a mapping")
-    site_name_value = site.get("name")
-    if not isinstance(site_name_value, str) or not site_name_value.strip():
-        raise ConfigurationError("orinoco.yaml site.name must be a non-empty string")
-    site_name = site_name_value.strip()
-    if any(
-        ord(character) < 0x20 or ord(character) == 0x7F
-        for character in site_name
-    ):
-        raise ConfigurationError("orinoco.yaml site.name must be a one-line string")
-    _browser_text_length(site_name)
-    base_url = _absolute_http_url(
-        site.get("base_url", "http://127.0.0.1:8767/"),
-        "orinoco.yaml site.base_url",
-        https_only=False,
-    )
-    if not base_url.endswith("/"):
-        base_url += "/"
+    unknown_site = sorted(set(site) - {"repository", "curation_service"})
+    if unknown_site:
+        raise ConfigurationError(
+            "orinoco.yaml contains public site identity; move these site fields to "
+            "site-specific/site.yaml: " + ", ".join(unknown_site)
+        )
     repository_value = site.get("repository")
     service_value = site.get("curation_service")
     repository: str | None = None
@@ -365,41 +430,6 @@ def load_workspace(
             repository_value,
             "orinoco.yaml site.repository",
         )
-    _review_app_name(site_name)
-
-    path_values = raw.get("paths", {})
-    if not isinstance(path_values, dict) or not all(
-        isinstance(key, str) for key in path_values
-    ):
-        raise ConfigurationError("orinoco.yaml paths must be a mapping")
-    unknown_paths = sorted(set(path_values) - set(DEFAULT_PATHS) - {"assets"})
-    if unknown_paths:
-        raise ConfigurationError(
-            f"orinoco.yaml has unknown path keys: {', '.join(unknown_paths)}"
-        )
-    paths = {
-        name: _relative_path(path_values.get(name, default), f"paths.{name}")
-        for name, default in DEFAULT_PATHS.items()
-    }
-    if "assets" in path_values:
-        retired_assets = _relative_path(path_values["assets"], "paths.assets")
-        expected_static = f"{paths['site']}/static"
-        if retired_assets != expected_static:
-            raise ConfigurationError(
-                f"Retired paths.assets must equal {expected_static!r}; "
-                "remove the key after updating the downstream"
-            )
-    duplicates: dict[str, list[str]] = {}
-    for name, value in paths.items():
-        duplicates.setdefault(value, []).append(name)
-    collisions = [names for names in duplicates.values() if len(names) > 1]
-    if collisions:
-        raise ConfigurationError(
-            "orinoco.yaml paths must be distinct: "
-            + "; ".join(", ".join(names) for names in collisions)
-        )
-    for name, value in paths.items():
-        _inside(resolved_root, value, f"paths.{name}")
 
     runtime = raw.get("runtime", {})
     if not isinstance(runtime, dict):
@@ -426,6 +456,7 @@ def load_workspace(
         lock_path=lock_path,
         site_name=site_name,
         base_url=base_url,
+        site_data=site_data,
         paths=paths,
         command_aliases=normalized_aliases,
         raw=raw,

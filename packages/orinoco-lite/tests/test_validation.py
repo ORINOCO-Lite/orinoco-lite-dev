@@ -18,8 +18,13 @@ from orinoco_lite.validation import validate_workspace
 
 CONFIG = """\
 contract_version: 2
-site:
-  name: Complete fixture
+"""
+
+SITE_DATA = """\
+version: 1
+identity:
+  title: Complete fixture
+  description: A validation fixture.
   base_url: https://example.invalid/complete/
 """
 
@@ -48,6 +53,9 @@ class DownstreamValidationTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
+        (self.root / "site-specific/site.yaml").write_text(
+            SITE_DATA, encoding="utf-8"
+        )
         (self.root / "site-specific/metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
             "schema_type: xyzri:XYZPerson\n"
