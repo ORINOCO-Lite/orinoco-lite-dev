@@ -30,6 +30,7 @@ IGNORED_WORKING_TREE_NAMES = {
 }
 SITE_OWNED_BEHAVIORS = {
     "create-once-never-overwrite",
+    "site-owned-input",
     "site-owned-acceptance",
     "site-owned-policy",
     "site-owned-stable-hook",
@@ -49,13 +50,12 @@ RELEASE_COORDINATES = {
     "workflow_ref",
 }
 QUICK_TASKS = (
-    "source-adapter-canary",
     "validate",
     "build",
     "test-browser-chromium",
 )
 FULL_TASKS = ("test-all",)
-OPTIONAL_TASKS = {"source-adapter-canary"}
+OPTIONAL_TASKS: set[str] = set()
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 

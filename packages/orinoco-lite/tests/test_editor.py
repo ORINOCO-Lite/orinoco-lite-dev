@@ -49,41 +49,41 @@ class EditorBundleTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
         for relative in (
-            "metadata/records/XYZPerson",
-            "metadata/records/XYZAgentRole",
+            "site-specific/metadata/records/XYZPerson",
+            "site-specific/metadata/records/XYZAgentRole",
             ".orinoco-lite/provenance",
-            "editorial",
-            "site/projection-templates",
-            "site/projection-tools",
-            "source-adapters",
+            "site-specific/content",
+            "site-specific/projection-templates",
+            "site-specific/projection-tools",
+            "extensions/adapters",
             "generated",
             "extensions",
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
-        (self.root / "site/projection-templates/person.md.j2").write_text(
+        (self.root / "site-specific/projection-templates/person.md.j2").write_text(
             "{{ display_label }}\n", encoding="utf-8"
         )
-        (self.root / "site/projection-tools/graph.py").write_text(
+        (self.root / "site-specific/projection-tools/graph.py").write_text(
             "import json, sys\njson.dump({'nodes': [], 'edges': []}, sys.stdout)\n",
             encoding="utf-8",
         )
-        (self.root / "site/projection.yaml").write_text(
+        (self.root / "site-specific/projection.yaml").write_text(
             "version: 2\n"
             "routing:\n  strip_prefix: 'xyzrins:'\n"
             "homepage:\n  pid: xyzrins:persons/first\n"
-            "  template: site/projection-templates/person.md.j2\n"
+            "  template: site-specific/projection-templates/person.md.j2\n"
             "pages:\n  xyzri:XYZPerson:\n"
-            "    template: site/projection-templates/person.md.j2\n"
+            "    template: site-specific/projection-templates/person.md.j2\n"
             "unrendered_classes: [xyzri:XYZAgentRole]\n"
-            "graph:\n  producer: site/projection-tools/graph.py\n"
+            "graph:\n  producer: site-specific/projection-tools/graph.py\n"
             "  node_classes: [xyzri:XYZPerson]\n"
             "  relationship_fields: []\n"
             "  missing_external_targets: reject\n",
             encoding="utf-8",
         )
-        self.first = self.root / "metadata/records/XYZPerson/first.yaml"
-        self.second = self.root / "metadata/records/XYZPerson/second.yaml"
+        self.first = self.root / "site-specific/metadata/records/XYZPerson/first.yaml"
+        self.second = self.root / "site-specific/metadata/records/XYZPerson/second.yaml"
         self.first.write_text(
             "pid: xyzrins:persons/first\n"
             "schema_type: xyzri:XYZPerson\n"
@@ -100,7 +100,7 @@ class EditorBundleTests(unittest.TestCase):
             "display_label: Second\n",
             encoding="utf-8",
         )
-        (self.root / "metadata/records/XYZAgentRole/role.yaml").write_text(
+        (self.root / "site-specific/metadata/records/XYZAgentRole/role.yaml").write_text(
             "pid: xyzrins:roles/member\n"
             "schema_type: xyzri:XYZAgentRole\n"
             "display_label: Member\n",
@@ -266,7 +266,7 @@ class EditorBundleTests(unittest.TestCase):
         )
 
     def test_editor_can_limit_rdf_data_to_declared_editable_records(self) -> None:
-        projection = self.root / "site/projection.yaml"
+        projection = self.root / "site-specific/projection.yaml"
         projection.write_text(
             projection.read_text(encoding="utf-8").replace(
                 "homepage:\n",
@@ -323,7 +323,7 @@ class EditorBundleTests(unittest.TestCase):
         self.assertEqual(report["format"], "orinoco-editor-apply-report")
         self.assertEqual(
             report["changed_paths"],
-            ["metadata/records/XYZPerson/first.yaml"],
+            ["site-specific/metadata/records/XYZPerson/first.yaml"],
         )
         self.assertFalse(report["applied"])
         self.assertIn("display_label: First", self.first.read_text())
@@ -430,7 +430,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_human_replacement_reconciles_companion_in_the_same_apply(self) -> None:
         companion = (
             self.root
-            / "metadata/overlays/annotations/XYZPerson/first.yaml"
+            / "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(
@@ -465,8 +465,8 @@ class EditorBundleTests(unittest.TestCase):
         self.assertEqual(
             report["changed_paths"],
             [
-                "metadata/overlays/annotations/XYZPerson/first.yaml",
-                "metadata/records/XYZPerson/first.yaml",
+                "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml",
+                "site-specific/metadata/records/XYZPerson/first.yaml",
             ],
         )
         self.assertIn("- assertion_sha256:", report["diff"])
@@ -489,7 +489,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_dirty_companion_and_bundle_inline_pav_fail_closed(self) -> None:
         companion = (
             self.root
-            / "metadata/overlays/annotations/XYZPerson/first.yaml"
+            / "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(

@@ -1,0 +1,16 @@
+contract_version: 2
+
+classes:
+  site_specific:
+    behavior: site-owned-input
+    paths:
+      - orinoco.yaml
+      - site-specific/site.yaml
+      - site-specific/metadata/records/**
+      - site-specific/content/**
+      - site-specific/assets/**
+      - site-specific/static/**
+  extensions:
+    behavior: site-owned-stable-hook
+    paths:
+      - extensions/**

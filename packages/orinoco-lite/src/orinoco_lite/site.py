@@ -208,18 +208,16 @@ def _assemble(workspace, runtime_root: Path, assembly: Path) -> None:
     # point at paths that no longer exist inside the assembly.
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
     _render_site_surfaces(workspace, framework, assembly)
-    _copy_tree(workspace.path("site") / "layouts", assembly / "layouts")
+    overrides = workspace.path("site") / "overrides"
+    _copy_tree(overrides / "config", assembly / "config" / "con")
+    _copy_tree(overrides / "layouts", assembly / "layouts")
+    _copy_tree(overrides / "static", assembly / "static")
+    _copy_tree(workspace.path("site") / "assets", assembly / "assets")
     _copy_tree(workspace.path("site") / "static", assembly / "static")
     _copy_tree(workspace.path("editorial"), assembly / "content")
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
-    extension_site = workspace.path("extensions") / "site"
-    if not extension_site.is_dir():
-        extension_site = workspace.path("extensions")
-    _copy_tree(extension_site / "layouts", assembly / "layouts")
-    _copy_tree(extension_site / "static", assembly / "static")
-    _copy_tree(extension_site / "assets", assembly / "assets")
     for name in (
         "android-chrome-192x192.png",
         "android-chrome-512x512.png",

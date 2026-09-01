@@ -28,12 +28,11 @@ DEFAULT_CURATION_SERVICE = "https://orinoco-curation-review.pages.dev"
 MAX_REPOSITORY_PATH_LENGTH = 1_024
 
 DEFAULT_PATHS: dict[str, str] = {
-    "records": "metadata/records",
+    "records": "site-specific/metadata/records",
     "provenance": ".orinoco-lite/provenance",
-    "editorial": "editorial",
-    "site": "site",
+    "editorial": "site-specific/content",
+    "site": "site-specific",
     "framework": ".orinoco-lite/site",
-    "source_adapters": "source-adapters",
     "generated": "generated",
     "extensions": "extensions",
     "build": "build",
@@ -45,7 +44,6 @@ DIRECTORY_PATHS = {
     "editorial",
     "site",
     "framework",
-    "source_adapters",
     "generated",
     "extensions",
     "build",

@@ -1,0 +1,9 @@
+attributes:
+  - predicate: skos:prefLabel
+    schema_type: dlthings:AttributeSpecification
+    value: Architecture Proof
+description: A compact forward-looking Orinoco Lite site.
+display_label: Architecture Proof
+pid: xyzrins:.
+schema_type: xyzri:XYZProject
+title: Architecture Proof

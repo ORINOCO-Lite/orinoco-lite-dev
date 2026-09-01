@@ -23,8 +23,30 @@ REQUIRED_INPUT_PATHS = (
     "provenance",
     "editorial",
     "site",
-    "source_adapters",
+    "extensions",
 )
+
+FORBIDDEN_EXTENSION_PARTS = {
+    ".github",
+    "archetypes",
+    "assets",
+    "build-hooks",
+    "content",
+    "layouts",
+    "navigation",
+    "static",
+    "themes",
+    "ui",
+    "workflows",
+}
+FORBIDDEN_EXTENSION_SUFFIXES = {
+    ".css",
+    ".html",
+    ".js",
+    ".mjs",
+    ".scss",
+    ".svg",
+}
 
 
 def _files(root: Path) -> Iterator[Path]:
@@ -143,6 +165,23 @@ def _validate_metadata_boundary(workspace: WorkspaceConfig) -> None:
     )
 
 
+def _validate_extension_boundary(workspace: WorkspaceConfig) -> None:
+    """Keep executable extensions separate from all website surfaces."""
+
+    root = workspace.path("extensions")
+    for path in _files(root):
+        relative = path.relative_to(root)
+        lowered_parts = {part.lower() for part in relative.parts[:-1]}
+        if lowered_parts & FORBIDDEN_EXTENSION_PARTS:
+            raise ConfigurationError(
+                f"Website functionality is forbidden under extensions: {path}"
+            )
+        if path.suffix.lower() in FORBIDDEN_EXTENSION_SUFFIXES:
+            raise ConfigurationError(
+                f"Website functionality is forbidden under extensions: {path}"
+            )
+
+
 def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     """Validate path ownership and the basic record inventory.
 
@@ -165,6 +204,7 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         if not path.is_dir():
             raise ConfigurationError(f"Required site-owned directory is missing: {path}")
     _validate_metadata_boundary(workspace)
+    _validate_extension_boundary(workspace)
 
     records = [(path, _load_record(path)) for path in record_files(workspace)]
     if not records:
