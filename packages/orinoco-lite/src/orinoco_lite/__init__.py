@@ -7,6 +7,6 @@ try:
 
     __version__ = version("orinoco-lite")
 except Exception:  # pragma: no cover - source-tree fallback
-    __version__ = "0.2.0rc17"
+    __version__ = "0.2.0rc18"
 
 __all__ = ["__version__"]
