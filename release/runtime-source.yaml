@@ -1,6 +1,6 @@
 format: orinoco-lite-runtime-source
 spec_version: 1
-release: 0.2.0rc17
+release: 0.2.0rc18
 compatibility:
   config: [2]
   minimum_python: "3.12"
@@ -100,11 +100,9 @@ resources:
 provenance:
   source_repository: https://github.com/ORINOCO-Lite/orinoco-lite-dev
   compatibility_change: >-
-    This release candidate makes the downstream proposal control the final
-    authorizing click, removes curator-attributed explanatory pull-request
-    text, and preserves unchanged RDF multivalue order during YAML
-    materialization. It supersedes the failed rc16 packaging attempt; accepted
-    schema and editor component pins are unchanged.
+    This release candidate composes the pinned upstream presentation with
+    downstream site-specific inputs, so downstreams no longer retain copied
+    framework presentation files. Accepted component pins are unchanged.
   source_inventory:
     engine:
       license: MIT
