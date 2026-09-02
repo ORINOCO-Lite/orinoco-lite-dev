@@ -1,6 +1,6 @@
 format: orinoco-lite-runtime-source
 spec_version: 1
-release: 0.2.0rc19
+release: 0.2.0rc20
 compatibility:
   config: [2]
   minimum_python: "3.12"
@@ -100,9 +100,9 @@ resources:
 provenance:
   source_repository: https://github.com/ORINOCO-Lite/orinoco-lite-dev
   compatibility_change: >-
-    This release candidate rebases the presentation integration onto the
-    current Psychoinformatics website and query revisions while retaining the
-    thin Orinoco adaptation and exact downstream composition contract.
+    This release candidate makes framework validation an explicit reusable CI
+    responsibility and removes accommodation for previous downstream layouts.
+    Accepted component pins are unchanged.
   source_inventory:
     engine:
       license: MIT
