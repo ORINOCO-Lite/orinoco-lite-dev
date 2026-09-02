@@ -126,44 +126,48 @@ Generated projection, static output, caches, downloads, and review artifacts rem
 
 ## Build and deployment flow
 
-1. A downstream lock selects exact engine, runtime, template, and reusable workflow releases.
-Runtime provenance identifies the exact engineering commit; that commit's Gitlink selects `www-from-model`, whose own declarations select Congo and the rest of its dependency closure.
-2. The engine joins records with their machine provenance companions and validates the result against the exact released Things Schema profile.
-3. The engine applies its released projection policy using the selected upstream `page_templates/` and graph producer.
-Projection output is reproducible and ignored.
-4. The engine composes the selected website and dependency closure with the template adaptation and materialized overlay, then adds declared downstream inputs and supported overrides under deterministic path and precedence rules.
-It binds the released static `/edit/` and `/review/` shells to the exact site source.
-5. The resulting bytes are deployed to static hosting.
-After exact dependencies have been resolved and cached, validation, projection, building, browsing, editing, and bundle download require no networked metadata service.
+1. The downstream lock file selects exact releases of the engine, runtime, template, and shared workflows.
+The selected runtime records the exact engineering commit, which selects one exact version of `www-from-model`; that project, in turn, selects Congo and its other dependencies.
+This chain ensures that every build uses a known set of source code.
+2. The engine converts the site's metadata into a graph and validates it against the exact Things Schema included in the selected release.
+3. The engine uses the selected upstream page templates and graph generator to create the site's pages and graph data.
+These generated files are reproducible build output, not source data kept in Git.
+4. The engine combines the reusable website, the thin Orinoco adaptation, and the downstream's content and settings in a fixed order.
+Site overrides apply only in the supported locations and take precedence there.
+The build also adds the static `/edit/` and `/review/` interfaces and connects them to the downstream repository and exact commit being built.
+5. The completed website is deployed as static files.
+Once the selected dependencies have been downloaded and verified, validating, building, browsing, editing, and downloading change bundles do not require a running metadata service.
 
 ## Metadata change flow
 
-Direct human edits are ordinary Git changes.
-The static `/edit/` application can export the same bounded change bundle for local application or explicitly hand it to GitHub through the curation service.
+People can edit metadata directly through ordinary Git changes.
+The static `/edit/` interface can package an edit for local review and application, or—after an explicit user action—send it to GitHub through the curation service.
 
-An optional source adapter reads an identified external source, derives a deterministic metadata proposal, and records its run and proposal commit with DataLad in ordinary Git.
-The deployed `/review/` application presents the proposal and collects explicit human decisions.
-The curation service verifies identity and exact GitHub state and transports the confirmed handoff or decision; trusted released workflows validate and finalize the change at the exact head.
-A human remains responsible for merge.
-Automation does not invent metadata semantics, identities, rights, or curation decisions.
-It does not approve or merge proposals or write back to the external source.
+An optional source adapter is a program that reads an identified external source and prepares a repeatable metadata proposal without changing that source.
+DataLad records the adapter run and proposed Git commit.
+The static `/review/` interface shows the proposal and asks a person to accept, reject, or defer each suggested change.
+
+For online review, the curation service handles sign-in, verifies the current GitHub commit, and transports the confirmed proposal or decisions.
+Trusted workflows then apply and validate the change only against that verified commit.
+A person remains responsible for merging it.
+Automation may derive proposals, but it must not invent metadata meaning, identity, rights, or review decisions; approve or merge changes; or write back to the external source.
 
 ```mermaid
 flowchart TB
-  sources["External sources"] -->|"read-only acquisition"| adapters["Downstream source adapter"]
-  adapters -->|"DataLad-recorded proposal"| github["GitHub pull request<br/>and trusted exact-head workflow"]
+  sources["External information source"] -->|"read only"| adapters["Metadata importer<br/>(source adapter)"]
+  adapters -->|"repeatable proposal recorded with DataLad"| github["GitHub pull request<br/>and trusted workflow"]
 
-  site["Deployed static site"] --> edit["/edit/<br/>bundle or explicit proposal"]
-  site --> review["/review/<br/>explicit source decisions"]
-  edit -->|"credential-free bundle"| local["Local review and apply"]
+  site["Published static website"] --> edit["Edit metadata<br/>/edit/"]
+  site --> review["Review automated suggestions<br/>/review/"]
+  edit -->|"download without signing in"| local["Review and apply locally"]
   local -->|"ordinary Git change"| github
-  edit -.->|"authenticated handoff"| service["Stateless curation service<br/>verified GitHub transport"]
-  review -.->|"authenticated decisions"| service
-  github -.->|"verified reads"| service
-  service -.->|"draft handoff or decision comment"| github
+  edit -.->|"explicit signed-in handoff"| service["Sign-in and GitHub handoff service<br/>no metadata storage"]
+  review -.->|"confirmed decisions"| service
+  github -.->|"verify current commit"| service
+  service -.->|"transport proposal or decisions"| github
 
-  github -->|"validated change; human merge"| canonical["Canonical downstream Git data"]
-  canonical -->|"validate, project, compose"| site
+  github -->|"validated change; human merge"| canonical["Approved metadata<br/>in the downstream repository"]
+  canonical -->|"validate and rebuild"| site
 
   click adapters "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/docs/agents/contract/source-adapters.md" "Open the source-adapter contract"
   click service "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/packages/curation-review-app" "Open the curation service"
@@ -174,35 +178,37 @@ The precise behavior is defined by the normative contracts for [source adapters]
 
 ## Design invariants
 
-- **Reuse rather than fork.** The selected upstream revision and its declared dependency closure supply the reusable website.
-Orinoco adaptations stay small, explicit, and separately owned.
-- **Keep the template thin.** The template carries only the downstream scaffold, adaptation, workflows, locks, and bounded licensed materialized assets required by retained upstream functionality; it never carries a complete website.
-- **Keep downstreams site-specific.** Organization metadata, editorial content, identity, assets, policy, decisions, and optional executable adapters live in one ordinary downstream repository.
-German records, identifiers, editorial content, and site-specific assets never enter a template or downstream build.
-- **Keep generic behavior in the engine.** Source resolution, integrity, validation, projection, composition, and shared curation operations do not become copied downstream framework code.
-The selected Things Schema profile remains the semantic boundary unless a deliberate design change says otherwise.
-- **Keep the published product static.** The website and its edit/review UI are static, and ordinary read and bundle-download paths do not depend on the curation service.
-Authenticated GitHub operations cross only that narrow boundary.
-- **Keep humans and Git authoritative.** External acquisition is read-only, machine changes are proposals, human choices are explicit, and commits, pull requests, merge, and revert provide durable review and recovery.
-- **Do not duplicate authority.** Exact pins and integrity metadata live only in the locks, manifests, Gitlinks, and release inputs whose operation requires them.
-Git and GitHub hold change history.
-Do not add parallel ledgers, inventories, or compatibility machinery merely for explanation or proof.
-- **Separate provenance tools.** Git Annex is maintainer-only repinning machinery used to hydrate and verify required upstream presentation payloads before ordinary licensed files enter the template overlay.
-DataLad records downstream source-adapter runs in Git; released builds and adapter runs do not require Git Annex.
+- **Reuse the upstream website.** One selected version of the upstream project and its declared dependencies supplies the reusable website.
+Orinoco-specific changes remain small, explicit, and separately owned instead of becoming a copied fork.
+- **Keep the template small.** The template provides the downstream starting structure, the Orinoco adaptation, shared workflows, dependency locks, and a limited set of licensed assets needed from upstream.
+It does not contain another copy of the website.
+- **Keep each organization's information in its own repository.** A downstream repository owns that organization's metadata, editorial content, identity, assets, policies, review decisions, and optional source adapters.
+Content and identity from the German reference site are never copied into the template or another organization's site.
+- **Keep shared behavior in the engine.** Resolving sources, checking integrity, validating metadata, generating pages and graph data, assembling the website, and supporting curation remain reusable engine functions rather than copied downstream code.
+The exact Things Schema included in the release defines valid metadata unless the project deliberately changes this design.
+- **Publish a static product.** The website and its editing and review interfaces are static files.
+Reading the site or downloading an edit bundle never depends on the curation service; only signed-in GitHub operations cross that service boundary.
+- **Keep people and Git in control.** External sources are read-only, automated changes remain proposals, and human choices are explicit.
+Git commits, pull requests, merges, and reverts provide the durable history and recovery path.
+- **Record each fact once.** Exact versions and integrity information live in the lock files, manifests, Gitlinks, and release inputs that use them; Git and GitHub hold the change history.
+Do not add separate ledgers or inventories that repeat those facts merely for explanation or proof.
+- **Give each provenance tool one job.** Maintainers use Git Annex only while selecting and preparing required upstream presentation assets for the licensed template overlay.
+Downstream source adapters use DataLad to record their runs in ordinary Git.
+Released builds and adapter runs do not require Git Annex.
 
 ## Documentation and change control
 
-This document owns durable intent, system boundaries, and architectural invariants.
-More precise or shorter-lived information has one separate home:
+This document explains the project's lasting purpose, organization, and boundaries.
+Exact rules and shorter-lived working information have separate homes:
 
-- [`docs/agents/contract/`](agents/contract/) defines normative behavior where exact semantics or security boundaries matter;
-- [`AGENTS.md`](../AGENTS.md) provides current operating constraints and routes agents to the relevant contract;
-- project [skills](../.agents/skills/) define repeatable development, deployment, documentation, and upstream-maintenance procedures; and
-- [`docs/agents/`](agents/) contains active plans and unresolved decisions, not a competing architecture.
+- [`docs/agents/contract/`](agents/contract/) defines exact technical rules where metadata meaning, review behavior, or security boundaries require precision;
+- [`AGENTS.md`](../AGENTS.md) gives agents current operating constraints and points them to the applicable contracts;
+- project [skills](../.agents/skills/) provide step-by-step procedures for repeatable work; and
+- [`docs/agents/`](agents/) holds active plans and unresolved decisions, not an alternative description of the architecture.
 
-Plans, code, tests, releases, and existing downstreams may temporarily lag this target during reviewed work.
-A discrepancy is work to reconcile, not evidence for silently changing the design or preserving accidental compatibility.
-Bring the implementation or plan back into alignment; if the intended direction itself should change, propose that change here for human agreement before it becomes implementation detail.
+During a reviewed change, plans, code, tests, releases, or existing downstreams may temporarily differ from this design.
+Treat that difference as work to resolve, not as permission to silently change the design or preserve accidental behavior.
+Bring the work back into alignment; if the intended direction should change, update this document for human agreement before treating the change as an implementation detail.
 
-Do not infer production metadata semantics, review authority, migration, hosting, cutover, accessibility, privacy, or recovery ownership from this architecture.
-Those choices remain in [`open-decisions.md`](agents/open-decisions.md) until humans resolve them.
+This architecture does not decide production metadata meaning, review authority, migration, hosting, cutover, accessibility, privacy, or recovery ownership.
+Those choices remain in [`open-decisions.md`](agents/open-decisions.md) until people resolve them.
