@@ -52,9 +52,15 @@ RELEASE_COORDINATES = {
 QUICK_TASKS = (
     "validate",
     "build",
-    "test-browser-chromium",
 )
-FULL_TASKS = ("test-all",)
+FULL_TASKS = (
+    "validate",
+    "projection-verify",
+    "verify-runtime",
+    "verify-hugo",
+    "verify-ownership",
+    "verify-build",
+)
 OPTIONAL_TASKS: set[str] = set()
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
@@ -147,9 +153,7 @@ def site_owned_patterns(downstream: Path) -> tuple[str, ...]:
             isinstance(path, str) and path for path in paths
         ):
             raise DevelopmentError(f"Ownership class {name} has invalid paths")
-        patterns.update(
-            path for path in paths if not path.startswith(".orinoco-lite/")
-        )
+        patterns.update(paths)
     if not patterns:
         raise DevelopmentError("Ownership contract declares no site-owned paths")
     return tuple(sorted(patterns))

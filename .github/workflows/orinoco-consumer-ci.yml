@@ -3,11 +3,6 @@ name: Orinoco consumer CI
 on:
   workflow_call:
     inputs:
-      command:
-        description: "Consumer facade task: validate, build, or test-all"
-        type: string
-        required: false
-        default: test-all
       runner:
         description: GitHub-hosted runner label
         type: string
@@ -34,23 +29,15 @@ permissions:
 
 jobs:
   consumer:
-    name: ${{ inputs.command }} (${{ inputs.runner }})
+    name: Framework checks (${{ inputs.runner }})
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Validate reusable-workflow inputs
         shell: bash
         env:
-          ORINOCO_COMMAND: ${{ inputs.command }}
           ORINOCO_ARTIFACT_PATH: ${{ inputs['artifact-path'] }}
         run: |
-          case "$ORINOCO_COMMAND" in
-            validate|build|test-all) ;;
-            *)
-              echo "command must be validate, build, or test-all" >&2
-              exit 2
-              ;;
-          esac
           case "$ORINOCO_ARTIFACT_PATH" in
             /*|*..*|*\\*)
               echo "artifact-path must be a safe repository-relative path" >&2
@@ -70,57 +57,15 @@ jobs:
           cache: true
           frozen: true
 
-      - name: Restore the exact Playwright browser cache
-        if: ${{ inputs.command == 'test-all' }}
-        id: playwright-browser-cache
-        continue-on-error: true
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
-        with:
-          path: |
-            build/playwright-browsers
-            !build/playwright-browsers/.links
-          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
-
-      - name: Select and bound the Linux package mirror
-        if: ${{ inputs.command == 'test-all' && runner.os == 'Linux' }}
+      - name: Run the released framework checks
         shell: bash
         run: |
-          printf '%s\tpriority:1\n' \
-            'https://archive.ubuntu.com/ubuntu/' \
-            | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
-          printf '%s\n' \
-            'Acquire::Retries "3";' \
-            'Acquire::http::Timeout "30";' \
-            'Acquire::https::Timeout "30";' \
-            | sudo tee /etc/apt/apt.conf.d/99orinoco-network-bounds >/dev/null
-
-      - name: Run the consumer facade
-        shell: bash
-        env:
-          ORINOCO_COMMAND: ${{ inputs.command }}
-        run: pixi run "$ORINOCO_COMMAND"
-
-      # PRs may restore the default branch's public browser cache, but only a
-      # successful default-branch push may publish one. This avoids large,
-      # merge-ref-scoped caches while keeping cache misses fully supported.
-      - name: Save the exact Playwright browser cache
-        if: >-
-          ${{
-            success() &&
-            inputs.command == 'test-all' &&
-            github.event_name == 'push' &&
-            github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-            steps.playwright-browser-cache.outputs.cache-hit != 'true'
-          }}
-        continue-on-error: true
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            build/playwright-browsers
-            !build/playwright-browsers/.links
-          key: orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', '.orinoco-lite/tests/browser/package.json', '.orinoco-lite/tests/browser/package-lock.json', '.orinoco-lite/tools/install_browser_tests.py') }}
+          pixi run validate
+          pixi run projection-verify
+          pixi run verify-runtime
+          pixi run verify-hugo
+          pixi run verify-ownership
+          pixi run verify-build
 
       - name: Upload the requested consumer artifact
         if: ${{ inputs['artifact-name'] != '' }}

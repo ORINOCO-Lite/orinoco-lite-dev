@@ -31,7 +31,6 @@ pixi install --frozen
 pixi run validate
 pixi run build
 pixi run serve
-pixi run test-all
 ```
 
 The downstream selects its template version and upgrade timing.

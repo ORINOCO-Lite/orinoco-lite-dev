@@ -391,68 +391,20 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertLess(deploy, record)
         self.assertLess(record, push)
 
-    def test_consumer_ci_bounds_and_reuses_exact_browser_downloads(self) -> None:
+    def test_consumer_ci_runs_released_framework_checks(self) -> None:
         workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")
-        cache_action = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
-        cache_key = (
-            "orinoco-playwright-v1-${{ inputs.runner }}-${{ runner.os }}-"
-            "${{ runner.arch }}-chromium-webkit-${{ hashFiles('pixi.toml', "
-            "'.orinoco-lite/tests/browser/package.json', "
-            "'.orinoco-lite/tests/browser/package-lock.json', "
-            "'.orinoco-lite/tools/install_browser_tests.py') }}"
-        )
-
         self.assertIn("timeout-minutes: 60", workflow)
-        self.assertIn(f"actions/cache/restore@{cache_action}", workflow)
-        self.assertIn(f"actions/cache/save@{cache_action}", workflow)
-        self.assertEqual(workflow.count("continue-on-error: true"), 2)
-        self.assertIn('SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"', workflow)
-        mirror_step = "Select and bound the Linux package mirror"
-        self.assertIn(mirror_step, workflow)
-        self.assertIn(
-            "inputs.command == 'test-all' && runner.os == 'Linux'",
-            workflow,
-        )
-        self.assertIn("https://archive.ubuntu.com/ubuntu/", workflow)
-        self.assertIn("sudo tee /etc/apt/apt-mirrors.txt", workflow)
-        self.assertNotIn("azure.archive.ubuntu.com", workflow)
-        self.assertIn('Acquire::Retries "3";', workflow)
-        self.assertIn('Acquire::http::Timeout "30";', workflow)
-        self.assertIn('Acquire::https::Timeout "30";', workflow)
-        self.assertEqual(workflow.count(cache_key), 2)
-        self.assertEqual(workflow.count("build/playwright-browsers\n"), 2)
-        self.assertEqual(
-            workflow.count("!build/playwright-browsers/.links"),
-            2,
-        )
-        self.assertNotIn("restore-keys:", workflow)
-        self.assertIn("inputs.command == 'test-all'", workflow)
-        self.assertIn("github.event_name == 'push'", workflow)
-        self.assertIn(
-            "github.ref == format('refs/heads/{0}', "
-            "github.event.repository.default_branch)",
-            workflow,
-        )
-        self.assertIn(
-            "steps.playwright-browser-cache.outputs.cache-hit != 'true'",
-            workflow,
-        )
-        self.assertLess(
-            workflow.index("Install locked Pixi"),
-            workflow.index("Restore the exact Playwright browser cache"),
-        )
-        self.assertLess(
-            workflow.index("Restore the exact Playwright browser cache"),
-            workflow.index(mirror_step),
-        )
-        self.assertLess(
-            workflow.index(mirror_step),
-            workflow.index("Run the consumer facade"),
-        )
-        self.assertLess(
-            workflow.index("Run the consumer facade"),
-            workflow.index("Save the exact Playwright browser cache"),
-        )
+        for task in (
+            "validate",
+            "projection-verify",
+            "verify-runtime",
+            "verify-hugo",
+            "verify-ownership",
+            "verify-build",
+        ):
+            self.assertIn(f"pixi run {task}", workflow)
+        self.assertNotIn("test-all", workflow)
+        self.assertNotIn("Playwright", workflow)
 
 
 if __name__ == "__main__":

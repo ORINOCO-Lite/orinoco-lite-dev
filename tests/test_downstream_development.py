@@ -33,10 +33,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                     "behavior": "site-owned-stable-hook",
                     "paths": ["extensions/**"],
                 },
-                "legacy_acceptance": {
-                    "behavior": "site-owned-acceptance",
-                    "paths": [".orinoco-lite/tests/**", "tests/**"],
-                },
                 "generated": {
                     "behavior": "ignored-runtime-output",
                     "paths": ["generated/**"],
@@ -47,14 +43,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         ownership_path.parent.mkdir()
         ownership_path.write_text(
             yaml.safe_dump(ownership, sort_keys=False), encoding="utf-8"
-        )
-        (self.downstream / ".orinoco-lite/tests/browser").mkdir(parents=True)
-        (self.downstream / ".orinoco-lite/tests/browser/stale.py").write_text(
-            "raise RuntimeError('stale framework test')\n", encoding="utf-8"
-        )
-        (self.downstream / "tests").mkdir()
-        (self.downstream / "tests/test_site.py").write_text(
-            "SITE_SPECIFIC = True\n", encoding="utf-8"
         )
         (self.downstream / "orinoco.yaml").write_text(
             "contract_version: 2\n", encoding="utf-8"
@@ -123,7 +111,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 "extensions",
                 "orinoco.yaml",
                 "site-specific",
-                "tests",
             ),
             copied,
         )
@@ -139,8 +126,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         )
         self.assertFalse((candidate / "generated").exists())
         self.assertFalse((candidate / "site-specific/stale.txt").exists())
-        self.assertFalse((candidate / ".orinoco-lite/tests").exists())
-        self.assertTrue((candidate / "tests/test_site.py").is_file())
 
     def test_overlay_omits_nested_runtime_state(self) -> None:
         cache = self.downstream / "extensions/source-adapters/example/.pixi/envs/bin"
@@ -276,11 +261,20 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             (
                 "validate",
                 "build",
-                "test-browser-chromium",
             ),
             development.task_names("quick", ()),
         )
-        self.assertEqual(("test-all",), development.task_names("full", ()))
+        self.assertEqual(
+            (
+                "validate",
+                "projection-verify",
+                "verify-runtime",
+                "verify-hugo",
+                "verify-ownership",
+                "verify-build",
+            ),
+            development.task_names("full", ()),
+        )
         self.assertEqual(
             ("validate", "custom"),
             development.task_names("full", ("validate", "custom")),
