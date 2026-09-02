@@ -362,6 +362,7 @@ class QueryInlineParityTests(unittest.TestCase):
         if not source.is_file():
             self.skipTest("pinned query-things source fixture is unavailable")
         common = types.ModuleType("query_things.common")
+        common.Record = dict
         common.RecordCache = object
         common.iter_json_objects = lambda: ()
         common.make_record_resolver = lambda **_kwargs: None
