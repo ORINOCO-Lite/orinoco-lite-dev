@@ -1,7 +1,8 @@
 # Orinoco Lite project design
 
-Orinoco Lite turns schema-backed research information held in one ordinary Git repository into a deterministic static website.
-An organization supplies its own records, editorial content, identity, assets, and policy; it does not maintain a copy of the reusable website or operate a persistent metadata server.
+Orinoco Lite provides a templated repo to maintain schema-backed research information that, among other things, can generate an associate static website for the organization.
+It is based on the the ORINOCO ecosytem (Organized Research Information: Ontology-mapping, Curation, Orchestration) maintained separately.
+It differs in that it hosts the records on github, uses github to host the website, and replaces the server backed metadata management of the original system with a github pull request based workflow.
 
 This document is the durable, high-level design contract shared by maintainers, developers, and AI agents.
 It describes the intended architecture rather than a release inventory or progress report.
@@ -9,17 +10,14 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 ## Objective
 
-An Orinoco Lite deployment should let an organization:
+An Orinoco Lite deployment should help an organization:
 
-- maintain human-readable metadata under review in Git;
-- augment that metadata from external sources without giving automation editorial authority;
-- publish a useful website with record pages, indexes, and graph views;
-- inspect and edit the deployed metadata through static browser interfaces; and
-- adopt framework updates deliberately without inheriting a copied website or an application-server dependency.
+- maintain human-readable metadata under review in Git conformant with the schema defined by the ORINOCO system;
+- augment metadata external sources using automation while allowing convenient human review using PRs;
+- use github pages to publish a website based on the upstream psychoinformatics.de;
+- implement customization of website content, style, and organization while continuing to update their version of orinoco-lite;
 
-The deployed site includes `/edit/` for metadata changes and `/review/` for source-adapter decisions.
-Both interfaces are part of the static site, and the credential-free editor bundle path needs no service.
-A separate service is invoked only for authenticated GitHub reads or writes after explicit curator action; it is not an application server for the site.
+The deployed site includes `/edit/` for webpage based metadata changes and `/review/` for integrating changes from automated metadata improvement.
 
 ## System organization
 
@@ -93,25 +91,25 @@ flowchart TB
 
 ## Downstream data boundary
 
-The normal downstream interface is intentionally small:
+Each downstream keeps its declarative site data under `site-specific/`, separate from site-specific executable adapters:
 
 ```text
-site-specific/
-  site.yaml
-  assets/
-  content/
-  static/
-  metadata/
-    records/
-    overlays/annotations/
-  curation-records/
-  sources/<adapter>/
-  overrides/
-    config/
-    layouts/
-    static/
-extensions/
-  source-adapters/<adapter>/
+site-specific/                         # Downstream-owned declarative site data
+  site.yaml                            # Site identity, navigation, and presentation settings
+  assets/                              # Source assets processed by Hugo during the build
+  content/                             # Hand-authored editorial pages
+  static/                              # Site files published verbatim
+  metadata/                            # Canonical schema-backed metadata
+    records/                           # Schema compliant yaml describing organization entities
+    overlays/annotations/              # Separate tree for messier record components that are part of the realized graph
+  curation-records/                    # Current reviewed automated data import decisions
+  sources/<adapter>/                   # Inputs, evidence, and mapping policy for metadata automation tools
+  overrides/                           # Bounded replacements for framework surfaces
+    config/                            # Final Hugo configuration overrides
+    layouts/                           # Hugo template replacements
+    static/                            # Replacements for framework static files
+extensions/                            # Downstream-owned executable code for metadata management
+  source-adapters/<adapter>/           # Site-specific acquisition and curation code
 ```
 
 `site-specific/` is declarative.
