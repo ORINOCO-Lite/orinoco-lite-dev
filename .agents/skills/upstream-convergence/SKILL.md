@@ -37,7 +37,7 @@ For nested submodules, Annex-backed repositories, mirror default-branch updates,
 ## Validate from the leaves upward
 
 Treat a repin as the complete fetch-and-content closure of the selected revision.
-Before committing the parent pin, verify from a cache-cold checkout that every gitlink is fetchable from the exact consumer-configured remote, and advance any exact companion content pins—such as `git-annex` metadata refs—needed to hydrate and build that revision.
+Before publishing or presenting the parent pin for review, verify from a cache-cold clone of an exact candidate commit that every gitlink is fetchable from the consumer-configured remote, and advance any exact companion content pins—such as `git-annex` metadata refs—needed to hydrate and build that revision.
 
 1. Test each rebased leaf component with its native locked build and focused tests.
 2. Update nested gitlinks to the corresponding rebased commits, not to discarded merge tips.
