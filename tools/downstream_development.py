@@ -147,7 +147,9 @@ def site_owned_patterns(downstream: Path) -> tuple[str, ...]:
             isinstance(path, str) and path for path in paths
         ):
             raise DevelopmentError(f"Ownership class {name} has invalid paths")
-        patterns.update(paths)
+        patterns.update(
+            path for path in paths if not path.startswith(".orinoco-lite/")
+        )
     if not patterns:
         raise DevelopmentError("Ownership contract declares no site-owned paths")
     return tuple(sorted(patterns))
