@@ -6,7 +6,7 @@ site_root="$repository_root/submodules/www-from-model"
 base_url=${BASE_URL:-http://127.0.0.1:1313/}
 destination=${DESTINATION:-$repository_root/build/upstream-psychoinformatics}
 edit_url=${SHACL_VUE_URL:-https://pool.psychoinformatics.de/ui/}
-annex_commit=d18f512d1cd722a8300b656c330020739da05be6
+annex_commit=3e8440e4e09bdb7904ec6ee6f3aca807ecbef130
 upstream_url=https://hub.psychoinformatics.de/www/www-from-model.git
 annex_remote_name=upstream-build-$$
 annex_remote_ref=refs/remotes/$annex_remote_name/git-annex
@@ -75,7 +75,11 @@ base_path=$(python3 -c \
 
 site_git fetch --no-write-fetch-head \
   "$upstream_url" "+$annex_commit:$annex_remote_ref"
-site_git -c annex.private=true annex init
+site_git \
+  -c user.name="Orinoco upstream builder" \
+  -c user.email="orinoco-upstream-builder@example.invalid" \
+  -c annex.private=true \
+  annex init
 site_git \
   -c annex.private=true \
   -c remote.$annex_remote_name.url="$upstream_url" \
