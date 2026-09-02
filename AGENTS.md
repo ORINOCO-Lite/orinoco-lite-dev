@@ -32,6 +32,8 @@ If no such operation exists, do not add it.
 
 ## Documentation
 
+- Treat `docs/project-design.md` as the durable high-level design contract.
+Reconcile conflicting plans or implementation state; propose a human-reviewed design change instead of silently normalizing drift.
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
 - Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
