@@ -153,16 +153,11 @@ These generated files are not canonical inputs and do not enter the downstream's
 
 ## Build and deployment flow
 
-1. The downstream lock selects exact versions of Orinoco Lite, the template, and shared workflows.
-The Orinoco Lite package identifies the engineering commit whose Gitlink selects `www-from-model`; that revision selects Congo and its other dependencies.
-2. Orinoco Lite converts the site's metadata into a graph and validates it against the exact Things Schema included in the package.
-3. Orinoco Lite uses the selected upstream page templates and graph generator to create the site's pages and graph data.
-These generated files form the **Hugo projection**: build output derived from the canonical source and selected dependency versions, rather than canonical source data.
-4. Orinoco Lite combines the reusable website, the thin Orinoco adaptation, and the downstream's content and settings in a fixed order.
-Site overrides apply only in the supported locations and take precedence there.
-The build also adds the static `/edit/` and `/review/` interfaces and connects them to the downstream repository and exact commit being built.
-5. The completed website is deployed as static files.
-Once the selected dependencies have been downloaded and verified, validating, building, browsing, editing, and downloading change bundles do not require a running metadata service.
+Upon a merge into the default branch, a GitHub Action deploys the website:
+
+1. The downstream lock selects exact versions of Orinoco Lite and the template.
+2. Orinoco Lite uses ORINOCO components to turn the metadata records into a graph, validates the graph, and projects it into the form used by the website.
+3. Orinoco Lite combines that projection with the upstream website and template, adds downstream content, and applies configured overrides to produce the static site.
 
 ## Generated publication records
 
