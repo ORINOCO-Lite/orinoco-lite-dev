@@ -176,37 +176,24 @@ This retention does not require byte-identical rebuilds or additional manifests,
 
 ## Metadata change flow
 
-People may edit metadata through ordinary Git changes or use `/edit/` to download an edit bundle for local application.
-After explicit confirmation, `/edit/` can instead ask the curation service to create or update a draft pull request.
+Orinoco Lite supports two sources of metadata change:
 
-Source adapters are downstream-defined automations that read identified external sources and prepare repeatable metadata proposals without modifying those sources.
-DataLad records each adapter run and proposed Git commit; `/review/` lets a person accept, reject, or defer every proposed change.
+1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
+Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
 
-For online editing and review, the curation service signs the user in and verifies the exact GitHub state.
-It commits a confirmed edit bundle or posts confirmed review decisions to the matching pull request.
-Trusted workflows validate and finalize the resulting metadata changes.
-Automation must not invent metadata meaning, identity, rights, or review decisions; approve or merge changes; or write to an external source.
+2. **Automated augmentation.** A github action runs a source adapter which reads an  external source and opens a pull request with proposed changes.
+In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
+Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
+
 
 ```mermaid
-flowchart TB
-  sources["External information source"] -->|"read only"| adapters["Metadata importer<br/>(source adapter)"]
-  adapters -->|"repeatable proposal recorded with DataLad"| github["GitHub pull request<br/>and trusted workflow"]
+flowchart LR
+  edit["Person edits metadata<br/>in /edit/"] --> changes["Pull request<br/>validated metadata changes"]
 
-  site["Published static website"] --> edit["Edit metadata<br/>/edit/"]
-  site --> review["Review automated suggestions<br/>/review/"]
-  edit -->|"download without signing in"| local["Review and apply locally"]
-  local -->|"ordinary Git change"| github
-  edit -.->|"submit edit after sign-in"| service["Curation service<br/>sign-in and exact-state checks"]
-  review -.->|"submit decisions"| service
-  github -.->|"verify pull request and current commit"| service
-  service -.->|"commit edit bundle or post review decisions"| github
-
-  github -->|"validated change; human merge"| canonical["Approved metadata<br/>in the downstream repository"]
-  canonical -->|"validate and rebuild"| site
-
-  click adapters "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/docs/agents/contract/source-adapters.md" "Open the source-adapter contract"
-  click service "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/packages/curation-review-app" "Open the curation service"
-  click github "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/docs/agents/contract" "Open the normative contracts"
+  source["External source"] --> adapter["GitHub Action<br/>runs source adapter"]
+  adapter --> proposal["Pull request<br/>proposed changes"]
+  proposal --> review["Person decides<br/>in /review/"]
+  review --> changes
 ```
 
 The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication rules](agents/contract/curation-service-authentication-options.md).
