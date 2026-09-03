@@ -316,26 +316,14 @@ class WorkspaceConfig:
 
 
 @dataclass(frozen=True)
-class RuntimePin:
-    """One immutable runtime archive or development directory."""
-
-    version: str
-    url: str | None
-    path: str | None
-    sha256: str
-    manifest_sha256: str
-
-
-@dataclass(frozen=True)
 class EngineLock:
-    """Resolved engine/runtime pins from ``orinoco.lock``."""
+    """Resolved immutable package pin from ``orinoco.lock``."""
 
     path: Path
     distribution: str
     engine_version: str
     engine_url: str
     engine_sha256: str
-    runtime: RuntimePin
     raw: Mapping[str, Any]
 
 
@@ -471,7 +459,7 @@ def load_config_path(path: Path) -> WorkspaceConfig:
 
 
 def load_lock(path: Path) -> EngineLock:
-    """Load a strict immutable package/runtime lock."""
+    """Load a strict immutable package lock."""
 
     raw = _load_mapping(path, "Orinoco lock")
     if raw.get("lock_version") != LOCK_CONTRACT_VERSION:
@@ -479,9 +467,8 @@ def load_lock(path: Path) -> EngineLock:
             f"orinoco.lock lock_version must be {LOCK_CONTRACT_VERSION}"
         )
     engine = raw.get("engine")
-    runtime = raw.get("runtime")
-    if not isinstance(engine, dict) or not isinstance(runtime, dict):
-        raise ConfigurationError("orinoco.lock requires engine and runtime mappings")
+    if not isinstance(engine, dict):
+        raise ConfigurationError("orinoco.lock requires an engine mapping")
     distribution = engine.get("distribution")
     engine_version = engine.get("version")
     engine_url = engine.get("url")
@@ -508,46 +495,12 @@ def load_lock(path: Path) -> EngineLock:
             "orinoco.lock engine.url must name the exact locked orinoco-lite wheel"
         )
 
-    runtime_version = runtime.get("version")
-    url = runtime.get("url")
-    location = runtime.get("path")
-    digest = runtime.get("sha256")
-    manifest_digest = runtime.get("manifest_sha256")
-    if not isinstance(runtime_version, str) or not runtime_version:
-        raise ConfigurationError("orinoco.lock runtime.version must be a string")
-    if (url is None) == (location is None):
-        raise ConfigurationError("orinoco.lock runtime requires exactly one of url or path")
-    if url is not None:
-        url = _absolute_http_url(url, "orinoco.lock runtime.url", https_only=True)
-    if location is not None:
-        location = _relative_path(location, "orinoco.lock runtime.path")
-    if (
-        not isinstance(digest, str)
-        or not SHA256.fullmatch(digest)
-        or set(digest) == {"0"}
-    ):
-        raise ConfigurationError("orinoco.lock runtime.sha256 must be lowercase SHA-256")
-    if (
-        not isinstance(manifest_digest, str)
-        or not SHA256.fullmatch(manifest_digest)
-        or set(manifest_digest) == {"0"}
-    ):
-        raise ConfigurationError(
-            "orinoco.lock runtime.manifest_sha256 must be lowercase SHA-256"
-        )
     return EngineLock(
         path=path.resolve(),
         distribution=distribution,
         engine_version=engine_version,
         engine_url=engine_url,
         engine_sha256=engine_digest,
-        runtime=RuntimePin(
-            version=runtime_version,
-            url=url,
-            path=location,
-            sha256=digest,
-            manifest_sha256=manifest_digest,
-        ),
         raw=raw,
     )
 

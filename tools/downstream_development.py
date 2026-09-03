@@ -39,10 +39,6 @@ RELEASE_COORDINATES = {
     "engine_version",
     "engine_url",
     "engine_sha256",
-    "runtime_version",
-    "runtime_url",
-    "runtime_sha256",
-    "runtime_manifest_sha256",
     "template_source",
     "template_version",
     "workflow_repository",
@@ -56,7 +52,6 @@ QUICK_TASKS = (
 FULL_TASKS = (
     "validate",
     "projection-verify",
-    "verify-runtime",
     "verify-hugo",
     "verify-ownership",
     "verify-build",
@@ -378,6 +373,8 @@ def prepare_candidate_editor_shell(
     engine: Path,
     destination: Path,
     environment: Mapping[str, str],
+    *,
+    licenses: Path | None = None,
 ) -> None:
     """Build the working-tree editor used by a downstream candidate."""
 
@@ -403,10 +400,96 @@ def prepare_candidate_editor_shell(
             "--shell",
             destination,
             "--licenses",
-            destination.parent / "editor-licenses",
+            licenses or destination.parent / "editor-licenses",
         ),
         cwd=engine.resolve(),
         environment=environment,
+    )
+
+
+def prepare_candidate_resources(
+    engine: Path,
+    destination: Path,
+    environment: Mapping[str, str],
+) -> None:
+    """Stage the candidate package's generated resources for one exercise."""
+
+    candidate_source = engine.resolve() / "packages/orinoco-lite/src"
+    if str(candidate_source) not in sys.path:
+        sys.path.insert(0, str(candidate_source))
+    from orinoco_lite.runtime import stage_package_resources
+
+    engine = engine.resolve()
+    source = destination / "source"
+    build = source / "build"
+    editor_shell = build / "runtime-editor-shell"
+    prepare_candidate_editor_shell(
+        engine,
+        editor_shell,
+        environment,
+        licenses=build / "runtime-editor-licenses",
+    )
+    _run(
+        (
+            sys.executable,
+            "-m",
+            "orinoco_lite.release_schema",
+            "--source-root",
+            engine / "submodules/things-schemas/src",
+            "--entry",
+            engine / "submodules/things-schemas/src/demo-research-information/unreleased.yaml",
+            "--destination",
+            build / "runtime-schema",
+        ),
+        cwd=engine,
+        environment=environment,
+    )
+    _run(
+        (
+            sys.executable,
+            "-m",
+            "orinoco_lite.release_review",
+            "--application",
+            engine / "packages/curation-review-app",
+            "--shell",
+            build / "runtime-review-shell",
+            "--licenses",
+            build / "runtime-review-licenses",
+        ),
+        cwd=engine,
+        environment=environment,
+    )
+    for relative in (
+        "tools/adapt_upstream_pages.py",
+        "release/runtime-licenses/README.md",
+        "packages/orinoco-lite/LICENSE",
+        "LICENSE",
+        "submodules/pool.psychoinformatics.de-ui/LICENSE",
+        "submodules/things-schemas/LICENSE",
+        "submodules/pool.psychoinformatics.de-ui/dlschemas_owl.ttl",
+        "submodules/pool.psychoinformatics.de-ui/dlschemas_shacl.ttl",
+        "submodules/pool.psychoinformatics.de-ui/config_default_xyzri.yaml",
+    ):
+        target = source / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(engine / relative, target)
+    spec = engine / "release/package-resources.yaml"
+    target_spec = source / "release/package-resources.yaml"
+    target_spec.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(spec, target_spec)
+    completed = subprocess.run(
+        ("git", "-C", str(engine), "rev-parse", "HEAD"),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    commit = completed.stdout.strip()
+    if completed.returncode or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise DevelopmentError("Could not resolve the candidate engine commit")
+    stage_package_resources(
+        target_spec,
+        destination / "package-resources",
+        source_commit=commit,
     )
 
 
@@ -531,9 +614,14 @@ def exercise_candidate(
             if not (application / "node_modules").is_dir():
                 _run(("npm", "ci", "--ignore-scripts"), cwd=application)
             _run(("npm", "run", "build:review"), cwd=application)
-            editor_shell = Path(temporary) / "editor-shell"
-            prepare_candidate_editor_shell(engine, editor_shell, environment)
-            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(editor_shell)
+            resources = Path(temporary) / "resources"
+            prepare_candidate_resources(engine, resources, environment)
+            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(
+                resources / "source/build/runtime-editor-shell"
+            )
+            environment["ORINOCO_CANDIDATE_RESOURCE_ROOT"] = os.fspath(
+                resources / "package-resources"
+            )
         for task in selected_tasks:
             _run(
                 (

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import shutil
 import stat
 import tarfile
 import tempfile
 import unittest
 
-from orinoco_lite.config import EngineLock, RuntimePin, load_workspace
+from orinoco_lite.config import EngineLock, load_workspace
 from orinoco_lite.errors import IntegrityError
 from orinoco_lite.integrity import sha256_file
 from orinoco_lite.runtime import (
@@ -39,7 +38,7 @@ class RuntimeReleaseTests(unittest.TestCase):
         self.spec = self.root / "runtime.yaml"
         self.spec.write_text(
             """\
-format: orinoco-lite-runtime-source
+format: orinoco-lite-package-resources
 spec_version: 1
 release: 0.1.0
 source_root: source
@@ -84,7 +83,7 @@ provenance:
         self.assertEqual(verified.files, 2)
         self.assertEqual(verified.commands, ("validate",))
 
-    def test_resolver_reopens_the_flattened_archive_install(self) -> None:
+    def test_resolver_uses_only_package_bundled_resources(self) -> None:
         archive = self.root / "runtime.tar.gz"
         assembled = assemble_runtime(self.spec, archive)
         consumer = self.root / "consumer"
@@ -102,7 +101,6 @@ provenance:
             "  base_url: https://example.invalid/runtime-cache/\n",
             encoding="utf-8",
         )
-        shutil.copyfile(archive, consumer / archive.name)
         workspace = load_workspace(consumer)
         lock = EngineLock(
             path=consumer / "orinoco.lock",
@@ -112,31 +110,23 @@ provenance:
                 "https://example.invalid/orinoco_lite-0.1.4-py3-none-any.whl"
             ),
             engine_sha256="a" * 64,
-            runtime=RuntimePin(
-                version="0.1.0",
-                url=None,
-                path=archive.name,
-                sha256=assembled["archive_sha256"],
-                manifest_sha256=assembled["manifest_sha256"],
-            ),
             raw={},
         )
+        extracted = self.root / "package-resources"
+        with tarfile.open(archive, "r:gz") as stream:
+            stream.extractall(extracted, filter="data")
+        resource_root = extracted / "orinoco-runtime"
+        from unittest.mock import patch
+        from orinoco_lite import runtime
 
-        installed = resolve_runtime(workspace, lock)
-        reopened = resolve_runtime(workspace, lock)
+        with (
+            patch.dict("os.environ", {"ORINOCO_CANDIDATE_RESOURCE_ROOT": str(resource_root)}),
+            patch.object(runtime, "__version__", "0.1.0"),
+        ):
+            installed = resolve_runtime(workspace, lock)
 
-        self.assertEqual(reopened, installed)
-        self.assertEqual(
-            installed.root,
-            (
-                consumer
-                / ".orinoco"
-                / "runtime"
-                / f"0.1.0-{assembled['archive_sha256'][:12]}"
-            ).resolve(),
-        )
-        self.assertTrue((installed.root / "runtime-manifest.json").is_file())
-        self.assertFalse((installed.root / "orinoco-runtime").exists())
+        self.assertEqual(installed.root, resource_root.resolve())
+        self.assertFalse((consumer / ".orinoco").exists())
 
     def test_source_commit_override_updates_engine_inventory(self) -> None:
         value = self.spec.read_text(encoding="utf-8").replace(

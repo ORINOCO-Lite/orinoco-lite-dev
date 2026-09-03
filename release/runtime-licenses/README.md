@@ -1,9 +1,9 @@
-# Runtime license inventory
+# Package resource license inventory
 
 Original Orinoco Lite software is MIT licensed.
-This directory records its license and the licenses of redistributed runtime components and is included in every runtime archive.
+This directory records its license and the licenses of redistributed components and is bundled in every released package.
 
-The deterministic release assembly copies the exact component license texts listed in `runtime-source.yaml` from their pinned source checkouts.
+The deterministic release assembly copies the exact component license texts listed in `package-resources.yaml` from their pinned source checkouts.
 Component licenses apply only to their respective components; downstream metadata, editorial content, media, and presentation retain their own declared terms.
 
 The editor and downstream source-review dependency inventories record every installed npm package, declared license, version, and all discovered license/notice files for their respective static shells.

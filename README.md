@@ -3,20 +3,20 @@
 Orinoco Lite turns schema-backed records and editorial inputs into a static website with browser-based metadata editing and source-adapter review.
 See the concise [`project design charter`](docs/project-design.md) for the durable objective, component boundaries, and data flows.
 
-This repository contains the engine, engineering tests, release assembly, and reusable CI.
-The engine reuses an exact upstream website revision, [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) supplies a thin adaptation and scaffold, and each deployed website is configured by one ordinary downstream repository.
+This repository contains the Python package, engineering tests, release assembly, and reusable CI.
+The package reuses an exact upstream website revision, [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) supplies a thin adaptation and scaffold, and each deployed website is configured by one ordinary downstream repository.
 
 ## Repository roles
 
 | Repository | Role |
 | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Engine, runtime assembly, engineering tests, and reusable CI |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Package development, release assembly, engineering tests, and reusable CI |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Submodule-pinned presentation and projection source |
 | [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks |
 | `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
 | [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Human-gated reference downstream |
 
-The engine resolves and composes the upstream website, while the template owns only the Orinoco-specific adaptation and downstream scaffold.
+The package resolves and composes the upstream website, while the template owns only the Orinoco-specific adaptation and downstream scaffold.
 A downstream provides declarative `site-specific/` inputs and optional overrides, plus site-specific executable metadata adapters under `extensions/`.
 
 The static website owns `/edit/` for SHACL Vue editing and `/review/` for source-adapter decisions.
@@ -88,6 +88,6 @@ Dependency locks and release inputs contain the versions required by the build; 
 See [`LICENSES.md`](LICENSES.md).
 - Canonical site metadata is the YAML below the configured records and annotation roots.
 Generated projection and website output are ignored.
-- The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in the runtime manifest.
+- The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in downstream configuration.
 Maintainer repinning hydrates and verifies required Annex-backed content and may place assets required by retained functionality in a bounded licensed template overlay as ordinary files; downstreams do not hydrate them.
 - Credentials, stores, caches, browser downloads, and build output are local state.
