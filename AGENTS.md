@@ -35,6 +35,8 @@ If no such operation exists, do not add it.
 - Treat `docs/project-design.md` as the durable high-level design contract.
 Reconcile conflicting plans or implementation state; propose a human-reviewed design change instead of silently normalizing drift.
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
+- In `docs/project-design.md`, name concrete actors, artifacts, and Git operations.
+Prefer terms such as commit, comment, pull request, and merge over abstract workflow language when they describe the actual action, and omit conclusions already evident from the flow.
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
 - Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
 - Detailed plans, decisions, and reports belong under `docs/agents/` only while active.

@@ -57,8 +57,8 @@ An Orinoco Lite release is one Python package whose code and bundled resources s
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, optional source adapters, review policy, deployment, and upgrade timing | It is human-gated. Generated projections, site output, and caches are build products rather than canonical input. |
-| The [curation service](../packages/curation-review-app/) | Provides authentication and verified GitHub transport for explicitly requested online editing and review operations | It is outside build and public-read paths, hosts no editor or review interface, and stores no metadata, decisions, bundles, or durable sessions. |
+| A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, downstream-defined source adapters, review policy, deployment, and upgrade timing | It is human-gated. Generated projections, site output, and caches are build products rather than canonical input. |
+| The [curation service](../packages/curation-review-app/) | Signs users in and performs verified GitHub operations for online editing and review | It is outside build and public-read paths, hosts no editor or review interface, and stores no metadata, decisions, bundles, or durable sessions. |
 
 ```mermaid
 flowchart TB
@@ -92,7 +92,7 @@ flowchart TB
     cache[("Ignored exact-source cache")]
     build["Orinoco Lite build<br/>resolve, verify, join, validate, project, compose"]
     artifact["Static artifact<br/>website plus /edit/ and /review/"]
-    service["Curation service<br/>authenticated GitHub transport"]
+    service["Curation service<br/>sign-in and GitHub operations"]
     host["Static hosting"]
 
     template -->|"initial scaffold and pins; reviewed updates"| repository
@@ -102,8 +102,8 @@ flowchart TB
     repository -->|"site-owned inputs and policy"| build
     build -->|"static bytes"| artifact
     artifact -->|"deploy static bytes"| host
-    artifact -.->|"explicit signed-in handoff"| service
-    service -.->|"verified GitHub operations"| repository
+    artifact -.->|"explicit signed-in request"| service
+    service -.->|"commit edit bundle or<br/>post review decisions"| repository
   end
 
   click engineering "https://github.com/ORINOCO-Lite/orinoco-lite-dev" "Open the engineering repository"
@@ -176,13 +176,14 @@ This retention does not require byte-identical rebuilds or additional manifests,
 ## Metadata change flow
 
 People may edit metadata through ordinary Git changes or use `/edit/` to download an edit bundle for local application.
-After explicit confirmation, `/edit/` can instead hand the bundle to GitHub through the curation service.
+After explicit confirmation, `/edit/` can instead ask the curation service to create or update a draft pull request.
 
-Optional source adapters read identified external sources and prepare repeatable metadata proposals without modifying those sources.
+Source adapters are downstream-defined automations that read identified external sources and prepare repeatable metadata proposals without modifying those sources.
 DataLad records each adapter run and proposed Git commit; `/review/` lets a person accept, reject, or defer every proposed change.
 
-For online editing and review, the curation service handles sign-in, verifies the exact GitHub state, and transports confirmed edit bundles or review decisions.
-Trusted workflows apply and validate the resulting change against that state, and a person remains responsible for merging it.
+For online editing and review, the curation service signs the user in and verifies the exact GitHub state.
+It commits a confirmed edit bundle or posts confirmed review decisions to the matching pull request.
+Trusted workflows validate and finalize the resulting metadata changes.
 Automation must not invent metadata meaning, identity, rights, or review decisions; approve or merge changes; or write to an external source.
 
 ```mermaid
@@ -194,10 +195,10 @@ flowchart TB
   site --> review["Review automated suggestions<br/>/review/"]
   edit -->|"download without signing in"| local["Review and apply locally"]
   local -->|"ordinary Git change"| github
-  edit -.->|"explicit signed-in handoff"| service["Sign-in and GitHub handoff service<br/>no metadata storage"]
-  review -.->|"confirmed decisions"| service
-  github -.->|"verify current commit"| service
-  service -.->|"transport proposal or decisions"| github
+  edit -.->|"submit edit after sign-in"| service["Curation service<br/>sign-in and exact-state checks"]
+  review -.->|"submit decisions"| service
+  github -.->|"verify pull request and current commit"| service
+  service -.->|"commit edit bundle or post review decisions"| github
 
   github -->|"validated change; human merge"| canonical["Approved metadata<br/>in the downstream repository"]
   canonical -->|"validate and rebuild"| site
@@ -207,15 +208,15 @@ flowchart TB
   click github "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/docs/agents/contract" "Open the normative contracts"
 ```
 
-The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication boundary](agents/contract/curation-service-authentication-options.md).
+The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication rules](agents/contract/curation-service-authentication-options.md).
 
 ## Design principles
 
 - **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website; Orinoco-specific changes remain small, explicit, and separately owned.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
-Each downstream owns its information, presentation choices, review policy, and optional adapters.
+Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
-Only signed-in GitHub operations cross the curation-service boundary.
+The curation service is used only for signed-in GitHub operations.
 - **Keep people and Git in control.** External sources are read-only, automation produces proposals, human choices are explicit, and Git supplies durable history and recovery.
 - **Record each fact once.** Versions and integrity data belong in the locks, package metadata, Gitlinks, and release inputs that use them; change history belongs in Git and GitHub.
 Do not add parallel ledgers or inventories merely for explanation or proof.
