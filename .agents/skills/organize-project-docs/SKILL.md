@@ -12,7 +12,7 @@ Keep active material short and rely on Git when completed working context is no 
 
 | Location | Purpose |
 | --- | --- |
-| `docs/project-design.md` | Concise, high-level human design and project direction |
+| `docs/project-design.md` | Concise project design charter: purpose, intended system, relationships, and principles |
 | `docs/agents/contract/` | Normative active engineering contracts |
 | `docs/agents/` | Active plans, open decisions, and agent context |
 
@@ -28,7 +28,7 @@ Keep `docs/project-design.md` readable without the detailed agent documents.
 It should say what the project is building, how its main parts fit together, and the principles that guide implementation.
 
 Files under `docs/agents/contract/` are normative for their named behavior.
-Other files under `docs/agents/` may accumulate the detail needed to coordinate active implementation, but are not automatically authoritative.
+Other files under `docs/agents/` may accumulate the detail needed to coordinate active implementation, but do not become current guidance merely by existing.
 Link only the small current subset needed by an instruction entry point or active task.
 
 ## Write from the shared model outward
@@ -41,27 +41,29 @@ Use a specialized, ambiguous, or overloaded term only when it improves precision
 Define it before first necessary use in the document's terminology section, and use it consistently with that definition.
 If a concise definition cannot justify and constrain the term, replace it with plain language.
 
-Keep detail at its narrowest authoritative layer:
+Keep detail at its narrowest useful layer:
 
-- high-level design owns the shared mental model, durable intent, and system boundaries;
-- contracts own exact supported behavior and authority boundaries;
-- agent guidance owns repeatable procedures and routing; and
-- code, configuration, workflows, and tests own implementation mechanics and executable facts.
+- the project design charter presents the shared mental model, durable intent, relationships, and principles;
+- contracts specify exact supported behavior;
+- agent guidance provides repeatable procedures and routing; and
+- code, configuration, workflows, and tests contain implementation mechanics and executable facts.
 
-Move detail to the narrowest authoritative source and link to it instead of repeating it at broader layers.
+Move detail to the narrowest appropriate source and link to it instead of repeating it at broader layers.
 Do not make a high-level document independently sufficient for implementation.
+Favor the smallest accurate model a human reader can understand.
+Do not add intermediaries or qualifications merely because a narrower contract needs them.
 
 ## Compress without making readers guess
 
-Before adding or removing text, identify its load-bearing claims: definitions, obligations, exclusions, conditions, defaults, and unresolved choices.
-Preserve each claim once at its authoritative layer.
+Before adding or removing text, identify its load-bearing claims: definitions, promises, boundaries, exclusions, and intended relationships.
+Preserve each claim once in its appropriate document.
 Different scopes are not duplicates; apparently similar statements must be reconciled rather than silently merged.
 
 For every precision pass:
 
-1. remove restatements and implementation detail available from a linked authority;
+1. remove restatements and implementation detail available from a linked source;
 2. hoist repeated qualifications or definitions to the earliest appropriate location;
-3. scan the edited document and linked authorities for conflicting scope or terminology;
+3. scan the edited document and linked sources for conflicting scope or terminology;
 4. prefer a net reduction or unchanged size unless the edit adds durable intent; and
 5. stop when another deletion would force a cold reader to infer a project-specific rule.
 

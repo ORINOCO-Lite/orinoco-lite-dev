@@ -1,7 +1,7 @@
 # Orinoco Lite engineering workspace
 
 Orinoco Lite turns schema-backed records and editorial inputs into a static website with browser-based metadata editing and source-adapter review.
-See the concise [`project design`](docs/project-design.md) for the durable objective, component boundaries, and data flows.
+See the concise [`project design charter`](docs/project-design.md) for the durable objective, component boundaries, and data flows.
 
 This repository contains the engine, engineering tests, release assembly, and reusable CI.
 The engine reuses an exact upstream website revision, [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) supplies a thin adaptation and scaffold, and each deployed website is configured by one ordinary downstream repository.

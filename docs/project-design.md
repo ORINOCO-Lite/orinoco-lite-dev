@@ -1,21 +1,25 @@
-# Orinoco Lite project design
+# Orinoco Lite project design charter
 
 Orinoco Lite provides a repository template for maintaining schema-backed research information and publishing an organization's static website.
 It adapts the separately maintained ORINOCO ecosystem (Organized Research Information: Ontology-mapping, Curation, Orchestration), which manages metadata records and derives consumer-specific views such as websites.
 Orinoco Lite keeps the records and website on GitHub and replaces ORINOCO's server-backed metadata management with pull-request-based curation.
 
-This document is the durable, high-level design contract shared by maintainers, developers, and AI agents.
+This document is the durable project design charter shared by maintainers, developers, and AI agents.
 It describes the intended architecture rather than a release inventory or progress report.
 Detailed protocols, procedures, and temporary implementation plans belong in the documents linked below.
 
 ## Terminology
 
+- *authority* — the person or source whose answer prevails when consequential claims conflict, preventing the project from treating incompatible answers as equally valid;
 - *canonical* — accepted source state from which other representations are derived, not an assertion that the state is immutable;
 - *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details;
 - *downstream* — a website repository created from and maintained with Orinoco Lite;
 - *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation;
 - *projection* — a consumer-specific view derived by selecting, joining, or transforming canonical metadata without changing it; and
 - *upstream* — the original ORINOCO ecosystem and its artifacts, including the [psychoinformatics.de](https://www.psychoinformatics.de) website.
+
+Authority matters where competing answers could change the result—for example, if generated output disagrees with reviewed metadata.
+Ordinary interactions do not need authority labels when the flow is clear.
 
 ## Objective
 
@@ -57,7 +61,7 @@ An Orinoco Lite release is one Python package whose code and bundled resources s
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, downstream-defined source adapters, review policy, deployment, and upgrade timing | It is human-gated. Generated projections, site output, and caches are build products rather than canonical input. |
+| A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, downstream-defined source adapters, review policy, deployment, and upgrade timing | Generated projections, site output, and caches are build products rather than canonical input. |
 | The [curation service](../packages/curation-review-app/) | Signs users in and performs verified GitHub operations for online editing and review | It is outside build and public-read paths, hosts no editor or review interface, and stores no metadata, decisions, bundles, or durable sessions. |
 
 The diagram follows reusable ORINOCO capabilities into an Orinoco Lite release, then shows how one downstream repository uses that release to curate metadata and regenerate its representations.
@@ -103,7 +107,7 @@ flowchart TB
     site["Static website"]
 
     interfaces -->|"open and update"| pull_request
-    pull_request -->|"propose updates to"| metadata
+    pull_request -->|"are merged into"| metadata
     metadata -->|"is processed by"| actions
     actions -->|"generates and validates"| built_graph
     built_graph -->|"is projected into"| website_data
@@ -165,7 +169,7 @@ Generated Hugo projection and website output must not accumulate there.
 
 The latest successful deployment retains its Hugo projection and deployed static files outside the default branch, traceable to the accepted source commit.
 A longer publication history may be retained for diagnosis and recovery.
-Other generated operational data is temporary and provides neither canonical metadata nor recovery authority.
+Other generated operational data is temporary and is neither canonical metadata nor a recovery source.
 This retention does not require byte-identical rebuilds or additional manifests, attestations, ledgers, or validation machinery.
 
 ## Metadata change flow
@@ -206,7 +210,7 @@ DataLad records downstream adapter runs in ordinary Git; released builds and ada
 
 ## Documentation and change control
 
-This document owns the project's lasting purpose, organization, and boundaries.
+This charter contains the project's lasting purpose, organization, and boundaries.
 Narrower or shorter-lived information belongs elsewhere:
 
 - [`docs/agents/contract/`](agents/contract/) defines exact technical rules where metadata meaning, review behavior, or security boundaries require precision;
@@ -214,9 +218,5 @@ Narrower or shorter-lived information belongs elsewhere:
 - project [skills](../.agents/skills/) provide step-by-step procedures for repeatable work; and
 - [`docs/agents/`](agents/) holds active plans and unresolved decisions, not an alternative description of the architecture.
 
-Plans, code, tests, releases, or downstreams may temporarily differ from this design during a reviewed change.
-Treat the difference as work to resolve, not permission to preserve accidental behavior or silently change the design.
-If the intended direction changes, update this document for human agreement before implementing it.
-
-This architecture does not decide production metadata meaning, review authority, migration, hosting, cutover, accessibility, privacy, or recovery ownership.
-Those choices remain in [`open-decisions.md`](agents/open-decisions.md) until people resolve them.
+Use this charter when deciding how Orinoco Lite should evolve.
+When the intended design changes, update the charter for human agreement; implementation status and sequencing belong in active plans and code.
