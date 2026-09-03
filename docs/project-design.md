@@ -139,7 +139,8 @@ extensions/                            # Downstream-owned executable code for me
   source-adapters/<adapter>/           # Site-specific acquisition and curation code
 ```
 
-`site-specific/` is the human-curated, declarative, self-contained source for what the organization's site contains and how it appears.
+`site-specific/` is human-curated and self-contained as the source for what the organization's site contains and how it appears.
+It is declarative: it describes what the site should contain and look like without implementing how Orinoco Lite performs the work.
 It holds semantic assertions, machine-provenance companions, editorial material, identity, presentation data, assets, source evidence and policy, current curation decisions, and supported small overrides—not implementation code.
 
 `extensions/source-adapters/` is exclusively for site-specific executable metadata acquisition and curation code.
