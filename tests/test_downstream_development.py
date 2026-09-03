@@ -268,7 +268,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             (
                 "validate",
                 "projection-verify",
-                "verify-runtime",
                 "verify-hugo",
                 "verify-ownership",
                 "verify-build",
@@ -322,7 +321,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
-            patch.object(development, "prepare_candidate_editor_shell") as editor,
+            patch.object(development, "prepare_candidate_resources") as resources,
             patch.object(development, "_run") as run,
         ):
             development.exercise_candidate(
@@ -335,7 +334,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             ("npm", "run", "build:review"),
             run.call_args_list[0].args[0],
         )
-        editor.assert_called_once()
+        resources.assert_called_once()
         self.assertEqual("build", run.call_args_list[1].args[0][-1])
         environment = run.call_args_list[1].kwargs["environment"]
         self.assertIn("ORINOCO_CANDIDATE_EDITOR_SHELL", environment)
@@ -353,7 +352,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
-            patch.object(development, "prepare_candidate_editor_shell"),
+            patch.object(development, "prepare_candidate_resources"),
             patch.object(development, "_run") as run,
         ):
             development.exercise_candidate(
