@@ -13,7 +13,10 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 - *upstream* — the original ORINOCO ecosystem and artifacts it produces, such as the [psychoinformatics.de](https://www.psychoinformatics.de) website;
 - *downstream* — a website-producing repository instantiated and managed by Orinoco Lite; and
-- *projection* — transformation into use-case-specific data representations, such as website sources or a CV.
+- *projection* — transformation into use-case-specific data representations, such as website sources or a CV;
+- *canonical* — accepted source state from which other representations are derived, not an assertion that the state is immutable;
+- *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details; and
+- *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation.
 
 ## Objective
 
@@ -135,7 +138,7 @@ Reusable adapter primitives belong in the engine or template.
 
 The Orinoco Lite engine combines `site-specific/metadata/` with the exact Gitlink-selected `www-from-model` revision to generate the graph and Hugo pages.
 It does not modify metadata during that step.
-Generated projection, static output, caches, downloads, and review artifacts remain derived or transient state.
+These generated files are not canonical inputs and do not enter the downstream's default branch.
 
 ## Build and deployment flow
 
@@ -144,12 +147,27 @@ The selected runtime records the exact engineering commit, which selects one exa
 This chain ensures that every build uses a known set of source code.
 2. The engine converts the site's metadata into a graph and validates it against the exact Things Schema included in the selected release.
 3. The engine uses the selected upstream page templates and graph generator to create the site's pages and graph data.
-These generated files are reproducible build output, not source data kept in Git.
+These generated files form the **Hugo projection**: build output derived from the canonical source and selected dependency versions, rather than canonical source data.
 4. The engine combines the reusable website, the thin Orinoco adaptation, and the downstream's content and settings in a fixed order.
 Site overrides apply only in the supported locations and take precedence there.
 The build also adds the static `/edit/` and `/review/` interfaces and connects them to the downstream repository and exact commit being built.
 5. The completed website is deployed as static files.
 Once the selected dependencies have been downloaded and verified, validating, building, browsing, editing, and downloading change bundles do not require a running metadata service.
+
+## Generated publication records
+
+Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
+Generated projection and website output must not accumulate there.
+
+For the latest successful deployment, the system retains the Hugo projection used to assemble the site and the static website bytes that were deployed.
+Both remain outside the default branch and are traceable to the accepted source commit.
+A longer history of publications may be retained for diagnosis and recovery.
+
+Other generated operational data is temporary and is neither canonical metadata nor recovery authority.
+Review state and handoff behavior follow the applicable contracts linked below.
+
+Publication retention supports inspection and recovery.
+It does not require proving that a later build is byte-identical or justify additional manifests, attestations, ledgers, or validation machinery.
 
 ## Metadata change flow
 
