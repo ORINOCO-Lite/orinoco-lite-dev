@@ -11,7 +11,7 @@ Projection and report-only diagnostics are not source adapters.
 
 The reviewed default branch is curated state.
 A proposal branch is temporary review state.
-Git history records earlier proposals and decisions; the project does not maintain a second history or candidate inventory.
+Commits retained on the reviewed default branch record finalized changes; the project does not maintain a second history or candidate inventory.
 
 ## Repository layout
 
@@ -132,9 +132,10 @@ A downstream may opt into stricter local closure.
 The supported host behavior is defined in [`github-curation-review.md`](github-curation-review.md).
 It presents the proposal diff, records authenticated complete decisions, applies finalization at the current head, and validates the result.
 
-One expiring Actions artifact MAY supply reproducible presentation data.
+One expiring Actions artifact MAY supply generated presentation data.
 It is not metadata, a decision store, provenance authority, or recovery mechanism.
-The proposal commit, authenticated submission, decision cache, and Git history are durable state.
+Finalized metadata and the decision cache retained on the reviewed default branch, together with the authenticated submission, form the retained review record.
+The proposal branch and presentation artifact are temporary.
 
 SHACL Vue editing follows [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md).
 It does not change source-adapter candidate or decision semantics.

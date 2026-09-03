@@ -74,5 +74,7 @@ All review, warning, and confirmation UI remains on the downstream origin.
 The central or self-hosted service supplies only OAuth, verified GitHub reads, and authenticated transport.
 It MUST NOT host a landing page, review application, editor, upload interface, metadata converter, database, or decision store.
 
-Git commits, the authenticated comment, and the compact decision cache are the durable review state.
-Expired artifacts can be regenerated and require no recovery ledger.
+Finalized metadata and the compact decision cache retained on the reviewed default branch, together with the authenticated comment, form the retained review record.
+The proposal branch and its presentation artifact are temporary.
+An expired presentation artifact can be generated again while the proposal remains open.
+Once a curator submits decisions, the authenticated comment and resulting finalized Git change provide the retained review record; submitted decisions MUST NOT depend on continued artifact availability.

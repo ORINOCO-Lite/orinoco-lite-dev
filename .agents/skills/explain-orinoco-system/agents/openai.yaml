@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain the ORINOCO System"
+  short_description: "Create clear ORINOCO system diagrams"
+  default_prompt: "Use $explain-orinoco-system to create or revise a high-level ORINOCO system diagram with consistent components, artifacts, and relationships."

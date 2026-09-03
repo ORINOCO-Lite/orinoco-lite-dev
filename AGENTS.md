@@ -32,9 +32,11 @@ If no such operation exists, do not add it.
 
 ## Documentation
 
-- Treat `docs/project-design.md` as the durable high-level design contract.
-Reconcile conflicting plans or implementation state; propose a human-reviewed design change instead of silently normalizing drift.
+- Treat `docs/project-design.md` as the durable project design charter.
+Use it for intended design; keep implementation status and sequencing in active plans.
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
+- In `docs/project-design.md`, name concrete actors, artifacts, and Git operations.
+Prefer terms such as commit, comment, pull request, and merge over abstract workflow language when they describe the actual action, and omit conclusions already evident from the flow.
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
 - Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
 - Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
@@ -51,7 +53,6 @@ Materialize those assets as ordinary files only in a bounded template overlay th
 - Use Git and Git Annex state as the provenance for materialized assets.
 Do not add redundant per-asset coordinates or provenance inventories when tooling can derive precise information from the selected repositories.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
-- Stop for clarification when ambiguity would change metadata semantics, review authority, or durable state.
 - Do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
 - Do not preserve copied framework files, workflows, tests, configuration, or updater machinery in downstreams as compatibility requirements.
 - Keep the engine on the pinned upstream Things Schema and exact `dlthings:*` CURIE contract; do not silently substitute a generated, vendored, or newer schema.
