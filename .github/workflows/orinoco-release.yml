@@ -78,6 +78,7 @@ jobs:
           if [ -z "$spec" ]; then
             spec="release/package-resources.yaml"
           fi
+          python -m pip install --disable-pip-version-check PyYAML==6.0.2
           SPEC="$spec" VERSION="$version" python - <<'PY'
           import os, pathlib, tomllib, yaml
           value = yaml.safe_load(pathlib.Path(os.environ["SPEC"]).read_text())
@@ -109,8 +110,7 @@ jobs:
             --application packages/curation-review-app \
             --shell build/runtime-review-shell \
             --licenses build/runtime-review-licenses
-          python -m pip install --disable-pip-version-check \
-            build==1.3.0 PyYAML==6.0.2
+          python -m pip install --disable-pip-version-check build==1.3.0
           package_source="$(mktemp -d)/orinoco-lite"
           cp -R packages/orinoco-lite "$package_source"
           PYTHONPATH=packages/orinoco-lite/src python -c '\
