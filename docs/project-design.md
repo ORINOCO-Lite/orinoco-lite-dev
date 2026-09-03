@@ -60,42 +60,59 @@ An Orinoco Lite release is one Python package whose code and bundled resources s
 | A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, downstream-defined source adapters, review policy, deployment, and upgrade timing | It is human-gated. Generated projections, site output, and caches are build products rather than canonical input. |
 | The [curation service](../packages/curation-review-app/) | Signs users in and performs verified GitHub operations for online editing and review | It is outside build and public-read paths, hosts no editor or review interface, and stores no metadata, decisions, bundles, or durable sessions. |
 
+The diagram follows reusable ORINOCO capabilities into an Orinoco Lite release, then shows how one downstream repository uses that release to curate metadata and regenerate its representations.
+
 ```mermaid
 flowchart TB
   subgraph orinoco["ORINOCO component ecosystem"]
     direction LR
-    input["Acquire and edit metadata<br/>enrichment tools · SHACL Vue"]
+    curation["Metadata curation components"]
+    schema["Schema and validation components"]
+    conversion["Graph conversion and query components"]
+    presentation["Presentation components"]
     records["Metadata records"]
-    semantic_graph["Validate and build graph<br/>Things Schemas · conversion tools"]
-    project["Query and project<br/>query-things · www-from-model"]
-    outputs["Downstream representations<br/>website data · graph views · exports"]
+    knowledge_graph["Knowledge graph"]
+    representations["Downstream representations"]
 
-    input --> records --> semantic_graph --> project --> outputs
+    curation -->|"create and update"| records
+    schema -->|"validate"| records
+    records -->|"are converted by"| conversion
+    conversion -->|"produces"| knowledge_graph
+    knowledge_graph -->|"is projected by"| presentation
+    presentation -->|"generates"| representations
   end
 
-  selected["Pinned ORINOCO component set<br/>exact schema, conversion, query, editor, and presentation revisions"]
-  adapter["Thin Orinoco Lite layer<br/>GitHub curation · workflow entry points · static-site assembly"]
+  subgraph release["Orinoco Lite release"]
+    direction TB
+    components["ORINOCO components"]
+    curation_integration["GitHub curation integration"]
+    site_assembly["Static-site assembly"]
+  end
 
-  orinoco -->|"selected for a release"| selected
-  selected --> adapter
+  orinoco -->|"is pinned by"| release
 
   subgraph downstream["Downstream GitHub repository"]
     direction LR
-    edit["Static edit / review interface"]
-    pull_request["Pull request"]
-    metadata["Metadata and site inputs"]
+    interfaces["Static curation interfaces"]
+    pull_request["Pull requests"]
+    metadata["Repository metadata"]
     actions["GitHub Actions"]
-    builds["Graph + website data"]
+    built_graph["Graph"]
+    website_data["Website data"]
+    other_outputs["Other representations"]
     site["Static website"]
 
-    edit -->|"proposes changes"| pull_request
-    pull_request -->|"merge"| metadata
-    metadata --> actions
-    actions --> builds --> site
-    site -.->|"edit or review"| edit
+    interfaces -->|"open and update"| pull_request
+    pull_request -->|"propose updates to"| metadata
+    metadata -->|"is processed by"| actions
+    actions -->|"generates and validates"| built_graph
+    built_graph -->|"is projected into"| website_data
+    built_graph -->|"is projected into"| other_outputs
+    website_data -->|"is assembled into"| site
+    site -.->|"provides"| interfaces
   end
 
-  adapter -->|"used by workflows"| actions
+  release -->|"runs in"| actions
 ```
 
 ## Downstream data boundary
