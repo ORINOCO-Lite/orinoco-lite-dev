@@ -31,6 +31,42 @@ Files under `docs/agents/contract/` are normative for their named behavior.
 Other files under `docs/agents/` may accumulate the detail needed to coordinate active implementation, but are not automatically authoritative.
 Link only the small current subset needed by an instruction entry point or active task.
 
+## Write from the shared model outward
+
+Order material by dependency: purpose and shared mental model, necessary terminology, high-level boundaries, then links to precise downstream detail.
+Introduce a concept where the reader first needs it, after its prerequisites; do not explain implementation detail early merely to make a later sentence possible.
+
+Prefer plain English.
+Use a specialized, ambiguous, or overloaded term only when it improves precision or compresses repeated explanation.
+Define it before first necessary use in the document's terminology section, and use it consistently with that definition.
+If a concise definition cannot justify and constrain the term, replace it with plain language.
+
+Keep detail at its narrowest authoritative layer:
+
+- high-level design owns the shared mental model, durable intent, and system boundaries;
+- contracts own exact supported behavior and authority boundaries;
+- agent guidance owns repeatable procedures and routing; and
+- code, configuration, workflows, and tests own implementation mechanics and executable facts.
+
+Move detail to the narrowest authoritative source and link to it instead of repeating it at broader layers.
+Do not make a high-level document independently sufficient for implementation.
+
+## Compress without making readers guess
+
+Before adding or removing text, identify its load-bearing claims: definitions, obligations, exclusions, conditions, defaults, and unresolved choices.
+Preserve each claim once at its authoritative layer.
+Different scopes are not duplicates; apparently similar statements must be reconciled rather than silently merged.
+
+For every precision pass:
+
+1. remove restatements and implementation detail available from a linked authority;
+2. hoist repeated qualifications or definitions to the earliest appropriate location;
+3. scan the edited document and linked authorities for conflicting scope or terminology;
+4. prefer a net reduction or unchanged size unless the edit adds durable intent; and
+5. stop when another deletion would force a cold reader to infer a project-specific rule.
+
+Measure success by preserved meaning, correct placement, and reduced ambiguity—not by the shortest possible text.
+
 ## Keep milestones bounded
 
 A substantial active milestone may use:
@@ -62,9 +98,8 @@ Do not create archive directories merely to retain superseded project context.
 
 ## Working rules
 
-- Inspect existing instructions, indexes, links, and conventions first.
+- Inspect existing instructions, indexes, links, conventions, and terminology before editing.
 - State the document's reader, lifetime, and source of truth before expanding it.
-- Prefer links to active canonical material over duplicated explanation.
 - Preserve useful current material when reorganizing files; rely on Git for retired history.
 - Never store credentials, tokens, private keys, or browser secrets in docs.
 - Report ambiguous classification instead of silently turning tentative notes into durable policy.
