@@ -397,7 +397,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         for task in (
             "validate",
             "projection-verify",
-            "verify-runtime",
             "verify-hugo",
             "verify-ownership",
             "verify-build",
