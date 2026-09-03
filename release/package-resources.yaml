@@ -1,6 +1,6 @@
 format: orinoco-lite-package-resources
 spec_version: 1
-release: 0.3.0rc1
+release: 0.3.0rc2
 compatibility:
   config: [2]
   minimum_python: "3.12"
