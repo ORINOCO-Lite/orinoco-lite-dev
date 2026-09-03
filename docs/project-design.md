@@ -10,16 +10,12 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 ## Terminology
 
-- *authority* — the person or source whose answer prevails when consequential claims conflict, preventing the project from treating incompatible answers as equally valid;
 - *canonical* — accepted source state from which other representations are derived, not an assertion that the state is immutable;
 - *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details;
 - *downstream* — a website repository created from and maintained with Orinoco Lite;
 - *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation;
 - *projection* — a consumer-specific view derived by selecting, joining, or transforming canonical metadata without changing it; and
 - *upstream* — the original ORINOCO ecosystem and its artifacts, including the [psychoinformatics.de](https://www.psychoinformatics.de) website.
-
-Authority matters where competing answers could change the result—for example, if generated output disagrees with reviewed metadata.
-Ordinary interactions do not need authority labels when the flow is clear.
 
 ## Objective
 
