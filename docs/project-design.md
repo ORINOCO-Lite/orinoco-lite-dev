@@ -62,58 +62,40 @@ An Orinoco Lite release is one Python package whose code and bundled resources s
 
 ```mermaid
 flowchart TB
-  subgraph maintenance["Source selection and repinning"]
+  subgraph orinoco["ORINOCO component ecosystem"]
     direction LR
-    engineering["orinoco-lite-dev<br/>package and service source,<br/>selected Gitlink, release assembly"]
-    upstream["www-from-model<br/>presentation, page templates, graph producer"]
-    dependencies["Dependencies declared and pinned<br/>by www-from-model, including Congo"]
-    annex["Git Annex<br/>maintainer-only hydration and verification"]
-    repin["Repin and materialize<br/>required presentation payloads"]
+    input["Acquire and edit metadata<br/>enrichment tools · SHACL Vue"]
+    records["Metadata records"]
+    semantic_graph["Validate and build graph<br/>Things Schemas · conversion tools"]
+    project["Query and project<br/>query-things · www-from-model"]
+    outputs["Downstream representations<br/>website data · graph views · exports"]
 
-    engineering -->|"exact Gitlink"| upstream
-    upstream -->|"declares exact pins"| dependencies
-    upstream -->|"selected payloads"| repin
-    annex -.->|"used only here"| repin
+    input --> records --> semantic_graph --> project --> outputs
   end
 
-  subgraph distribution["Distribution"]
-    direction LR
-    package["orinoco-lite Python package<br/>code, schema, drivers,<br/>/edit/ and /review/ shells, licenses"]
-    template["orinoco-lite-template source<br/>thin adapter, licensed asset overlay,<br/>Copier scaffold, workflows, initial pins"]
+  selected["Pinned ORINOCO component set<br/>exact schema, conversion, query, editor, and presentation revisions"]
+  adapter["Thin Orinoco Lite layer<br/>GitHub curation · workflow entry points · static-site assembly"]
 
-    engineering -->|"publishes one package"| package
-    repin -->|"ordinary licensed files"| template
-    package -->|"reviewed version and integrity pin"| template
+  orinoco -->|"selected for a release"| selected
+  selected --> adapter
+
+  subgraph downstream["Downstream GitHub repository"]
+    direction LR
+    edit["Static edit / review interface"]
+    pull_request["Pull request"]
+    metadata["Metadata and site inputs"]
+    actions["GitHub Actions"]
+    builds["Graph + website data"]
+    site["Static website"]
+
+    edit -->|"proposes changes"| pull_request
+    pull_request -->|"merge"| metadata
+    metadata --> actions
+    actions --> builds --> site
+    site -.->|"edit or review"| edit
   end
 
-  subgraph downstream["One deployed site"]
-    direction LR
-    repository["Downstream repository<br/>canonical metadata, content, identity,<br/>policy, adapters, exact locks"]
-    cache[("Ignored exact-source cache")]
-    build["Orinoco Lite build<br/>resolve, verify, join, validate, project, compose"]
-    artifact["Static artifact<br/>website plus /edit/ and /review/"]
-    service["Curation service<br/>sign-in and GitHub operations"]
-    host["Static hosting"]
-
-    template -->|"initial scaffold and pins; reviewed updates"| repository
-    package -->|"recorded engineering commit selects<br/>exact presentation sources"| cache
-    package -->|"installed and verified<br/>from the downstream lock"| build
-    cache -->|"verified sources"| build
-    repository -->|"site-owned inputs and policy"| build
-    build -->|"static bytes"| artifact
-    artifact -->|"deploy static bytes"| host
-    artifact -.->|"explicit signed-in request"| service
-    service -.->|"commit edit bundle or<br/>post review decisions"| repository
-  end
-
-  click engineering "https://github.com/ORINOCO-Lite/orinoco-lite-dev" "Open the engineering repository"
-  click upstream "https://github.com/ORINOCO-Lite/www-from-model" "Open the presentation source"
-  click dependencies "https://github.com/ORINOCO-Lite/congo" "Open the selected theme repository"
-  click annex "https://git-annex.branchable.com/" "Open Git Annex"
-  click repin "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/tools/materialize_presentation_assets.py" "Open the repinning tool"
-  click package "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/packages/orinoco-lite" "Open the Orinoco Lite package"
-  click template "https://github.com/ORINOCO-Lite/orinoco-lite-template/tree/main" "Open the template source"
-  click repository "https://github.com/ORINOCO-Lite/test-orinoco-downstream-website" "Open the human-gated reference downstream"
+  adapter -->|"used by workflows"| actions
 ```
 
 ## Downstream data boundary
@@ -171,6 +153,15 @@ This retention does not require byte-identical rebuilds or additional manifests,
 
 ## Metadata change flow
 
+Orinoco Lite supports two sources of metadata change:
+
+1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
+Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
+
+2. **Automated augmentation.** A GitHub Action runs a source adapter which reads an external source and opens a pull request with proposed changes.
+In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
+Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
+
 ```mermaid
 flowchart LR
   edit["Person edits metadata<br/>in /edit/"] --> changes["Pull request<br/>validated metadata changes"]
@@ -180,15 +171,6 @@ flowchart LR
   proposal --> review["Person decides<br/>in /review/"]
   review --> changes
 ```
-
-Orinoco Lite supports two sources of metadata change:
-
-1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
-Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
-
-2. **Automated augmentation.** A github action runs a source adapter which reads an  external source and opens a pull request with proposed changes.
-In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
-Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
 
 The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication rules](agents/contract/curation-service-authentication-options.md).
 
