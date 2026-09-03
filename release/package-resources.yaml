@@ -1,6 +1,6 @@
-format: orinoco-lite-runtime-source
+format: orinoco-lite-package-resources
 spec_version: 1
-release: 0.2.0rc20
+release: 0.3.0rc1
 compatibility:
   config: [2]
   minimum_python: "3.12"
@@ -66,8 +66,6 @@ licenses:
   - licenses/review-dependencies/inventory.json
 
 resources:
-  - source: packages/orinoco-lite/src/orinoco_lite
-    destination: engine/orinoco_lite
   - source: tools/adapt_upstream_pages.py
     destination: drivers/adapt_pages.py
   - source: release/runtime-licenses/README.md

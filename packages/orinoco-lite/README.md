@@ -1,11 +1,11 @@
 # Orinoco Lite engine
 
 `orinoco-lite` is the stable, location-independent command-line and integrity boundary for a single-repository Orinoco Lite website.
-It discovers the site through `orinoco.yaml`, enforces the exact release coordinates in `orinoco.lock`, verifies a checksummed runtime, and invokes only drivers declared by that runtime.
+It discovers the site through `orinoco.yaml`, enforces the exact released-wheel coordinate in `orinoco.lock`, and runs with the code and resources bundled in that wheel.
 
 This package is one layer of the larger system:
 
-- the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the wheel, runtime, and reusable CI;
+- the [engineering repository](https://github.com/ORINOCO-Lite/orinoco-lite-dev) integrates components and publishes the package and reusable CI;
 - the submodule-selected `www-from-model` revision and its declared dependency closure provide the presentation and projection source;
 - the [template repository](https://github.com/ORINOCO-Lite/orinoco-lite-template) provides the thin Orinoco adaptation, materialized presentation overlay, and downstream scaffold; and
 - each downstream repository owns its declarative site inputs and site-specific executable metadata adapters; projection output is ignored and regenerated.
@@ -17,13 +17,13 @@ The engineering workspace's submodules, upstream-rebase history, release fixture
 The engine owns:
 
 - structural validation of the single-repository workspace;
-- exact engine, runtime, manifest, and resource integrity checks;
-- semantic validation and deterministic projection through released drivers;
+- exact released-package integrity checks;
+- semantic validation and deterministic projection through bundled drivers;
 - canonical source-adapter serialization, annotation joining, candidate planning, compact decisions, and Git-based finalization primitives;
 - deterministic static builds for root-relative local preview or an explicit public project-path base;
 - serving an already built artifact without rewriting it;
 - validation and optional application of static-editor review bundles; and
-- deterministic runtime assembly and release verification for engineering.
+- deterministic package-resource assembly and release verification for engineering.
 
 It does not own site content, upstream website behavior, site-specific presentation policy, GitHub branch protection, or production cutover.
 Those belong respectively to the downstream, selected upstream source, template and downstream overrides, or repository operator.
@@ -35,23 +35,19 @@ The stable commands are:
 
 | Command | Purpose |
 | --- | --- |
-| `orinoco validate` | Validate structure and run the verified runtime's semantic contract. |
+| `orinoco validate` | Validate structure and run the package's semantic contract. |
 | `orinoco projection update` | Regenerate and atomically install projection output. |
 | `orinoco projection verify` | Prove existing projection output is current and deterministic. |
 | `orinoco build` | Validate and build a static site below the configured build root. |
 | `orinoco serve` | Serve existing static bytes; it never changes the artifact's URL base. |
 | `orinoco editor apply` | Validate a review bundle; add `--write` only after review. |
-| `orinoco runtime install` | Resolve and install the exact locked runtime archive. |
-| `orinoco runtime verify` | Verify the runtime manifest, resource inventory, and tree digest. |
-| `orinoco release assemble` | Engineering-only deterministic runtime assembly. |
-| `orinoco release verify` | Verify a release archive or extracted runtime. |
 
 Normal users should invoke the corresponding `pixi run ...` facade from their downstream repository.
 The template can compose prerequisites and platform compatibility checks that a raw engine command intentionally does not own.
 
 ## Configuration and release locks
 
-`orinoco.yaml` names the site, public base URL, normalized site-owned roots, and optional released-driver aliases.
+`orinoco.yaml` names the site, public base URL, and normalized site-owned roots.
 The current configuration contract is version 2; version 1 is intentionally rejected rather than translated implicitly.
 Hosted builds obtain the exact GitHub `owner/repository` coordinate from the trusted build invocation; `orinoco build --github-repository` defaults to GitHub Actions' `GITHUB_REPOSITORY` value.
 The released central curation service is the default.
@@ -68,14 +64,11 @@ It also defaults an omitted `graph.missing_external_targets` policy to `drop`, s
 Malformed or schema-invalid values still fail.
 Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
 Site-specific executable metadata adapters live under `extensions/source-adapters/`; their configuration and evidence live under `site-specific/sources/`, and compact decisions under `site-specific/curation-records/`.
-`orinoco.lock` binds:
-
-- the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest;
-- the exact runtime version, immutable archive URL, archive digest, and embedded-manifest digest; and
-- the template and reusable-workflow coordinates recorded by the surrounding downstream contract.
+`orinoco.lock` binds the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest.
+The surrounding Copier and workflow contracts record their own coordinates.
 
 The immutable wheel digest must also match the consumer's frozen `pixi.lock`.
-Placeholder digests, mismatched installed versions, mutable runtime contents, path escapes, and undeclared drivers fail closed.
+Placeholder digests and mismatched installed versions fail closed.
 
 ### Open-reference policy migration
 
@@ -93,7 +86,7 @@ For full local-reference closure, a site must separately set `references.missing
 
 ## Schema conversion boundary
 
-The current runtime is content-neutral within the selected Things Schema profile; it does not claim arbitrary-schema compatibility.
+The package is content-neutral within the selected Things Schema profile; it does not claim arbitrary-schema compatibility.
 The pinned schema has an intentional recursive relationship range and an acyclic inheritance graph.
 LinkML's current generated Pydantic representation expands the wide recursive descendant union deeply enough to exceed Python's default recursion limit during model rebuilding.
 
@@ -102,11 +95,11 @@ It does not change the schema, hide semantic errors, or leave a process-wide set
 
 ## Release and license boundary
 
-Releases contain a deterministic wheel and source archive, a checksummed runtime archive with the static `/edit/` and `/review/` shells, machine-readable source and dependency inventories, component license texts, and build provenance.
-The runtime contains the localized schema closure, reviewed renderer, graph support, and static editor required by consumers; it does not expose component checkouts.
+One release is one deterministic wheel and source archive containing the static `/edit/` and `/review/` shells, localized schema closure, reviewed renderer, graph support, component license texts, notices, and release provenance.
+It does not expose component checkouts or publish a second runtime archive.
 
 The engine and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
-Bundled component licenses and notices remain authoritative for their own files; the runtime inventory preserves them rather than replacing them with the Orinoco Lite license.
+Bundled component licenses and notices remain authoritative for their own files.
 Documentation, factual metadata, media, and branding use the repository-wide matrix in [`LICENSES.md`](../../LICENSES.md).
 
 ## Development
@@ -119,7 +112,7 @@ PYTHONPATH=packages/orinoco-lite/src \
   python -m unittest discover -s packages/orinoco-lite/tests -v
 ```
 
-The release workflow additionally proves independent package, editor, and runtime builds and verifies the installed wheel.
+The release workflow additionally proves independent package and static-interface builds and verifies the installed wheel and its bundled resources.
 Package discovery stays content-neutral; pinned schema and editor checks activate when their recorded sources are available.
 Ordinary engineering and release CI initialize those sources and reject every skipped package test.
 Engineering CI separately projects one exact consumer revision from tracked inputs, while complete site-content and browser acceptance remain consumer-owned.

@@ -127,7 +127,7 @@ class PresentationResolverTests(unittest.TestCase):
             provenance["source_repository"] = str(repository)
         spec = source / "runtime.yaml"
         spec.write_text(
-            "format: orinoco-lite-runtime-source\n"
+            "format: orinoco-lite-package-resources\n"
             "spec_version: 1\n"
             "release: 0.2.0\n"
             "source_root: .\n"

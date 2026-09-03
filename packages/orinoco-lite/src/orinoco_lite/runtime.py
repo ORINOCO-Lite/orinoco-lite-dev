@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 import yaml
 
+from . import __version__
 from .config import CONFIG_CONTRACT_VERSION, EngineLock, WorkspaceConfig
 from .errors import ConfigurationError, IntegrityError
 from .integrity import (
@@ -29,7 +30,7 @@ from .integrity import (
 
 RUNTIME_FORMAT = "orinoco-lite-runtime"
 RUNTIME_MANIFEST_VERSION = 1
-RUNTIME_SPEC_FORMAT = "orinoco-lite-runtime-source"
+RUNTIME_SPEC_FORMAT = "orinoco-lite-package-resources"
 RUNTIME_SPEC_VERSION = 1
 RUNTIME_ROOT_NAME = "orinoco-runtime"
 MANIFEST_NAME = "runtime-manifest.json"
@@ -337,60 +338,21 @@ def _download_runtime(url: str, destination: Path) -> None:
         raise IntegrityError(f"Could not download runtime release: {url}") from error
 
 
-def resolve_runtime(workspace: WorkspaceConfig, lock: EngineLock) -> RuntimeReport:
-    """Resolve one lock pin to an exact verified runtime directory."""
+def resolve_runtime(_workspace: WorkspaceConfig, _lock: EngineLock) -> RuntimeReport:
+    """Return the resources bundled with the installed locked wheel.
 
-    pin = lock.runtime
-    if pin.path is not None:
-        source = workspace.root.joinpath(*PurePosixPath(pin.path).parts)
-        if source.is_dir():
-            return verify_runtime_directory(
-                source,
-                expected_release=pin.version,
-                expected_manifest_sha256=pin.manifest_sha256,
-                expected_tree_sha256=pin.sha256,
-            )
-        archive = source
-    else:
-        download_root = workspace.root / ".orinoco" / "downloads"
-        download_root.mkdir(parents=True, exist_ok=True)
-        archive = download_root / f"runtime-{pin.sha256}.tar.gz"
-        if not archive.exists():
-            temporary = download_root / f".{archive.name}.{os.getpid()}.tmp"
-            _download_runtime(pin.url or "", temporary)
-            if sha256_file(temporary) != pin.sha256:
-                temporary.unlink(missing_ok=True)
-                raise IntegrityError("Downloaded runtime archive does not match orinoco.lock")
-            os.replace(temporary, archive)
+    The name is retained internally while callers migrate; there is no
+    independently downloaded or locked runtime release.
+    """
 
-    if sha256_file(archive) != pin.sha256:
-        raise IntegrityError("Runtime archive does not match orinoco.lock")
-    cache = workspace.root / ".orinoco" / "runtime"
-    cache.mkdir(parents=True, exist_ok=True)
-    destination = cache / f"{pin.version}-{pin.sha256[:12]}"
-    if destination.exists():
-        return verify_runtime_directory(
-            destination,
-            expected_release=pin.version,
-            expected_manifest_sha256=pin.manifest_sha256,
+    candidate = os.environ.get("ORINOCO_CANDIDATE_RESOURCE_ROOT")
+    root = Path(candidate).resolve() if candidate else Path(__file__).parent / "_resources"
+    if not root.is_dir():
+        raise IntegrityError(
+            "orinoco-lite package resources are absent; install a released wheel "
+            "or stage candidate resources"
         )
-    with tempfile.TemporaryDirectory(prefix=".install-", dir=cache) as temporary_name:
-        temporary = Path(temporary_name)
-        extracted = _safe_extract(archive, temporary)
-        report = verify_runtime_directory(
-            extracted,
-            expected_release=pin.version,
-            expected_manifest_sha256=pin.manifest_sha256,
-        )
-        os.replace(extracted, destination)
-    return RuntimeReport(
-        root=destination,
-        release=report.release,
-        manifest_sha256=report.manifest_sha256,
-        tree_sha256=tree_sha256(destination),
-        files=report.files,
-        commands=report.commands,
-    )
+    return verify_runtime_directory(root, expected_release=__version__)
 
 
 def _copy_resource(source: Path, destination: Path) -> list[Path]:
@@ -480,7 +442,7 @@ def assemble_runtime(
         raise ConfigurationError("Runtime source specification must be a mapping")
     if spec.get("format") != RUNTIME_SPEC_FORMAT or spec.get("spec_version") != 1:
         raise ConfigurationError(
-            f"Runtime source specification must be {RUNTIME_SPEC_FORMAT} version 1"
+            f"Package resource specification must be {RUNTIME_SPEC_FORMAT} version 1"
         )
     release = spec.get("release")
     compatibility = spec.get("compatibility")
@@ -639,3 +601,22 @@ def assemble_runtime(
         "release": report.release,
         "tree_sha256": report.tree_sha256,
     }
+
+
+def stage_package_resources(
+    spec_path: Path,
+    destination: Path,
+    *,
+    source_commit: str,
+) -> dict[str, Any]:
+    """Materialize the release resources under a staged package source tree."""
+
+    if destination.exists():
+        raise IntegrityError(f"Package resource destination already exists: {destination}")
+    with tempfile.TemporaryDirectory(prefix="orinoco-package-resources-") as temporary:
+        archive = Path(temporary) / "resources.tar.gz"
+        report = assemble_runtime(spec_path, archive, source_commit=source_commit)
+        extracted = _safe_extract(archive, Path(temporary) / "extract")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(extracted, destination)
+    return report

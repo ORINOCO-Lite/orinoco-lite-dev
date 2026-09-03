@@ -266,7 +266,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             and isinstance(node.value.value, str)
         ]
         release_spec = yaml.safe_load(
-            (ROOT / "release/runtime-source.yaml").read_text(encoding="utf-8")
+            (ROOT / "release/package-resources.yaml").read_text(encoding="utf-8")
         )
         pool_gitlink = subprocess.check_output(
             [

@@ -62,7 +62,7 @@ builtins.__import__ = guarded_import
             spec = root / "runtime.yaml"
             spec.write_text(
                 """\
-format: orinoco-lite-runtime-source
+format: orinoco-lite-package-resources
 spec_version: 1
 release: 0.2.0rc2
 source_root: source
@@ -124,11 +124,11 @@ provenance:
             self.assertEqual(report["release"], "0.2.0rc2")
             self.assertEqual(report["provenance"]["source_commit"], "a" * 40)
 
-    def test_release_workflow_uses_only_the_narrow_entrypoint(self) -> None:
+    def test_release_workflow_stages_resources_only_inside_the_package(self) -> None:
         workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(
-            workflow.count("python -m orinoco_lite.release_runtime"),
-            2,
+            workflow.count("stage_package_resources("),
+            1,
         )
         self.assertEqual(
             workflow.count("python -m orinoco_lite.release_review"),
@@ -140,7 +140,7 @@ provenance:
             workflow,
         )
         self.assertIn("npm install --global npm@11.6.0", workflow)
-        self.assertNotIn("python -m orinoco_lite release assemble", workflow)
+        self.assertNotIn("orinoco-runtime-$version.tar.gz", workflow)
 
 
 if __name__ == "__main__":

@@ -35,11 +35,6 @@ engine:
   version: 0.1.0
   url: https://example.invalid/releases/orinoco_lite-0.1.0-py3-none-any.whl
   sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-runtime:
-  version: 0.1.0
-  path: vendor/orinoco-runtime.tar.gz
-  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  manifest_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 """
 
 
@@ -330,22 +325,12 @@ class WorkspaceConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, "contract_version must be 2"):
             load_workspace(self.root)
 
-    def test_lock_requires_one_immutable_runtime_location(self) -> None:
+    def test_lock_carries_only_the_wheel_coordinate(self) -> None:
         lock = load_lock(self.root / "orinoco.lock")
-        self.assertEqual(lock.runtime.path, "vendor/orinoco-runtime.tar.gz")
-        (self.root / "orinoco.lock").write_text(
-            LOCK.replace(
-                "  path: vendor/orinoco-runtime.tar.gz\n",
-                "  path: vendor/orinoco-runtime.tar.gz\n"
-                "  url: https://example.invalid/runtime.tar.gz\n",
-            ),
-            encoding="utf-8",
-        )
-        with self.assertRaisesRegex(ConfigurationError, "exactly one"):
-            load_lock(self.root / "orinoco.lock")
+        self.assertEqual(lock.engine_version, "0.1.0")
 
     def test_lock_rejects_placeholder_digests_and_mismatched_wheel(self) -> None:
-        for digest in ("c" * 64, "a" * 64, "b" * 64):
+        for digest in ("c" * 64,):
             value = LOCK.replace(digest, "0" * 64)
             (self.root / "orinoco.lock").write_text(value, encoding="utf-8")
             with self.assertRaisesRegex(ConfigurationError, "sha256"):

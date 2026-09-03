@@ -78,23 +78,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     projection.add_argument("projection_command", choices=("update", "verify"))
 
-    runtime = commands.add_parser("runtime", help="resolve and verify the runtime")
-    runtime_commands = runtime.add_subparsers(dest="runtime_command", required=True)
-    runtime_verify = runtime_commands.add_parser("verify")
-    runtime_verify.add_argument("--json", action="store_true")
-    runtime_commands.add_parser("install")
-
-    release = commands.add_parser("release", help="assemble or inspect runtime releases")
-    release_commands = release.add_subparsers(dest="release_command", required=True)
-    assemble = release_commands.add_parser("assemble")
-    assemble.add_argument("--spec", type=Path, required=True)
-    assemble.add_argument("--output", type=Path, required=True)
-    assemble.add_argument("--force", action="store_true")
-    assemble.add_argument("--source-commit", required=True)
-    inspect = release_commands.add_parser("verify")
-    inspect.add_argument("artifact", type=Path)
-    inspect.add_argument("--manifest-sha256")
-
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
     run.add_argument("arguments", nargs=argparse.REMAINDER)
@@ -307,10 +290,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _editor(args)
         if args.command == "projection":
             return _projection(args)
-        if args.command == "runtime":
-            return _runtime_command(args)
-        if args.command == "release":
-            return _release(args)
         if args.command == "run":
             return _run(args)
     except OrinocoError as error:

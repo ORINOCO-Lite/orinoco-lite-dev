@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orinoco-lite"
-version = "0.2.0rc20"
+version = "0.3.0rc1"
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
 license = "MIT"
@@ -36,7 +36,7 @@ orinoco = "orinoco_lite.cli:main"
 package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
-orinoco_lite = ["default_projection.yaml"]
+orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
