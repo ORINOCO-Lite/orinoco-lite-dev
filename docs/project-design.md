@@ -171,16 +171,6 @@ This retention does not require byte-identical rebuilds or additional manifests,
 
 ## Metadata change flow
 
-Orinoco Lite supports two sources of metadata change:
-
-1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
-Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
-
-2. **Automated augmentation.** A github action runs a source adapter which reads an  external source and opens a pull request with proposed changes.
-In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
-Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
-
-
 ```mermaid
 flowchart LR
   edit["Person edits metadata<br/>in /edit/"] --> changes["Pull request<br/>validated metadata changes"]
@@ -190,6 +180,15 @@ flowchart LR
   proposal --> review["Person decides<br/>in /review/"]
   review --> changes
 ```
+
+Orinoco Lite supports two sources of metadata change:
+
+1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
+Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
+
+2. **Automated augmentation.** A github action runs a source adapter which reads an  external source and opens a pull request with proposed changes.
+In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
+Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
 
 The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication rules](agents/contract/curation-service-authentication-options.md).
 
