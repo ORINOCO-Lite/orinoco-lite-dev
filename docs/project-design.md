@@ -2,7 +2,7 @@
 
 Orinoco Lite provides a templated repository for maintaining schema-backed research information and generating an associated static website for an organization.
 It is based on the separately maintained ORINOCO ecosystem (Organized Research Information: Ontology-mapping, Curation, Orchestration).
-ORINOCO supports entering, curating, and maintaining metadata records and projecting them into convenient representations for uses such as website rendering.
+ORINOCO supports entering, curating, and maintaining metadata records and deriving consumer-specific views for applications such as website rendering.
 Orinoco Lite instead hosts records and the website on GitHub and replaces the original system's server-backed metadata management with a pull-request-based workflow.
 
 This document is the durable, high-level design contract shared by maintainers, developers, and AI agents.
@@ -13,7 +13,7 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 - *upstream* — the original ORINOCO ecosystem and artifacts it produces, such as the [psychoinformatics.de](https://www.psychoinformatics.de) website;
 - *downstream* — a website-producing repository instantiated and managed by Orinoco Lite; and
-- *projection* — transformation into use-case-specific data representations, such as website sources or a CV;
+- *projection* — a derived, consumer-specific view of canonical metadata, produced by selecting, joining, or transforming records without changing them;
 - *canonical* — accepted source state from which other representations are derived, not an assertion that the state is immutable;
 - *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details; and
 - *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation.
@@ -42,7 +42,7 @@ GitHub is the target platform where changes are proposed, reviewed, and approved
 | submodule: [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | The existing website and visual theme Orinoco Lite reuses for its pages, navigation, and map of connected records. | Reusable website presentation, `page_templates/`, graph production, and the exact nested Congo selection | The engineering Gitlink selects it. Its dependency coordinates are not redeclared downstream; German records, identifiers, editorial content, and site-specific assets are not copied into the template or build. |
 | package: [`curation-review-app`](../packages/curation-review-app/README.md) | The review experience for proposed metadata changes. Pages included in each site help people inspect changes, while a small hosted service performs GitHub actions that require sign-in. | A static review shell released into downstream sites and a separately deployed GitHub authentication and verified-transport backend | The backend hosts no editor or review application and stores no metadata, decisions, bundles, or durable sessions. It is outside the build and public read paths. |
 | **Template** [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | The starter repository for a new Orinoco Lite site. It supplies the standard project layout, automation, and small set of shared files each site needs. | Thin Orinoco presentation adaptation, bounded licensed materialized assets, Copier scaffold, helper tools, workflows, and initial release locks | It is not another website repository. It contains no German records, editorial content, or site identity. |
-| **Example website**: [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) from Template with metadata records and Hugo website | The home of DEMO organization's website. It contains that site's data and choices and controls when updates are adopted and published. | Canonical site inputs, optional site-specific source adapters, review policy, deployment, and the choice and timing of upgrades | It is a human-gated repository. Generated projections, caches, and sites are build products, not canonical input. |
+| **Example website**: [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) from Template with metadata records and Hugo website | The home of DEMO organization's website. It contains that site's data and choices and controls when updates are adopted and published. | Canonical site inputs, optional site-specific source adapters, review policy, deployment, and the choice and timing of upgrades | It is a human-gated repository. Generated projection and site output, along with caches, are build products rather than canonical input. |
 
 The release and deployment path is a chain of authority rather than a copied source tree.
 Linked nodes open the relevant source or tool.
@@ -157,7 +157,7 @@ Once the selected dependencies have been downloaded and verified, validating, bu
 ## Generated publication records
 
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
-Generated projection and website output must not accumulate there.
+Generated Hugo projection and website output must not accumulate there.
 
 For the latest successful deployment, the system retains the Hugo projection used to assemble the site and the static website bytes that were deployed.
 Both remain outside the default branch and are traceable to the accepted source commit.
