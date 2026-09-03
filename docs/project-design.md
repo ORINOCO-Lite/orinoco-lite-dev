@@ -1,9 +1,8 @@
 # Orinoco Lite project design
 
-Orinoco Lite provides a templated repository for maintaining schema-backed research information and generating an associated static website for an organization.
-It is based on the separately maintained ORINOCO ecosystem (Organized Research Information: Ontology-mapping, Curation, Orchestration).
-ORINOCO supports entering, curating, and maintaining metadata records and deriving consumer-specific views for applications such as website rendering.
-Orinoco Lite instead hosts records and the website on GitHub and replaces the original system's server-backed metadata management with a pull-request-based workflow.
+Orinoco Lite provides a repository template for maintaining schema-backed research information and publishing an organization's static website.
+It adapts the separately maintained ORINOCO ecosystem (Organized Research Information: Ontology-mapping, Curation, Orchestration), which manages metadata records and derives consumer-specific views such as websites.
+Orinoco Lite keeps the records and website on GitHub and replaces ORINOCO's server-backed metadata management with pull-request-based curation.
 
 This document is the durable, high-level design contract shared by maintainers, developers, and AI agents.
 It describes the intended architecture rather than a release inventory or progress report.
@@ -11,49 +10,63 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 ## Terminology
 
-- *upstream* — the original ORINOCO ecosystem and artifacts it produces, such as the [psychoinformatics.de](https://www.psychoinformatics.de) website;
-- *downstream* — a website-producing repository instantiated and managed by Orinoco Lite; and
-- *projection* — a derived, consumer-specific view of canonical metadata, produced by selecting, joining, or transforming records without changing them;
 - *canonical* — accepted source state from which other representations are derived, not an assertion that the state is immutable;
-- *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details; and
-- *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation.
+- *contract* — behavior or a boundary that implementations must preserve, excluding incidental implementation details;
+- *downstream* — a website repository created from and maintained with Orinoco Lite;
+- *policy* — an explicit human or organization choice among supported behaviors, not a choice inferred from the current implementation;
+- *projection* — a consumer-specific view derived by selecting, joining, or transforming canonical metadata without changing it; and
+- *upstream* — the original ORINOCO ecosystem and its artifacts, including the [psychoinformatics.de](https://www.psychoinformatics.de) website.
 
 ## Objective
 
 An Orinoco Lite deployment should help an organization:
 
-- maintain human-readable metadata under review in Git conformant with the schema defined by the ORINOCO system;
-- augment metadata from external sources using automation while allowing convenient human review through pull requests;
-- use GitHub Pages to publish a website based on the original [psychoinformatics.de](https://www.psychoinformatics.de); and
-- customize website content, style, and organization while continuing to update their version of Orinoco Lite.
+- maintain human-readable, schema-conformant metadata under review in Git;
+- prepare automated improvements from external sources for human review through pull requests;
+- publish a static website based on [psychoinformatics.de](https://www.psychoinformatics.de) with GitHub Pages; and
+- customize the site's content, presentation, and organization while continuing to receive Orinoco Lite updates.
 
 The deployed site URL includes endpoints for client-side operations:
 
 - `/edit/` for web-based metadata changes; and
 - `/review/` for integrating changes from automated metadata improvements.
 
-GitHub is the target platform where changes are proposed, reviewed, and approved; static hosting serves the finished files produced by the build.
+GitHub is the target platform for proposing, reviewing, and approving changes; static hosting serves the build output.
 
 ## System organization
 
-| Component | Description | Authority and responsibility | Boundary |
-| --- | --- | --- | --- |
-| **Tooling** [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/), with [engine](../packages/orinoco-lite/) and [review app](../packages/curation-review-app/) | The project's development workspace and build software. Together they check a site's inputs and assemble a publishable website. | Generic source resolution, integrity checks, joined metadata validation, released default projection policy, composition, curation primitives, release assembly, and reusable CI | The engine owns neither organization content nor organization presentation policy. Its runtime contains verified drivers, schema, and static editor/review shells, not a copy of the website. |
-| submodule: [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | The existing website and visual theme Orinoco Lite reuses for its pages, navigation, and map of connected records. | Reusable website presentation, `page_templates/`, graph production, and the exact nested Congo selection | The engineering Gitlink selects it. Its dependency coordinates are not redeclared downstream; German records, identifiers, editorial content, and site-specific assets are not copied into the template or build. |
-| package: [`curation-review-app`](../packages/curation-review-app/README.md) | The review experience for proposed metadata changes. Pages included in each site help people inspect changes, while a small hosted service performs GitHub actions that require sign-in. | A static review shell released into downstream sites and a separately deployed GitHub authentication and verified-transport backend | The backend hosts no editor or review application and stores no metadata, decisions, bundles, or durable sessions. It is outside the build and public read paths. |
-| **Template** [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | The starter repository for a new Orinoco Lite site. It supplies the standard project layout, automation, and small set of shared files each site needs. | Thin Orinoco presentation adaptation, bounded licensed materialized assets, Copier scaffold, helper tools, workflows, and initial release locks | It is not another website repository. It contains no German records, editorial content, or site identity. |
-| **Example website**: [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) from Template with metadata records and Hugo website | The home of DEMO organization's website. It contains that site's data and choices and controls when updates are adopted and published. | Canonical site inputs, optional site-specific source adapters, review policy, deployment, and the choice and timing of upgrades | It is a human-gated repository. Generated projection and site output, along with caches, are build products rather than canonical input. |
+The system has three layers: development sources, distributed components, and each deployed site.
 
-The release and deployment path is a chain of authority rather than a copied source tree.
-Linked nodes open the relevant source or tool.
+### Development sources
+
+| Part | Role | Boundary |
+| --- | --- | --- |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite, selects the exact presentation source, assembles releases, and maintains reusable CI | Its multi-repository engineering structure is not exposed to downstreams. |
+| [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the reusable website presentation, page templates, graph production, and its exact Congo selection | Its selected revision and the dependencies it declares are reused without copying German content, identity, or site-specific assets. |
+
+### Distribution
+
+An Orinoco Lite release is one Python package whose code and bundled resources share one version and integrity boundary.
+
+| Part | Role | Boundary |
+| --- | --- | --- |
+| [`orinoco-lite`](../packages/orinoco-lite/) | Contains the code and data needed to validate metadata, derive projections, assemble the site, and add the static `/edit/` and `/review/` interfaces | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, notices, and the engineering source commit that selects the presentation source. It contains no organization content or policy and no copy of the upstream website. |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Supplies the downstream scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, helper tools, and initial locks | It is not a website copy and contains no German content or site identity. |
+
+### Deployment
+
+| Part | Role | Boundary |
+| --- | --- | --- |
+| A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs, optional source adapters, review policy, deployment, and upgrade timing | It is human-gated. Generated projections, site output, and caches are build products rather than canonical input. |
+| The [curation service](../packages/curation-review-app/) | Provides authentication and verified GitHub transport for explicitly requested online editing and review operations | It is outside build and public-read paths, hosts no editor or review interface, and stores no metadata, decisions, bundles, or durable sessions. |
 
 ```mermaid
 flowchart TB
   subgraph maintenance["Source selection and repinning"]
     direction LR
-    engineering["orinoco-lite-dev<br/>engine, selected Gitlink, release assembly"]
+    engineering["orinoco-lite-dev<br/>package and service source,<br/>selected Gitlink, release assembly"]
     upstream["www-from-model<br/>presentation, page templates, graph producer"]
-    dependencies["Declared dependency closure<br/>including Congo"]
+    dependencies["Dependencies declared and pinned<br/>by www-from-model, including Congo"]
     annex["Git Annex<br/>maintainer-only hydration and verification"]
     repin["Repin and materialize<br/>required presentation payloads"]
 
@@ -63,34 +76,34 @@ flowchart TB
     annex -.->|"used only here"| repin
   end
 
-  subgraph distribution["Released distribution"]
+  subgraph distribution["Distribution"]
     direction LR
-    release["Engine wheel and verified runtime<br/>schema, drivers, /edit/ and /review/ shells"]
+    package["orinoco-lite Python package<br/>code, schema, drivers,<br/>/edit/ and /review/ shells, licenses"]
     template["orinoco-lite-template source<br/>thin adapter, licensed asset overlay,<br/>Copier scaffold, workflows, initial pins"]
 
-    engineering -->|"publishes immutable artifacts"| release
+    engineering -->|"publishes one package"| package
     repin -->|"ordinary licensed files"| template
-    release -->|"reviewed release coordinates"| template
+    package -->|"reviewed version and integrity pin"| template
   end
 
-  subgraph downstream["One downstream repository and deployment"]
+  subgraph downstream["One deployed site"]
     direction LR
-    repository["Downstream facade and release selection<br/>orinoco.yaml, exact locks, generic workflows"]
-    inputs["site-specific/<br/>canonical metadata, content, identity,<br/>assets, policy, bounded overrides"]
+    repository["Downstream repository<br/>canonical metadata, content, identity,<br/>policy, adapters, exact locks"]
     cache[("Ignored exact-source cache")]
-    build["Engine build<br/>resolve, verify, join, validate, project, compose"]
+    build["Orinoco Lite build<br/>resolve, verify, join, validate, project, compose"]
     artifact["Static artifact<br/>website plus /edit/ and /review/"]
+    service["Curation service<br/>authenticated GitHub transport"]
     host["Static hosting"]
 
     template -->|"initial scaffold and pins; reviewed updates"| repository
-    repository -->|"site-owned inputs"| inputs
-    release -->|"runtime provenance resolves<br/>the exact presentation closure"| cache
-    release -->|"installed and verified<br/>from the downstream lock"| build
+    package -->|"recorded engineering commit selects<br/>exact presentation sources"| cache
+    package -->|"installed and verified<br/>from the downstream lock"| build
     cache -->|"verified sources"| build
-    repository -->|"lock, facade, adaptation, materialized assets"| build
-    inputs -->|"declarative site data"| build
+    repository -->|"site-owned inputs and policy"| build
     build -->|"static bytes"| artifact
     artifact -->|"deploy static bytes"| host
+    artifact -.->|"explicit signed-in handoff"| service
+    service -.->|"verified GitHub operations"| repository
   end
 
   click engineering "https://github.com/ORINOCO-Lite/orinoco-lite-dev" "Open the engineering repository"
@@ -98,7 +111,7 @@ flowchart TB
   click dependencies "https://github.com/ORINOCO-Lite/congo" "Open the selected theme repository"
   click annex "https://git-annex.branchable.com/" "Open Git Annex"
   click repin "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/tools/materialize_presentation_assets.py" "Open the repinning tool"
-  click release "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/packages/orinoco-lite" "Open the engine package"
+  click package "https://github.com/ORINOCO-Lite/orinoco-lite-dev/tree/main/packages/orinoco-lite" "Open the Orinoco Lite package"
   click template "https://github.com/ORINOCO-Lite/orinoco-lite-template/tree/main" "Open the template source"
   click repository "https://github.com/ORINOCO-Lite/test-orinoco-downstream-website" "Open the human-gated reference downstream"
 ```
@@ -126,29 +139,25 @@ extensions/                            # Downstream-owned executable code for me
   source-adapters/<adapter>/           # Site-specific acquisition and curation code
 ```
 
-`site-specific/` is:
-
-- **human-curated**: intended to constitute the human-maintained knowledge base used to produce the website.
-- **declarative**: it describes what the organization’s site should contain and look like, without implementing how the system performs the work.
-- **self-contained as a data source**: it contains the site's semantic assertions, machine provenance companions, editorial material, identity, presentation data, assets, source evidence and policy, current curation decisions, and supported small overrides.
+`site-specific/` is the human-curated, declarative, self-contained source for what the organization's site contains and how it appears.
+It holds semantic assertions, machine-provenance companions, editorial material, identity, presentation data, assets, source evidence and policy, current curation decisions, and supported small overrides—not implementation code.
 
 `extensions/source-adapters/` is exclusively for site-specific executable metadata acquisition and curation code.
-It is not a website extension surface: adapter code, captured runtime state, and dependencies are neither loaded by website composition nor copied into the generated site.
-Reusable adapter primitives belong in the engine or template.
+It is not a website extension surface: adapter code, captured execution state, and dependencies are neither loaded by website composition nor copied into the generated site.
+Reusable adapter primitives belong in Orinoco Lite or the template.
 
-The Orinoco Lite engine combines `site-specific/metadata/` with the exact Gitlink-selected `www-from-model` revision to generate the graph and Hugo pages.
+Orinoco Lite combines `site-specific/metadata/` with the exact Gitlink-selected `www-from-model` revision to generate the graph and Hugo pages.
 It does not modify metadata during that step.
 These generated files are not canonical inputs and do not enter the downstream's default branch.
 
 ## Build and deployment flow
 
-1. The downstream lock file selects exact releases of the engine, runtime, template, and shared workflows.
-The selected runtime records the exact engineering commit, which selects one exact version of `www-from-model`; that project, in turn, selects Congo and its other dependencies.
-This chain ensures that every build uses a known set of source code.
-2. The engine converts the site's metadata into a graph and validates it against the exact Things Schema included in the selected release.
-3. The engine uses the selected upstream page templates and graph generator to create the site's pages and graph data.
+1. The downstream lock selects exact versions of Orinoco Lite, the template, and shared workflows.
+The Orinoco Lite package identifies the engineering commit whose Gitlink selects `www-from-model`; that revision selects Congo and its other dependencies.
+2. Orinoco Lite converts the site's metadata into a graph and validates it against the exact Things Schema included in the package.
+3. Orinoco Lite uses the selected upstream page templates and graph generator to create the site's pages and graph data.
 These generated files form the **Hugo projection**: build output derived from the canonical source and selected dependency versions, rather than canonical source data.
-4. The engine combines the reusable website, the thin Orinoco adaptation, and the downstream's content and settings in a fixed order.
+4. Orinoco Lite combines the reusable website, the thin Orinoco adaptation, and the downstream's content and settings in a fixed order.
 Site overrides apply only in the supported locations and take precedence there.
 The build also adds the static `/edit/` and `/review/` interfaces and connects them to the downstream repository and exact commit being built.
 5. The completed website is deployed as static files.
@@ -159,29 +168,22 @@ Once the selected dependencies have been downloaded and verified, validating, bu
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
 Generated Hugo projection and website output must not accumulate there.
 
-For the latest successful deployment, the system retains the Hugo projection used to assemble the site and the static website bytes that were deployed.
-Both remain outside the default branch and are traceable to the accepted source commit.
-A longer history of publications may be retained for diagnosis and recovery.
-
-Other generated operational data is temporary and is neither canonical metadata nor recovery authority.
-Review state and handoff behavior follow the applicable contracts linked below.
-
-Publication retention supports inspection and recovery.
-It does not require proving that a later build is byte-identical or justify additional manifests, attestations, ledgers, or validation machinery.
+The latest successful deployment retains its Hugo projection and deployed static files outside the default branch, traceable to the accepted source commit.
+A longer publication history may be retained for diagnosis and recovery.
+Other generated operational data is temporary and provides neither canonical metadata nor recovery authority.
+This retention does not require byte-identical rebuilds or additional manifests, attestations, ledgers, or validation machinery.
 
 ## Metadata change flow
 
-People can edit metadata directly through ordinary Git changes.
-The static `/edit/` interface can package an edit for local review and application, or—after an explicit user action—send it to GitHub through the curation service.
+People may edit metadata through ordinary Git changes or use `/edit/` to download an edit bundle for local application.
+After explicit confirmation, `/edit/` can instead hand the bundle to GitHub through the curation service.
 
-An optional source adapter is a program that reads an identified external source and prepares a repeatable metadata proposal without changing that source.
-DataLad records the adapter run and proposed Git commit.
-The static `/review/` interface shows the proposal and asks a person to accept, reject, or defer each suggested change.
+Optional source adapters read identified external sources and prepare repeatable metadata proposals without modifying those sources.
+DataLad records each adapter run and proposed Git commit; `/review/` lets a person accept, reject, or defer every proposed change.
 
-For online review, the curation service handles sign-in, verifies the current GitHub commit, and transports the confirmed proposal or decisions.
-Trusted workflows then apply and validate the change only against that verified commit.
-A person remains responsible for merging it.
-Automation may derive proposals, but it must not invent metadata meaning, identity, rights, or review decisions; approve or merge changes; or write back to the external source.
+For online editing and review, the curation service handles sign-in, verifies the exact GitHub state, and transports confirmed edit bundles or review decisions.
+Trusted workflows apply and validate the resulting change against that state, and a person remains responsible for merging it.
+Automation must not invent metadata meaning, identity, rights, or review decisions; approve or merge changes; or write to an external source.
 
 ```mermaid
 flowchart TB
@@ -207,39 +209,32 @@ flowchart TB
 
 The precise behavior is defined by the normative contracts for [source adapters](agents/contract/source-adapters.md), [GitHub source review](agents/contract/github-curation-review.md), and [SHACL Vue editing](agents/contract/github-shacl-vue-edit.md), including the [curation-service authentication boundary](agents/contract/curation-service-authentication-options.md).
 
-## Design invariants
+## Design principles
 
-- **Reuse the upstream website.** One selected version of the upstream project and its declared dependencies supplies the reusable website.
-Orinoco-specific changes remain small, explicit, and separately owned instead of becoming a copied fork.
-- **Keep the template small.** The template provides the downstream starting structure, the Orinoco adaptation, shared workflows, dependency locks, and a limited set of licensed assets needed from upstream.
-It does not contain another copy of the website.
-- **Keep each organization's information in its own repository.** A downstream repository owns that organization's metadata, editorial content, identity, assets, policies, review decisions, and optional source adapters.
-Content and identity from the German reference site are never copied into the template or another organization's site.
-- **Keep shared behavior in the engine.** Resolving sources, checking integrity, validating metadata, generating pages and graph data, assembling the website, and supporting curation remain reusable engine functions rather than copied downstream code.
-The exact Things Schema included in the release defines valid metadata unless the project deliberately changes this design.
-- **Publish a static product.** The website and its editing and review interfaces are static files.
-Reading the site or downloading an edit bundle never depends on the curation service; only signed-in GitHub operations cross that service boundary.
-- **Keep people and Git in control.** External sources are read-only, automated changes remain proposals, and human choices are explicit.
-Git commits, pull requests, merges, and reverts provide the durable history and recovery path.
-- **Record each fact once.** Exact versions and integrity information live in the lock files, manifests, Gitlinks, and release inputs that use them; Git and GitHub hold the change history.
-Do not add separate ledgers or inventories that repeat those facts merely for explanation or proof.
-- **Give each provenance tool one job.** Maintainers use Git Annex only while selecting and preparing required upstream presentation assets for the licensed template overlay.
-Downstream source adapters use DataLad to record their runs in ordinary Git.
-Released builds and adapter runs do not require Git Annex.
+- **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website; Orinoco-specific changes remain small, explicit, and separately owned.
+- **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
+Each downstream owns its information, presentation choices, review policy, and optional adapters.
+- **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
+Only signed-in GitHub operations cross the curation-service boundary.
+- **Keep people and Git in control.** External sources are read-only, automation produces proposals, human choices are explicit, and Git supplies durable history and recovery.
+- **Record each fact once.** Versions and integrity data belong in the locks, package metadata, Gitlinks, and release inputs that use them; change history belongs in Git and GitHub.
+Do not add parallel ledgers or inventories merely for explanation or proof.
+- **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
+DataLad records downstream adapter runs in ordinary Git; released builds and adapter runs do not require Git Annex.
 
 ## Documentation and change control
 
-This document explains the project's lasting purpose, organization, and boundaries.
-Exact rules and shorter-lived working information have separate homes:
+This document owns the project's lasting purpose, organization, and boundaries.
+Narrower or shorter-lived information belongs elsewhere:
 
 - [`docs/agents/contract/`](agents/contract/) defines exact technical rules where metadata meaning, review behavior, or security boundaries require precision;
 - [`AGENTS.md`](../AGENTS.md) gives agents current operating constraints and points them to the applicable contracts;
 - project [skills](../.agents/skills/) provide step-by-step procedures for repeatable work; and
 - [`docs/agents/`](agents/) holds active plans and unresolved decisions, not an alternative description of the architecture.
 
-During a reviewed change, plans, code, tests, releases, or existing downstreams may temporarily differ from this design.
-Treat that difference as work to resolve, not as permission to silently change the design or preserve accidental behavior.
-Bring the work back into alignment; if the intended direction should change, update this document for human agreement before treating the change as an implementation detail.
+Plans, code, tests, releases, or downstreams may temporarily differ from this design during a reviewed change.
+Treat the difference as work to resolve, not permission to preserve accidental behavior or silently change the design.
+If the intended direction changes, update this document for human agreement before implementing it.
 
 This architecture does not decide production metadata meaning, review authority, migration, hosting, cutover, accessibility, privacy, or recovery ownership.
 Those choices remain in [`open-decisions.md`](agents/open-decisions.md) until people resolve them.
