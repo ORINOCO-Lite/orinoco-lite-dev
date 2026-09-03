@@ -35,7 +35,7 @@ GitHub is the target platform for proposing, reviewing, and approving changes; s
 
 ## System organization
 
-The system has three layers: development sources, distributed components, and each deployed site.
+The system has three layers: development sources, released components, and each deployed site.
 
 ### Development sources
 
@@ -44,14 +44,14 @@ The system has three layers: development sources, distributed components, and ea
 | [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite, selects the exact presentation source, assembles releases, and maintains reusable CI | Its multi-repository engineering structure is not exposed to downstreams. |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the reusable website presentation, page templates, graph production, and its exact Congo selection | Its selected revision and the dependencies it declares are reused without copying German content, identity, or site-specific assets. |
 
-### Distribution
+### Released components
 
 An Orinoco Lite release is one Python package whose code and bundled resources share one version and integrity boundary.
 
 | Part | Role | Boundary |
 | --- | --- | --- |
 | [`orinoco-lite`](../packages/orinoco-lite/) | Contains the code and data needed to validate metadata, derive projections, assemble the site, and add the static `/edit/` and `/review/` interfaces | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, notices, and the engineering source commit that selects the presentation source. It contains no organization content or policy and no copy of the upstream website. |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Supplies the downstream scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, helper tools, and initial locks | It is not a website copy and contains no German content or site identity. |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the versioned Copier source for creating and updating downstream repositories | It contains the scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, helper tools, and initial locks—not a website copy, German content, or site identity. |
 
 ### Deployment
 
