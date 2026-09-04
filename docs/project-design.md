@@ -173,11 +173,11 @@ This retention does not require byte-identical rebuilds or additional manifests,
 Orinoco Lite supports two sources of metadata change:
 
 1. **A person creates an edit.** The static SHACL Vue `/edit/` page is used to update the metadata and generate a pull request.
-Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
+   Automation converts the submitted bundle into validated ordinary metadata changes with the appropriate Git attribution.
 
 2. **Automated augmentation.** A GitHub Action runs a source adapter which reads an external source and opens a pull request with proposed changes.
-In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
-Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
+   In the static `/review/` interface, a person can accept, reject, defer, or modify each proposal.
+   Automation finalizes and validates the selected changes, retains the appropriate machine provenance and review state, and updates the pull request.
 
 ```mermaid
 flowchart LR
@@ -195,14 +195,14 @@ The precise behavior is defined by the normative contracts for [source adapters]
 
 - **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website; Orinoco-specific changes remain small, explicit, and separately owned.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
-Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
+  Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
-The curation service is used only for signed-in GitHub operations.
+  The curation service is used only for signed-in GitHub operations.
 - **Keep people and Git in control.** External sources are read-only, automation produces proposals, human choices are explicit, and Git supplies durable history and recovery.
 - **Record each fact once.** Versions and integrity data belong in the locks, package metadata, Gitlinks, and release inputs that use them; change history belongs in Git and GitHub.
-Do not add parallel ledgers or inventories merely for explanation or proof.
+  Do not add parallel ledgers or inventories merely for explanation or proof.
 - **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
-DataLad records downstream adapter runs in ordinary Git; released builds and adapter runs do not require Git Annex.
+  DataLad records downstream adapter runs in ordinary Git; released builds and adapter runs do not require Git Annex.
 
 ## Documentation and change control
 

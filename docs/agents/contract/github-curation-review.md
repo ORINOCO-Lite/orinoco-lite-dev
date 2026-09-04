@@ -8,7 +8,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 1. A trusted workflow runs the adapter with released code and opens a draft pull request containing one proposal commit.
 2. The pull request identifies the adapter, links to the downstream `/review/` route, and places the source coordinate in a closed details block.
 3. The workflow publishes one expiring review artifact derived from the proposal.
-The artifact is presentation input, not durable authority.
+   The artifact is presentation input, not durable authority.
 4. The downstream review page authenticates the curator through the configured GitHub App service and displays the complete proposal.
 5. The curator selects one disposition for every candidate and explicitly submits the decision state.
 6. The service revalidates repository, permission, pull request, proposal, artifact, and current head, then posts one authenticated GitHub comment.

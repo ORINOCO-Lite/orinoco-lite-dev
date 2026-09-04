@@ -12,16 +12,16 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Establish the live scope
 
 1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
-Git Annex is permitted only in the engineering repinning path.
-Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
+   Git Annex is permitted only in the engineering repinning path.
+   Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
 2. Identify the package and template candidates and any downstream inputs to inject.
-Local candidate testing is the default.
-When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
-Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
+   Local candidate testing is the default.
+   When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
+   Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
-Resolve missing access early.
+   Resolve missing access early.
 4. Treat a release and reference-downstream merge as separate gates.
-Permission to test a working tree locally does not itself authorize either one.
+   Permission to test a working tree locally does not itself authorize either one.
 
 ## Exercise the temporary downstream
 

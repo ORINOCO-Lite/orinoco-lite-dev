@@ -28,21 +28,21 @@ Do not retain old framework copies, checked rendered trees, legacy paths, update
 ## Boundary
 
 - The controlled engineering gitlink selects the exact `www-from-model` revision.
-That revision's normal dependency mechanism selects Congo and other upstream dependencies; package and downstream configuration do not repeat those pins.
+  That revision's normal dependency mechanism selects Congo and other upstream dependencies; package and downstream configuration do not repeat those pins.
 - Git and Git Annex state are the provenance for an upstream Annex payload.
-Do not add per-asset coordinates, digests, or origin inventories to package, template, or downstream configuration.
+  Do not add per-asset coordinates, digests, or origin inventories to package, template, or downstream configuration.
 - Git Annex is used only by maintainer repinning tooling.
-The released package, template tasks, and downstream validation, projection, build, test, and deployment paths do not invoke or depend on it.
+  The released package, template tasks, and downstream validation, projection, build, test, and deployment paths do not invoke or depend on it.
 - DataLad remains in downstream source-adapter workflows to record run provenance in Git.
-Correct repository configuration keeps adapter inputs and outputs out of Annex, so these workflows do not require Git Annex.
+  Correct repository configuration keeps adapter inputs and outputs out of Annex, so these workflows do not require Git Annex.
 - The package owns source resolution, integrity verification, metadata validation, projection, composition, and shared behavioral tests.
 - `orinoco-lite-template` owns the small Orinoco adaptation, bounded materialized presentation overlay, Copier scaffold, workflows, and dependency locks.
-It does not own a complete website.
+  It does not own a complete website.
 - `site-specific/` contains declarative downstream metadata, curation records, editorial content, assets, identity, limited presentation choices, source-adapter configuration and evidence, and supported small overrides.
 - `extensions/` contains only site-specific executable metadata acquisition and curation adapters.
-Extension code and its outputs are neither loaded during website composition nor copied into the generated site.
+  Extension code and its outputs are neither loaded during website composition nor copied into the generated site.
 - Generated projections, static sites, caches, and Copier renderings remain untracked build products.
-The template publication branch may contain its exact rendered distribution tree because that branch is itself a distribution product.
+  The template publication branch may contain its exact rendered distribution tree because that branch is itself a distribution product.
 
 Do not copy it wholesale.
 Keep required materialized artifacts in a bounded template overlay that carries a license and applicable notices.
