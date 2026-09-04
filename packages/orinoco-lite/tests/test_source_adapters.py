@@ -9,10 +9,9 @@ import unittest
 import yaml
 
 from orinoco_lite.source_adapters import curation, review
-from orinoco_lite.source_adapters.zotero import candidates, metadata_adapter
 
 
-class PackagedSourceAdapterTests(unittest.TestCase):
+class SourceAdapterRunnerTests(unittest.TestCase):
     def write_source(self, root: Path, source: dict[str, object]) -> Path:
         directory = root / "site-specific/sources" / str(source["id"])
         directory.mkdir(parents=True)
@@ -20,19 +19,23 @@ class PackagedSourceAdapterTests(unittest.TestCase):
         path.write_text(yaml.safe_dump({"contract_version": 1, **source}))
         return path
 
-    def test_builtin_modules_do_not_require_copied_downstream_code(self) -> None:
+    def test_downstream_adapter_uses_the_package_runner(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            implementation = root / "extensions/source-adapters/example/adapter.py"
+            implementation.parent.mkdir(parents=True)
+            implementation.write_text(
+                "ADAPTER_API_VERSION = 1\n"
+                "def review(context):\n"
+                "    return context['config']['id']\n"
+            )
             source = {
-                "id": "zotero",
-                "adapter": "orinoco_lite.source_adapters.zotero.metadata_adapter",
-                "candidate_provider": "orinoco_lite.source_adapters.zotero.candidates",
-                "provenance_identity": "https://example.invalid/agents/zotero",
+                "id": "example",
+                "adapter": implementation.relative_to(root).as_posix(),
             }
             self.write_source(root, source)
-            self.assertIs(metadata_adapter, review.load_adapter(root, source))
-            self.assertIs(candidates, curation._load_provider(root, "zotero"))
-            self.assertFalse((root / ".orinoco-lite").exists())
+            adapter = review.load_adapter(root, source)
+            self.assertEqual("example", adapter.review({"config": source}))
 
     def test_site_provider_loads_from_the_explicit_trusted_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -59,7 +62,7 @@ class PackagedSourceAdapterTests(unittest.TestCase):
                 root,
                 {
                     "id": "zotero",
-                    "adapter": "orinoco_lite.source_adapters.zotero.metadata_adapter",
+                    "adapter": "extensions/source-adapters/zotero/metadata_adapter.py",
                     "provenance_identity": "https://example.invalid/agents/zotero",
                 },
             )
