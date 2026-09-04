@@ -25,6 +25,11 @@ The package owns:
 - validation and optional application of static-editor review bundles; and
 - deterministic package-resource assembly and release verification for engineering.
 
+The package supplies the source-review runner and GitHub curation operations.
+The current runner and workflow integrate `dump-research-info` and `zotero` explicitly; their implementation is not yet a general adapter-author interface.
+Zotero acquisition and mapping remain downstream-owned under `extensions/source-adapters/zotero/`.
+Future packaged adapters must meet the [source-adapter admission and interface requirements](../../docs/agents/contract/source-adapters.md#admitting-an-adapter-to-the-package).
+
 It does not own site content, upstream website behavior, site-specific presentation policy, GitHub branch protection, or production cutover.
 Those belong respectively to the downstream, selected upstream source, template and downstream overrides, or repository operator.
 

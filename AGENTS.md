@@ -52,6 +52,8 @@ Required upstream functionality includes its required assets automatically.
 Materialize those assets as ordinary files only in a bounded template overlay that carries a license and applicable notices.
 - Use Git and Git Annex state as the provenance for materialized assets.
 Do not add redundant per-asset coordinates or provenance inventories when tooling can derive precise information from the selected repositories.
+- Before moving a source adapter into the package, follow the admission and interface requirements in `docs/agents/contract/source-adapters.md`.
+Keep an adapter downstream-owned until those requirements are met.
 - Do not invent metadata semantics, identities, rights, or curation decisions.
 - Do not resolve the production choices in `docs/agents/open-decisions.md` by inference.
 - Do not preserve copied framework files, workflows, tests, configuration, or updater machinery in downstreams as compatibility requirements.
