@@ -96,7 +96,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/55/62/3bcf988945065eb9f6ce91d8f5ecdcab59093a539549c3d0d9ec777d75e5/curies-0.15.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5b/a5/987a405322d78a73b66e39e4a90e4ef156fd7141bf71df987e50717c321b/pre_commit-4.3.0-py2.py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/27/a7bc8ecff2c5791c6d202a71bdb93b0c48ac97ff71d08350405b50e96fe0/snapper_fmt-0.8.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/5d/85/9ebeae2f76e9e77b952f4b274c27238156eae7979c5421fba91a28f4970d/sphinxcontrib_applehelp-2.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/1d/d8d5be9e72e518b42f544e196de9c07161b0933143c9d0e4e2e33de60d79/pyshexc-0.10.3.post1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/53/fb7122b71361a0d121b669dcf3d31244ef75badbbb724af388948de543e2/imagesize-2.0.0-py2.py3-none-any.whl
@@ -138,6 +137,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/6a/a83720e953b1682d2d109d3c2dbb0bc9bf28cc1cbc205be4ef4be5da709d/jsonpointer-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a3/c7/fabc5e0b66cedc7fd8fb47c82c03669646da9d3b63f5e517d06ac6ab4e9e/snapper_fmt-0.10.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a4/d1/9725ec62421dcfe430d874cba9f82c0288baee0c4b7dd8aa8dcca2b0394e/fastapi_pagination-0.15.16-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/a8/c6e6db62226df8cd3d950889925d826a0e35ac567cc5df548a872944f1ed/rignore-0.8.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
@@ -217,7 +217,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/17/c1/3226e6d7f5a4f736f38ac11a6fbb262d701889802595cdb0f53a885ac2e0/pydantic_extra_types-2.11.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/19/95/6195171e385007300f0f5574592e467c568becce2d937a0b6804f218bc49/pydantic_core-2.46.4-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/1a/77/48ce09fce2836856588beb84f434c1f8812d1428326efd993b619d49d949/sparqlslurper-0.5.1-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/1a/ff/b8c3ab819c4b90abeb197f24abb373391daa472c066605247d032941aefe/snapper_fmt-0.8.1-py3-none-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/1f/fb/3068f649cc436be915f51b2f5ac0656c83dc9bcc6d4f8940633e295042c0/linkml-1.11.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
@@ -275,6 +274,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/7b/24/61844afbf38acf419e01ca2639f7bd079584523d34471acbc4152ee991c5/hbreader-0.9.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/44/4e421b96b67b2daff264473f7465db72fbdf36a07e05494f50300cc7b0c6/rfc3339_validator-0.1.4-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/7c/4c/75aa7bdecae280cd1d16f3b2f95ffd358eb38e5ab5188340bf57619e14f1/snapper_fmt-0.10.0-py3-none-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/7e/b3/6b4067be973ae96ba0d615946e314c5ae35f9f993eca561b356540bb0c2b/alabaster-1.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl
@@ -1029,11 +1029,6 @@ packages:
   - rdflib>=5.0.0
   - sparqlwrapper>=1.8.2
   requires_python: '>=3.7.4'
-- pypi: https://files.pythonhosted.org/packages/1a/ff/b8c3ab819c4b90abeb197f24abb373391daa472c066605247d032941aefe/snapper_fmt-0.8.1-py3-none-macosx_11_0_arm64.whl
-  name: snapper-fmt
-  version: 0.8.1
-  sha256: d59fb92eab4188a6d1336ab379de24a898c78042adc0b239fcf46ca22112b7a1
-  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
   name: idna
   version: '3.18'
@@ -1535,11 +1530,6 @@ packages:
   - pyyaml>=5.1
   - virtualenv>=20.10.0
   requires_python: '>=3.9'
-- pypi: https://files.pythonhosted.org/packages/5d/27/a7bc8ecff2c5791c6d202a71bdb93b0c48ac97ff71d08350405b50e96fe0/snapper_fmt-0.8.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  name: snapper-fmt
-  version: 0.8.1
-  sha256: 8ba795b15bc9ad7e11a337898f9567a9654f6a2655e73518876776b38b572dc1
-  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/5d/85/9ebeae2f76e9e77b952f4b274c27238156eae7979c5421fba91a28f4970d/sphinxcontrib_applehelp-2.0.0-py3-none-any.whl
   name: sphinxcontrib-applehelp
   version: 2.0.0
@@ -1839,6 +1829,11 @@ packages:
   requires_dist:
   - arrow>=0.15.0
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/7c/4c/75aa7bdecae280cd1d16f3b2f95ffd358eb38e5ab5188340bf57619e14f1/snapper_fmt-0.10.0-py3-none-macosx_11_0_arm64.whl
+  name: snapper-fmt
+  version: 0.10.0
+  sha256: 8eb12e7147130ed564076b94d9668d657e7bc3d32e1c1431e36f86cc1a8b0ab3
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/7e/b3/6b4067be973ae96ba0d615946e314c5ae35f9f993eca561b356540bb0c2b/alabaster-1.0.0-py3-none-any.whl
   name: alabaster
   version: 1.0.0
@@ -1981,6 +1976,11 @@ packages:
   - pysocks>=1.5.6,!=1.5.7 ; extra == 'socks'
   - chardet>=3.0.2,<8 ; extra == 'use-chardet-on-py3'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/a3/c7/fabc5e0b66cedc7fd8fb47c82c03669646da9d3b63f5e517d06ac6ab4e9e/snapper_fmt-0.10.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  name: snapper-fmt
+  version: 0.10.0
+  sha256: e90843acda9d17beca02fb88c3eda98ac24eea8193bfca6add34103c8188ac45
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/a4/73/319dfa745dd668efe89309141ded489126461fcecd2b8f3a3cda185129b6/rpds_py-2026.6.3-cp312-cp312-macosx_11_0_arm64.whl
   name: rpds-py
   version: 2026.6.3
