@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-import json
 import os
 from pathlib import Path
 import sys
@@ -13,20 +12,13 @@ from typing import Any, Sequence
 
 from . import __version__
 from .config import (
-    development_engine_source,
     github_repository,
     load_workspace,
     load_workspace_lock,
 )
 from .driver import invoke_driver
 from .errors import ConfigurationError, OrinocoError
-from .integrity import sha256_file
-from .runtime import (
-    assemble_runtime,
-    resolve_runtime,
-    verify_runtime_archive,
-    verify_runtime_directory,
-)
+from .resources import resolve_resources
 from .validation import report_json, validate_workspace
 
 
@@ -88,30 +80,10 @@ def _workspace(args: argparse.Namespace):
     return load_workspace(args.root)
 
 
-def _runtime_payload(report) -> dict[str, Any]:
-    return {
-        "commands": list(report.commands),
-        "files": report.files,
-        "manifest_sha256": report.manifest_sha256,
-        "release": report.release,
-        "root": str(report.root),
-        "tree_sha256": report.tree_sha256,
-    }
-
-
-def _require_engine_version(lock) -> None:
-    if lock.engine_version != __version__ and development_engine_source() is None:
-        raise ConfigurationError(
-            f"orinoco.lock requires orinoco-lite {lock.engine_version}, "
-            f"but {__version__} is installed"
-        )
-
-
 def _resolve(args: argparse.Namespace):
     workspace = _workspace(args)
     lock = load_workspace_lock(workspace)
-    _require_engine_version(lock)
-    return workspace, lock, resolve_runtime(workspace, lock)
+    return workspace, lock, resolve_resources(workspace, lock)
 
 
 def _safe_build_destination(workspace, value: Path | None) -> Path:
@@ -132,12 +104,11 @@ def _validate(args: argparse.Namespace) -> int:
     report = validate_workspace(workspace)
     if not args.structural_only:
         lock = load_workspace_lock(workspace)
-        _require_engine_version(lock)
-        runtime = resolve_runtime(workspace, lock)
-        status = invoke_driver("validate", workspace, lock, runtime)
+        resources = resolve_resources(workspace, lock)
+        status = invoke_driver("validate", workspace, lock, resources)
         if status:
             return status
-        report["runtime"] = _runtime_payload(runtime)
+        report["package_version"] = __version__
     if args.json:
         sys.stdout.write(report_json(report))
     else:
@@ -146,7 +117,7 @@ def _validate(args: argparse.Namespace) -> int:
 
 
 def _build(args: argparse.Namespace) -> int:
-    workspace, lock, runtime = _resolve(args)
+    workspace, lock, resources = _resolve(args)
     build_repository = (
         github_repository(
             args.github_repository,
@@ -157,7 +128,7 @@ def _build(args: argparse.Namespace) -> int:
     )
     if not args.skip_structural_validation:
         validate_workspace(workspace)
-    semantic_status = invoke_driver("validate", workspace, lock, runtime)
+    semantic_status = invoke_driver("validate", workspace, lock, resources)
     if semantic_status:
         return semantic_status
     destination = _safe_build_destination(workspace, args.destination)
@@ -171,7 +142,7 @@ def _build(args: argparse.Namespace) -> int:
         "build",
         workspace,
         lock,
-        runtime,
+        resources,
         values={"base_url": base_url, "destination": str(destination)},
         environment=build_environment,
     )
@@ -203,67 +174,29 @@ def _serve(args: argparse.Namespace) -> int:
 
 
 def _editor(args: argparse.Namespace) -> int:
-    workspace, lock, runtime = _resolve(args)
+    workspace, lock, resources = _resolve(args)
     bundle = args.bundle.resolve()
     extra = ["--write"] if args.write else []
     return invoke_driver(
         "editor-apply",
         workspace,
         lock,
-        runtime,
+        resources,
         values={"bundle": str(bundle)},
         extra_arguments=extra,
     )
 
 
 def _projection(args: argparse.Namespace) -> int:
-    workspace, lock, runtime = _resolve(args)
+    workspace, lock, resources = _resolve(args)
     validate_workspace(workspace)
     return invoke_driver(
-        f"projection-{args.projection_command}", workspace, lock, runtime
+        f"projection-{args.projection_command}", workspace, lock, resources
     )
 
 
-def _runtime_command(args: argparse.Namespace) -> int:
-    _, _, runtime = _resolve(args)
-    payload = _runtime_payload(runtime)
-    if args.runtime_command == "verify" and args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
-    else:
-        print(
-            f"Verified Orinoco runtime {runtime.release} "
-            f"({runtime.files} resources, {runtime.manifest_sha256})"
-        )
-    return 0
-
-
-def _release(args: argparse.Namespace) -> int:
-    if args.release_command == "assemble":
-        report = assemble_runtime(
-            args.spec,
-            args.output,
-            force=args.force,
-            source_commit=args.source_commit,
-        )
-    else:
-        artifact = args.artifact.resolve()
-        if artifact.is_dir():
-            verified = verify_runtime_directory(
-                artifact, expected_manifest_sha256=args.manifest_sha256
-            )
-        else:
-            verified = verify_runtime_archive(
-                artifact, expected_manifest_sha256=args.manifest_sha256
-            )
-        report = _runtime_payload(verified)
-        if artifact.is_file():
-            report["archive_sha256"] = sha256_file(artifact)
-    print(json.dumps(report, indent=2, sort_keys=True))
-    return 0
-
-
 def _run(args: argparse.Namespace) -> int:
-    workspace, lock, runtime = _resolve(args)
+    workspace, lock, resources = _resolve(args)
     arguments = args.arguments
     if arguments and arguments[0] == "--":
         arguments = arguments[1:]
@@ -271,7 +204,7 @@ def _run(args: argparse.Namespace) -> int:
         args.driver,
         workspace,
         lock,
-        runtime,
+        resources,
         extra_arguments=arguments,
     )
 

@@ -128,8 +128,8 @@ class EditorBundleTests(unittest.TestCase):
             ["git", "-C", str(self.root), "commit", "-qm", "fixture"], check=True
         )
         self.workspace = load_workspace(self.root)
-        self.runtime = self.root / "runtime"
-        self.runtime.mkdir()
+        self.resources = self.root / "resources"
+        self.resources.mkdir()
 
         class FixtureConverter:
             def convert(self, value, class_name):
@@ -282,8 +282,8 @@ class EditorBundleTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        shell = self.runtime / "editor-shell"
-        schema = self.runtime / "editor-schema"
+        shell = self.resources / "editor-shell"
+        schema = self.resources / "editor-schema"
         shell.mkdir()
         schema.mkdir()
         (shell / "index.html").write_text("editor\n", encoding="utf-8")
@@ -308,7 +308,7 @@ class EditorBundleTests(unittest.TestCase):
         ) as rendered:
             report = bind_editor(
                 self.workspace,
-                self.runtime,
+                self.resources,
                 self.root / "bound-editor",
             )
 
@@ -324,7 +324,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_bundle_dry_run_and_write(self) -> None:
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
         report = apply_bundle_report(
-            self.workspace, self.runtime, bundle, write=False
+            self.workspace, self.resources, bundle, write=False
         )
         difference = report["diff"]
         self.assertIn("+display_label: Changed", difference)
@@ -335,7 +335,7 @@ class EditorBundleTests(unittest.TestCase):
         )
         self.assertFalse(report["applied"])
         self.assertIn("display_label: First", self.first.read_text())
-        apply_bundle(self.workspace, self.runtime, bundle, write=True)
+        apply_bundle(self.workspace, self.resources, bundle, write=True)
         self.assertIn("display_label: Changed", self.first.read_text())
 
     def test_bundle_preserves_unchanged_rdf_multivalue_order(self) -> None:
@@ -376,9 +376,9 @@ class EditorBundleTests(unittest.TestCase):
             return_value=(ReorderingConverter(), ReorderingConverter()),
         ):
             report = apply_bundle_report(
-                self.workspace, self.runtime, bundle, write=False
+                self.workspace, self.resources, bundle, write=False
             )
-            apply_bundle(self.workspace, self.runtime, bundle, write=True)
+            apply_bundle(self.workspace, self.resources, bundle, write=True)
 
         material = yaml.safe_load(self.first.read_text(encoding="utf-8"))
         self.assertEqual(material["associated_with"], associated_with)
@@ -398,19 +398,19 @@ class EditorBundleTests(unittest.TestCase):
         value["records"][0]["source_path"] = "../first.yaml"
         bundle.write_text(json.dumps(value), encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "source path"):
-            apply_bundle(self.workspace, self.runtime, bundle, write=False)
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
         value = json.loads(bundle.read_text())
         value["records"].append(value["records"][0])
         bundle.write_text(json.dumps(value), encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "duplicate PID"):
-            apply_bundle(self.workspace, self.runtime, bundle, write=False)
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
         value = json.loads(bundle.read_text())
         value["records"][0]["source_sha256"] = "0" * 64
         bundle.write_text(json.dumps(value), encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
-            apply_bundle(self.workspace, self.runtime, bundle, write=False)
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
 
     def test_multi_record_replace_failure_rolls_back(self) -> None:
         originals = {self.first: self.first.read_bytes(), self.second: self.second.read_bytes()}
@@ -467,7 +467,7 @@ class EditorBundleTests(unittest.TestCase):
         bundle = self._bundle({"xyzrins:persons/first": "Human replacement"})
 
         report = apply_bundle_report(
-            self.workspace, self.runtime, bundle, write=False
+            self.workspace, self.resources, bundle, write=False
         )
 
         self.assertEqual(
@@ -478,7 +478,7 @@ class EditorBundleTests(unittest.TestCase):
             ],
         )
         self.assertIn("- assertion_sha256:", report["diff"])
-        apply_bundle(self.workspace, self.runtime, bundle, write=True)
+        apply_bundle(self.workspace, self.resources, bundle, write=True)
         self.assertEqual(
             yaml.safe_load(companion.read_text(encoding="utf-8"))["assertions"],
             [],
@@ -531,7 +531,7 @@ class EditorBundleTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(DriverError, "conflicting local change"):
-            apply_bundle(self.workspace, self.runtime, bundle, write=False)
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
 
         subprocess.run(
             ["git", "-C", str(self.root), "restore", companion.relative_to(self.root)],
@@ -554,7 +554,7 @@ class EditorBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 ConfigurationError, "configured annotation companion tree"
             ):
-                apply_bundle(self.workspace, self.runtime, bundle, write=False)
+                apply_bundle(self.workspace, self.resources, bundle, write=False)
 
 
 if __name__ == "__main__":

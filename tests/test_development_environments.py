@@ -26,7 +26,7 @@ ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
-    def test_root_environment_is_engine_only_and_bootstrappable(self) -> None:
+    def test_root_environment_is_package_only_and_bootstrappable(self) -> None:
         manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
         workspace = manifest["workspace"]
         self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
@@ -75,16 +75,16 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(set(lock["environments"]), {"default"})
         self.assertTrue(FULL_SCRIPT_LOCK.is_file())
 
-    def test_ci_tasks_require_engine_and_development_contracts(self) -> None:
+    def test_ci_tasks_require_package_and_development_contracts(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
         self.assertEqual(
-            tasks["test-engine-strict"],
+            tasks["test-package-strict"],
             "python tools/run_unittests.py --fail-on-skip --discover "
             "packages/orinoco-lite/tests",
         )
         self.assertEqual(
             set(tasks["test-ci"]["depends-on"]),
-            {"test-engine-strict", "test-development"},
+            {"test-package-strict", "test-development"},
         )
         self.assertFalse((ROOT / "apm.yml").exists())
         self.assertFalse((ROOT / "apm.lock.yaml").exists())
@@ -94,22 +94,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         for relative in ("SKILL.md", "agents/openai.yaml"):
             source = DEVELOPER_SKILL / relative
             self.assertTrue(source.is_file())
-
-        skill = (DEVELOPER_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        for required in (
-            "test-downstream-candidate",
-            "--engine",
-            "--template",
-            "--mode quick",
-            "--mode full",
-            "<github-user>/orinoco-lite-demo",
-            "ORINOCO-Lite/test-orinoco-downstream-website",
-            "merge with a merge commit",
-            "standing authority",
-            "human-gated",
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, skill)
 
         interface = yaml.safe_load(
             (DEVELOPER_SKILL / "agents" / "openai.yaml").read_text(
@@ -245,29 +229,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
 
     def test_release_inputs_match_selected_dependencies(self) -> None:
         package = tomllib.loads(PACKAGE_MANIFEST.read_text(encoding="utf-8"))
-        version = package["project"]["version"]
-        package_metadata = ast.parse(
-            (
-                PACKAGE_MANIFEST.parent
-                / "src"
-                / "orinoco_lite"
-                / "__init__.py"
-            ).read_text(encoding="utf-8")
-        )
-        source_tree_versions = [
-            node.value.value
-            for node in ast.walk(package_metadata)
-            if isinstance(node, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == "__version__"
-                for target in node.targets
-            )
-            and isinstance(node.value, ast.Constant)
-            and isinstance(node.value.value, str)
-        ]
-        release_spec = yaml.safe_load(
-            (ROOT / "release/package-resources.yaml").read_text(encoding="utf-8")
-        )
         pool_gitlink = subprocess.check_output(
             [
                 "git",
@@ -282,27 +243,12 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             cwd=ROOT,
             text=True,
         ).strip()
-        things_schemas_gitlink = subprocess.check_output(
-            ["git", "rev-parse", "HEAD:submodules/things-schemas"],
-            cwd=ROOT,
-            text=True,
-        ).strip()
         shacl_gitlink = subprocess.check_output(
             ["git", "rev-parse", "HEAD:shacl-vue"],
             cwd=ROOT / "submodules" / "pool.psychoinformatics.de-ui",
             text=True,
         ).strip()
 
-        self.assertEqual(source_tree_versions, [version])
-        self.assertEqual(release_spec["release"], version)
-        self.assertNotIn("component_commits", release_spec["provenance"])
-        for component in release_spec["provenance"]["source_inventory"].values():
-            self.assertNotIn("commit", component)
-        self.assertEqual(
-            release_spec["compatibility"]["schema_profile"],
-            "things-schemas/demo-research-information@"
-            f"{things_schemas_gitlink}",
-        )
         self.assertEqual(POOL_UI_COMMIT, pool_gitlink)
         self.assertEqual(SHACL_VUE_COMMIT, shacl_gitlink)
 

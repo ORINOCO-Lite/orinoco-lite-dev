@@ -186,7 +186,7 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
 
     The released schema/projection driver performs semantic validation. This
     check deliberately runs before that driver so malformed or unsafe
-    downstream structure fails without downloading or executing a runtime.
+    downstream structure fails before projection or website generation.
     """
 
     if (workspace.root / ".gitmodules").exists():

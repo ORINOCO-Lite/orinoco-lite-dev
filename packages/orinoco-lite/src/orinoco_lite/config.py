@@ -19,7 +19,6 @@ CONFIG_CONTRACT_VERSION = 2
 LOCK_CONTRACT_VERSION = 1
 SITE_DATA_VERSION = 1
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-DRIVER_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$")
 GITHUB_REPOSITORY = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})/[A-Za-z0-9_.-]{1,100}$"
 )
@@ -285,7 +284,6 @@ class WorkspaceConfig:
     site_name: str
     base_url: str
     paths: Mapping[str, str]
-    command_aliases: Mapping[str, str]
     raw: Mapping[str, Any]
     site_data: Mapping[str, Any] = field(default_factory=dict)
     repository: str | None = None
@@ -297,9 +295,6 @@ class WorkspaceConfig:
         except KeyError as error:
             raise ConfigurationError(f"Unknown workspace path: {name}") from error
         return _inside(self.root, relative, f"paths.{name}")
-
-    def driver_name(self, action: str) -> str:
-        return self.command_aliases.get(action, action)
 
     def environment(self) -> dict[str, str]:
         """Return the stable environment understood by released drivers."""
@@ -316,14 +311,14 @@ class WorkspaceConfig:
 
 
 @dataclass(frozen=True)
-class EngineLock:
+class PackageLock:
     """Resolved immutable package pin from ``orinoco.lock``."""
 
     path: Path
     distribution: str
-    engine_version: str
-    engine_url: str
-    engine_sha256: str
+    package_version: str
+    package_url: str
+    package_sha256: str
     raw: Mapping[str, Any]
 
 
@@ -417,25 +412,6 @@ def load_workspace(
             "orinoco.yaml site.repository",
         )
 
-    runtime = raw.get("runtime", {})
-    if not isinstance(runtime, dict):
-        raise ConfigurationError("orinoco.yaml runtime must be a mapping")
-    aliases = runtime.get("commands", {})
-    if not isinstance(aliases, dict):
-        raise ConfigurationError("orinoco.yaml runtime.commands must be a mapping")
-    normalized_aliases: dict[str, str] = {}
-    for public_name, driver_name in aliases.items():
-        if (
-            not isinstance(public_name, str)
-            or not DRIVER_NAME.fullmatch(public_name)
-            or not isinstance(driver_name, str)
-            or not DRIVER_NAME.fullmatch(driver_name)
-        ):
-            raise ConfigurationError(
-                "runtime.commands keys and values must be normalized driver names"
-            )
-        normalized_aliases[public_name] = driver_name
-
     return WorkspaceConfig(
         root=resolved_root,
         config_path=config_path,
@@ -444,7 +420,6 @@ def load_workspace(
         base_url=base_url,
         site_data=site_data,
         paths=paths,
-        command_aliases=normalized_aliases,
         raw=raw,
         repository=repository,
         curation_service=curation_service,
@@ -458,7 +433,7 @@ def load_config_path(path: Path) -> WorkspaceConfig:
     return load_workspace(path.parent, config_name=path.name)
 
 
-def load_lock(path: Path) -> EngineLock:
+def load_lock(path: Path) -> PackageLock:
     """Load a strict immutable package lock."""
 
     raw = _load_mapping(path, "Orinoco lock")
@@ -466,97 +441,82 @@ def load_lock(path: Path) -> EngineLock:
         raise ConfigurationError(
             f"orinoco.lock lock_version must be {LOCK_CONTRACT_VERSION}"
         )
-    engine = raw.get("engine")
-    if not isinstance(engine, dict):
-        raise ConfigurationError("orinoco.lock requires an engine mapping")
-    distribution = engine.get("distribution")
-    engine_version = engine.get("version")
-    engine_url = engine.get("url")
-    engine_digest = engine.get("sha256")
+    package = raw.get("package")
+    if not isinstance(package, dict):
+        raise ConfigurationError("orinoco.lock requires a package mapping")
+    distribution = package.get("distribution")
+    package_version = package.get("version")
+    package_url = package.get("url")
+    package_digest = package.get("sha256")
     if distribution != "orinoco-lite":
-        raise ConfigurationError("orinoco.lock engine.distribution must be orinoco-lite")
-    if not isinstance(engine_version, str) or not engine_version:
-        raise ConfigurationError("orinoco.lock engine.version must be a string")
-    engine_url = _absolute_http_url(
-        engine_url, "orinoco.lock engine.url", https_only=True
+        raise ConfigurationError("orinoco.lock package.distribution must be orinoco-lite")
+    if not isinstance(package_version, str) or not package_version:
+        raise ConfigurationError("orinoco.lock package.version must be a string")
+    package_url = _absolute_http_url(
+        package_url, "orinoco.lock package.url", https_only=True
     )
     if (
-        not isinstance(engine_digest, str)
-        or not SHA256.fullmatch(engine_digest)
-        or set(engine_digest) == {"0"}
+        not isinstance(package_digest, str)
+        or not SHA256.fullmatch(package_digest)
+        or set(package_digest) == {"0"}
     ):
-        raise ConfigurationError("orinoco.lock engine.sha256 must be lowercase SHA-256")
-    wheel_name = PurePosixPath(urlsplit(engine_url).path).name
-    expected_wheel_prefix = f"orinoco_lite-{engine_version.replace('-', '_')}-"
+        raise ConfigurationError("orinoco.lock package.sha256 must be lowercase SHA-256")
+    wheel_name = PurePosixPath(urlsplit(package_url).path).name
+    expected_wheel_prefix = f"orinoco_lite-{package_version.replace('-', '_')}-"
     if not wheel_name.startswith(expected_wheel_prefix) or not wheel_name.endswith(
         ".whl"
     ):
         raise ConfigurationError(
-            "orinoco.lock engine.url must name the exact locked orinoco-lite wheel"
+            "orinoco.lock package.url must name the exact locked orinoco-lite wheel"
         )
 
-    return EngineLock(
+    return PackageLock(
         path=path.resolve(),
         distribution=distribution,
-        engine_version=engine_version,
-        engine_url=engine_url,
-        engine_sha256=engine_digest,
+        package_version=package_version,
+        package_url=package_url,
+        package_sha256=package_digest,
         raw=raw,
     )
 
 
-def load_workspace_lock(workspace: WorkspaceConfig) -> EngineLock:
+def load_workspace_lock(workspace: WorkspaceConfig) -> PackageLock:
     return load_lock(workspace.lock_path)
 
 
-def development_runtime_allowed() -> bool:
-    """Return whether an unhashed environment override is explicitly enabled.
+def development_package_allowed() -> bool:
+    """Return whether local package candidate execution is explicitly enabled."""
 
-    This is intentionally not used by normal commands. It exists so runtime
-    authors can build dedicated tooling without accidentally weakening the
-    downstream release path.
-    """
-
-    return os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME") == "1"
+    return os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") == "1"
 
 
-def development_engine_root() -> Path | None:
+def development_package_root() -> Path | None:
     """Resolve the explicitly selected local engineering working tree."""
 
-    if not development_runtime_allowed():
+    if not development_package_allowed():
         return None
-    root_value = os.environ.get("ORINOCO_CANDIDATE_ENGINE_ROOT")
+    root_value = os.environ.get("ORINOCO_CANDIDATE_PACKAGE_ROOT")
     if root_value is None:
         return None
     root = Path(root_value).resolve()
     source = root / "packages/orinoco-lite/src"
     if not (source / "orinoco_lite/__init__.py").is_file():
         raise ConfigurationError(
-            "ORINOCO_CANDIDATE_ENGINE_ROOT does not contain "
+            "ORINOCO_CANDIDATE_PACKAGE_ROOT does not contain "
             "packages/orinoco-lite/src/orinoco_lite"
         )
     return root
 
 
-def development_engine_source() -> Path | None:
-    """Resolve the explicitly selected local engine source for development."""
-
-    root = development_engine_root()
-    if root is None:
-        return None
-    source = root / "packages/orinoco-lite/src"
-    return source
-
-
 def development_editor_shell() -> Path | None:
-    """Resolve the editor shell built for a local engine candidate."""
+    """Resolve the editor shell built for a local package candidate."""
 
-    if development_engine_root() is None:
+    if development_package_root() is None:
         return None
     shell_value = os.environ.get("ORINOCO_CANDIDATE_EDITOR_SHELL")
     if shell_value is None:
         raise ConfigurationError(
-            "Local engine candidate has no editor shell; run it through the "
+            "Local package candidate has no editor shell; run it through the "
             "downstream candidate command"
         )
     shell = Path(shell_value).resolve()

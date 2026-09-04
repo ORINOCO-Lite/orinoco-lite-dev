@@ -10,8 +10,8 @@ class ConfigurationError(OrinocoError):
 
 
 class IntegrityError(OrinocoError):
-    """A release artifact or runtime resource failed verification."""
+    """A release artifact or resources resource failed verification."""
 
 
 class DriverError(OrinocoError):
-    """A verified runtime driver could not be invoked successfully."""
+    """A package driver could not be invoked successfully."""

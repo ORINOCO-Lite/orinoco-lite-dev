@@ -10,8 +10,8 @@ from linkml_runtime import SchemaView
 from orinoco_lite.release_schema import localize_schema
 
 
-ENGINE_ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
+PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+SCHEMA_SOURCE = PACKAGE_ROOT / "submodules/things-schemas/src"
 
 
 @unittest.skipUnless(SCHEMA_SOURCE.is_dir(), "pinned schema fixture is unavailable")
@@ -24,7 +24,7 @@ class LocalizedSchemaTests(unittest.TestCase):
                 SCHEMA_SOURCE / "demo-research-information/unreleased.yaml",
                 destination,
             )
-            self.assertEqual(len(report["sources"]), 12)
+            self.assertEqual(report["sources"], 12)
             entry = destination / report["entrypoint"]
             with patch(
                 "urllib.request.urlopen",

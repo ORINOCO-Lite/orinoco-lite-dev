@@ -34,7 +34,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                     "paths": ["extensions/**"],
                 },
                 "generated": {
-                    "behavior": "ignored-runtime-output",
+                    "behavior": "ignored-resources-output",
                     "paths": ["generated/**"],
                 },
             }
@@ -73,7 +73,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                     "project_name": "Downstream name",
                     "site_description": "Obsolete downstream description",
                     "site_base_url": "https://obsolete.example.invalid/",
-                    "engine_version": "0.1.0",
+                    "package_version": "0.1.0",
                     "template_source": "gh:old/template",
                     "template_version": "v0.1.0",
                 },
@@ -82,7 +82,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def test_copy_working_tree_omits_repository_and_runtime_output(self) -> None:
+    def test_copy_working_tree_omits_repository_and_resources_output(self) -> None:
         (self.downstream / ".git").mkdir()
         (self.downstream / ".git/config").write_text("ignored\n", encoding="utf-8")
         destination = self.root / "copy"
@@ -127,7 +127,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertFalse((candidate / "generated").exists())
         self.assertFalse((candidate / "site-specific/stale.txt").exists())
 
-    def test_overlay_omits_nested_runtime_state(self) -> None:
+    def test_overlay_omits_nested_resources_state(self) -> None:
         cache = self.downstream / "extensions/source-adapters/example/.pixi/envs/bin"
         cache.mkdir(parents=True)
         (cache / "python").symlink_to("/usr/bin/python3")
@@ -143,32 +143,32 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             (candidate / "extensions/source-adapters/example/.pixi").exists()
         )
 
-    def test_engine_environment_prefers_candidate_source(self) -> None:
-        engine = self.root / "engine"
-        package = engine / "packages/orinoco-lite/src/orinoco_lite"
-        package.mkdir(parents=True)
-        (package / "__init__.py").write_text("", encoding="utf-8")
+    def test_package_environment_prefers_candidate_source(self) -> None:
+        package = self.root / "package"
+        source = package / "packages/orinoco-lite/src/orinoco_lite"
+        source.mkdir(parents=True)
+        (source / "__init__.py").write_text("", encoding="utf-8")
 
         with patch.dict(os.environ, {"PYTHONPATH": "/existing"}, clear=False):
             environment = development.candidate_environment(
-                engine,
+                package,
                 "example/downstream",
             )
 
         self.assertEqual(
             os.pathsep.join(
                 (
-                    os.fspath(engine.resolve() / "packages/orinoco-lite/src"),
+                    os.fspath(package.resolve() / "packages/orinoco-lite/src"),
                     "/existing",
                 )
             ),
             environment["PYTHONPATH"],
         )
         self.assertEqual(
-            os.fspath(engine.resolve()),
-            environment["ORINOCO_CANDIDATE_ENGINE_ROOT"],
+            os.fspath(package.resolve()),
+            environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"],
         )
-        self.assertEqual("1", environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"])
+        self.assertEqual("1", environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"])
         self.assertEqual("example/downstream", environment["GITHUB_REPOSITORY"])
 
     def test_github_repository_is_discovered_from_ssh_origin(self) -> None:
@@ -209,7 +209,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 {
                     "_subdirectory": "copier-template",
                     "project_slug": {"type": "str", "default": "template-site"},
-                    "engine_version": {"type": "str", "default": "0.2.0"},
+                    "package_version": {"type": "str", "default": "0.2.0"},
                     "template_source": {
                         "type": "str",
                         "default": "gh:new/template",
@@ -227,7 +227,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         answers = development._template_answers(self.downstream, template)
 
         self.assertEqual("downstream-site", answers["project_slug"])
-        self.assertEqual("0.2.0", answers["engine_version"])
+        self.assertEqual("0.2.0", answers["package_version"])
         self.assertEqual("gh:new/template", answers["template_source"])
         self.assertEqual("v0.2.0", answers["template_version"])
         self.assertNotIn("project_name", answers)
@@ -312,11 +312,11 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
-        engine = self.root / "engine"
-        package = engine / "packages/orinoco-lite/src/orinoco_lite"
-        package.mkdir(parents=True)
-        (package / "__init__.py").write_text("", encoding="utf-8")
-        application = engine / "packages/curation-review-app"
+        package = self.root / "package"
+        source = package / "packages/orinoco-lite/src/orinoco_lite"
+        source.mkdir(parents=True)
+        (source / "__init__.py").write_text("", encoding="utf-8")
+        application = package / "packages/curation-review-app"
         (application / "node_modules").mkdir(parents=True)
 
         with (
@@ -326,7 +326,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         ):
             development.exercise_candidate(
                 candidate,
-                engine=engine,
+                package=package,
                 tasks=("build",),
             )
 
@@ -343,11 +343,11 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
-        engine = self.root / "engine"
-        package = engine / "packages/orinoco-lite/src/orinoco_lite"
-        package.mkdir(parents=True)
-        (package / "__init__.py").write_text("", encoding="utf-8")
-        application = engine / "packages/curation-review-app"
+        package = self.root / "package"
+        source = package / "packages/orinoco-lite/src/orinoco_lite"
+        source.mkdir(parents=True)
+        (source / "__init__.py").write_text("", encoding="utf-8")
+        application = package / "packages/curation-review-app"
         (application / "node_modules").mkdir(parents=True)
 
         with (
@@ -357,7 +357,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         ):
             development.exercise_candidate(
                 candidate,
-                engine=engine,
+                package=package,
                 tasks=("build-browser-pages",),
             )
 
@@ -383,7 +383,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         ):
             development.exercise_candidate(
                 candidate,
-                engine=None,
+                package=None,
                 tasks=("validate",),
             )
 
@@ -391,17 +391,17 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertEqual("validate", run.call_args.args[0][-1])
 
     def test_candidate_output_may_not_be_nested_in_any_source(self) -> None:
-        engine = self.root / "engine"
+        package = self.root / "package"
         template = self.root / "template"
-        engine.mkdir()
+        package.mkdir()
         template.mkdir()
         sources = development._candidate_output_sources(
             self.downstream,
-            engine,
+            package,
             template,
         )
 
-        for source in (self.downstream, engine, template):
+        for source in (self.downstream, package, template):
             with self.subTest(source=source), self.assertRaisesRegex(
                 development.DevelopmentError, "cannot be inside"
             ):
@@ -414,7 +414,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 self.downstream / "candidate",
             )
 
-    def test_cli_requires_an_engine_or_template_candidate(self) -> None:
+    def test_cli_requires_a_package_or_template_candidate(self) -> None:
         self.assertEqual(
             2,
             development.main(("--downstream", os.fspath(self.downstream))),

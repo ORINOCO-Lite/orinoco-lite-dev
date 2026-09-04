@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  engine:
+  package:
     name: Engineering contracts (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORINOCO-Lite/orinoco-lite-template
-          ref: main
+          ref: 9acdd13cd0f8ac82d4bd7b36159c12af794b2019
           path: build/orinoco-lite-template
           persist-credentials: false
           fetch-depth: 1
@@ -54,7 +54,7 @@ jobs:
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
-      - name: Install the locked engine environment
+      - name: Install the locked package environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: true
@@ -71,7 +71,7 @@ jobs:
       - name: Verify pre-commit formatting
         run: pixi run check-format
 
-      - name: Run strict engine and engineering tests
+      - name: Run strict package and engineering tests
         run: pixi run test
 
       - name: Prove the forward template contract with compact mock content

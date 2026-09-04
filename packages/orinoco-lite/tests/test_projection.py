@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-import hashlib
 import importlib.util
 import json
 import os
@@ -37,8 +36,8 @@ from orinoco_lite.projection import (
 from orinoco_lite.schema_conversion import build_format_converters
 
 
-ENGINE_ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_SOURCE = ENGINE_ROOT / "submodules/things-schemas/src"
+PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+SCHEMA_SOURCE = PACKAGE_ROOT / "submodules/things-schemas/src"
 
 
 class SemanticReferencePolicyTests(unittest.TestCase):
@@ -86,7 +85,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
                 return_value=(to_ttl, to_json),
             ),
         ):
-            return validate_semantics(Mock(), Path("/unused-runtime"))
+            return validate_semantics(Mock(), Path("/unused-resources"))
 
     def test_preserve_policy_reports_external_creator_and_keeps_scalar(
         self,
@@ -356,7 +355,7 @@ class QueryInlineParityTests(unittest.TestCase):
 
     def test_behavior_matches_the_exact_pinned_query_things_walker(self) -> None:
         source = (
-            ENGINE_ROOT
+            PACKAGE_ROOT
             / "submodules/query-things/query_things/inline_things.py"
         )
         if not source.is_file():
@@ -488,7 +487,7 @@ class GenericProjectionContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name) / "consumer"
-        self.runtime = Path(self.temporary.name) / "runtime"
+        self.resources = Path(self.temporary.name) / "resources"
         for relative in (
             "site-specific/metadata/records/Person",
             "site-specific/projection-templates",
@@ -530,37 +529,12 @@ class GenericProjectionContractTests(unittest.TestCase):
             "  node_classes: ['acme:Person']\n  relationship_fields: []\n",
             encoding="utf-8",
         )
-        schema = self.runtime / "schema/demo/main.yaml"
-        imported = self.runtime / "schema/types/base.yaml"
+        schema = self.resources / "schema/demo/main.yaml"
+        imported = self.resources / "schema/types/base.yaml"
         schema.parent.mkdir(parents=True)
         imported.parent.mkdir(parents=True)
         schema.write_text("id: https://example.invalid/main\nimports: [../types/base]\n", encoding="utf-8")
         imported.write_text("id: https://example.invalid/base\n", encoding="utf-8")
-        sources = []
-        for relative in ("demo/main.yaml", "types/base.yaml"):
-            data = (self.runtime / "schema" / relative).read_bytes()
-            sources.append(
-                {
-                    "localized_path": relative,
-                    "source_path": relative,
-                    "source_sha256": hashlib.sha256(data).hexdigest(),
-                    "localized_sha256": hashlib.sha256(data).hexdigest(),
-                }
-            )
-        (self.runtime / "schema/source-inventory.json").write_text(
-            json.dumps(
-                {
-                    "entrypoint": "demo/main.yaml",
-                    "format": "orinoco-localized-linkml-source-closure",
-                    "sources": sources,
-                    "version": 1,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
         self.workspace = WorkspaceConfig(
             root=self.root,
             config_path=self.root / "orinoco.yaml",
@@ -568,7 +542,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             site_name="Generic fixture",
             base_url="https://example.invalid/",
             paths=DEFAULT_PATHS,
-            command_aliases={},
             raw={},
         )
         self.semantic = {
@@ -603,7 +576,7 @@ class GenericProjectionContractTests(unittest.TestCase):
                 return_value=(IdentityConverter(), IdentityConverter()),
             ),
         ):
-            return validate_semantics(self.workspace, self.runtime)
+            return validate_semantics(self.workspace, self.resources)
 
     def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
         contract = load_contract(self.workspace)
@@ -617,9 +590,9 @@ class GenericProjectionContractTests(unittest.TestCase):
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
         ) as semantic:
-            update_projection(self.workspace, self.runtime)
+            update_projection(self.workspace, self.resources)
             semantic.reset_mock()
-            report = verify_projection(self.workspace, self.runtime)
+            report = verify_projection(self.workspace, self.resources)
             semantic.assert_called_once()
         self.assertTrue(report["deterministic"])
         self.assertTrue(
@@ -628,10 +601,27 @@ class GenericProjectionContractTests(unittest.TestCase):
                 / "generated/projection/content/people/one/_index.md"
             ).is_file()
         )
-        imported = self.runtime / "schema/types/base.yaml"
+        imported = self.resources / "schema/types/base.yaml"
         imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
         with self.assertRaisesRegex(DriverError, "stale"):
-            verify_projection(self.workspace, self.runtime)
+            verify_projection(self.workspace, self.resources)
+
+    def test_custom_policy_reuses_pinned_presentation_inputs(self) -> None:
+        config = self.root / "site-specific/projection.yaml"
+        config.write_text(
+            config.read_text().replace(
+                "template: site-specific/", "template: presentation:site-specific/"
+            ).replace(
+                "producer: site-specific/", "producer: presentation:site-specific/"
+            ).replace("graph:\n", "graph:\n  missing_external_targets: reject\n")
+        )
+        with (
+            patch("orinoco_lite.projection.resolve_presentation", return_value=self.root) as resolve,
+            patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic),
+        ):
+            update_projection(self.workspace, self.resources)
+        resolve.assert_called_with(self.workspace.root, self.resources)
+        self.assertEqual(load_contract(self.workspace, self.root).missing_graph_targets, "reject")
 
     def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
         alias = self.root / "site-specific/metadata/records/Person/alias.yaml"
@@ -647,7 +637,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             "orinoco_lite.projection.validate_semantics",
             return_value={**self.semantic, "records": 3},
         ), self.assertRaisesRegex(DriverError, "unsafe route"):
-            render_projection(self.workspace, self.runtime, output)
+            render_projection(self.workspace, self.resources, output)
 
         canonical = output / "content/people/one/_index.md"
         self.assertTrue(canonical.is_file())
@@ -688,7 +678,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
         ):
-            render_projection(self.workspace, self.runtime, output)
+            render_projection(self.workspace, self.resources, output)
 
         public_page = output / "content/people/one/_index.md"
         self.assertEqual(
@@ -796,7 +786,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             "orinoco_lite.projection.validate_semantics",
             return_value=report,
         ):
-            rendered = render_projection(self.workspace, self.runtime, output)
+            rendered = render_projection(self.workspace, self.resources, output)
         self.assertEqual(rendered["dropped_graph_edges"], 2)
         self.assertEqual(
             json.loads((output / "static/graph.json").read_text(encoding="utf-8"))[
@@ -899,8 +889,8 @@ class GenericProjectionContractTests(unittest.TestCase):
         sidecar.write_bytes(sidecar_bytes)
 
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            update_projection(self.workspace, self.runtime)
-            report = verify_projection(self.workspace, self.runtime)
+            update_projection(self.workspace, self.resources)
+            report = verify_projection(self.workspace, self.resources)
 
         self.assertEqual(sidecar.read_bytes(), sidecar_bytes)
         self.assertTrue((projection / "SHA256SUMS").is_file())
@@ -912,13 +902,13 @@ class GenericProjectionContractTests(unittest.TestCase):
 
     def test_verify_rejects_arbitrary_undeclared_sidecar(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            update_projection(self.workspace, self.runtime)
+            update_projection(self.workspace, self.resources)
 
         projection = self.root / "generated/projection"
         undeclared = projection / ".undeclared-sidecar"
         undeclared.write_text("must remain in deterministic scope\n", encoding="utf-8")
         (projection / "SHA256SUMS").write_text(
-            projection_manifest(self.workspace, self.runtime, projection),
+            projection_manifest(self.workspace, self.resources, projection),
             encoding="utf-8",
         )
 
@@ -927,7 +917,7 @@ class GenericProjectionContractTests(unittest.TestCase):
                 DriverError,
                 r"deterministic regeneration: \.undeclared-sidecar",
             ):
-                verify_projection(self.workspace, self.runtime)
+                verify_projection(self.workspace, self.resources)
 
     def test_provenance_named_content_remains_in_projection_scope(self) -> None:
         output = self.root / "generated/projection"
@@ -939,7 +929,7 @@ class GenericProjectionContractTests(unittest.TestCase):
 
     def test_double_failure_preserves_recovery_backup(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            update_projection(self.workspace, self.runtime)
+            update_projection(self.workspace, self.resources)
         real_replace = os.replace
         replacements = 0
 
@@ -956,7 +946,7 @@ class GenericProjectionContractTests(unittest.TestCase):
                 side_effect=fail_install_and_rollback,
             ):
                 with self.assertRaisesRegex(DriverError, "original is preserved"):
-                    update_projection(self.workspace, self.runtime)
+                    update_projection(self.workspace, self.resources)
         backups = list((self.root / "generated").glob(".projection-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-try:
-    from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import tomllib
 
+try:
     __version__ = version("orinoco-lite")
-except Exception:  # pragma: no cover - source-tree fallback
-    __version__ = "0.3.0rc2"
+except PackageNotFoundError:  # Release preparation before package installation.
+    manifest = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    __version__ = tomllib.loads(manifest.read_text(encoding="utf-8"))["project"]["version"]
 
 __all__ = ["__version__"]

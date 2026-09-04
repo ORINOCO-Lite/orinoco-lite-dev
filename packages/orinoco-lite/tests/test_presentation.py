@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import subprocess
-import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from orinoco_lite.errors import IntegrityError
 from orinoco_lite.presentation import resolve_presentation
-from orinoco_lite.runtime import assemble_runtime
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -114,47 +111,20 @@ class PresentationResolverTests(unittest.TestCase):
         _git(repository, "commit", "--quiet", "-m", f"create {name}")
         return repository
 
-    def _runtime(self, *, repository: Path | None = None) -> Path:
-        source = self.root / f"runtime-source-{len(list(self.root.glob('runtime-*')))}"
-        (source / "licenses").mkdir(parents=True)
-        (source / "licenses/LICENSE.txt").write_text(
-            "Fixture license\n", encoding="utf-8"
-        )
-        provenance = {
-            "source_commit": self.engineering_commit,
-        }
-        if repository is not None:
-            provenance["source_repository"] = str(repository)
-        spec = source / "runtime.yaml"
-        spec.write_text(
-            "format: orinoco-lite-package-resources\n"
-            "spec_version: 1\n"
-            "release: 0.2.0\n"
-            "source_root: .\n"
-            "compatibility:\n"
-            "  config: [2]\n"
-            '  hugo: ">=0.154,<0.155"\n'
-            "commands:\n"
-            '  build: ["{python}", "-c", "pass"]\n'
-            "licenses:\n"
-            "  - licenses/LICENSE.txt\n"
-            "resources:\n"
-            "  - source: licenses\n"
-            "    destination: licenses\n"
-            f"provenance: {json.dumps(provenance, sort_keys=True)}\n",
-            encoding="utf-8",
-        )
-        archive = source / "runtime.tar.gz"
-        assemble_runtime(spec, archive)
-        extracted = source / "extracted"
-        with tarfile.open(archive, "r:gz") as stream:
-            stream.extractall(extracted, filter="data")
-        return extracted / "orinoco-runtime"
+    def _resources(self, *, repository: Path | None = None) -> Path:
+        root = self.root / "resources"
+        root.mkdir()
+        (root / "source-commit.txt").write_text(self.engineering_commit + "\n")
+        self.source_repository = str(repository) if repository else ""
+        source_patch = patch("orinoco_lite.presentation.SOURCE_REPOSITORY", self.source_repository)
+        source_patch.start()
+        self.addCleanup(source_patch.stop)
+        return root
 
     def _candidate_environment(self) -> dict[str, str]:
         return {
-            "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
-            "ORINOCO_CANDIDATE_ENGINE_ROOT": str(self.engineering),
+            "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+            "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(self.engineering),
         }
 
     def test_candidate_uses_committed_gitlink_and_resolves_recursively(self) -> None:
@@ -196,19 +166,19 @@ class PresentationResolverTests(unittest.TestCase):
                 "Presentation fixture\n",
             )
 
-    def test_verified_runtime_cache_supports_offline_reuse_and_rejects_tampering(
+    def test_presentation_cache_supports_offline_reuse_and_rejects_tampering(
         self,
     ) -> None:
-        runtime = self._runtime(repository=self.engineering)
+        resources = self._resources(repository=self.engineering)
 
         with patch.dict(
             os.environ,
-            {"ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "0"},
+            {"ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "0"},
         ):
-            first = resolve_presentation(self.workspace, runtime)
+            first = resolve_presentation(self.workspace, resources)
             offline_sources = self.root / "offline-sources"
             self.sources.rename(offline_sources)
-            second = resolve_presentation(self.workspace, runtime)
+            second = resolve_presentation(self.workspace, resources)
 
             self.assertEqual(first, second)
             self.assertEqual(
@@ -222,16 +192,17 @@ class PresentationResolverTests(unittest.TestCase):
                 "offline tampering\n", encoding="utf-8"
             )
             with self.assertRaisesRegex(IntegrityError, "repair failed"):
-                resolve_presentation(self.workspace, runtime)
+                resolve_presentation(self.workspace, resources)
 
-    def test_runtime_requires_only_the_engineering_coordinate(self) -> None:
-        runtime = self._runtime()
+    def test_missing_package_source_commit_is_rejected(self) -> None:
+        resources = self._resources()
+        (resources / "source-commit.txt").unlink()
         with patch.dict(
             os.environ,
-            {"ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "0"},
+            {"ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "0"},
         ):
-            with self.assertRaisesRegex(IntegrityError, "source_repository"):
-                resolve_presentation(self.workspace, runtime)
+            with self.assertRaisesRegex(IntegrityError, "source commit"):
+                resolve_presentation(self.workspace, resources)
 
 
 if __name__ == "__main__":
