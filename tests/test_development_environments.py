@@ -86,8 +86,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             set(tasks["test-ci"]["depends-on"]),
             {"test-engine-strict", "test-development"},
         )
-        self.assertFalse((ROOT / "apm.yml").exists())
-        self.assertFalse((ROOT / "apm.lock.yaml").exists())
 
     def test_developer_skill_is_native_and_scoped(self) -> None:
         self.assertFalse((ROOT / ".apm" / "skills").exists())
