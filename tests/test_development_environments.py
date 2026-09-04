@@ -323,16 +323,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertNotIn("submodules: recursive", workflow)
         self.assertIn("pixi-version: v0.76.2", workflow)
         self.assertIn(
-            "repository: ORINOCO-Lite/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn("path: build/orinoco-lite-template", workflow)
-        self.assertIn(
-            "ORINOCO_TEMPLATE_CANDIDATE: "
-            "${{ github.workspace }}/build/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn(
             "submodules/pool.psychoinformatics.de-ui",
             workflow,
         )
@@ -343,14 +333,12 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             "tools/upstream_full.py",
         ):
             self.assertIn(f"pixi lock --script {script} --check", workflow)
-        fixture = workflow.index("Check out the template candidate")
         components = workflow.index(
             "Initialize only release-authorized compatibility components"
         )
         install = workflow.index("frozen: true")
-        tests = workflow.index("run: pixi run test-template-candidate-quick")
+        tests = workflow.index("run: pixi run test")
         build = workflow.index("run: pixi run build-upstream-static")
-        self.assertLess(fixture, tests)
         self.assertLess(components, tests)
         self.assertLess(install, tests)
         self.assertLess(tests, build)

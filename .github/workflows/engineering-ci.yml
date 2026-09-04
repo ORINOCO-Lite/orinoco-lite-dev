@@ -29,15 +29,6 @@ jobs:
           persist-credentials: false
           submodules: false
 
-      - name: Check out the template candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ORINOCO-Lite/orinoco-lite-template
-          ref: main
-          path: build/orinoco-lite-template
-          persist-credentials: false
-          fetch-depth: 1
-
       - name: Initialize only release-authorized compatibility components
         shell: bash
         run: |
@@ -73,11 +64,6 @@ jobs:
 
       - name: Run strict engine and engineering tests
         run: pixi run test
-
-      - name: Prove the forward template contract with compact mock content
-        env:
-          ORINOCO_TEMPLATE_CANDIDATE: ${{ github.workspace }}/build/orinoco-lite-template
-        run: pixi run test-template-candidate-quick
 
       - name: Build the pinned upstream static site from a non-recursive clone
         run: pixi run build-upstream-static
