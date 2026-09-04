@@ -20,11 +20,10 @@ npm run check
 Deploy its API handlers, generated protocol response, route and header policy, and public configuration together from the same clean revision.
 Do not deploy `dist/`, a review shell, a landing page, or other static presentation assets with the service.
 
-The released source-review shell belongs in the immutable Orinoco runtime and downstream static build.
+The source-review shell is bundled in the `orinoco-lite` package and included in each downstream static build.
 Verify it through the release and downstream checks, not by deploying it as a second central review page.
 
-The service does not consume an Orinoco Lite runtime archive.
-Do not stage SHACL Vue, a Things schema, downstream record input, an editor-input Actions artifact, `/editor-runtime/` assets, or a runtime-manifest digest.
+Do not stage SHACL Vue, a Things schema, downstream record input, or an editor-input Actions artifact in the service.
 The immutable editor shell and schema belong in each downstream's static site build, which is the only SHACL Vue editor.
 
 ## Required configuration
@@ -38,7 +37,7 @@ The immutable editor shell and schema belong in each downstream's static site bu
 
 Generate `SESSION_SEAL_KEY` with a cryptographically secure random source.
 Avoid commands that print it into captured logs; send it directly to the provider's secret input.
-No App private key, webhook secret, installation token, runtime digest, database credential, or storage binding is required.
+No App private key, webhook secret, installation token, database credential, or storage binding is required.
 
 The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.
 Repository identity is not a separate curation setting.
@@ -47,7 +46,7 @@ Repository identity is not a separate curation setting.
 When absent, the released integration uses the Orinoco Lite central-service origin.
 When present, it is the credential-free HTTPS origin of a compatible independently hosted backend, with no path, query, fragment, or credentials.
 It is not a service secret, OAuth state, or a substitute for the App's selected-repository installation.
-The site's `site.base_url` owns the canonical `edit/` and `review/` routes.
+The `identity.base_url` value in the configured `paths.site/site.yaml` owns the canonical `edit/` and `review/` routes.
 The service independently verifies every browser coordinate against GitHub, the App installation, trusted repository content, and the exact operation.
 
 ## Provider capability gate
@@ -97,6 +96,7 @@ The exact API paths and accepted methods are:
 | `POST /api/logout` | `functions/api/logout.ts` |
 | `GET /api/proposal` | `functions/api/proposal.ts` |
 | `GET /api/session` | `functions/api/session.ts` |
+| `GET /api/transport` | `functions/api/transport.ts` |
 | `POST /api/shacl/propose` | `functions/api/shacl/propose.ts` |
 | `POST /api/submit` | `functions/api/submit.ts` |
 
@@ -127,7 +127,7 @@ The downstream static `review/` route generates a fresh 256-bit nonce and opens 
 OAuth remains in the popup, so the main browser and all review state remain on the downstream route.
 The sealed session grant binds all coordinates.
 
-Before sending proposal data, the backend reads `orinoco.yaml` at the verified proposal metadata base, derives the trusted repository from the GitHub objects, resolves the central-service default or verifies an explicit `site.curation_service` override, and derives the exact downstream `site.base_url` plus `review/`.
+Before sending proposal data, the backend reads `orinoco.yaml` and its configured `paths.site/site.yaml` at the same verified proposal metadata base, derives the trusted repository from the GitHub objects, resolves the central-service default or verifies an explicit `site.curation_service` override, and derives the exact downstream `identity.base_url` plus `review/`.
 The minimal generated callback/transport response and downstream complete a typed ready/request handshake and require exact opener window, origin, operation, nonce, repository, pull request, and artifact matches.
 Never send a token or CSRF value through browser messaging and never use `*` as a message target.
 
@@ -148,7 +148,7 @@ The static site opens the backend SHACL authorization route with its repository,
 The bundle remains in the static editor's memory through OAuth.
 The editor sends it only after the exact popup at the effective service origin signals readiness with the matching repository, operation, and nonce.
 The backend transport accepts it only from the exact opener at the declared HTTPS editor origin with the same coordinates.
-The backend independently reads `orinoco.yaml` at the trusted base commit before a SHACL write and requires its `site.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
+The backend independently reads `orinoco.yaml` and its configured `paths.site/site.yaml` at the same trusted base commit before a SHACL write and requires the `identity.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
 Successful writes consume the relevant grant; standalone SHACL branches are deterministic for the source commit and handoff nonce so GitHub ref creation rejects a concurrent replay.
 
 The URL and OAuth state must not contain the bundle.

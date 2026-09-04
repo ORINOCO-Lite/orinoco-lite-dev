@@ -1,4 +1,4 @@
-# Orinoco Lite engine
+# Orinoco Lite package
 
 `orinoco-lite` is the stable, location-independent command-line and integrity boundary for a single-repository Orinoco Lite website.
 It discovers the site through `orinoco.yaml`, enforces the exact released-wheel coordinate in `orinoco.lock`, and runs with the code and resources bundled in that wheel.
@@ -14,7 +14,7 @@ The engineering workspace's submodules, upstream-rebase history, release fixture
 
 ## Responsibilities
 
-The engine owns:
+The package owns:
 
 - structural validation of the single-repository workspace;
 - exact released-package integrity checks;
@@ -43,18 +43,19 @@ The stable commands are:
 | `orinoco editor apply` | Validate a review bundle; add `--write` only after review. |
 
 Normal users should invoke the corresponding `pixi run ...` facade from their downstream repository.
-The template can compose prerequisites and platform compatibility checks that a raw engine command intentionally does not own.
+The template can compose prerequisites and platform compatibility checks that a raw package command intentionally does not own.
 
 ## Configuration and release locks
 
-`orinoco.yaml` names the site, public base URL, and normalized site-owned roots.
+`orinoco.yaml` selects normalized site-owned roots and optional curation-service settings.
+The configured `paths.site/site.yaml` owns the public site identity, including `identity.base_url`.
 The current configuration contract is version 2; version 1 is intentionally rejected rather than translated implicitly.
 Hosted builds obtain the exact GitHub `owner/repository` coordinate from the trusted build invocation; `orinoco build --github-repository` defaults to GitHub Actions' `GITHUB_REPOSITORY` value.
 The released central curation service is the default.
 A site may replace only that backend with an optional credential-free HTTPS `site.curation_service` origin.
 Nonstandard builds may supply `site.repository`; normal downstreams obtain their repository coordinate from the trusted build invocation.
 The **Download bundle** action remains credential-free even when no repository coordinate or reachable service is available.
-The semantic metadata interface comprises reviewed Things below configured `paths.records` and their machine-managed PAV companions below the engine-derived annotation root.
+The semantic metadata interface comprises reviewed Things below configured `paths.records` and their machine-managed PAV companions below the package-derived annotation root.
 Templates set `paths.records` to `site-specific/metadata/records/`, which derives `site-specific/metadata/overlays/annotations/`.
 The companion tree mirrors the configured record path below the derived overlay namespace, and the deterministic join is the validation and RDF boundary.
 Every Thing below the configured record root participates in validation and projection.
@@ -64,7 +65,8 @@ It also defaults an omitted `graph.missing_external_targets` policy to `drop`, s
 Malformed or schema-invalid values still fail.
 Editor RDF includes all records by default, while an explicit `editable` scope can limit the static editor payload to page-eligible records without excluding any record from structural, semantic, RDF, or projection validation.
 Site-specific executable metadata adapters live under `extensions/source-adapters/`; their configuration and evidence live under `site-specific/sources/`, and compact decisions under `site-specific/curation-records/`.
-`orinoco.lock` binds the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest.
+The `package` mapping in `orinoco.lock` binds the exact `orinoco-lite` distribution `version`, immutable wheel `url`, and `sha256` digest.
+Copier records the corresponding `package_version`, `package_url`, and `package_sha256` answers.
 The surrounding Copier and workflow contracts record their own coordinates.
 
 The immutable wheel digest must also match the consumer's frozen `pixi.lock`.
@@ -90,15 +92,16 @@ The package is content-neutral within the selected Things Schema profile; it doe
 The pinned schema has an intentional recursive relationship range and an acyclic inheritance graph.
 LinkML's current generated Pydantic representation expands the wide recursive descendant union deeply enough to exceed Python's default recursion limit during model rebuilding.
 
-Until LinkML emits a named recursive alias, the engine serializes converter construction, raises the limit to the already-proven value only inside that boundary, and restores the caller's exact value on success or failure.
+Until LinkML emits a named recursive alias, the package serializes converter construction, raises the limit to the already-proven value only inside that boundary, and restores the caller's exact value on success or failure.
 It does not change the schema, hide semantic errors, or leave a process-wide setting behind.
 
 ## Release and license boundary
 
-One release is one deterministic wheel and source archive containing the static `/edit/` and `/review/` shells, localized schema closure, reviewed renderer, graph support, component license texts, notices, and release provenance.
-It does not expose component checkouts or publish a second runtime archive.
+One `orinoco-lite` release provides a deterministic wheel and source archive containing the static `/edit/` and `/review/` shells, localized schema closure, reviewed renderer, graph support, component license texts, notices, and release provenance.
+Package code and bundled resources share one version and integrity boundary.
+The package does not expose component checkouts as downstream dependencies.
 
-The engine and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
+The package and original Orinoco Lite software are licensed under the [MIT License](LICENSE).
 Bundled component licenses and notices remain authoritative for their own files.
 Documentation, factual metadata, media, and branding use the repository-wide matrix in [`LICENSES.md`](../../LICENSES.md).
 

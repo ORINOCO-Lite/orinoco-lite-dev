@@ -55,12 +55,12 @@ pixi install --locked
 pixi run test
 ```
 
-Test unreleased engine and template bytes by injecting compact downstream inputs into a fresh disposable template instance before publishing them:
+Test unreleased package and template bytes by injecting compact downstream inputs into a fresh disposable template instance before publishing them:
 
 ```console
 pixi run test-downstream-candidate -- \
   --downstream /path/to/downstream \
-  --engine "$PWD" \
+  --package "$PWD" \
   --template /path/to/orinoco-lite-template
 ```
 
