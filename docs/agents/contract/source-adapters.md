@@ -32,11 +32,51 @@ extensions/source-adapters/<adapter>/
 Joining them produces the validation and RDF view.
 - `site-specific/sources/<adapter>/` contains source configuration, captured distributable input, and mapping policy.
 - `site-specific/curation-records/<adapter>.yaml` contains current decisions.
-- Consumer-specific executable adapters live under `extensions/`; reusable adapters belong to the engine or template.
+- Downstream-defined executable adapters live under `extensions/source-adapters/`.
+Reusable curation operations belong in the package; admitting a source adapter to the package requires the conditions below.
 - Credentials, restricted payloads, caches, plans, and generated review output remain untracked.
 
 Configured record roots remain supported.
-The engine derives the companion root from the configured record root.
+The package derives the companion root from the configured record root.
+
+## Admitting an adapter to the package
+
+An adapter MUST remain downstream-owned until maintainers review its supported scope, interface, tests, and maintenance obligations in the promotion pull request.
+Removing copied framework files or making an adapter importable is not sufficient reason to promote it.
+The charter permits reusable adapters in the package; it does not require every existing adapter to be moved there.
+
+Before promotion:
+
+- The adapter MUST implement the documented invocation and result contract below, using the same interface as a downstream-defined adapter.
+- Organization identifiers, entity mappings, collection selection, attribution, and publication policy MUST remain explicit downstream inputs.
+Any required source or schema profile MUST be declared and tested; undocumented identifier conventions or one organization's fixtures MUST NOT define package behavior.
+- The relevant behavioral tests MUST move with the implementation and run in its new owning repository.
+They MUST exercise the actual adapter, including deterministic proposals, changed source semantics, unchanged reruns, human corrections, and important acquisition and validation failures.
+Passing import tests or general curation tests alone is insufficient.
+- Maintainers MUST have evidence from materially different downstream configurations that site identity and policy are inputs rather than assumptions in the code.
+They MUST also demonstrate a differently sourced adapter using the complete proposal, review, and finalization flow without adding adapter-name branches to the curation runner, reusable workflow, or curation service.
+- The pull request MUST identify the supported source API and schema profile, required dependencies, known limitations, and who will maintain the adapter and its tests.
+Use the pull request and existing documentation; do not create an admission registry, duplicate inventory, or new validation framework.
+
+## Interface required for reusable adapters
+
+The programming interface MUST document the callable entry points, input and result fields, failure behavior, and compatibility expectations.
+A behavior contract or API-version constant alone is not a complete programming interface.
+Exact signatures and value types SHOULD have one authoritative definition referenced by adapter-author guidance.
+
+The invocation MUST provide the identified source input, trusted implementation and mapping policy, canonical metadata base, pinned schema, provenance identity, scratch location, and allowed read and write roots explicitly.
+Acquisition requirements and credentials MUST be confined to the adapter's declared source operation.
+Adapters MUST NOT depend on ambient working directories, hidden checkout locations, or another adapter's module state.
+
+The adapter MUST return a candidate plan through the common package representation, with source coordinates, candidate changes, and actionable failures represented consistently.
+Source-specific acquisition and mapping belong to the adapter.
+Authenticated decisions, Git writes, validation, and finalization belong to the reusable curation operations.
+An adapter MUST NOT need its own branch in those operations merely to introduce a new source name or source-coordinate shape.
+
+The runner MUST select an implementation from the existing source configuration at the trusted downstream revision, whether it is packaged or downstream-owned.
+Adding an adapter MUST NOT require an additional registration manifest or source-name lists in the curation service and reusable workflow.
+Unavailable inputs, unsupported interfaces, and invalid results MUST fail before canonical writes.
+Tests MUST demonstrate that packaged and downstream-owned implementations obey the same boundary.
 
 ## Adapter run
 

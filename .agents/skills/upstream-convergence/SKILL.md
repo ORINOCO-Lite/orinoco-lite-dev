@@ -42,7 +42,7 @@ Before publishing or presenting the parent pin for review, verify from a cache-c
 1. Test each rebased leaf component with its native locked build and focused tests.
 2. Update nested gitlinks to the corresponding rebased commits, not to discarded merge tips.
 3. Test each owning component, then advance its reviewed mirror ref.
-4. Audit every independently interpreted pin surface: parent and nested gitlinks, direct VCS requirements, generated locks, build-time commit assertions, runtime source specifications, compatibility declarations, and CI or deploy pins.
+4. Audit every independently interpreted pin surface: parent and nested gitlinks, direct VCS requirements, generated locks, build-time commit assertions, package source specifications, compatibility declarations, and CI or deploy pins.
 Updating one surface does not update the others.
 5. Reproduce at least one clean, non-recursive or otherwise cache-cold checkout.
 A warm local object, package, or Annex cache is not evidence that a pin is complete.
@@ -59,8 +59,8 @@ State the authoritative base, owned commits, validation, and whether history was
 - A normal GitHub PR merge can recreate a merge topology when the mirror default still contains the old local commits.
 After approval and checks, advance the reviewed default ref directly with an exact lease when that rewrite is authorized; verify how GitHub records the PR afterward.
 - Update the parent only to commits reachable from the published reviewed refs.
-- Record exact accepted gitlinks, nested heads, lock/runtime changes, PRs, CI runs, and release coordinates in the repository's existing acceptance surface.
+- Record exact accepted gitlinks, nested heads, package and lock changes, PRs, CI runs, and release coordinates in the repository's existing acceptance surface.
 Do not invent a mutable upstream-head inventory unless the user asks for one.
-- If the update changes a released compatibility boundary, create a new immutable release source rather than editing an older release specification, then finish the aligned engine/runtime and consumer-template releases before declaring convergence complete.
+- If the update changes a released compatibility boundary, create a new immutable release source rather than editing an older release specification, then finish the aligned package and consumer-template releases before declaring convergence complete.
 
 Stop for clarification when a choice would change semantic behavior, provenance, review authority, protected history, repository custody, or production state.

@@ -19,7 +19,7 @@ disposable static-site build
 ```
 
 The German `www-from-model` repository and its `page_templates/` are the authoritative presentation and projection source.
-The engine resolves the exact revision and performs generic metadata, projection, and composition operations.
+The package resolves the exact revision and performs generic metadata, projection, and composition operations.
 The template is a lightweight Copier scaffold with the Orinoco adaptation, required materialized presentation assets, workflows, and locks.
 
 This is a replacement implementation, not a migration.
@@ -28,19 +28,19 @@ Do not retain old framework copies, checked rendered trees, legacy paths, update
 ## Boundary
 
 - The controlled engineering gitlink selects the exact `www-from-model` revision.
-That revision's normal dependency mechanism selects Congo and other upstream dependencies; the runtime manifest, template, and downstream do not repeat those pins.
+That revision's normal dependency mechanism selects Congo and other upstream dependencies; package, template, and downstream configuration do not repeat those pins.
 - Git and Git Annex state are the provenance for an upstream Annex payload.
-Do not add per-asset coordinates, digests, or origin inventories to runtime, template, or downstream configuration.
+Do not add per-asset coordinates, digests, or origin inventories to package, template, or downstream configuration.
 - Git Annex is used only by maintainer repinning tooling.
-The released engine, template tasks, and downstream validation, projection, build, test, and deployment paths do not invoke or depend on it.
+The released package, template tasks, and downstream validation, projection, build, test, and deployment paths do not invoke or depend on it.
 - DataLad remains in downstream source-adapter workflows to record run provenance in Git.
 Correct repository configuration keeps adapter inputs and outputs out of Annex, so these workflows do not require Git Annex.
-- The engine owns source resolution, integrity verification, metadata validation, projection, composition, and shared behavioral tests.
+- The package owns source resolution, integrity verification, metadata validation, projection, composition, and shared behavioral tests.
 - `orinoco-lite-template` owns the small Orinoco adaptation, bounded materialized presentation overlay, Copier scaffold, workflows, and dependency locks.
 It does not own a complete website.
 - `site-specific/` contains declarative downstream metadata, curation records, editorial content, assets, identity, limited presentation choices, source-adapter configuration and evidence, and supported small overrides.
 - `extensions/` contains only site-specific executable metadata acquisition and curation adapters.
-Extension code and runtime products are neither loaded during website composition nor copied into the generated site.
+Extension code and generated outputs are neither loaded during website composition nor copied into the generated site.
 - Generated projections, static sites, caches, and Copier renderings remain untracked build products.
 The template publication branch may contain its exact rendered distribution tree because that branch is itself a distribution product.
 
@@ -61,7 +61,7 @@ Candidate development may use an explicit local exact checkout without changing 
 ### Carry required upstream assets
 
 Required assets are part of retained upstream functionality automatically; do not maintain a feature-specific allowlist.
-Maintainer repinning derives the required Annex-backed content from the selected upstream state, hydrates and verifies it, and copies payloads needed by downstream runtime into the licensed template overlay as ordinary files.
+Maintainer repinning derives the required Annex-backed content from the selected upstream state, hydrates and verifies it, and copies payloads needed by downstream builds into the licensed template overlay as ordinary files.
 A Pixi task may report precise Git and Git Annex information when useful, but its output is derived evidence rather than another tracked source of truth.
 
 Failure to hydrate, verify, or match any asset required by retained upstream functionality blocks the repin.
@@ -92,7 +92,7 @@ Website composition must not import extension code or copy extension files, cach
 ### Prove the composition
 
 Use the smallest relevant check for each important boundary rather than creating a persistent proof framework.
-The engineering candidate task creates a fresh disposable Copier instance, injects compact mock downstream inputs, and tests selected engine and template working trees together.
+The engineering candidate task creates a fresh disposable Copier instance, injects compact mock downstream inputs, and tests selected package and template working trees together.
 Focused checks cover observable behavior and major failure boundaries rather than comparison with a checked-in rendered website or exhaustive restatement of this plan.
 
 ## Acceptance criteria
@@ -106,9 +106,9 @@ Milestone 8 is complete when:
 - DataLad records source-adapter run provenance while downstream website and adapter tasks require no Git Annex;
 - a missing required asset blocks repinning rather than removing upstream behavior or publishing an Annex pointer;
 - downstream metadata builds the expected static website without German records, identifiers, editorial content, or site-specific assets leaking into it;
-- a fresh candidate run passes against the engine and template working trees using a disposable render and focused behavioral assertions;
+- a fresh candidate run passes against the package and template working trees using a disposable render and focused behavioral assertions;
 - a verified cached dependency supports an offline repeat build;
 - the template publication branch is produced directly from the validated ephemeral render; and
-- after reviewed engine and template releases, the reference downstream update is proposed through its normal human-review gate.
+- after reviewed package and template releases, the reference downstream update is proposed through its normal human-review gate.
 
 Do not delay acceptance for migration, historical reconstruction, updater compatibility, or preservation of prior downstream framework structure.

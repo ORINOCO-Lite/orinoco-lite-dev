@@ -1,7 +1,7 @@
 # Curation review and GitHub transport
 
 This package implements both halves of the browser boundary in [`docs/agents/contract/github-curation-review.md`](../../docs/agents/contract/github-curation-review.md).
-Its content-neutral static review shell is released inside the Orinoco runtime and bound into each configured downstream at `/review/`.
+Its content-neutral static review shell is bundled in the `orinoco-lite` package and bound into each configured downstream at `/review/`.
 Its central deployment is backend-only: API handlers authenticate with the GitHub App, verify proposals, and perform authenticated GitHub transport.
 The only service-origin browser document is a generated, restrictive-CSP `/api/transport` popup that retains the host-only session cookie and exchanges nonce-bound messages with its exact downstream opener.
 It contains no landing, review, editor, upload, or confirmation application.
@@ -28,7 +28,7 @@ npm run pages:dev
 Copy `.dev.vars.example` to the untracked `.dev.vars` file before running the Functions locally.
 
 `npm run build:review` independently produces the unconfigured downstream shell in `dist-review/`.
-Release assembly inventories its dependencies and places it in the runtime; the trusted site build supplies the repository coordinate and the effective central-default or optional override service origin in strict `config.json`.
+Package assembly includes the shell and its dependencies; the trusted site build supplies the repository coordinate and the effective central-default or optional override service origin in strict `config.json`.
 
 ## GitHub App configuration
 
@@ -87,11 +87,11 @@ It opens `/api/transport` in a popup that binds the exact opener, downstream ori
 
 The link selects one artifact by immutable GitHub artifact ID.
 Its required name is `orinoco-curation-review-<proposal_sha>` and its ZIP contains exactly one regular top-level `review-bundle.json` using format `orinoco-lite-curation-review-bundle-v1`.
-The service permits at most 8 MiB compressed, 16 MiB uncompressed, 225 candidate records, 450 changed metadata paths, and 16 MiB of loaded Git record text per review.
+The service permits at most 8 MiB compressed, 16 MiB uncompressed, 225 candidate records, 450 changed metadata paths, and 16 MiB of loaded Git configuration and record text per review.
 These are service-resource bounds, not pull-request Markdown or native-diff limits.
 The complete authenticated decision comment remains subject to GitHub's comment-size constraint.
 
-A successful maximum-size submission makes at most 48 outbound requests: one curator check, one pull-request read, one commit-list read, one artifact metadata read, one workflow-run read, one configured-site read, one authenticated artifact redirect, one credential-free archive download, five commit-file pages, 34 batched GraphQL record reads, and one comment write.
+A successful maximum-size submission makes at most 49 outbound requests: one curator check, one pull-request read, one commit-list read, one artifact metadata read, one workflow-run read, two same-commit configuration reads, one authenticated artifact redirect, one credential-free archive download, five commit-file pages, 34 batched GraphQL record reads, and one comment write.
 This remains below the Cloudflare Free limit of 50 subrequests per invocation.
 Oversized artifacts, candidate sets, and proposal paths are rejected before record blobs are loaded.
 
@@ -99,7 +99,7 @@ The pull-request body is only an accessible fallback and review link.
 The application never parses it for candidate identity, ordering, source coordinates, or completeness.
 It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for presentation facts.
 
-Before releasing proposal data, the central service verifies the requested repository against the live GitHub objects and verifies the downstream base URL and effective default or override service origin from `orinoco.yaml` at the proposal's metadata base.
+Before releasing proposal data, the central service verifies the requested repository against the live GitHub objects and verifies the downstream base URL and effective default or override service origin from `orinoco.yaml` and the configured `paths.site/site.yaml` at the proposal's metadata base.
 A sealed short-lived grant and an exact ready/request handshake bind the repository, pull request, artifact, downstream origin, popup, and one-time nonce.
 The downstream keeps all decisions in browser memory.
 The downstream displays every path and disposition and requires the final user click before instructing the popup to post.

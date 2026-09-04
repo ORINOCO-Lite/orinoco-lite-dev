@@ -11,12 +11,11 @@ Do not record cookies, OAuth codes, access tokens, client secrets, or the sessio
 - Re-run `npm ci --ignore-scripts` and `npm run check` using the declared tools.
 - Confirm the deployment contains the checked Worker, Functions, or equivalent backend adapter and no static presentation application or assets.
 - Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the two encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available.
-- Confirm `EDITOR_RUNTIME_MANIFEST_SHA256`, staged editor files, editor-input artifacts, and durable storage bindings are absent.
+- Confirm staged editor files, editor-input artifacts, and durable storage bindings are absent.
 - Confirm there is no token, cookie, or received-bundle logging.
 - Confirm the provider exposes deployment history or that the checked Git revision can be redeployed.
 
-The backend has no runtime release or manifest coordinate.
-The downstream static-site release remains responsible for its immutable editor shell, schema, and exact-source inputs.
+The `orinoco-lite` package supplies the immutable editor shell and schema used by downstream static builds.
 
 ### 2. Anonymous, non-mutating probes
 
@@ -75,7 +74,7 @@ For an authorized downstream:
 2. Configure that exact domain for the downstream Pages site using GitHub's current [custom-domain procedure](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 Follow the current provider-displayed DNS targets; do not copy historical IP addresses from logs or documentation.
 3. Wait for GitHub's domain and certificate checks, then enable and verify HTTPS using its [HTTPS guidance](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
-4. Confirm that the origin of `site.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
+4. Confirm that the origin of `identity.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
 5. Load `/edit/` and `/review/` from the final deployment, confirm the custom-domain flow omits the shared-origin warning, and complete the read-only OAuth proof before authorizing a write proof.
 
 If the custom domain is unavailable or not yet verified, retain the ordinary `github.io` deployment and its informational warning and remediation link.
