@@ -431,9 +431,12 @@ function safeSiteUrl(value: unknown): URL | null {
   return url;
 }
 
-export function siteCoordinates(value: string | null): SiteCoordinates {
+function configurationMapping(
+  value: string | null,
+  path: string,
+): Record<string, unknown> {
   if (value === null) {
-    invalid("The proposal metadata base has no orinoco.yaml configuration.");
+    invalid(`The proposal metadata base has no ${path} configuration.`);
   }
   let parsed: unknown;
   try {
@@ -447,24 +450,43 @@ export function siteCoordinates(value: string | null): SiteCoordinates {
     }
     parsed = document.toJS({ maxAliasCount: 0 }) as unknown;
   } catch {
-    invalid("The proposal metadata-base orinoco.yaml is invalid.");
+    invalid(`The proposal metadata-base ${path} is invalid.`);
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    invalid("The proposal metadata-base orinoco.yaml is not a mapping.");
+    invalid(`The proposal metadata-base ${path} is not a mapping.`);
   }
-  const config = parsed as Record<string, unknown>;
+  return parsed as Record<string, unknown>;
+}
+
+export async function loadSiteCoordinates(
+  github: GitHubClient,
+  repository: string,
+  baseSha: string,
+): Promise<{ coordinates: SiteCoordinates; contentBytes: number }> {
+  const configContents = await github.contents(repository, [
+    { key: "site-config", path: "orinoco.yaml", ref: baseSha },
+  ]);
+  const configText = configContents.get("site-config") ?? null;
+  const config = configurationMapping(configText, "orinoco.yaml");
   if (config.contract_version !== 2) {
     invalid("The proposal metadata-base orinoco.yaml contract is unsupported.");
   }
-  if (
-    config.site === null ||
-    typeof config.site !== "object" ||
-    Array.isArray(config.site)
-  ) {
+  const site = config.site === undefined ? {} : config.site;
+  if (site === null || typeof site !== "object" || Array.isArray(site)) {
     invalid("The proposal metadata-base orinoco.yaml site is not a mapping.");
   }
-  const site = config.site as Record<string, unknown>;
+  const serviceConfig = site as Record<string, unknown>;
+  if (
+    Object.keys(serviceConfig).some(
+      (key) => !["repository", "curation_service"].includes(key),
+    )
+  ) {
+    invalid(
+      "The proposal metadata-base orinoco.yaml contains unsupported site fields.",
+    );
+  }
   let recordRoot = DEFAULT_RECORD_ROOT;
+  let siteRoot = "site-specific";
   if (config.paths !== undefined) {
     if (
       config.paths === null ||
@@ -483,12 +505,16 @@ export function siteCoordinates(value: string | null): SiteCoordinates {
       }
       recordRoot = configured;
     }
+    if (paths.site !== undefined) {
+      const configured = normalizedRepositoryDirectory(paths.site);
+      if (configured === null) {
+        invalid("The proposal metadata-base paths.site is unsafe.");
+      }
+      siteRoot = configured;
+    }
   }
-  const baseUrl = safeSiteUrl(site.base_url);
-  if (baseUrl === null) {
-    invalid("The proposal metadata-base site.base_url is unsafe.");
-  }
-  const serviceValue = site.curation_service ?? DEFAULT_CURATION_SERVICE_ORIGIN;
+  const serviceValue =
+    serviceConfig.curation_service ?? DEFAULT_CURATION_SERVICE_ORIGIN;
   const serviceUrl = safeSiteUrl(serviceValue);
   if (
     serviceUrl === null ||
@@ -500,12 +526,42 @@ export function siteCoordinates(value: string | null): SiteCoordinates {
       "The proposal metadata-base site.curation_service is not an origin.",
     );
   }
+  const configBytes = new TextEncoder().encode(configText ?? "").byteLength;
+  const sitePath = `${siteRoot}/site.yaml`;
+  const siteContents = await github.contents(
+    repository,
+    [{ key: "site-data", path: sitePath, ref: baseSha }],
+    MAX_REVIEW_BYTES - configBytes,
+  );
+  const siteText = siteContents.get("site-data") ?? null;
+  const siteData = configurationMapping(siteText, sitePath);
+  if (siteData.version !== 1) {
+    invalid(`The proposal metadata-base ${sitePath} version is unsupported.`);
+  }
+  if (
+    siteData.identity === null ||
+    typeof siteData.identity !== "object" ||
+    Array.isArray(siteData.identity)
+  ) {
+    invalid(
+      `The proposal metadata-base ${sitePath} identity is not a mapping.`,
+    );
+  }
+  const identity = siteData.identity as Record<string, unknown>;
+  const baseUrl = safeSiteUrl(identity.base_url);
+  if (baseUrl === null) {
+    invalid("The proposal metadata-base identity.base_url is unsafe.");
+  }
   if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
   return {
-    editorSiteUrl: new URL("edit/", baseUrl).toString(),
-    metadataRoots: metadataRoots(recordRoot),
-    reviewServiceOrigin: serviceUrl.origin,
-    reviewSiteUrl: new URL("review/", baseUrl).toString(),
+    coordinates: {
+      editorSiteUrl: new URL("edit/", baseUrl).toString(),
+      metadataRoots: metadataRoots(recordRoot),
+      reviewServiceOrigin: serviceUrl.origin,
+      reviewSiteUrl: new URL("review/", baseUrl).toString(),
+    },
+    contentBytes:
+      configBytes + new TextEncoder().encode(siteText ?? "").byteLength,
   };
 }
 
@@ -562,16 +618,12 @@ export async function loadReviewProposal(
     artifact.runId,
     proposal.baseSha,
   );
-  const siteConfig = await github.contents(repository, [
-    { key: "site-config", path: "orinoco.yaml", ref: proposal.baseSha },
-  ]);
-  const siteConfigText = siteConfig.get("site-config") ?? null;
-  const review = siteCoordinates(siteConfigText);
-  const remainingContentBytes =
-    MAX_REVIEW_BYTES -
-    (siteConfigText === null
-      ? 0
-      : new TextEncoder().encode(siteConfigText).byteLength);
+  const { coordinates: review, contentBytes } = await loadSiteCoordinates(
+    github,
+    repository,
+    proposal.baseSha,
+  );
+  const remainingContentBytes = MAX_REVIEW_BYTES - contentBytes;
   const bundle = parseReviewBundle(
     await github.artifactArchive(repository, artifactId),
     review.metadataRoots,

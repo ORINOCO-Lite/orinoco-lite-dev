@@ -18,6 +18,7 @@ import {
   BASE_SHA,
   HEAD_SHA,
   ORINOCO_CONFIG,
+  SITE_DATA,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
@@ -51,7 +52,7 @@ const REVIEW_GRANT: ReviewGrant = {
 const REVIEW_TRANSPORT_MISMATCHES = [
   {
     label: "a different downstream review origin",
-    siteConfig: ORINOCO_CONFIG.replace(
+    siteData: SITE_DATA.replace(
       "https://site.example/",
       "https://other-site.example/",
     ),
@@ -115,6 +116,7 @@ function proposalApi(
   url: string,
   init: RequestInit | undefined,
   siteConfig: string = ORINOCO_CONFIG,
+  siteData: string = SITE_DATA,
 ): Response | null {
   if (url.endsWith("/collaborators/octocat/permission")) {
     return Response.json({ permission: "write" });
@@ -205,6 +207,8 @@ function proposalApi(
         const index = key.slice("expression".length);
         if (expression === `${BASE_SHA}:orinoco.yaml`) {
           repository[`blob${index}`] = blob(siteConfig);
+        } else if (expression === `${BASE_SHA}:site-specific/site.yaml`) {
+          repository[`blob${index}`] = blob(siteData);
         } else if (
           expression ===
           `${BASE_SHA}:site-specific/metadata/records/example/first.yaml`
@@ -654,10 +658,15 @@ describe("curator authorization and exact-head submission handlers", () => {
 
   it.each(REVIEW_TRANSPORT_MISMATCHES)(
     "does not release a proposal configured for $label",
-    async ({ siteConfig }) => {
+    async ({ siteConfig, siteData }) => {
       const fetchMock = vi.fn(
         async (input: RequestInfo | URL, init?: RequestInit) => {
-          const response = proposalApi(String(input), init, siteConfig);
+          const response = proposalApi(
+            String(input),
+            init,
+            siteConfig,
+            siteData,
+          );
           if (response !== null) return response;
           throw new Error(`Unexpected GitHub request: ${String(input)}`);
         },
@@ -715,10 +724,15 @@ describe("curator authorization and exact-head submission handlers", () => {
 
   it.each(REVIEW_TRANSPORT_MISMATCHES)(
     "does not post decisions configured for $label",
-    async ({ siteConfig }) => {
+    async ({ siteConfig, siteData }) => {
       const fetchMock = vi.fn(
         async (input: RequestInfo | URL, init?: RequestInit) => {
-          const response = proposalApi(String(input), init, siteConfig);
+          const response = proposalApi(
+            String(input),
+            init,
+            siteConfig,
+            siteData,
+          );
           if (response !== null) return response;
           throw new Error(`Unexpected GitHub request: ${String(input)}`);
         },

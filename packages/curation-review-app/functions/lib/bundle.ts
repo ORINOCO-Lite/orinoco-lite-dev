@@ -6,7 +6,7 @@ import type {
 } from "../../shared/contracts";
 import {
   annotationPathForRecord,
-  CURRENT_METADATA_ROOTS,
+  DEFAULT_METADATA_ROOTS,
   type MetadataRoots,
   validRepositoryYamlPath,
   validYamlPathBelow,
@@ -373,7 +373,7 @@ function extractReviewBundle(bytes: Uint8Array): Uint8Array {
 
 export function parseReviewBundle(
   archive: Uint8Array,
-  roots: MetadataRoots | null = CURRENT_METADATA_ROOTS,
+  roots: MetadataRoots | null = DEFAULT_METADATA_ROOTS,
 ): ReviewBundle {
   const bytes = extractReviewBundle(archive);
   let raw: unknown;

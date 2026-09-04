@@ -5,7 +5,7 @@ import type {
 } from "../../shared/contracts";
 import { GitHubClient } from "./github";
 import { HttpError } from "./http";
-import { siteCoordinates, type SiteCoordinates } from "./proposal";
+import { loadSiteCoordinates, type SiteCoordinates } from "./proposal";
 import {
   SHACL_BUNDLE_PATH,
   serializeShaclReviewBundle,
@@ -119,10 +119,11 @@ async function requireTrustedEditorDeployment(
   grant: ShaclGrant,
   serviceOrigin: string,
 ): Promise<SiteCoordinates> {
-  const contents = await github.contents(repository, [
-    { key: "site-config", path: "orinoco.yaml", ref: baseSha },
-  ]);
-  const site = siteCoordinates(contents.get("site-config") ?? null);
+  const { coordinates: site } = await loadSiteCoordinates(
+    github,
+    repository,
+    baseSha,
+  );
   if (
     new URL(site.editorSiteUrl).origin !== grant.editor_origin ||
     site.reviewServiceOrigin !== serviceOrigin
