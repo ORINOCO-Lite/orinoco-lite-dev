@@ -14,7 +14,7 @@ Keep the hosting choice separate from the application contract and keep every hu
 Prefer the central service when the downstream does not require its own origin, GitHub App, or custody.
 2. Resolve the exact reviewed application commit and tree.
 Refuse a mutable branch or dirty checkout as production authority.
-The backend consumes no Orinoco Lite runtime release: do not stage an editor, schema, editor-input artifact, runtime manifest, or runtime digest.
+The backend provides authentication and verified GitHub transport; the `orinoco-lite` package supplies the static editor, schema, and review shell to downstream builds.
 3. Read [runtime-and-hosting-contract.md](references/runtime-and-hosting-contract.md) and compare every required capability with the proposed provider before provisioning it.
 The checked implementation is Fetch- and Web-Crypto-shaped; a provider may need a thin, reviewed Worker or Functions adapter.
 Do not deploy a static application or presentation assets.

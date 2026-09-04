@@ -311,6 +311,9 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("--fail-on-skip --discover packages/orinoco-lite/tests", release)
         self.assertIn("submodules/query-things", release)
         self.assertIn("set -o pipefail", release)
+        self.assertIn('spec="release/package-resources.yaml"', release)
+        self.assertNotIn("source-spec", release)
+        self.assertNotIn("INPUT_SPEC", release)
         self.assertNotIn("may report an intentional skip", release)
 
     def test_pages_workflow_records_only_successful_default_branch_deployments(

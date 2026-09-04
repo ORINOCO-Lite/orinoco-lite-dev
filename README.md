@@ -33,7 +33,7 @@ pixi run build
 pixi run serve
 ```
 
-The downstream selects its template version and upgrade timing.
+The downstream selects its Orinoco Lite package and template versions and chooses when to update either one.
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 Source-adapter tasks use DataLad to record run provenance in Git.
 They do not require Git Annex, and ordinary website builds never invoke it.
@@ -55,12 +55,12 @@ pixi install --locked
 pixi run test
 ```
 
-Test unreleased engine and template bytes by injecting compact downstream inputs into a fresh disposable template instance before publishing them:
+Test unreleased package and template changes by applying a selected downstream's declared inputs to a fresh disposable template instance before publishing them:
 
 ```console
 pixi run test-downstream-candidate -- \
   --downstream /path/to/downstream \
-  --engine "$PWD" \
+  --package "$PWD" \
   --template /path/to/orinoco-lite-template
 ```
 

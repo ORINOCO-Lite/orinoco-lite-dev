@@ -5,20 +5,16 @@ identity:
   description: A compact forward-looking Orinoco Lite site.
   base_url: https://example.invalid/architecture-proof/
 navigation:
-  main:
-    - name: Projects
-      page_ref: projects
-      weight: 10
-    - name: People
-      page_ref: persons
-      weight: 20
-    - name: Publications
-      page_ref: publications
-      weight: 30
-  footer: []
-  sections: {}
-theme:
+  - name: Projects
+    page_ref: projects
+    weight: 10
+  - name: People
+    page_ref: persons
+    weight: 20
+  - name: Publications
+    page_ref: publications
+    weight: 30
+presentation:
   color_scheme: fire
   default_appearance: light
-  header:
-    layout: hybrid
+  header_layout: hybrid

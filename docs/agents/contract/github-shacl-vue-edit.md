@@ -47,7 +47,7 @@ The service MUST NOT retarget a stale bundle, create a cross-repository pull req
 
 ## Trusted replacement
 
-A trusted workflow runs released engine code against an isolated checkout of the handoff parent.
+A trusted workflow runs the released package against an isolated checkout of the handoff parent.
 It verifies the bundle and allowed paths, applies the edits, validates all records and the joined graph, and replaces the temporary handoff with one ordinary metadata commit.
 
 The verified curator is the author and automation is the committer.

@@ -7,11 +7,6 @@ on:
         description: Release version matching the Python package
         required: true
         type: string
-      source-spec:
-        description: Reviewed package-resource source specification
-        required: true
-        default: release/package-resources.yaml
-        type: string
   push:
     tags:
       - v*
@@ -67,16 +62,12 @@ jobs:
       - name: Build deterministic package resources and artifacts
         shell: bash
         env:
-          INPUT_SPEC: ${{ inputs['source-spec'] }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           version="$INPUT_VERSION"
-          spec="$INPUT_SPEC"
+          spec="release/package-resources.yaml"
           if [ -z "$version" ]; then
             version="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$spec" ]; then
-            spec="release/package-resources.yaml"
           fi
           python -m pip install --disable-pip-version-check PyYAML==6.0.2
           SPEC="$spec" VERSION="$version" python - <<'PY'

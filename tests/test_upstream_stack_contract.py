@@ -147,7 +147,7 @@ class UpstreamStackContractTests(unittest.TestCase):
         ):
             self.assertIn(contract, check)
 
-    def test_checkout_provenance_is_written_to_ignored_runtime_state(self) -> None:
+    def test_checkout_provenance_is_written_to_ignored_local_state(self) -> None:
         source = (ROOT / "tools" / "upstream_full.py").read_text()
         self.assertIn('STACK / "checkout.json"', source)
         self.assertIn('"checkout_mode": checkout', source)

@@ -16,7 +16,7 @@ Keep these three levels distinct:
 2. **Orinoco Lite release** combines exact versions of selected ORINOCO components with a thin adaptation for GitHub-based curation and static-site construction.
 3. **Downstream GitHub repository** uses pull requests and GitHub Actions to change its metadata and regenerate its graph, website data, and static site.
 
-Do not present source repositories, release artifacts, runtime operations, and generated outputs as peers.
+Do not present source repositories, the Orinoco Lite package, build operations, and generated outputs as peers.
 Use a boundary or transition when the diagram moves between those levels.
 
 Exclude facts that do not help explain a component or interaction.
