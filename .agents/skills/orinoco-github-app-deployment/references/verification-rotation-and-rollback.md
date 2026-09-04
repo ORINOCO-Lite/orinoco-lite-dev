@@ -11,17 +11,16 @@ Do not record cookies, OAuth codes, access tokens, client secrets, or the sessio
 - Re-run `npm ci --ignore-scripts` and `npm run check` using the declared tools.
 - Confirm the deployment contains the checked Worker, Functions, or equivalent backend adapter and no static presentation application or assets.
 - Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the two encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available.
-- Confirm `EDITOR_RUNTIME_MANIFEST_SHA256`, staged editor files, editor-input artifacts, and durable storage bindings are absent.
+- Confirm staged editor files, editor-input artifacts, and durable storage bindings are absent.
 - Confirm there is no token, cookie, or received-bundle logging.
 - Confirm the provider exposes deployment history or that the checked Git revision can be redeployed.
 
-The backend has no runtime release or manifest coordinate.
-The downstream static-site release remains responsible for its immutable editor shell, schema, and exact-source inputs.
+The `orinoco-lite` package supplies the immutable editor shell and schema used by downstream static builds.
 
 ### 2. Anonymous, non-mutating probes
 
 - `/`, `/review`, `/review/`, `/review-transport/`, `/review-auth-complete/`, `/edit`, and `/edit/` return a small `404` or compatibility `410` and never render or redirect to a landing, review, receiver, upload, confirmation, or editor page.
-- `/api/shacl/editor` is not registered and no `/editor-runtime/` tree serves an editor shell or schema.
+- `/api/shacl/editor` is not registered and the service does not serve an editor shell or schema.
 - `/api/session` returns HTTP 200 with `authenticated: false` while anonymous.
 - `/api/discovery` and `/api/auth/discovery-start` return HTTP 410 `review_discovery_retired` without a GitHub request or OAuth-state cookie.
 - A callback probe with exactly `code=probe`, `state=probe`, and `iss=https://github.com/login/oauth`, but no OAuth-state cookie, returns HTTP 401 `missing_oauth_state` before any token exchange.
@@ -93,7 +92,7 @@ Do not disable **Download bundle** while domain work is pending.
 | GitHub 403/404 | App not installed, permission approval pending, user lacks write or admin, or session token expired. |
 | Artifact failure | Egress blocked, redirect auto-followed or rewritten, destination host rejected, or provider size limit exceeded. This applies to the source-adapter review artifact, not SHACL editor input. |
 | Downstream UI works but APIs 404 | The Worker, Functions, or provider backend adapter is absent or routed incorrectly. |
-| A central landing, source-review, receiver, upload, confirmation, second editor, or `/editor-runtime/` surface is available | A superseded application revision or stale static build directory was deployed. Rebuild from the reviewed backend-only revision and remove static presentation assets. |
+| A central landing, source-review, receiver, upload, confirmation, or second editor is available | A superseded application revision or stale static build directory was deployed. Rebuild from the reviewed backend-only revision and remove static presentation assets. |
 
 Both the successful OAuth callback and logout emit two cookies in one response.
 Exercise both paths when validating an adapter's header behavior.

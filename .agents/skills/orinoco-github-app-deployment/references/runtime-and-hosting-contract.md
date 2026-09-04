@@ -20,11 +20,10 @@ npm run check
 Deploy its API handlers, generated protocol response, route and header policy, and public configuration together from the same clean revision.
 Do not deploy `dist/`, a review shell, a landing page, or other static presentation assets with the service.
 
-The released source-review shell belongs in the immutable Orinoco runtime and downstream static build.
+The source-review shell is bundled in the `orinoco-lite` package and included in each downstream static build.
 Verify it through the release and downstream checks, not by deploying it as a second central review page.
 
-The service does not consume an Orinoco Lite runtime archive.
-Do not stage SHACL Vue, a Things schema, downstream record input, an editor-input Actions artifact, `/editor-runtime/` assets, or a runtime-manifest digest.
+Do not stage SHACL Vue, a Things schema, downstream record input, or an editor-input Actions artifact in the service.
 The immutable editor shell and schema belong in each downstream's static site build, which is the only SHACL Vue editor.
 
 ## Required configuration
@@ -38,7 +37,7 @@ The immutable editor shell and schema belong in each downstream's static site bu
 
 Generate `SESSION_SEAL_KEY` with a cryptographically secure random source.
 Avoid commands that print it into captured logs; send it directly to the provider's secret input.
-No App private key, webhook secret, installation token, runtime digest, database credential, or storage binding is required.
+No App private key, webhook secret, installation token, database credential, or storage binding is required.
 
 The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.
 Repository identity is not a separate curation setting.
@@ -85,7 +84,7 @@ Rewriting production requests to an internal HTTP origin breaks origin validatio
 | `/edit/`, `/edit` | Return a small `404` or compatibility `410`; do not render a receiver, file selector, confirmation, or editor. |
 | `/api/*` | Route to the stateless Functions handlers. |
 
-The service must not register `/api/shacl/editor`, serve `/editor-runtime/`, or render, frame, or assemble SHACL Vue at `/edit/`.
+The service must not register `/api/shacl/editor` or render, frame, or assemble SHACL Vue at `/edit/`.
 
 The exact API paths and accepted methods are:
 
@@ -158,7 +157,7 @@ Both transports must receive the same format, size, repository, source-commit, e
 
 On a shared `github.io` origin, keep **Download bundle** enabled without GitHub authorization and keep the warning informational rather than gating **Propose via GitHub**.
 The downstream's **Propose via GitHub** click is the final authorization for that one proposal; do not add another confirmation after authentication.
-When the editor is framed, refuse direct GitHub proposal at both the visible controls and the runtime helper while leaving **Download bundle** available.
+When the editor is framed, refuse direct GitHub proposal at both the visible controls and the client helper while leaving **Download bundle** available.
 
 ## Capacity floor
 

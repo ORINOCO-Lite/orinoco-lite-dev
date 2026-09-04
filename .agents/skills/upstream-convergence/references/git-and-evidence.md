@@ -88,7 +88,7 @@ After updating an Annex-backed source:
 - materialize any required, redistributable downstream-independent payload as an ordinary tracked artifact at the owning distribution boundary; and
 - add a focused invariant test when two current execution paths must share the same coordinate.
 
-Do not duplicate Annex refs, keys, or per-file digests into runtime, template, or downstream configuration when the selected Git repositories and tooling can derive them.
+Do not duplicate Annex refs, keys, or per-file digests into package, template, or downstream configuration when the selected Git repositories and tooling can derive them.
 A project Pixi task may print exact Git, Annex, key, and digest information for review without creating a tracked inventory.
 When software actually requires an Annex ref as an execution input, keep that one coordinate in its existing dependency or release surface.
 
@@ -106,7 +106,7 @@ Common independent surfaces include:
 - a direct VCS dependency in package metadata;
 - one or more generated environment locks;
 - hard-coded source assertions in deterministic assembly code;
-- runtime compatibility ranges and source inventories;
+- package compatibility ranges and source inputs;
 - CI, deployment, and Annex refs; and
 - consumer-template checksums or release coordinates.
 
@@ -115,12 +115,12 @@ Historical acceptance evidence and prior immutable release specifications should
 Active build inputs and the new immutable release specification should converge on the new reviewed set.
 
 Treat each repository's release sequence as independent.
-An engine `rc5` may be consumed by a template `rc8`; choose the next unused version in the repository being released rather than copying another component's suffix.
+A package `rc5` may be consumed by a template `rc8`; choose the next unused version in the repository being released rather than copying another component's suffix.
 Likewise, a reusable-workflow ref can intentionally remain at the last reviewed commit that changed that workflow.
 Verify the file history and policy before moving it solely to make release numbers or commit dates look aligned.
 
 Exercise the release workflow's deterministic path twice when practical.
-Compare the package artifacts, editor shell and license inventory, schema closure, and runtime archive byte-for-byte.
+Compare the package artifacts byte-for-byte and verify their required packaged resources.
 Local determinism is useful evidence, but the hosted workflow remains authoritative when it fixes exact runner toolchains or produces attestations.
 
 ## Acceptance checklist
@@ -131,7 +131,7 @@ Record the smallest useful evidence in the project's existing authority:
 - old and accepted parent/nested gitlinks;
 - owned commits replayed above upstream;
 - mirror PRs and final default-branch OIDs;
-- exact package, tool, runtime, assembly assertion, and consumer-template pins plus regenerated locks, with the observed Annex state when Annex was used;
+- exact package, assembly assertion, and consumer-template pins plus regenerated locks, with the observed Annex state when Annex was used;
 - focused leaf tests, parent builds, clean-clone builds, and cross-layer tests;
 - hosted CI run and immutable release coordinates when applicable; and
 - explicit unchanged components that were verified current.

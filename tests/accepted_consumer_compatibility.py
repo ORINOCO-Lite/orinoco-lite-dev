@@ -118,7 +118,7 @@ def _selected_by_fixture_policy(
 
 
 class AcceptedConsumerCompatibilityTests(unittest.TestCase):
-    """Exercise the engine against one frozen set of tracked consumer inputs."""
+    """Exercise the package against one frozen set of tracked consumer inputs."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -174,8 +174,8 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         temporary = Path(self.temporary.name)
         self.root = temporary / "consumer"
-        self.runtime_010 = temporary / "runtime-0.1.0"
-        self.runtime_011 = temporary / "runtime-0.1.1"
+        self.resources_010 = temporary / "resources-0.1.0"
+        self.resources_011 = temporary / "resources-0.1.1"
         self.root.mkdir()
         for relative in TRACKED_INPUTS:
             source = self.accepted_consumer / relative
@@ -188,17 +188,9 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
         localize_schema(
             SCHEMA_SOURCE,
             SCHEMA_SOURCE / "demo-research-information/unreleased.yaml",
-            self.runtime_010 / "schema",
+            self.resources_010 / "schema",
         )
-        shutil.copytree(self.runtime_010 / "schema", self.runtime_011 / "schema")
-        runtime_releases = (
-            (self.runtime_010, "0.1.0"),
-            (self.runtime_011, "0.1.1"),
-        )
-        for runtime, release in runtime_releases:
-            (runtime / "runtime-manifest.json").write_text(
-                json.dumps({"release": release}) + "\n", encoding="utf-8"
-            )
+        shutil.copytree(self.resources_010 / "schema", self.resources_011 / "schema")
         self.workspace = WorkspaceConfig(
             root=self.root,
             config_path=self.root / "orinoco.yaml",
@@ -206,7 +198,6 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
             site_name="Full fixture",
             base_url="https://example.invalid/",
             paths=DEFAULT_PATHS,
-            command_aliases={},
             raw={},
         )
 
@@ -232,10 +223,10 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
             sys.setrecursionlimit(1000)
             with self.assertNoLogs("dump_things_service", level="WARNING"):
                 report = render_projection(
-                    self.workspace, self.runtime_010, candidate
+                    self.workspace, self.resources_010, candidate
                 )
                 repeated_report = render_projection(
-                    self.workspace, self.runtime_010, repeated
+                    self.workspace, self.resources_010, repeated
                 )
             self.assertEqual(sys.getrecursionlimit(), 1000)
         finally:
@@ -354,11 +345,11 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
 
         semantic = {key: report[key] for key in report if key != "pages"}
         with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            verified = verify_projection(self.workspace, self.runtime_010)
+            verified = verify_projection(self.workspace, self.resources_010)
         self.assertTrue(verified["deterministic"])
         self.assertEqual(
-            projection_manifest(self.workspace, self.runtime_010, committed),
-            projection_manifest(self.workspace, self.runtime_011, committed),
+            projection_manifest(self.workspace, self.resources_010, committed),
+            projection_manifest(self.workspace, self.resources_011, committed),
         )
 
         record = next(
@@ -371,10 +362,10 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(DriverError, "stale"):
-            verify_projection(self.workspace, self.runtime_010)
+            verify_projection(self.workspace, self.resources_010)
         with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            update_projection(self.workspace, self.runtime_010)
-            verify_projection(self.workspace, self.runtime_011)
+            update_projection(self.workspace, self.resources_010)
+            verify_projection(self.workspace, self.resources_011)
 
         before = tree_sha256(committed)
         real_replace = os.replace
@@ -390,7 +381,7 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
         with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
             with patch("orinoco_lite.projection.os.replace", side_effect=fail_install):
                 with self.assertRaisesRegex(OSError, "injected"):
-                    update_projection(self.workspace, self.runtime_010)
+                    update_projection(self.workspace, self.resources_010)
         self.assertEqual(tree_sha256(committed), before)
 
         producer = self.root / "site/projection-tools/pool2graph.py"
@@ -403,7 +394,7 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
             with self.assertRaisesRegex(DriverError, "missing node"):
                 render_projection(
                     self.workspace,
-                    self.runtime_010,
+                    self.resources_010,
                     temporary / "bad-graph",
                 )
 

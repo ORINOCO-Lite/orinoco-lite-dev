@@ -11,9 +11,9 @@ import subprocess
 import tempfile
 from typing import Sequence
 
-from .config import development_engine_root
+from .config import development_package_root
 from .errors import IntegrityError
-from .runtime import MANIFEST_NAME, load_runtime_manifest, verify_runtime_directory
+from .resources import SOURCE_REPOSITORY, source_commit
 
 
 _GIT_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
@@ -258,39 +258,17 @@ def _ensure_checkout(
     return (destination / relative_presentation).resolve()
 
 
-def _runtime_engineering_source(runtime_root: Path) -> tuple[str, str]:
-    report = verify_runtime_directory(runtime_root)
-    manifest = load_runtime_manifest(report.root / MANIFEST_NAME)
-    provenance = manifest.raw.get("provenance")
-    if not isinstance(provenance, dict):
-        raise IntegrityError("Runtime manifest provenance must be an object")
-    repository = provenance.get("source_repository")
-    commit = provenance.get("source_commit")
-    if (
-        not isinstance(repository, str)
-        or not repository
-        or repository != repository.strip()
-        or "\0" in repository
-        or "\n" in repository
-    ):
-        raise IntegrityError(
-            "Runtime provenance.source_repository must be a non-empty Git repository"
-        )
-    if not isinstance(commit, str) or _GIT_COMMIT.fullmatch(commit) is None:
-        raise IntegrityError(
-            "Runtime provenance.source_commit must be an exact lowercase "
-            "40-hex Git commit"
-        )
-    return repository, commit
+def _package_source(resources_root: Path) -> tuple[str, str]:
+    return SOURCE_REPOSITORY, source_commit(resources_root)
 
 
-def resolve_presentation(workspace: Path, runtime_root: Path | None = None) -> Path:
-    """Return the presentation checkout selected by candidate or runtime Git."""
+def resolve_presentation(workspace: Path, resources_root: Path | None = None) -> Path:
+    """Return the presentation checkout selected by the package source commit."""
 
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():
         raise IntegrityError(f"Presentation workspace is not a directory: {workspace}")
-    candidate = development_engine_root()
+    candidate = development_package_root()
     if candidate is not None:
         candidate = candidate.resolve()
         engineering_repository = os.fspath(candidate)
@@ -298,13 +276,13 @@ def resolve_presentation(workspace: Path, runtime_root: Path | None = None) -> P
             candidate, label="Candidate engineering source"
         )
     else:
-        if runtime_root is None:
+        if resources_root is None:
             raise IntegrityError(
-                "Presentation resolution requires a verified runtime outside "
+                "Presentation resolution requires package resources outside "
                 "candidate mode"
             )
-        engineering_repository, engineering_commit = _runtime_engineering_source(
-            runtime_root
+        engineering_repository, engineering_commit = _package_source(
+            resources_root
         )
     return _ensure_checkout(
         workspace / ".orinoco" / "presentation",

@@ -1,20 +1,20 @@
 ---
 name: develop-orinoco-lite
-description: Develop and exercise unreleased Orinoco Lite engine or template changes against a selected downstream. Use for local engine-only, template-only, or combined candidate testing and for autonomous end-to-end GitHub workflow experiments in a user-owned demo. Use maintain-orinoco-site instead for ordinary maintenance of a released downstream.
+description: Develop and exercise unreleased Orinoco Lite package or template changes against a selected downstream. Use for local package-only, template-only, or combined candidate testing and for autonomous end-to-end GitHub workflow experiments in a user-owned demo. Use maintain-orinoco-site instead for ordinary maintenance of a released downstream.
 ---
 
 # Develop Orinoco Lite
 
-Exercise engine and template changes through a disposable content-only downstream before release.
+Exercise package and template changes through a disposable content-only downstream before release.
 Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
-Keep generic source resolution, metadata, projection, and composition in the engine; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
+Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
 ## Establish the live scope
 
 1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
 Git Annex is permitted only in the engineering repinning path.
 Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
-2. Identify the engine and template candidates and any downstream inputs to inject.
+2. Identify the package and template candidates and any downstream inputs to inject.
 Local candidate testing is the default.
 When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
 Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
@@ -26,17 +26,17 @@ Permission to test a working tree locally does not itself authorize either one.
 ## Exercise the temporary downstream
 
 Run the engineering task from the `orinoco-lite-dev` working tree.
-It must materialize the selected template afresh and inject only the downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
+It must materialize the selected template afresh and apply only the selected downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
 
 ```console
 pixi run test-downstream-candidate \
   --downstream /path/to/orinoco-lite-demo \
-  --engine /path/to/orinoco-lite-dev \
+  --package /path/to/orinoco-lite-dev \
   --template /path/to/orinoco-lite-template \
   --mode quick
 ```
 
-Select at least one of `--engine` and `--template`; omit the other for an engine-only or template-only candidate.
+Select at least one of `--package` and `--template`; omit the other for a package-only or template-only candidate.
 The task leaves the source downstream unchanged and must not copy its framework files, workflows, framework tests, or duplicated template configuration.
 
 Use quick mode while iterating.
@@ -44,7 +44,7 @@ Use `--mode full` before release or adoption.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
 
-When a candidate failure exposes generic source resolution, metadata, projection, or composition behavior, fix the engine.
+When a candidate failure exposes generic source resolution, metadata, projection, or composition behavior, fix the package.
 When it exposes an Orinoco adaptation or scaffold, fix the template.
 When required Annex-backed upstream content is missing, repair the maintainer dependency-closure hydration and materialization path; do not remove upstream functionality or add Git Annex to the downstream.
 Change downstream inputs only for site data, policy, supported presentation choices or overrides, or executable metadata adapters.

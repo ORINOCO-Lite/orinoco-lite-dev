@@ -158,10 +158,7 @@ def _relative(
     return path
 
 
-def load_contract(
-    workspace: WorkspaceConfig,
-    presentation_root: Path | None = None,
-) -> ProjectionContract:
+def _contract_document(workspace: WorkspaceConfig) -> tuple[Path, dict[str, Any]]:
     path = workspace.path("site") / "projection.yaml"
     if not path.exists():
         path = Path(__file__).with_name("default_projection.yaml")
@@ -171,6 +168,14 @@ def load_contract(
         raise ConfigurationError(f"Projection contract is invalid: {path}") from error
     if not isinstance(value, dict) or value.get("version") != 2:
         raise ConfigurationError("Projection contract must be version 2")
+    return path, value
+
+
+def load_contract(
+    workspace: WorkspaceConfig,
+    presentation_root: Path | None = None,
+) -> ProjectionContract:
+    path, value = _contract_document(workspace)
     homepage = value.get("homepage")
     pages = value.get("pages")
     unrendered = value.get("unrendered_classes")
@@ -310,15 +315,25 @@ def load_contract(
 
 def _presentation_root(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
 ) -> Path | None:
-    """Resolve upstream only when the downstream uses the engine-owned contract."""
+    """Resolve upstream when selected projection inputs reference it."""
 
     if not isinstance(workspace, WorkspaceConfig):
         return None
-    if (workspace.path("site") / "projection.yaml").is_file():
-        return None
-    return resolve_presentation(workspace.root, runtime_root)
+    _, value = _contract_document(workspace)
+    homepage = value.get("homepage")
+    graph = value.get("graph")
+    pages = value.get("pages")
+    paths = [
+        homepage.get("template") if isinstance(homepage, dict) else None,
+        graph.get("producer") if isinstance(graph, dict) else None,
+    ]
+    if isinstance(pages, dict):
+        paths.extend(policy.get("template") for policy in pages.values() if isinstance(policy, dict))
+    if any(isinstance(path, str) and path.startswith("presentation:") for path in paths):
+        return resolve_presentation(workspace.root, resources_root)
+    return None
 
 
 def _nested_schema_types(value: Any) -> Iterable[str]:
@@ -568,13 +583,13 @@ def _records(
 
 def validate_semantics(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     presentation_root: Path | None = None,
 ) -> dict[str, Any]:
     if presentation_root is None:
-        presentation_root = _presentation_root(workspace, runtime_root)
+        presentation_root = _presentation_root(workspace, resources_root)
     contract = load_contract(workspace, presentation_root)
-    schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
+    schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     records, record_pids = _records(workspace, schema)
     by_pid = {record["pid"]: record for record in records}
     if len(by_pid) != len(records) or not record_pids:
@@ -861,41 +876,18 @@ def _projection_inputs(
     return sorted(set(paths))
 
 
-def _schema_closure_digest(runtime_root: Path) -> str:
+def _schema_closure_digest(resources_root: Path) -> str:
     """Digest the localized semantic schema closure, not just its entrypoint."""
 
-    schema_root = runtime_root / "schema"
-    inventory_path = schema_root / "source-inventory.json"
-    try:
-        inventory_bytes = inventory_path.read_bytes()
-        inventory = json.loads(inventory_bytes)
-    except (OSError, json.JSONDecodeError) as error:
-        raise DriverError("Runtime schema source inventory is missing or invalid") from error
-    sources = inventory.get("sources") if isinstance(inventory, dict) else None
-    if not isinstance(sources, list) or not sources:
-        raise DriverError("Runtime schema source inventory has no source closure")
-    paths: list[tuple[str, Path]] = []
-    seen: set[str] = set()
-    for source in sources:
-        relative = source.get("localized_path") if isinstance(source, dict) else None
-        if not isinstance(relative, str) or not relative or relative in seen:
-            raise DriverError("Runtime schema source inventory is malformed")
-        posix = PurePosixPath(relative)
-        if posix.is_absolute() or posix.as_posix() != relative or ".." in posix.parts:
-            raise DriverError("Runtime schema source inventory contains an unsafe path")
-        path = schema_root.joinpath(*posix.parts)
-        if path.is_symlink() or not path.is_file():
-            raise DriverError(f"Runtime schema closure source is missing: {relative}")
-        seen.add(relative)
-        paths.append((relative, path))
-    entrypoint = inventory.get("entrypoint")
-    if not isinstance(entrypoint, str) or entrypoint not in seen:
-        raise DriverError("Runtime schema entrypoint is absent from its source closure")
+    schema_root = resources_root / "schema"
+    paths = sorted(schema_root.rglob("*.yaml"))
+    if not paths:
+        raise DriverError("Package schema source closure is missing")
     digest = hashlib.sha256()
-    digest.update(b"orinoco-schema-closure-v1\0")
-    digest.update(inventory_bytes)
-    for relative, path in sorted(paths):
-        digest.update(relative.encode("utf-8"))
+    for path in paths:
+        if path.is_symlink() or not path.is_file():
+            raise DriverError(f"Package schema source is not a regular file: {path}")
+        digest.update(path.relative_to(schema_root).as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes())
         digest.update(b"\0")
@@ -946,10 +938,10 @@ def rendered_record_route(
 
 def projection_manifest(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     output: Path,
 ) -> str:
-    presentation_root = _presentation_root(workspace, runtime_root)
+    presentation_root = _presentation_root(workspace, resources_root)
     contract = load_contract(workspace, presentation_root)
     lines: list[str] = []
     for path in _projection_inputs(workspace, contract):
@@ -957,7 +949,7 @@ def projection_manifest(
         workspace_root = workspace.root.resolve()
         label = f"input:{resolved.relative_to(workspace_root).as_posix()}"
         lines.append(f"{sha256_file(path)}  {label}")
-    closure_digest = _schema_closure_digest(runtime_root)
+    closure_digest = _schema_closure_digest(resources_root)
     lines.append(f"{closure_digest}  pin:schema-closure@{closure_digest}")
     lines.append(
         f"{hashlib.sha256((PROJECTION_ALGORITHM + chr(10)).encode()).hexdigest()}  "
@@ -978,14 +970,14 @@ def projection_manifest(
 
 def render_projection(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     output: Path,
 ) -> dict[str, Any]:
-    presentation_root = _presentation_root(workspace, runtime_root)
-    semantic = validate_semantics(workspace, runtime_root, presentation_root)
+    presentation_root = _presentation_root(workspace, resources_root)
+    semantic = validate_semantics(workspace, resources_root, presentation_root)
     contract = load_contract(workspace, presentation_root)
     records, record_pids = _records(workspace)
-    schema = runtime_root / "schema/demo-research-information/unreleased.yaml"
+    schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     machine_records, machine_pids = _records(workspace, schema)
     if machine_pids != record_pids:
         raise DriverError("Joined projection changed the metadata record inventory")
@@ -1073,26 +1065,26 @@ def render_projection(
         graph_result.stdout.rstrip("\n") + "\n", encoding="utf-8"
     )
     (output / "SHA256SUMS").write_text(
-        projection_manifest(workspace, runtime_root, output), encoding="utf-8"
+        projection_manifest(workspace, resources_root, output), encoding="utf-8"
     )
     return {**semantic, "pages": len(list((output / "content").rglob("*.md")))}
 
 
-def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[str, Any]:
+def verify_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[str, Any]:
     output = workspace.path("generated") / "projection"
     ledger = output / "SHA256SUMS"
     if not ledger.is_file():
         raise DriverError(
             "Projection ledger is missing; run `orinoco projection update`"
         )
-    expected = projection_manifest(workspace, runtime_root, output)
+    expected = projection_manifest(workspace, resources_root, output)
     if ledger.read_text(encoding="utf-8") != expected:
         raise DriverError(
             "Projection output is stale; run `orinoco projection update`"
         )
     with tempfile.TemporaryDirectory(prefix="orinoco-projection-") as temporary:
         candidate = Path(temporary) / "projection"
-        rendered = render_projection(workspace, runtime_root, candidate)
+        rendered = render_projection(workspace, resources_root, candidate)
         expected_files = {
             path.relative_to(output).as_posix(): path
             for path in output.rglob("*")
@@ -1120,7 +1112,7 @@ def verify_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
     return {**rendered, "deterministic": True}
 
 
-def update_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[str, Any]:
+def update_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[str, Any]:
     destination = workspace.path("generated") / "projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(
@@ -1134,7 +1126,7 @@ def update_projection(workspace: WorkspaceConfig, runtime_root: Path) -> dict[st
     installed = False
     preserve_backup = False
     try:
-        report = render_projection(workspace, runtime_root, staging)
+        report = render_projection(workspace, resources_root, staging)
         control_sidecar = destination / PROJECTION_CONTROL_SIDECAR
         if control_sidecar.exists() or control_sidecar.is_symlink():
             if control_sidecar.is_symlink() or not control_sidecar.is_file():

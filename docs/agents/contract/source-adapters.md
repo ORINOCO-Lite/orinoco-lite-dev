@@ -32,11 +32,11 @@ extensions/source-adapters/<adapter>/
 Joining them produces the validation and RDF view.
 - `site-specific/sources/<adapter>/` contains source configuration, captured distributable input, and mapping policy.
 - `site-specific/curation-records/<adapter>.yaml` contains current decisions.
-- Consumer-specific executable adapters live under `extensions/`; reusable adapters belong to the engine or template.
+- Consumer-specific executable adapters live under `extensions/`; reusable adapters belong to the package or template.
 - Credentials, restricted payloads, caches, plans, and generated review output remain untracked.
 
 Configured record roots remain supported.
-The engine derives the companion root from the configured record root.
+The package derives the companion root from the configured record root.
 
 ## Adapter run
 

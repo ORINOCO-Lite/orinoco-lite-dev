@@ -30,7 +30,7 @@ identity:
 
 LOCK = """\
 lock_version: 1
-engine:
+package:
   distribution: orinoco-lite
   version: 0.1.0
   url: https://example.invalid/releases/orinoco_lite-0.1.0-py3-none-any.whl
@@ -327,7 +327,7 @@ class WorkspaceConfigTests(unittest.TestCase):
 
     def test_lock_carries_only_the_wheel_coordinate(self) -> None:
         lock = load_lock(self.root / "orinoco.lock")
-        self.assertEqual(lock.engine_version, "0.1.0")
+        self.assertEqual(lock.package_version, "0.1.0")
 
     def test_lock_rejects_placeholder_digests_and_mismatched_wheel(self) -> None:
         for digest in ("c" * 64,):

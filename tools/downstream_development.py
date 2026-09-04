@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 from typing import Iterable, Mapping, Sequence
 
 import yaml
@@ -36,9 +35,9 @@ SITE_OWNED_BEHAVIORS = {
     "site-owned-stable-hook",
 }
 RELEASE_COORDINATES = {
-    "engine_version",
-    "engine_url",
-    "engine_sha256",
+    "package_version",
+    "package_url",
+    "package_sha256",
     "template_source",
     "template_version",
     "workflow_repository",
@@ -56,7 +55,6 @@ FULL_TASKS = (
     "verify-ownership",
     "verify-build",
 )
-OPTIONAL_TASKS: set[str] = set()
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
@@ -87,7 +85,7 @@ def _ignore_working_tree(_directory: str, names: list[str]) -> set[str]:
 
 
 def copy_working_tree(source: Path, destination: Path) -> None:
-    """Copy candidate bytes without repository or generated runtime state."""
+    """Copy candidate bytes without repository or generated resources state."""
 
     source = source.resolve()
     destination = destination.resolve()
@@ -344,33 +342,33 @@ def render_template(
 
 
 def candidate_environment(
-    engine: Path | None,
+    package: Path | None,
     repository: str | None = None,
 ) -> dict[str, str]:
-    """Return an environment that imports an unreleased engine first."""
+    """Return an environment that imports an unreleased package first."""
 
     environment = dict(os.environ)
     if repository is not None:
         if GITHUB_REPOSITORY.fullmatch(repository) is None:
             raise DevelopmentError("Repository must use GitHub OWNER/REPOSITORY form")
         environment["GITHUB_REPOSITORY"] = repository
-    if engine is None:
+    if package is None:
         return environment
-    engine = engine.resolve()
-    source = engine / "packages/orinoco-lite/src"
+    package = package.resolve()
+    source = package / "packages/orinoco-lite/src"
     if not (source / "orinoco_lite/__init__.py").is_file():
-        raise DevelopmentError(f"Engine candidate has no Orinoco source tree: {engine}")
+        raise DevelopmentError(f"Package candidate has no Orinoco source tree: {package}")
     existing = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (
         os.fspath(source) if not existing else os.pathsep.join((os.fspath(source), existing))
     )
-    environment["ORINOCO_CANDIDATE_ENGINE_ROOT"] = os.fspath(engine)
-    environment["ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME"] = "1"
+    environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = os.fspath(package)
+    environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
     return environment
 
 
 def prepare_candidate_editor_shell(
-    engine: Path,
+    package: Path,
     destination: Path,
     environment: Mapping[str, str],
     *,
@@ -378,12 +376,12 @@ def prepare_candidate_editor_shell(
 ) -> None:
     """Build the working-tree editor used by a downstream candidate."""
 
-    pool_ui = engine.resolve() / "submodules/pool.psychoinformatics.de-ui"
+    pool_ui = package.resolve() / "submodules/pool.psychoinformatics.de-ui"
     if not (pool_ui / "Makefile").is_file() or not (
         pool_ui / "shacl-vue/package.json"
     ).is_file():
         raise DevelopmentError(
-            "Engine candidate editor sources are missing; initialize the "
+            "Package candidate editor sources are missing; initialize the "
             "pool.psychoinformatics.de-ui submodule recursively"
         )
     source = destination.parent / "editor-source"
@@ -396,38 +394,38 @@ def prepare_candidate_editor_shell(
             "--pool-ui",
             source,
             "--overlay",
-            engine.resolve() / "release/editor-v2",
+            package.resolve() / "release/editor-v2",
             "--shell",
             destination,
             "--licenses",
             licenses or destination.parent / "editor-licenses",
         ),
-        cwd=engine.resolve(),
+        cwd=package.resolve(),
         environment=environment,
     )
 
 
 def prepare_candidate_resources(
-    engine: Path,
+    package: Path,
     destination: Path,
     environment: Mapping[str, str],
 ) -> None:
     """Stage the candidate package's generated resources for one exercise."""
 
-    candidate_source = engine.resolve() / "packages/orinoco-lite/src"
+    candidate_source = package.resolve() / "packages/orinoco-lite/src"
     if str(candidate_source) not in sys.path:
         sys.path.insert(0, str(candidate_source))
-    from orinoco_lite.runtime import stage_package_resources
+    from orinoco_lite.stage_resources import stage_package_resources
 
-    engine = engine.resolve()
+    package = package.resolve()
     source = destination / "source"
     build = source / "build"
-    editor_shell = build / "runtime-editor-shell"
+    editor_shell = build / "resources-editor-shell"
     prepare_candidate_editor_shell(
-        engine,
+        package,
         editor_shell,
         environment,
-        licenses=build / "runtime-editor-licenses",
+        licenses=build / "resources-editor-licenses",
     )
     _run(
         (
@@ -435,13 +433,13 @@ def prepare_candidate_resources(
             "-m",
             "orinoco_lite.release_schema",
             "--source-root",
-            engine / "submodules/things-schemas/src",
+            package / "submodules/things-schemas/src",
             "--entry",
-            engine / "submodules/things-schemas/src/demo-research-information/unreleased.yaml",
+            package / "submodules/things-schemas/src/demo-research-information/unreleased.yaml",
             "--destination",
-            build / "runtime-schema",
+            build / "resources-schema",
         ),
-        cwd=engine,
+        cwd=package,
         environment=environment,
     )
     _run(
@@ -450,18 +448,18 @@ def prepare_candidate_resources(
             "-m",
             "orinoco_lite.release_review",
             "--application",
-            engine / "packages/curation-review-app",
+            package / "packages/curation-review-app",
             "--shell",
-            build / "runtime-review-shell",
+            build / "resources-review-shell",
             "--licenses",
-            build / "runtime-review-licenses",
+            build / "resources-review-licenses",
         ),
-        cwd=engine,
+        cwd=package,
         environment=environment,
     )
     for relative in (
         "tools/adapt_upstream_pages.py",
-        "release/runtime-licenses/README.md",
+        "release/package-licenses/README.md",
         "packages/orinoco-lite/LICENSE",
         "LICENSE",
         "submodules/pool.psychoinformatics.de-ui/LICENSE",
@@ -472,20 +470,20 @@ def prepare_candidate_resources(
     ):
         target = source / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(engine / relative, target)
-    spec = engine / "release/package-resources.yaml"
+        shutil.copyfile(package / relative, target)
+    spec = package / "release/package-resources.yaml"
     target_spec = source / "release/package-resources.yaml"
     target_spec.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(spec, target_spec)
     completed = subprocess.run(
-        ("git", "-C", str(engine), "rev-parse", "HEAD"),
+        ("git", "-C", str(package), "rev-parse", "HEAD"),
         capture_output=True,
         text=True,
         check=False,
     )
     commit = completed.stdout.strip()
     if completed.returncode or not re.fullmatch(r"[0-9a-f]{40}", commit):
-        raise DevelopmentError("Could not resolve the candidate engine commit")
+        raise DevelopmentError("Could not resolve the candidate package commit")
     stage_package_resources(
         target_spec,
         destination / "package-resources",
@@ -541,27 +539,14 @@ def task_names(mode: str, overrides: Sequence[str]) -> tuple[str, ...]:
     raise DevelopmentError(f"Unknown downstream test mode: {mode}")
 
 
-def _available_tasks(manifest: Path) -> frozenset[str]:
-    try:
-        value = tomllib.loads(manifest.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
-        raise DevelopmentError(f"Candidate pixi.toml is invalid: {manifest}") from error
-    tasks = value.get("tasks")
-    if tasks is None:
-        return frozenset()
-    if not isinstance(tasks, dict) or not all(isinstance(name, str) for name in tasks):
-        raise DevelopmentError(f"Candidate pixi.toml tasks are invalid: {manifest}")
-    return frozenset(tasks)
-
-
 def _candidate_output_sources(
     downstream: Path,
-    engine: Path | None,
+    package: Path | None,
     template: Path | None,
 ) -> tuple[tuple[str, Path], ...]:
     sources = [("downstream", downstream.resolve())]
-    if engine is not None:
-        sources.append(("engine", engine.resolve()))
+    if package is not None:
+        sources.append(("package", package.resolve()))
     if template is not None:
         sources.append(("template", template.resolve()))
     return tuple(sources)
@@ -585,7 +570,7 @@ def validate_candidate_output(
 def exercise_candidate(
     candidate: Path,
     *,
-    engine: Path | None,
+    package: Path | None,
     repository: str | None = None,
     tasks: Sequence[str],
 ) -> None:
@@ -595,29 +580,18 @@ def exercise_candidate(
     pixi = shutil.which("pixi")
     if pixi is None:
         raise DevelopmentError("Pixi is unavailable")
-    available_tasks = _available_tasks(manifest)
-    selected_tasks = tuple(
-        task
-        for task in tasks
-        if task not in OPTIONAL_TASKS or task in available_tasks
-    )
-    for task in tasks:
-        if task in OPTIONAL_TASKS and task not in available_tasks:
-            print(
-                f"Skipping optional task absent from candidate pixi.toml: {task}",
-                flush=True,
-            )
-    environment = candidate_environment(engine, repository)
+    selected_tasks = tuple(tasks)
+    environment = candidate_environment(package, repository)
     with tempfile.TemporaryDirectory(prefix="orinoco-candidate-shells-") as temporary:
-        if engine is not None and selected_tasks:
-            application = engine.resolve() / "packages/curation-review-app"
+        if package is not None and selected_tasks:
+            application = package.resolve() / "packages/curation-review-app"
             if not (application / "node_modules").is_dir():
                 _run(("npm", "ci", "--ignore-scripts"), cwd=application)
             _run(("npm", "run", "build:review"), cwd=application)
             resources = Path(temporary) / "resources"
-            prepare_candidate_resources(engine, resources, environment)
+            prepare_candidate_resources(package, resources, environment)
             environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(
-                resources / "source/build/runtime-editor-shell"
+                resources / "source/build/resources-editor-shell"
             )
             environment["ORINOCO_CANDIDATE_RESOURCE_ROOT"] = os.fspath(
                 resources / "package-resources"
@@ -640,7 +614,7 @@ def exercise_candidate(
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--downstream", type=Path, required=True)
-    result.add_argument("--engine", type=Path)
+    result.add_argument("--package", type=Path)
     result.add_argument("--template", type=Path)
     result.add_argument(
         "--repository",
@@ -672,8 +646,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not (downstream / "orinoco.yaml").is_file():
         print(f"Downstream has no orinoco.yaml: {downstream}", file=sys.stderr)
         return 2
-    if args.engine is None and args.template is None:
-        print("Select --engine, --template, or both", file=sys.stderr)
+    if args.package is None and args.template is None:
+        print("Select --package, --template, or both", file=sys.stderr)
         return 2
 
     try:
@@ -692,7 +666,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             validate_candidate_output(
                 workspace,
-                _candidate_output_sources(downstream, args.engine, args.template),
+                _candidate_output_sources(downstream, args.package, args.template),
             )
         except DevelopmentError as error:
             print(error, file=sys.stderr)
@@ -715,7 +689,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Candidate metadata base: {metadata_base}", flush=True)
         exercise_candidate(
             candidate,
-            engine=args.engine,
+            package=args.package,
             repository=repository,
             tasks=task_names(args.mode, args.task),
         )

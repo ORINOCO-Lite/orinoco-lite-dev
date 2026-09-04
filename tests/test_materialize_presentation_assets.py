@@ -131,12 +131,12 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            runtime = b"new upstream runtime payload\n"
+            payload = b"new upstream asset payload\n"
             static = b"retained client payload\n"
             german = b"upstream record depiction"
             generated = b'{"upstream": "graph"}\n'
             annexed = {
-                "assets/novel/runtime-v9.bin": runtime,
+                "assets/novel/payload-v9.bin": payload,
                 "static/clients/behavior.bin": static,
                 "content/projects/german/depiction.bin": german,
                 "static/graph.json": generated,
@@ -160,8 +160,8 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
             self.assertEqual(result.selected_commit, "a" * 40)
             self.assertEqual(result.asset_count, 2)
             self.assertEqual(
-                (result.destination / "assets/novel/runtime-v9.bin").read_bytes(),
-                runtime,
+                (result.destination / "assets/novel/payload-v9.bin").read_bytes(),
+                payload,
             )
             self.assertEqual(
                 (result.destination / "static/clients/behavior.bin").read_bytes(),
@@ -182,7 +182,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             content = b"required payload"
-            annexed = {"assets/runtime.bin": content}
+            annexed = {"assets/payload.bin": content}
             engineering, _website, template, fake = self.fixture(root, annexed)
             existing = (
                 template
@@ -208,7 +208,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             pointer = b"/annex/objects/WORM-s30--payload\n"
-            annexed = {"assets/runtime.bin": pointer}
+            annexed = {"assets/payload.bin": pointer}
             engineering, _website, template, fake = self.fixture(root, annexed)
             existing = (
                 template

@@ -53,9 +53,9 @@ class StaticReviewBindingTests(unittest.TestCase):
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
-            runtime_shell = root / "runtime/review-shell"
-            runtime_shell.mkdir(parents=True)
-            (runtime_shell / "index.html").write_text(
+            resources_shell = root / "resources/review-shell"
+            resources_shell.mkdir(parents=True)
+            (resources_shell / "index.html").write_text(
                 "released\n", encoding="utf-8"
             )
             candidate = root / "candidate"
@@ -66,14 +66,14 @@ class StaticReviewBindingTests(unittest.TestCase):
             shell.mkdir(parents=True)
             (shell / "index.html").write_text("candidate\n", encoding="utf-8")
             environment = {
-                "ORINOCO_UNSAFE_DEVELOPMENT_RUNTIME": "1",
-                "ORINOCO_CANDIDATE_ENGINE_ROOT": str(candidate),
+                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+                "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(candidate),
             }
 
             with patch.dict("os.environ", environment, clear=True):
                 bind_review(
                     load_workspace(root),
-                    root / "runtime",
+                    root / "resources",
                     root / "build/site/review",
                     repository="ORINOCO-Lite/example-site",
                 )
@@ -94,7 +94,7 @@ class StaticReviewBindingTests(unittest.TestCase):
 
             report = bind_review(
                 load_workspace(root),
-                root / "runtime",
+                root / "resources",
                 destination,
             )
 
@@ -106,19 +106,19 @@ class StaticReviewBindingTests(unittest.TestCase):
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
-            shell = root / "runtime/review-shell"
+            shell = root / "resources/review-shell"
             (shell / "assets").mkdir(parents=True)
             (shell / "index.html").write_text("review\n", encoding="utf-8")
             (shell / "assets/app.js").write_text("app\n", encoding="utf-8")
             (shell / "config.json").write_text(
-                "runtime default\n",
+                "resources default\n",
                 encoding="utf-8",
             )
             destination = root / "build/site/review"
 
             report = bind_review(
                 load_workspace(root),
-                root / "runtime",
+                root / "resources",
                 destination,
                 repository="ORINOCO-Lite/example-site",
             )
@@ -141,13 +141,13 @@ class StaticReviewBindingTests(unittest.TestCase):
             )
             self.assertEqual(
                 (shell / "config.json").read_text(encoding="utf-8"),
-                "runtime default\n",
+                "resources default\n",
             )
 
             (destination / "stale.html").write_text("stale\n", encoding="utf-8")
             second_report = bind_review(
                 load_workspace(root),
-                root / "runtime",
+                root / "resources",
                 destination,
                 repository="ORINOCO-Lite/example-site",
             )
@@ -165,14 +165,14 @@ class StaticReviewBindingTests(unittest.TestCase):
             site_name = "r" * 233
             (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root, title=site_name)
-            shell = root / "runtime/review-shell"
+            shell = root / "resources/review-shell"
             shell.mkdir(parents=True)
             (shell / "index.html").write_text("review\n", encoding="utf-8")
             destination = root / "build/site/review"
 
             bind_review(
                 load_workspace(root),
-                root / "runtime",
+                root / "resources",
                 destination,
                 repository="ORINOCO-Lite/example-site",
             )
@@ -202,7 +202,7 @@ class StaticReviewBindingTests(unittest.TestCase):
             self.assertIsNone(origin.username)
             self.assertIsNone(origin.password)
 
-    def test_configured_binding_requires_the_runtime_shell(self) -> None:
+    def test_configured_binding_requires_the_resources_shell(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
@@ -211,7 +211,7 @@ class StaticReviewBindingTests(unittest.TestCase):
             with self.assertRaisesRegex(DriverError, "source-review shell"):
                 bind_review(
                     load_workspace(root),
-                    root / "runtime",
+                    root / "resources",
                     root / "build/site/review",
                     repository="ORINOCO-Lite/example-site",
                 )
@@ -221,13 +221,13 @@ class StaticReviewBindingTests(unittest.TestCase):
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
-            shell = root / "runtime/review-shell"
+            shell = root / "resources/review-shell"
             shell.mkdir(parents=True)
             (shell / "index.html").write_text("review\n", encoding="utf-8")
 
             report = bind_review(
                 load_workspace(root),
-                root / "runtime",
+                root / "resources",
                 root / "build/site/review",
                 repository="ORINOCO-Lite/example-site",
             )
@@ -247,8 +247,8 @@ class StaticReviewBindingTests(unittest.TestCase):
             config = root / "orinoco.yaml"
             config.write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
-            runtime = root / "runtime"
-            shell = runtime / "review-shell"
+            resources = root / "resources"
+            shell = resources / "review-shell"
             shell.mkdir(parents=True)
             (shell / "index.html").write_text("review\n", encoding="utf-8")
             destination = root / "build/site"
@@ -274,7 +274,7 @@ class StaticReviewBindingTests(unittest.TestCase):
             ):
                 report = site.build_site(
                     config,
-                    runtime,
+                    resources,
                     destination,
                     "https://example.invalid/orinoco/",
                     "ORINOCO-Lite/example-site",

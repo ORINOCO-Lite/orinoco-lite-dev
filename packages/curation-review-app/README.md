@@ -1,7 +1,7 @@
 # Curation review and GitHub transport
 
 This package implements both halves of the browser boundary in [`docs/agents/contract/github-curation-review.md`](../../docs/agents/contract/github-curation-review.md).
-Its content-neutral static review shell is released inside the Orinoco runtime and bound into each configured downstream at `/review/`.
+Its content-neutral static review shell is bundled in the `orinoco-lite` package and bound into each configured downstream at `/review/`.
 Its central deployment is backend-only: API handlers authenticate with the GitHub App, verify proposals, and perform authenticated GitHub transport.
 The only service-origin browser document is a generated, restrictive-CSP `/api/transport` popup that retains the host-only session cookie and exchanges nonce-bound messages with its exact downstream opener.
 It contains no landing, review, editor, upload, or confirmation application.
@@ -28,7 +28,7 @@ npm run pages:dev
 Copy `.dev.vars.example` to the untracked `.dev.vars` file before running the Functions locally.
 
 `npm run build:review` independently produces the unconfigured downstream shell in `dist-review/`.
-Release assembly inventories its dependencies and places it in the runtime; the trusted site build supplies the repository coordinate and the effective central-default or optional override service origin in strict `config.json`.
+Package assembly includes the shell and its dependencies; the trusted site build supplies the repository coordinate and the effective central-default or optional override service origin in strict `config.json`.
 
 ## GitHub App configuration
 

@@ -5,7 +5,7 @@ Different kinds of work in this repository need different terms:
 
 | Material | License |
 | --- | --- |
-| Original Orinoco Lite software, build and release code, workflows, tests, configuration, template logic, and runtime glue | [MIT](LICENSE) |
+| Original Orinoco Lite software, build and release code, workflows, tests, configuration, and template logic | [MIT](LICENSE) |
 | Original documentation and editorial prose | [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) |
 | Original factual metadata and machine-readable factual projections | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Third-party components, themes, schemas, and copied or patched upstream files | Their existing license and notice, preserved with the component or release inventory |

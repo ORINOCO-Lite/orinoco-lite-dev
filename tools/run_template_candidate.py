@@ -28,7 +28,7 @@ def main() -> int:
         ROOT / "tools/downstream_development.py",
         "--downstream",
         FIXTURE,
-        "--engine",
+        "--package",
         ROOT,
         "--template",
         template,
