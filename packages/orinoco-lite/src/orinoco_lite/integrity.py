@@ -1,11 +1,11 @@
-"""Canonical hashing helpers shared by release and runtime code."""
+"""Canonical hashing helpers shared by release and resources code."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 def sha256_file(path: Path) -> str:
@@ -26,10 +26,6 @@ def canonical_json_bytes(value: Any) -> bytes:
         )
         + "\n"
     ).encode("utf-8")
-
-
-def resource_checksum_lines(entries: Iterable[tuple[str, str]]) -> str:
-    return "".join(f"{digest}  {name}\n" for name, digest in sorted(entries))
 
 
 def tree_sha256(root: Path) -> str:

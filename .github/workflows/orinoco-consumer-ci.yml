@@ -62,7 +62,6 @@ jobs:
         run: |
           pixi run validate
           pixi run projection-verify
-          pixi run verify-runtime
           pixi run verify-hugo
           pixi run verify-ownership
           pixi run verify-build

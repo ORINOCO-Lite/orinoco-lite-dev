@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from .config import WorkspaceConfig, _review_app_name, development_engine_root
+from .config import WorkspaceConfig, _review_app_name, development_package_root
 from .errors import ConfigurationError, DriverError
 
 
@@ -47,7 +47,7 @@ def _remove_destination(destination: Path) -> None:
 
 def bind_review(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     destination: Path,
     *,
     repository: str | None = None,
@@ -61,19 +61,19 @@ def bind_review(
         _remove_destination(destination)
         return {"enabled": False}
 
-    candidate_root = development_engine_root()
+    candidate_root = development_package_root()
     shell = (
         candidate_root / "packages/curation-review-app/dist-review"
         if candidate_root is not None
-        else runtime_root / "review-shell"
+        else resources_root / "review-shell"
     )
     if not shell.is_dir() or not (shell / "index.html").is_file():
         if candidate_root is not None:
             raise DriverError(
-                "Local engine candidate has no built static source-review shell; "
+                "Local package candidate has no built static source-review shell; "
                 "run its curation-review build"
             )
-        raise DriverError("Runtime does not contain the static source-review shell")
+        raise DriverError("Package does not contain the static source-review shell")
 
     _remove_destination(destination)
     shutil.copytree(shell, destination)

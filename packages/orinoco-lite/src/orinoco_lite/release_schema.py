@@ -1,13 +1,11 @@
-"""Localize the exact pinned LinkML source import closure for offline runtime use."""
+"""Localize the exact pinned LinkML source import closure for offline resources use."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 from typing import Any, Sequence
 
 import yaml
@@ -33,7 +31,6 @@ def localize_schema(source_root: Path, entry: Path, destination: Path) -> dict[s
     destination.mkdir(parents=True, exist_ok=True)
     pending = [entry]
     seen: set[Path] = set()
-    inventory: list[dict[str, str]] = []
     while pending:
         source = pending.pop()
         if source in seen:
@@ -75,25 +72,10 @@ def localize_schema(source_root: Path, entry: Path, destination: Path) -> dict[s
         target.write_text(
             yaml.safe_dump(value, sort_keys=False, allow_unicode=True), encoding="utf-8"
         )
-        inventory.append(
-            {
-                "localized_path": relative.as_posix(),
-                "source_path": relative.as_posix(),
-                "source_sha256": hashlib.sha256(raw).hexdigest(),
-                "localized_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-            }
-        )
-    inventory.sort(key=lambda item: item["source_path"])
-    report = {
+    return {
         "entrypoint": entry.relative_to(source_root).as_posix(),
-        "format": "orinoco-localized-linkml-source-closure",
-        "sources": inventory,
-        "version": 1,
+        "sources": len(seen),
     }
-    (destination / "source-inventory.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    return report
 
 
 def main(argv: Sequence[str] | None = None) -> int:

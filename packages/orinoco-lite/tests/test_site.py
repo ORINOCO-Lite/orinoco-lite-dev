@@ -118,7 +118,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             site._assemble(
                 load_config_path(root / "orinoco.yaml"),
-                root / "runtime",
+                root / "resources",
                 assembly,
                 presentation=presentation,
             )
@@ -141,7 +141,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             ):
                 site._assemble(
                     load_config_path(root / "orinoco.yaml"),
-                    root / "runtime",
+                    root / "resources",
                     root / "build/unmaterialized",
                     presentation=presentation,
                 )
@@ -234,7 +234,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             site._assemble(
                 workspace,
-                root / "runtime",
+                root / "resources",
                 assembly,
                 presentation=presentation,
             )
@@ -334,7 +334,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             site._assemble(
                 workspace,
-                root / "runtime",
+                root / "resources",
                 assembly,
                 presentation=_presentation(root),
             )
@@ -362,7 +362,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             site._assemble(
                 load_config_path(config),
-                root / "runtime",
+                root / "resources",
                 assembly,
                 presentation=_presentation(root),
             )
@@ -410,8 +410,8 @@ class HugoCompatibilityTests(unittest.TestCase):
             config = root / "orinoco.yaml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
-            runtime = root / "runtime"
-            adapter = runtime / "drivers" / "adapt_pages.py"
+            resources = root / "resources"
+            adapter = resources / "drivers" / "adapt_pages.py"
             adapter.parent.mkdir(parents=True)
             adapter.write_text("# test adapter\n", encoding="utf-8")
 
@@ -452,7 +452,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     ):
                         report = site.build_site(
                             config,
-                            runtime,
+                            resources,
                             destination,
                             base_url,
                         )
@@ -484,39 +484,39 @@ class HugoCompatibilityTests(unittest.TestCase):
                 version = site._require_compatible_hugo(
                     output,
                     ">=0.154,<0.155",
-                    runtime_release="0.1.7",
+                    package_version="0.1.7",
                 )
                 self.assertEqual(str(version), "0.154.5")
 
-    def test_site_adapter_prefers_explicit_engine_candidate(self) -> None:
+    def test_site_adapter_prefers_explicit_package_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            runtime_adapter = root / "runtime/drivers/adapt_pages.py"
-            runtime_adapter.parent.mkdir(parents=True)
-            runtime_adapter.write_text("# released\n", encoding="utf-8")
-            candidate_adapter = root / "engine/tools/adapt_upstream_pages.py"
+            resources_adapter = root / "resources/drivers/adapt_pages.py"
+            resources_adapter.parent.mkdir(parents=True)
+            resources_adapter.write_text("# released\n", encoding="utf-8")
+            candidate_adapter = root / "package/tools/adapt_upstream_pages.py"
             candidate_adapter.parent.mkdir(parents=True)
             candidate_adapter.write_text("# candidate\n", encoding="utf-8")
 
             with patch.object(
-                site, "development_engine_root", return_value=root / "engine"
+                site, "development_package_root", return_value=root / "package"
             ):
                 self.assertEqual(
-                    site._site_adapter(root / "runtime"), candidate_adapter
+                    site._site_adapter(root / "resources"), candidate_adapter
                 )
-            with patch.object(site, "development_engine_root", return_value=None):
+            with patch.object(site, "development_package_root", return_value=None):
                 self.assertEqual(
-                    site._site_adapter(root / "runtime"), runtime_adapter
+                    site._site_adapter(root / "resources"), resources_adapter
                 )
 
     def test_site_adapter_requires_candidate_driver(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with patch.object(
-                site, "development_engine_root", return_value=root / "engine"
+                site, "development_package_root", return_value=root / "package"
             ):
                 with self.assertRaisesRegex(IntegrityError, "no site adapter"):
-                    site._site_adapter(root / "runtime")
+                    site._site_adapter(root / "resources")
 
     def test_unsupported_or_malformed_hugo_is_rejected(self) -> None:
         cases = (
@@ -547,7 +547,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     site._require_compatible_hugo(
                         output,
                         ">=0.154,<0.155",
-                        runtime_release="0.1.7",
+                        package_version="0.1.7",
                     )
 
     def test_build_preflight_preserves_existing_outputs_on_failure(self) -> None:
@@ -561,14 +561,14 @@ class HugoCompatibilityTests(unittest.TestCase):
             assembly = root / "build" / "assembly"
             assembly.mkdir()
             (assembly / "sentinel").write_text("existing\n", encoding="utf-8")
-            runtime = root / "runtime"
-            runtime.mkdir()
+            resources = root / "resources"
+            resources.mkdir()
             manifest = SimpleNamespace(
                 compatibility={"hugo": ">=0.154,<0.155"},
                 release="0.1.3",
             )
             with (
-                patch.object(site, "load_runtime_manifest", return_value=manifest),
+                patch.object(site, "HUGO_REQUIREMENT", ">=0.154,<0.155"),
                 patch.object(
                     site,
                     "_run",
@@ -578,7 +578,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 with self.assertRaisesRegex(DriverError, "found 0.155.0"):
                     site.build_site(
                         root / "orinoco.yaml",
-                        runtime,
+                        resources,
                         destination,
                         "https://example.invalid/orinoco/",
                     )

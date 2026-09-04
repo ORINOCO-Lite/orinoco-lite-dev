@@ -3,8 +3,7 @@ export interface MetadataRoots {
   records: string;
 }
 
-export const DEFAULT_RECORD_ROOT = "metadata/records";
-export const CURRENT_RECORD_ROOT = "site-specific/metadata/records";
+export const DEFAULT_RECORD_ROOT = "site-specific/metadata/records";
 
 export function normalizedRepositoryDirectory(value: unknown): string | null {
   if (
@@ -40,7 +39,6 @@ export function metadataRoots(recordRoot: string): MetadataRoots {
   };
 }
 
-export const CURRENT_METADATA_ROOTS = metadataRoots(CURRENT_RECORD_ROOT);
 export const DEFAULT_METADATA_ROOTS = metadataRoots(DEFAULT_RECORD_ROOT);
 
 export function validRepositoryYamlPath(value: string): boolean {

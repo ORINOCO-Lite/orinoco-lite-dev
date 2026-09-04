@@ -11,12 +11,16 @@ export const ARTIFACT_ID = 123456789;
 export const WORKFLOW_RUN_ID = 987654321;
 export const ORINOCO_CONFIG = `contract_version: 2
 site:
-  name: Example site
-  base_url: https://site.example/
   repository: example/site
   curation_service: https://review.example/
 paths:
   records: site-specific/metadata/records
+`;
+export const SITE_DATA = `version: 1
+identity:
+  title: Example site
+  description: A research site
+  base_url: https://site.example/
 `;
 
 export function proposalCommitMessage(): string {

@@ -17,14 +17,16 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from .config import development_engine_root, github_repository, load_config_path
+from .config import development_package_root, github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
 from .projection import load_contract
 from .presentation import resolve_presentation
 from .review import bind_review
-from .runtime import MANIFEST_NAME, load_runtime_manifest
+from . import __version__
+
+HUGO_REQUIREMENT = ">=0.161,<0.162"
 
 
 HUGO_VERSION = re.compile(
@@ -223,12 +225,12 @@ def _safe_destination(workspace, destination: Path) -> Path:
 
 def _assemble(
     workspace,
-    runtime_root: Path,
+    resources_root: Path,
     assembly: Path,
     *,
     presentation: Path | None = None,
 ) -> None:
-    presentation = presentation or resolve_presentation(workspace.root, runtime_root)
+    presentation = presentation or resolve_presentation(workspace.root, resources_root)
     upstream = presentation
     theme = upstream / "themes" / "congo"
     adapter = workspace.root / ".orinoco-lite" / "presentation"
@@ -320,7 +322,7 @@ def _require_compatible_hugo(
     output: str,
     specifier: str,
     *,
-    runtime_release: str,
+    package_version: str,
 ) -> Version:
     match = HUGO_VERSION.match(output.strip())
     if match is None:
@@ -335,31 +337,30 @@ def _require_compatible_hugo(
     version = Version(match.group("version"))
     if version not in SpecifierSet(specifier):
         raise DriverError(
-            f"Orinoco runtime {runtime_release} requires Hugo {specifier}; "
+            f"Orinoco Lite {package_version} requires Hugo {specifier}; "
             f"found {version}"
         )
     return version
 
 
-def _preflight_hugo(runtime_root: Path, *, cwd: Path) -> Version:
-    manifest = load_runtime_manifest(runtime_root / MANIFEST_NAME)
+def _preflight_hugo(resources_root: Path, *, cwd: Path) -> Version:
     output = _run(["hugo", "version"], cwd=cwd)
     return _require_compatible_hugo(
         output,
-        str(manifest.compatibility["hugo"]),
-        runtime_release=manifest.release,
+        HUGO_REQUIREMENT,
+        package_version=__version__,
     )
 
 
-def _site_adapter(runtime_root: Path) -> Path:
-    """Select the released adapter or explicitly enabled engine candidate."""
+def _site_adapter(resources_root: Path) -> Path:
+    """Select the released adapter or explicitly enabled package candidate."""
 
-    engine_root = development_engine_root()
-    if engine_root is None:
-        return runtime_root / "drivers" / "adapt_pages.py"
-    adapter = engine_root / "tools" / "adapt_upstream_pages.py"
+    package_root = development_package_root()
+    if package_root is None:
+        return resources_root / "drivers" / "adapt_pages.py"
+    adapter = package_root / "tools" / "adapt_upstream_pages.py"
     if not adapter.is_file():
-        raise IntegrityError(f"Engine candidate has no site adapter: {adapter}")
+        raise IntegrityError(f"Package candidate has no site adapter: {adapter}")
     return adapter
 
 
@@ -401,13 +402,13 @@ def normalize_build_base_url(value: str) -> str:
 
 def build_site(
     config: Path,
-    runtime_root: Path,
+    resources_root: Path,
     destination: Path,
     base_url: str,
     github_repository_coordinate: str | None = None,
 ) -> dict[str, Any]:
     workspace = load_config_path(config)
-    runtime_root = runtime_root.resolve()
+    resources_root = resources_root.resolve()
     destination = _safe_destination(workspace, destination)
     base_url = normalize_build_base_url(base_url)
     repository = (
@@ -419,12 +420,12 @@ def build_site(
         else workspace.repository
     )
     parsed = urlsplit(base_url)
-    _preflight_hugo(runtime_root, cwd=workspace.root)
+    _preflight_hugo(resources_root, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)
-    _assemble(workspace, runtime_root, assembly)
+    _assemble(workspace, resources_root, assembly)
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -444,7 +445,7 @@ def build_site(
         ],
         cwd=workspace.root,
     )
-    adapter = _site_adapter(runtime_root)
+    adapter = _site_adapter(resources_root)
     if adapter.is_file():
         _run(
             [
@@ -460,14 +461,14 @@ def build_site(
         )
     editor_report = bind_editor(
         workspace,
-        runtime_root,
+        resources_root,
         destination / "edit",
         repository=repository,
         service_origin=workspace.curation_service,
     )
     review_report = bind_review(
         workspace,
-        runtime_root,
+        resources_root,
         destination / "review",
         repository=repository,
         service_origin=workspace.curation_service,
@@ -496,14 +497,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--runtime", type=Path, required=True)
+    parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
     args = parser.parse_args(argv)
     try:
         report = build_site(
             args.config,
-            args.runtime,
+            args.resources,
             args.destination,
             args.base_url,
             os.environ.get("ORINOCO_GITHUB_REPOSITORY"),

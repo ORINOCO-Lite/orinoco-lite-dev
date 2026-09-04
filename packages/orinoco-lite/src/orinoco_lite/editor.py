@@ -160,7 +160,7 @@ def _editor_config(
 
 def _converters(schema: Path):
     if schema.is_symlink() or not schema.is_file():
-        raise DriverError("Runtime does not contain the pinned editor schema")
+        raise DriverError("Package does not contain the pinned editor schema")
     try:
         return build_format_converters(schema)
     except ImportError as error:
@@ -225,7 +225,7 @@ def _render_rdf_sources(
 
 def bind_editor(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     destination: Path,
     *,
     repository: str | None = None,
@@ -235,9 +235,9 @@ def bind_editor(
     from .projection import load_contract
 
     candidate_shell = development_editor_shell()
-    shell = candidate_shell or runtime_root / "editor-shell"
+    shell = candidate_shell or resources_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
-        raise DriverError("Runtime does not contain the generic static editor shell")
+        raise DriverError("Package does not contain the generic static editor shell")
     if destination.exists():
         shutil.rmtree(destination)
     shutil.copytree(shell, destination)
@@ -246,14 +246,14 @@ def bind_editor(
         "dlschemas_shacl.ttl",
         "config_default_xyzri.yaml",
     ):
-        source = runtime_root / "editor-schema" / name
+        source = resources_root / "editor-schema" / name
         if not source.is_file():
-            raise DriverError(f"Runtime editor schema resource is missing: {name}")
+            raise DriverError(f"Package editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
     presentation_root = None
     if not (workspace.path("site") / "projection.yaml").is_file():
-        presentation_root = resolve_presentation(workspace.root, runtime_root)
+        presentation_root = resolve_presentation(workspace.root, resources_root)
     contract = load_contract(workspace, presentation_root)
     all_sources = record_sources(workspace)
     catalog = record_catalog(workspace, presentation_root)
@@ -263,7 +263,7 @@ def bind_editor(
     else:
         sources = all_sources
     json_to_rdf, _ = _converters(
-        runtime_root / "schema/demo-research-information/unreleased.yaml"
+        resources_root / "schema/demo-research-information/unreleased.yaml"
     )
     record_rdf, combined_rdf = _render_rdf_sources(sources, json_to_rdf)
     for entry in catalog["records"]:
@@ -397,14 +397,14 @@ def _preserve_unchanged_rdf_list_order(converted: Any, source: Any) -> Any:
 
 def validate_bundle(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     bundle: Mapping[str, Any],
 ) -> dict[Path, str]:
     from .presentation import resolve_presentation
 
     presentation_root = None
     if not (workspace.path("site") / "projection.yaml").is_file():
-        presentation_root = resolve_presentation(workspace.root, runtime_root)
+        presentation_root = resolve_presentation(workspace.root, resources_root)
     catalog = record_catalog(workspace, presentation_root)
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")
@@ -415,7 +415,7 @@ def validate_bundle(
         for source in companion_sources(workspace)
     }
     _, rdf_to_json = _converters(
-        runtime_root / "schema/demo-research-information/unreleased.yaml"
+        resources_root / "schema/demo-research-information/unreleased.yaml"
     )
     updates: dict[Path, str] = {}
     seen: set[str] = set()
@@ -539,12 +539,12 @@ def _atomic_apply(updates: Mapping[Path, str]) -> None:
 
 def apply_bundle_report(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     path: Path,
     *,
     write: bool,
 ) -> dict[str, Any]:
-    updates = validate_bundle(workspace, runtime_root, _read_bundle(path))
+    updates = validate_bundle(workspace, resources_root, _read_bundle(path))
     chunks: list[str] = []
     for source, content in sorted(updates.items()):
         before = source.read_text(encoding="utf-8")
@@ -590,7 +590,7 @@ def apply_bundle_report(
 
 def apply_bundle(
     workspace: WorkspaceConfig,
-    runtime_root: Path,
+    resources_root: Path,
     path: Path,
     *,
     write: bool,
@@ -598,21 +598,21 @@ def apply_bundle(
     """Compatibility API returning only the reviewed unified difference."""
 
     return apply_bundle_report(
-        workspace, runtime_root, path, write=write
+        workspace, resources_root, path, write=write
     )["diff"]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--runtime", type=Path, required=True)
+    parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)
     try:
         workspace = load_config_path(args.config)
         report = apply_bundle_report(
-            workspace, args.runtime.resolve(), args.bundle, write=args.write
+            workspace, args.resources.resolve(), args.bundle, write=args.write
         )
     except (ConfigurationError, DriverError) as error:
         print(f"orinoco editor: {error}", file=sys.stderr)
