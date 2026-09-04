@@ -36,5 +36,5 @@ check-format = { cmd = "pre-commit run --all-files" }
 
 [pypi-dependencies]
 orinoco-lite = { path = "packages/orinoco-lite", editable = true }
-snapper-fmt = "==0.8.1"
+snapper-fmt = "==0.10.0"
 pre-commit = "==4.3.0"

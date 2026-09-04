@@ -6,15 +6,16 @@ App registration, ownership transfer, permission changes, secret creation/deleti
 ## Required App settings
 
 - Set GitHub's required homepage URL to the stable Orinoco Lite project or service-documentation page selected by the operator.
-Do not create a service landing page merely to satisfy this field; `PUBLIC_ORIGIN/` may intentionally return `404` or `410`.
+  Do not create a service landing page merely to satisfy this field; `PUBLIC_ORIGIN/` may intentionally return `404` or `410`.
 - Enable expiring user-to-server access tokens.
-- Disable **Request user authorization (OAuth) during installation**. Start OAuth only through this application's `/api/auth/*-start` routes so it can create the encrypted state cookie and PKCE verifier before GitHub returns to the callback.
+- Disable **Request user authorization (OAuth) during installation**.
+  Start OAuth only through this application's `/api/auth/*-start` routes so it can create the encrypted state cookie and PKCE verifier before GitHub returns to the callback.
 - Disable Device Flow; this browser service does not implement it.
 - For a stable deployment, set the callback URL to exactly `PUBLIC_ORIGIN/api/auth/callback`.
 - Disable callback-URL wildcard matching.
-Every accepted callback must be the one exact production URL.
+  Every accepted callback must be the one exact production URL.
 - If using a post-install setup URL, keep it separate from the callback.
-The setup URL must never send GitHub's installation callback fields into OAuth.
+  The setup URL must never send GitHub's installation callback fields into OAuth.
 - Grant repository permissions:
   - Metadata: read;
   - Actions: read;
@@ -22,14 +23,14 @@ The setup URL must never send GitHub's installation callback fields into OAuth.
   - Pull requests: write.
 - Install the App only on the selected downstream repositories.
 - Disable the webhook **Active** setting and subscribe to no webhook events.
-This service consumes none.
+  This service consumes none.
 
 Choose the App visibility deliberately:
 
 - For an independently hosted downstream, prefer **Only on this account** with an App owned by that downstream's user or organization, then install it on selected repositories only.
-This makes the account boundary enforceable.
+  This makes the account boundary enforceable.
 - Use **Any account** only for a deliberately shared, public service.
-A public App owner cannot prevent an external account from installing it; each installing account controls its own selected-repository scope, while the service still enforces App installation and curator permission on every request.
+  A public App owner cannot prevent an external account from installing it; each installing account controls its own selected-repository scope, while the service still enforces App installation and curator permission on every request.
 
 To minimize manual entry, an agent may generate GitHub's current official prefilled registration URL with the resolved homepage, exact callback, visibility choice, permission values, OAuth-on-install disabled, and webhook disabled.
 Treat the URL as an operator convenience, not authority: GitHub's supported query parameters may change, it must contain no secrets, and the created App's settings must still be read back and verified field by field.

@@ -29,7 +29,7 @@ extensions/source-adapters/<adapter>/
 
 - Records contain semantic assertion content.
 - Annotation companions contain only machine PAV for assertions present in the corresponding record.
-Joining them produces the validation and RDF view.
+  Joining them produces the validation and RDF view.
 - `site-specific/sources/<adapter>/` contains source configuration, captured distributable input, and mapping policy.
 - `site-specific/curation-records/<adapter>.yaml` contains current decisions.
 - Consumer-specific executable adapters live under `extensions/`; reusable adapters belong to the package or template.
