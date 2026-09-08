@@ -343,9 +343,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("timeout-minutes: 60", workflow)
         for task in (
             "validate",
-            "projection-verify",
             "verify-hugo",
-            "verify-ownership",
+            "verify-release-selection",
             "verify-build",
         ):
             self.assertIn(f"pixi run {task}", workflow)

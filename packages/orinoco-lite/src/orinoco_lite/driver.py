@@ -26,11 +26,35 @@ PASSTHROUGH_ENVIRONMENT = {
     "XDG_CONFIG_HOME",
 }
 COMMANDS = {
-    "validate": ("orinoco_lite.validate_resources",),
-    "projection-update": ("orinoco_lite.projection_cli", "update"),
-    "projection-verify": ("orinoco_lite.projection_cli", "verify"),
-    "build": ("orinoco_lite.site", "--destination", "{destination}", "--base-url", "{base_url}"),
-    "editor-apply": ("orinoco_lite.editor", "--bundle", "{bundle}"),
+    "validate": ("orinoco_lite.validate_resources", "--config", "{config}"),
+    "projection-update": (
+        "orinoco_lite.projection_cli",
+        "--config",
+        "{config}",
+        "--resources",
+        "{resources}",
+        "update",
+    ),
+    "build": (
+        "orinoco_lite.site",
+        "--config",
+        "{config}",
+        "--resources",
+        "{resources}",
+        "--destination",
+        "{destination}",
+        "--base-url",
+        "{base_url}",
+    ),
+    "editor-apply": (
+        "orinoco_lite.editor",
+        "--config",
+        "{config}",
+        "--resources",
+        "{resources}",
+        "--bundle",
+        "{bundle}",
+    ),
 }
 
 
@@ -87,7 +111,7 @@ def invoke_driver(
 
     try:
         module, *arguments = COMMANDS[action]
-        template = ["{python}", "-m", module, "--config", "{config}", "--resources", "{resources}", *arguments]
+        template = ["{python}", "-m", module, *arguments]
     except KeyError as error:
         raise DriverError(
             f"Orinoco Lite does not provide the {action!r} driver"

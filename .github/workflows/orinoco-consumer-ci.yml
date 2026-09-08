@@ -61,9 +61,8 @@ jobs:
         shell: bash
         run: |
           pixi run validate
-          pixi run projection-verify
           pixi run verify-hugo
-          pixi run verify-ownership
+          pixi run verify-release-selection
           pixi run verify-build
 
       - name: Upload the requested consumer artifact

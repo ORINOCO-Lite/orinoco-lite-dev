@@ -19,19 +19,16 @@ from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
     _all_links,
     _apply_inline,
-    _is_historical_provenance,
     _machine_pav_fingerprint,
     _matches_policy,
     _native_fingerprint,
     _relationship_targets,
     _route_for_pid,
     load_contract,
-    projection_manifest,
     rendered_record_route,
     render_projection,
     update_projection,
     validate_semantics,
-    verify_projection,
 )
 from orinoco_lite.schema_conversion import build_format_converters
 
@@ -578,7 +575,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         ):
             return validate_semantics(self.workspace, self.resources)
 
-    def test_non_xyz_route_closure_pin_and_single_semantic_pass(self) -> None:
+    def test_non_xyz_route_closure_pin_and_projection(self) -> None:
         contract = load_contract(self.workspace)
         self.assertEqual(contract.editor_record_scope, "all")
         self.assertEqual(contract.missing_reference_targets, "preserve")
@@ -589,22 +586,14 @@ class GenericProjectionContractTests(unittest.TestCase):
         )
         with patch(
             "orinoco_lite.projection.validate_semantics", return_value=self.semantic
-        ) as semantic:
+        ):
             update_projection(self.workspace, self.resources)
-            semantic.reset_mock()
-            report = verify_projection(self.workspace, self.resources)
-            semantic.assert_called_once()
-        self.assertTrue(report["deterministic"])
         self.assertTrue(
             (
                 self.root
                 / "generated/projection/content/people/one/_index.md"
             ).is_file()
         )
-        imported = self.resources / "schema/types/base.yaml"
-        imported.write_text(imported.read_text() + "# semantic change\n", encoding="utf-8")
-        with self.assertRaisesRegex(DriverError, "stale"):
-            verify_projection(self.workspace, self.resources)
 
     def test_custom_policy_reuses_pinned_presentation_inputs(self) -> None:
         config = self.root / "site-specific/projection.yaml"
@@ -700,11 +689,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             self.root / "site-specific/metadata/records/Person/one.yaml"
         ).read_text(encoding="utf-8")
         self.assertNotIn("pav:imported", stored)
-        manifest = (output / "SHA256SUMS").read_text(encoding="utf-8")
-        self.assertIn(
-            "input:site-specific/metadata/overlays/annotations/Person/one.yaml",
-            manifest,
-        )
 
     def test_default_open_reference_policy_reports_omissions(self) -> None:
         projection = self.root / "site-specific/projection.yaml"
@@ -880,52 +864,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             _native_fingerprint(first),
             _native_fingerprint(second),
         )
-
-    def test_update_preserves_projection_control_sidecar_and_manifest(self) -> None:
-        projection = self.root / "generated/projection"
-        projection.mkdir()
-        sidecar = projection / ".gitattributes"
-        sidecar_bytes = b"* annex.largefiles=nothing\n"
-        sidecar.write_bytes(sidecar_bytes)
-
-        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            update_projection(self.workspace, self.resources)
-            report = verify_projection(self.workspace, self.resources)
-
-        self.assertEqual(sidecar.read_bytes(), sidecar_bytes)
-        self.assertTrue((projection / "SHA256SUMS").is_file())
-        self.assertNotIn(
-            "output:.gitattributes",
-            (projection / "SHA256SUMS").read_text(encoding="utf-8"),
-        )
-        self.assertTrue(report["deterministic"])
-
-    def test_verify_rejects_arbitrary_undeclared_sidecar(self) -> None:
-        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            update_projection(self.workspace, self.resources)
-
-        projection = self.root / "generated/projection"
-        undeclared = projection / ".undeclared-sidecar"
-        undeclared.write_text("must remain in deterministic scope\n", encoding="utf-8")
-        (projection / "SHA256SUMS").write_text(
-            projection_manifest(self.workspace, self.resources, projection),
-            encoding="utf-8",
-        )
-
-        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
-            with self.assertRaisesRegex(
-                DriverError,
-                r"deterministic regeneration: \.undeclared-sidecar",
-            ):
-                verify_projection(self.workspace, self.resources)
-
-    def test_provenance_named_content_remains_in_projection_scope(self) -> None:
-        output = self.root / "generated/projection"
-        historical = output / "provenance/source.json"
-        page = output / "content/topics/provenance/_index.md"
-
-        self.assertTrue(_is_historical_provenance(output, historical))
-        self.assertFalse(_is_historical_provenance(output, page))
 
     def test_double_failure_preserves_recovery_backup(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):

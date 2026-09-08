@@ -1,4 +1,4 @@
-"""Semantic release driver entry point for a flattened consumer."""
+"""Validate a consumer's semantic inputs."""
 
 from __future__ import annotations
 
@@ -9,19 +9,16 @@ import sys
 
 from .config import load_config_path
 from .errors import OrinocoError
-from .projection import verify_projection
 from .validation import validate_workspace
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--resources", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         workspace = load_config_path(args.config)
         report = validate_workspace(workspace)
-        report["projection"] = verify_projection(workspace, args.resources.resolve())
     except OrinocoError as error:
         print(f"orinoco validate: {error}", file=sys.stderr)
         return 1

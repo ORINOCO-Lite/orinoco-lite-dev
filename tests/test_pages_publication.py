@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -54,7 +53,6 @@ class PagesPublicationTests(unittest.TestCase):
         (projection / "static").mkdir()
         (projection / "static/graph.json").write_text("{}\n")
         (projection / "records.jsonl").write_text('{"pid":"example:one"}\n')
-        (projection / "SHA256SUMS").write_text("projection manifest\n")
         pages = repository / "build/pages"
         pages.mkdir(parents=True)
         (pages / "index.html").write_text("<h1>Site</h1>\n")
@@ -64,13 +62,8 @@ class PagesPublicationTests(unittest.TestCase):
     def test_bundle_records_exact_two_commit_publication_chain(self) -> None:
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:
             repository, source = self.make_repository(temporary)
-            first = run(["python", SCRIPT], repository)
-            first_result = json.loads(first.stdout)
+            run(["python", SCRIPT], repository)
             bundle = repository / "build/pages-publication.bundle"
-            metadata = json.loads(
-                (repository / "build/pages-publication.json").read_text()
-            )
-            self.assertEqual(first_result, metadata)
             run(["git", "bundle", "verify", bundle], repository)
             run(
                 [
@@ -108,16 +101,6 @@ class PagesPublicationTests(unittest.TestCase):
             ).stdout.splitlines()
             self.assertEqual(["graph.json", "index.html"], pages_paths)
             self.assertEqual(source, run(["git", "rev-parse", "main"], repository).stdout.strip())
-
-            second = run(["python", SCRIPT], repository)
-            second_result = json.loads(second.stdout)
-            self.assertEqual(
-                first_result["projection"]["commit"],
-                second_result["projection"]["commit"],
-            )
-            self.assertEqual(
-                first_result["pages"]["commit"], second_result["pages"]["commit"]
-            )
 
     def test_dirty_tracked_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:

@@ -27,13 +27,7 @@ IGNORED_WORKING_TREE_NAMES = {
     "playwright-report",
     "test-results",
 }
-SITE_OWNED_BEHAVIORS = {
-    "create-once-never-overwrite",
-    "site-owned-input",
-    "site-owned-acceptance",
-    "site-owned-policy",
-    "site-owned-stable-hook",
-}
+SITE_OWNED_PATHS = ("site-specific", "extensions")
 RELEASE_COORDINATES = {
     "package_version",
     "package_url",
@@ -50,9 +44,8 @@ QUICK_TASKS = (
 )
 FULL_TASKS = (
     "validate",
-    "projection-verify",
     "verify-hugo",
-    "verify-ownership",
+    "verify-release-selection",
     "verify-build",
 )
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -128,30 +121,6 @@ def _copy_site_path(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
-def site_owned_patterns(downstream: Path) -> tuple[str, ...]:
-    """Return the checked downstream's declared preservation surfaces."""
-
-    ownership = _load_yaml(
-        downstream / ".orinoco-lite/template-ownership.yml",
-        "Template ownership contract",
-    )
-    classes = _mapping(ownership.get("classes"), "Ownership classes")
-    patterns: set[str] = set()
-    for name, raw in classes.items():
-        entry = _mapping(raw, f"Ownership class {name}")
-        if entry.get("behavior") not in SITE_OWNED_BEHAVIORS:
-            continue
-        paths = entry.get("paths")
-        if not isinstance(paths, list) or not all(
-            isinstance(path, str) and path for path in paths
-        ):
-            raise DevelopmentError(f"Ownership class {name} has invalid paths")
-        patterns.update(paths)
-    if not patterns:
-        raise DevelopmentError("Ownership contract declares no site-owned paths")
-    return tuple(sorted(patterns))
-
-
 def _pattern_matches(root: Path, pattern: str) -> Iterable[Path]:
     if pattern.endswith("/**"):
         prefix = root / pattern[:-3]
@@ -166,7 +135,7 @@ def overlay_site_owned(downstream: Path, candidate: Path) -> tuple[str, ...]:
     """Copy only the source downstream's declared site-owned paths."""
 
     copied: set[str] = set()
-    for pattern in site_owned_patterns(downstream):
+    for pattern in SITE_OWNED_PATHS:
         for source in _pattern_matches(downstream, pattern):
             relative = source.relative_to(downstream)
             _copy_site_path(source, candidate / relative)

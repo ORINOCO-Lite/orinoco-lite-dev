@@ -176,7 +176,7 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
 Generated Hugo projection and website output must not accumulate there.
 
-The latest successful deployment retains its Hugo projection and deployed static files outside the default branch.
+The latest successful deployment retains its Hugo projection, including a machine-readable normalized record stream, and deployed static files outside the default branch.
 The accepted source commit identifies their source.
 A longer publication history may be retained for diagnosis and recovery.
 Other generated operational data is temporary and is neither canonical metadata nor a recovery source.
