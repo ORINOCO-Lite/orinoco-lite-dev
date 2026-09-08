@@ -96,7 +96,8 @@ Finalization MUST:
 5. validate records, companions, and the joined graph before committing.
 
 Restoration uses Git three-way semantics.
-A clean unrelated edit survives; an overlap stops for human resolution.
+A clean unrelated edit survives.
+An overlap makes the proposal obsolete: finalization stops before canonical writes, and the source adapter MUST be rerun from the current reviewed branch to create a fresh proposal.
 Finalization MUST fail rather than overwrite an edited companion or guess between ambiguous assertions.
 
 Automation MUST NOT choose a disposition, approve, merge, deploy, or write back to the external source.
