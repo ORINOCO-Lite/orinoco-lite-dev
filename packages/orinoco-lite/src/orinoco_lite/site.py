@@ -364,6 +364,8 @@ def _assemble(
         if name == "static":
             _remove_upstream_identity_images(assembly / "static")
         _copy_tree(adapter / name, assembly / name)
+    for name in ("fzj.svg", "hhu.svg", "logo.png"):
+        (assembly / "assets" / "img" / name).unlink(missing_ok=True)
     _copy_upstream_section_frontmatter(upstream / "content", assembly / "content")
 
     materialized_license = materialized.parent / "LICENSE"
@@ -389,10 +391,10 @@ def _assemble(
     _copy_tree(overrides / "static", assembly / "static")
     _copy_tree(workspace.path("site") / "assets", assembly / "assets")
     _copy_tree(workspace.path("site") / "static", assembly / "static")
-    _copy_tree(workspace.path("editorial"), assembly / "content")
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
+    _copy_tree(workspace.path("editorial"), assembly / "content")
     _copy_file(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",

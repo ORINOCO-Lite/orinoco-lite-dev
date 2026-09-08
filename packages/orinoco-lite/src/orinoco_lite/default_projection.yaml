@@ -12,9 +12,9 @@ homepage:
     - from: part_of
       to: parts
   inline:
-    - associated_with
+    - associated_with::object
     - associated_with::roles
-    - influenced_by
+    - influenced_by::object
     - influenced_by::roles
     - identifiers::creator
     - part_of
@@ -22,7 +22,7 @@ homepage:
 pages:
   xyzri:XYZDataset:
     template: presentation:page_templates/dataset.md.j2
-    inline: [about, attributed_to, kind, rules, characterized_by]
+    inline: [about, attributed_to::object, kind, rules, characterized_by::object]
   xyzri:XYZObjective:
     template: presentation:page_templates/objective.md.j2
     inline: [part_of, depends_on]
@@ -42,9 +42,9 @@ pages:
       - from: part_of
         to: parts
     inline:
-      - associated_with
+      - associated_with::object
       - associated_with::roles
-      - influenced_by
+      - influenced_by::object
       - influenced_by::roles
       - identifiers::creator
       - part_of
@@ -54,13 +54,13 @@ pages:
       linked_from:
         pid: xyzrins:.
         field: associated_with
-    inline: [delegated_by, delegated_by::roles, identifiers::creator]
+    inline: [delegated_by::object, delegated_by::roles, identifiers::creator]
   xyzri:XYZPublication:
     template: presentation:page_templates/publication.md.j2
-    inline: [about, attributed_to]
+    inline: [about, attributed_to::object]
   xyzri:XYZInstrument:
     template: presentation:page_templates/instrument.md.j2
-    inline: [about, attributed_to, kind, rules]
+    inline: [about, attributed_to::object, kind, rules]
 
 unrendered_classes:
   - xyzri:XYZGrant
