@@ -1,12 +1,51 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import Mock
+
+from orinoco_lite.projection import load_contract
 
 from tools import upstream_orinoco_records as storage
 from tools import upstream_snapshot as snapshot
+
+
+class UpstreamPresentationTests(unittest.TestCase):
+    def test_default_projection_keeps_publication_authors_and_issued_date(self):
+        from orinoco_lite.projection import _render_record
+        import yaml
+
+        presentation = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Mock()
+            workspace.path.return_value = Path(temporary)
+            contract = load_contract(workspace, presentation)
+        person = {
+            "pid": "xyzrins:persons/example",
+            "schema_type": "xyzri:XYZPerson",
+            "given_name": "Example",
+            "family_name": "Author",
+        }
+        publication = {
+            "pid": "xyzrins:publications/example",
+            "schema_type": "xyzri:XYZPublication",
+            "title": "Example publication",
+            "attributed_to": [{"object": person["pid"]}],
+            "attributes": [{"predicate": "dcterms:issued", "value": "2024"}],
+        }
+        original = deepcopy(publication)
+        rendered = _render_record(
+            publication, contract.pages["xyzri:XYZPublication"],
+            {person["pid"]: person}, [publication, person],
+        )
+        frontmatter = yaml.safe_load(rendered.split("---", 2)[1])
+        self.assertEqual(frontmatter["persons"], ["example"])
+        self.assertEqual(frontmatter["params"]["author"][0]["family_name"], "Author")
+        self.assertEqual(frontmatter["params"]["date"], "2024")
+        self.assertEqual(publication, original)
 
 
 class UpstreamOrinocoRecordTests(unittest.TestCase):
