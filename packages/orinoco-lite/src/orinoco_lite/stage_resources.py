@@ -46,12 +46,28 @@ def _copy(source: Path, destination: Path) -> None:
 
 
 def stage_package_resources(
-    spec_path: Path, destination: Path, *, source_commit: str
+    spec_path: Path,
+    destination: Path,
+    *,
+    source_commit: str,
+    source_description: str | None = None,
 ) -> dict[str, object]:
     """Stage ordinary files directly, without an intermediate release artifact."""
 
     if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
         raise ConfigurationError("Package source commit must be a full lowercase Git SHA")
+    if source_description is None:
+        source_description = source_commit[:12]
+    if (
+        not source_description
+        or "\n" in source_description
+        or len(source_description) > 200
+        or any(
+            character.isspace() or ord(character) < 0x20
+            for character in source_description
+        )
+    ):
+        raise ConfigurationError("Package source description must be one bounded Git value")
     if destination.exists():
         raise IntegrityError(f"Package resource destination already exists: {destination}")
     try:
@@ -89,6 +105,12 @@ def stage_package_resources(
         if commit_file.exists():
             raise ConfigurationError("Package output path is repeated: source-commit.txt")
         commit_file.write_text(source_commit + "\n", encoding="ascii")
+        description_file = destination / "source-description.txt"
+        if description_file.exists():
+            raise ConfigurationError(
+                "Package output path is repeated: source-description.txt"
+            )
+        description_file.write_text(source_description + "\n", encoding="utf-8")
     except Exception:
         shutil.rmtree(destination)
         raise
@@ -100,9 +122,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--spec", type=Path, required=True)
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--source-description")
     args = parser.parse_args(argv)
     try:
-        stage_package_resources(args.spec, args.destination, source_commit=args.source_commit)
+        stage_package_resources(
+            args.spec,
+            args.destination,
+            source_commit=args.source_commit,
+            source_description=args.source_description,
+        )
     except OrinocoError as error:
         parser.exit(1, f"orinoco package resources: {error}\n")
     return 0

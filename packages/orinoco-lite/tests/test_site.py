@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -70,6 +71,74 @@ def _presentation(root: Path) -> Path:
 
 
 class HugoCompatibilityTests(unittest.TestCase):
+    def test_build_provenance_footer_links_immutable_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            resources = root / "resources"
+            resources.mkdir()
+            engine_commit = "a" * 40
+            (resources / "source-commit.txt").write_text(
+                engine_commit + "\n", encoding="ascii"
+            )
+            (resources / "source-description.txt").write_text(
+                "v1.2.3-4-g" + engine_commit[:7] + "\n", encoding="utf-8"
+            )
+            workspace = SimpleNamespace(root=root)
+            with patch.object(
+                site,
+                "_git_output",
+                side_effect=("b" * 40, "v1.2.3-4-g" + "b" * 7),
+            ):
+                provenance = site._build_provenance(
+                    workspace,
+                    resources,
+                    "example/site",
+                    "2026-09-08T12:34:56+00:00",
+                )
+
+            partials = root / "assembly/layouts/_partials"
+            partials.mkdir(parents=True)
+            (partials / "extend-footer.html").write_text(
+                "site extension\n", encoding="utf-8"
+            )
+            site._write_build_provenance_footer(root / "assembly", provenance)
+
+            self.assertEqual(provenance["built_at"], "2026-09-08T12:34:56Z")
+            self.assertEqual(
+                provenance["engine"]["describe"], "v1.2.3-4-g" + engine_commit[:7]
+            )
+            self.assertEqual(
+                provenance["engine"]["url"],
+                f"https://github.com/ORINOCO-Lite/orinoco-lite-dev/commit/{engine_commit}",
+            )
+            self.assertEqual(
+                provenance["content"]["url"],
+                "https://github.com/example/site/commit/" + "b" * 40,
+            )
+            self.assertIn(
+                "site extension",
+                (partials / "extend-footer.html").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                json.loads(
+                    (root / "assembly/data/orinoco_build.json").read_text(
+                        encoding="utf-8"
+                    )
+                ),
+                provenance,
+            )
+
+    def test_build_timestamp_requires_utc_iso_8601(self) -> None:
+        self.assertEqual(site._build_timestamp(None), None)
+        self.assertEqual(
+            site._build_timestamp("2026-09-08T12:34:56Z"),
+            "2026-09-08T12:34:56Z",
+        )
+        for value in ("", " 2026-09-08T12:34:56Z", "2026-09-08", "2026-09-08T12:34:56+01:00"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ConfigurationError, "UTC ISO 8601"):
+                    site._build_timestamp(value)
+
     def test_composition_and_template_roots_reject_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -443,6 +512,8 @@ class HugoCompatibilityTests(unittest.TestCase):
                     with (
                         patch.object(site, "_preflight_hugo"),
                         patch.object(site, "_assemble"),
+                        patch.object(site, "_build_provenance", return_value={}),
+                        patch.object(site, "_write_build_provenance_footer"),
                         patch.object(site, "_run", side_effect=run),
                         patch.object(
                             site,

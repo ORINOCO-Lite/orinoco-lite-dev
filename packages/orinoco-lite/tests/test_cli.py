@@ -34,6 +34,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             lock = object()
             args = SimpleNamespace(
                 base_url=None,
+                build_timestamp="2026-09-08T12:34:56Z",
                 destination=None,
                 github_repository="ORINOCO-Lite/example-site",
                 skip_structural_validation=True,
@@ -62,6 +63,9 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
                         environment={
                             "ORINOCO_GITHUB_REPOSITORY": "ORINOCO-Lite/example-site"
                         },
+                        extra_arguments=(
+                            "--build-timestamp", "2026-09-08T12:34:56Z"
+                        ),
                     ),
                 ],
             )

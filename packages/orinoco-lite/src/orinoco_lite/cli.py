@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import sys
 from typing import Any, Sequence
+from urllib.parse import urlsplit
 
 from . import __version__
 from .config import (
@@ -39,6 +41,11 @@ def _parser() -> argparse.ArgumentParser:
     build = commands.add_parser("build", help="build the deterministic static site")
     build.add_argument("--destination", type=Path)
     build.add_argument("--base-url")
+    build.add_argument(
+        "--build-timestamp",
+        default=os.environ.get("ORINOCO_BUILD_TIMESTAMP"),
+        help="UTC ISO 8601 timestamp embedded in the static site footer",
+    )
     build.add_argument(
         "--github-repository",
         default=os.environ.get("GITHUB_REPOSITORY"),
@@ -133,6 +140,14 @@ def _build(args: argparse.Namespace) -> int:
         return semantic_status
     destination = _safe_build_destination(workspace, args.destination)
     base_url = args.base_url or workspace.base_url
+    build_timestamp = getattr(args, "build_timestamp", None)
+    if build_timestamp is None and urlsplit(base_url).scheme in {"http", "https"}:
+        build_timestamp = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
     build_environment = (
         {"ORINOCO_GITHUB_REPOSITORY": build_repository}
         if build_repository is not None
@@ -145,6 +160,11 @@ def _build(args: argparse.Namespace) -> int:
         resources,
         values={"base_url": base_url, "destination": str(destination)},
         environment=build_environment,
+        extra_arguments=(
+            ("--build-timestamp", build_timestamp)
+            if build_timestamp is not None
+            else ()
+        ),
     )
 
 
