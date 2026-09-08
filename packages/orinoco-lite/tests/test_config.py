@@ -70,6 +70,14 @@ class WorkspaceConfigTests(unittest.TestCase):
             (self.root / "site-specific").resolve(),
         )
         self.assertEqual(
+            workspace.path("generated").resolve(),
+            (self.root / "generated").resolve(),
+        )
+        self.assertEqual(
+            workspace.path("build").resolve(),
+            (self.root / "build").resolve(),
+        )
+        self.assertEqual(
             workspace.environment()["ORINOCO_RECORDS_ROOT"],
             str((self.root / "site-specific/metadata/records").resolve()),
         )
@@ -262,11 +270,24 @@ class WorkspaceConfigTests(unittest.TestCase):
             CONFIG
             + "paths:\n"
             + "  records: metadata\n"
-            + "  generated: metadata\n",
+            + "  editorial: metadata\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ConfigurationError, "distinct"):
             load_workspace(self.root)
+
+    def test_package_owned_paths_cannot_be_overridden(self) -> None:
+        for name in ("build", "generated", "site"):
+            with self.subTest(name=name):
+                (self.root / "orinoco.yaml").write_text(
+                    CONFIG + f"paths:\n  {name}: elsewhere\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ConfigurationError,
+                    "cannot override package-owned paths",
+                ):
+                    load_workspace(self.root)
 
     def test_paths_share_the_browser_service_normalization_contract(self) -> None:
         (self.root / "orinoco.yaml").write_text(
