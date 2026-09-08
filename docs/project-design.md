@@ -11,14 +11,14 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 ## Terminology
 
 - *canonical* — accepted source state that provides other representations.
-The term does not mean that the state is immutable.
+  The term does not mean that the state is immutable.
 - *contract* — behavior or a boundary that implementations must preserve.
-It excludes incidental implementation details.
+  It excludes incidental implementation details.
 - *downstream* — a website repository that people create and maintain with Orinoco Lite.
 - *policy* — an explicit choice that a person or organization makes among supported behaviors.
-The current implementation does not imply this choice.
+  The current implementation does not imply this choice.
 - *projection* — a consumer-specific view that selects, joins, or transforms canonical metadata.
-The projection does not change the metadata.
+  The projection does not change the metadata.
 - *upstream* — the original ORINOCO ecosystem and its artifacts, including the [psychoinformatics.de](https://www.psychoinformatics.de) website.
 
 ## Objective
@@ -167,9 +167,9 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 
 1. The downstream lock selects exact versions of Orinoco Lite and the template.
 2. Orinoco Lite uses ORINOCO components to convert the metadata records into a graph.
-It validates and projects the graph for the website.
+   It validates and projects the graph for the website.
 3. Orinoco Lite combines that projection with the upstream website and template.
-It adds downstream content and applies configured overrides.
+   It adds downstream content and applies configured overrides.
 
 ## Generated publication records
 
@@ -187,14 +187,14 @@ This retention does not require byte-identical rebuilds or additional manifests,
 Orinoco Lite supports two sources of metadata change:
 
 1. **A person creates an edit.** The person uses the static SHACL Vue `/edit/` page to change the metadata and generate a pull request.
-Automation converts the submitted bundle into validated ordinary metadata changes.
-The changes include the appropriate Git attribution.
+   Automation converts the submitted bundle into validated ordinary metadata changes.
+   The changes include the appropriate Git attribution.
 
 2. **Automated augmentation.** A GitHub Action runs a source adapter.
-The adapter reads an external source and opens a pull request with proposals.
-In the static `/review/` interface, a person can accept, reject, defer, or change each proposal.
-Automation finalizes and validates the selected changes.
-It retains the appropriate machine provenance and review state, then updates the pull request.
+   The adapter reads an external source and opens a pull request with proposals.
+   In the static `/review/` interface, a person can accept, reject, defer, or change each proposal.
+   Automation finalizes and validates the selected changes.
+   It retains the appropriate machine provenance and review state, then updates the pull request.
 
 ```mermaid
 flowchart LR
@@ -216,19 +216,19 @@ The normative contracts define the precise behavior:
 ## Design principles
 
 - **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website.
-Orinoco-specific changes remain small, explicit, and separately owned.
+  Orinoco-specific changes remain small, explicit, and separately owned.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
-Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
+  Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
-Only signed-in GitHub operations use the curation service.
+  Only signed-in GitHub operations use the curation service.
 - **Keep people and Git in control.** Automation only reads external sources.
-It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
+  It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
 - **Record each fact once.** Versions and integrity data belong in the locks, package metadata, Gitlinks, and release inputs that use them.
-Change history belongs in Git and GitHub.
-Do not add parallel ledgers or inventories merely for explanation or proof.
+  Change history belongs in Git and GitHub.
+  Do not add parallel ledgers or inventories merely for explanation or proof.
 - **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
-DataLad records downstream adapter runs in ordinary Git.
-Released builds and adapter runs do not require Git Annex.
+  DataLad records downstream adapter runs in ordinary Git.
+  Released builds and adapter runs do not require Git Annex.
 
 ## Documentation and change control
 

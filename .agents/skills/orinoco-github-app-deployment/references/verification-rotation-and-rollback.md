@@ -24,7 +24,7 @@ The `orinoco-lite` package supplies the immutable editor shell and schema used b
 - `/api/session` returns HTTP 200 with `authenticated: false` while anonymous.
 - `/api/discovery` and `/api/auth/discovery-start` return HTTP 410 `review_discovery_retired` without a GitHub request or OAuth-state cookie.
 - A callback probe with exactly `code=probe`, `state=probe`, and `iss=https://github.com/login/oauth`, but no OAuth-state cookie, returns HTTP 401 `missing_oauth_state` before any token exchange.
-An `iss`-only probe is malformed and correctly returns HTTP 400 `invalid_oauth_callback`.
+  An `iss`-only probe is malformed and correctly returns HTTP 400 `invalid_oauth_callback`.
 - Authorization starts with a 302 to GitHub containing the exact client ID, callback, state, and PKCE challenge, no OAuth scope, and `Cross-Origin-Opener-Policy: unsafe-none`.
 - A successful callback uses the same opener-preserving policy and redirects to the minimal generated popup-transport protocol response, which has its restrictive CSP and no product presentation.
 - Security and `no-store` response headers are present, and the callback adapter emits two distinct `Set-Cookie` fields in the actual wire or header-list representation, not one comma-joined field.
@@ -72,7 +72,7 @@ For an authorized downstream:
 
 1. Verify the intended domain for the repository owner's GitHub account or organization before publishing it, following GitHub's [domain-verification guidance](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages).
 2. Configure that exact domain for the downstream Pages site using GitHub's current [custom-domain procedure](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
-Follow the current provider-displayed DNS targets; do not copy historical IP addresses from logs or documentation.
+   Follow the current provider-displayed DNS targets; do not copy historical IP addresses from logs or documentation.
 3. Wait for GitHub's domain and certificate checks, then enable and verify HTTPS using its [HTTPS guidance](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
 4. Confirm that the origin of `site.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
 5. Load `/edit/` and `/review/` from the final deployment, confirm the custom-domain flow omits the shared-origin warning, and complete the read-only OAuth proof before authorizing a write proof.
