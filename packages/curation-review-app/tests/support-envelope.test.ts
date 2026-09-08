@@ -16,6 +16,7 @@ import {
   CLAIM_ONE,
   HEAD_SHA,
   ORINOCO_CONFIG,
+  SITE_DATA,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
@@ -199,8 +200,16 @@ describe("hosted service-resource envelope", () => {
             .filter(([key]) => key.startsWith("expression"))
             .forEach(([key, expression]) => {
               const alias = `blob${key.slice("expression".length)}`;
-              if (expression === `${BASE_SHA}:orinoco.yaml`) {
-                const text = ORINOCO_CONFIG;
+              if (
+                [
+                  `${BASE_SHA}:orinoco.yaml`,
+                  `${BASE_SHA}:site-specific/site.yaml`,
+                ].includes(expression)
+              ) {
+                const text =
+                  expression === `${BASE_SHA}:orinoco.yaml`
+                    ? ORINOCO_CONFIG
+                    : SITE_DATA;
                 repository[alias] = {
                   __typename: "Blob",
                   byteSize: new TextEncoder().encode(text).byteLength,
@@ -265,8 +274,8 @@ describe("hosted service-resource envelope", () => {
     const graphRequests = Math.ceil(
       (MAX_REVIEW_CANDIDATES * 3) / BLOBS_PER_GRAPHQL_REQUEST,
     );
-    const expectedRequests = 9 + commitPages + graphRequests;
-    expect(expectedRequests).toBe(48);
+    const expectedRequests = 10 + commitPages + graphRequests;
+    expect(expectedRequests).toBe(49);
     expect(fetchMock).toHaveBeenCalledTimes(expectedRequests);
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(
       CLOUDFLARE_FREE_SUBREQUEST_LIMIT,

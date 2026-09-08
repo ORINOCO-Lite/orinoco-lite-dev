@@ -12,6 +12,7 @@ import {
   BASE_SHA,
   HEAD_SHA,
   ORINOCO_CONFIG,
+  SITE_DATA,
   PROPOSAL_SHA,
   WORKFLOW_RUN_ID,
   proposalCommitMessage,
@@ -59,6 +60,8 @@ interface ClientOptions {
   runHeadSha?: string;
   runStatus?: string;
   siteConfig?: string | null;
+  siteData?: string | null;
+  siteDataPath?: string;
 }
 
 function contentFixture(): Map<string, string> {
@@ -156,7 +159,13 @@ function client(options: ClientOptions = {}): GitHubClient {
           request.key,
           request.path === "orinoco.yaml" && request.ref === BASE_SHA
             ? (siteConfig ?? null)
-            : (content.get(`${request.path}@${request.ref}`) ?? null),
+            : request.path ===
+                  (options.siteDataPath ?? "site-specific/site.yaml") &&
+                request.ref === BASE_SHA
+              ? "siteData" in options
+                ? (options.siteData ?? null)
+                : SITE_DATA
+              : (content.get(`${request.path}@${request.ref}`) ?? null),
         ]),
       );
     },
@@ -189,9 +198,10 @@ function client(options: ClientOptions = {}): GitHubClient {
   } as unknown as GitHubClient;
 }
 
-function expectOnlySiteConfig(requests: ContentRequest[][]): void {
+function expectOnlySiteConfiguration(requests: ContentRequest[][]): void {
   expect(requests).toEqual([
     [{ key: "site-config", path: "orinoco.yaml", ref: BASE_SHA }],
+    [{ key: "site-data", path: "site-specific/site.yaml", ref: BASE_SHA }],
   ]);
 }
 
@@ -254,48 +264,27 @@ describe("artifact-backed GitHub proposal loading", () => {
         ARTIFACT_ID,
       ),
     ).rejects.toThrow("Candidate record_path is invalid");
-    expectOnlySiteConfig(contentRequests);
+    expectOnlySiteConfiguration(contentRequests);
   });
 
   it.each([
     {
-      config: null,
+      siteConfig: null,
       expected: "has no orinoco.yaml",
-      label: "a missing config",
+      label: "missing configuration",
     },
     {
-      config: "contract_version: [\n",
+      siteConfig: "contract_version: [\n",
       expected: "orinoco.yaml is invalid",
-      label: "malformed YAML",
+      label: "malformed configuration",
     },
     {
-      config: `${ORINOCO_CONFIG}contract_version: 2\n`,
+      siteConfig: `${ORINOCO_CONFIG}contract_version: 2\n`,
       expected: "orinoco.yaml is invalid",
-      label: "duplicate keys",
+      label: "duplicate configuration keys",
     },
     {
-      config: ORINOCO_CONFIG.replace(
-        "base_url: https://site.example/",
-        "base_url: !untrusted https://site.example/",
-      ),
-      expected: "orinoco.yaml is invalid",
-      label: "an unknown YAML tag",
-    },
-    {
-      config: ORINOCO_CONFIG.replace(
-        "name: Example site",
-        "name: &site-name Example site\n  copied_name: *site-name",
-      ),
-      expected: "orinoco.yaml is invalid",
-      label: "a YAML alias",
-    },
-    {
-      config: `${ORINOCO_CONFIG}---\ncontract_version: 2\n`,
-      expected: "orinoco.yaml is invalid",
-      label: "multiple YAML documents",
-    },
-    {
-      config: ORINOCO_CONFIG.replace(
+      siteConfig: ORINOCO_CONFIG.replace(
         "contract_version: 2",
         "contract_version: 1",
       ),
@@ -303,84 +292,189 @@ describe("artifact-backed GitHub proposal loading", () => {
       label: "an unsupported contract",
     },
     {
-      config: ORINOCO_CONFIG.replace(
-        "paths:\n  records: site-specific/metadata/records",
-        "paths:\n  records: ../escape",
+      siteConfig: ORINOCO_CONFIG.replace(
+        "records: site-specific/metadata/records",
+        "records: ../escape",
       ),
       expected: "paths.records is unsafe",
       label: "an escaping metadata root",
     },
     {
-      config: ORINOCO_CONFIG.replace(
+      siteConfig: ORINOCO_CONFIG.replace(
         "paths:\n  records: site-specific/metadata/records",
         "paths: []",
       ),
       expected: "paths is not a mapping",
-      label: "a non-mapping path configuration",
+      label: "non-mapping paths",
     },
     {
-      config: ORINOCO_CONFIG.replace(
-        "https://site.example/",
-        "http://site.example/",
-      ),
-      expected: "site.base_url is unsafe",
-      label: "an unsafe site URL",
+      siteConfig: `${ORINOCO_CONFIG}  site: ../escape\n`,
+      expected: "paths.site is unsafe",
+      label: "an escaping site root",
     },
     {
-      config: ORINOCO_CONFIG.replace("https://site.example/", "/project/"),
-      expected: "site.base_url is unsafe",
-      label: "a relative site URL",
+      siteConfig: `${ORINOCO_CONFIG}  site: /absolute\n`,
+      expected: "paths.site is unsafe",
+      label: "an absolute site root",
     },
     {
-      config: ORINOCO_CONFIG.replace(
-        "base_url: https://site.example/",
-        'base_url: "https://site.exa\\tmple/"',
-      ),
-      expected: "site.base_url is unsafe",
-      label: "a control character in the site URL",
-    },
-    {
-      config: ORINOCO_CONFIG.replace(
+      siteConfig: ORINOCO_CONFIG.replace(
         "https://review.example/",
         "https://review.example/api/",
       ),
       expected: "site.curation_service is not an origin",
-      label: "a non-origin curation service",
+      label: "a service URL with a path",
     },
     {
-      config: ORINOCO_CONFIG.replace(
+      siteConfig: ORINOCO_CONFIG.replace(
         "https://review.example/",
         "https://review.example/./",
       ),
       expected: "site.curation_service is not an origin",
-      label: "a normalized curation-service path",
+      label: "a normalized service path",
     },
     {
-      config: ORINOCO_CONFIG.replace(
+      siteConfig: ORINOCO_CONFIG.replace(
         "https://review.example/",
         "http://review.example/",
       ),
       expected: "site.curation_service is not an origin",
-      label: "an unsafe curation service",
+      label: "an unsafe service origin",
     },
-  ])("rejects $label at the metadata base", async ({ config, expected }) => {
-    await expect(
-      loadReviewProposal(
-        client({ siteConfig: config }),
-        "example/site",
-        42,
-        ARTIFACT_ID,
+    {
+      siteConfig: ORINOCO_CONFIG.replace(
+        "site:\n",
+        "site:\n  base_url: https://site.example/\n",
       ),
-    ).rejects.toThrow(expected);
+      expected: "unsupported site fields",
+      label: "identity stored in the package configuration",
+    },
+    {
+      siteData: null,
+      expected: "has no site-specific/site.yaml",
+      label: "missing site data",
+    },
+    {
+      siteData: "version: [\n",
+      expected: "site-specific/site.yaml is invalid",
+      label: "malformed site data",
+    },
+    {
+      siteData: `${SITE_DATA}version: 1\n`,
+      expected: "site-specific/site.yaml is invalid",
+      label: "duplicate site-data keys",
+    },
+    {
+      siteData: SITE_DATA.replace(
+        "https://site.example/",
+        "!untrusted https://site.example/",
+      ),
+      expected: "site-specific/site.yaml is invalid",
+      label: "an unknown site-data YAML tag",
+    },
+    {
+      siteData: SITE_DATA.replace(
+        "title: Example site",
+        "title: &title Example site\n  description: *title",
+      ).replace("  description: A research site\n", ""),
+      expected: "site-specific/site.yaml is invalid",
+      label: "a site-data YAML alias",
+    },
+    {
+      siteData: `${SITE_DATA}---\nversion: 1\n`,
+      expected: "site-specific/site.yaml is invalid",
+      label: "multiple site-data YAML documents",
+    },
+    {
+      siteData: SITE_DATA.replace("version: 1", "version: 2"),
+      expected: "version is unsupported",
+      label: "an unsupported site-data version",
+    },
+    {
+      siteData: "version: 1\nidentity: []\n",
+      expected: "identity is not a mapping",
+      label: "a non-mapping identity",
+    },
+    {
+      siteData: SITE_DATA.replace(
+        "https://site.example/",
+        "http://site.example/",
+      ),
+      expected: "identity.base_url is unsafe",
+      label: "an unsafe site URL",
+    },
+    {
+      siteData: SITE_DATA.replace("https://site.example/", "/project/"),
+      expected: "identity.base_url is unsafe",
+      label: "a relative site URL",
+    },
+    {
+      siteData: SITE_DATA.replace(
+        "base_url: https://site.example/",
+        'base_url: "https://site.exa\\tmple/"',
+      ),
+      expected: "identity.base_url is unsafe",
+      label: "a control character in the site URL",
+    },
+  ])(
+    "rejects $label at the metadata base",
+    async ({ expected, label: _label, ...options }) => {
+      await expect(
+        loadReviewProposal(client(options), "example/site", 42, ARTIFACT_ID),
+      ).rejects.toThrow(expected);
+    },
+  );
+
+  it("loads a configured site-data root at the proposal metadata base", async () => {
+    const contentRequests: ContentRequest[][] = [];
+    const result = await loadReviewProposal(
+      client({
+        contentRequests,
+        pullBaseSha: "d".repeat(40),
+        siteConfig: `${ORINOCO_CONFIG}  site: .site-data/identity/\n`,
+        siteDataPath: ".site-data/identity/site.yaml",
+        siteData: SITE_DATA.replace(
+          "https://site.example/",
+          "https://site.example/project/",
+        ),
+      }),
+      "example/site",
+      42,
+      ARTIFACT_ID,
+    );
+    expect(result.review_site_url).toBe("https://site.example/project/review/");
+    expect(contentRequests[1]).toEqual([
+      {
+        key: "site-data",
+        path: ".site-data/identity/site.yaml",
+        ref: BASE_SHA,
+      },
+    ]);
+  });
+
+  it("uses the central service when optional site settings are absent", async () => {
+    const result = await loadReviewProposal(
+      client({ siteConfig: "contract_version: 2\n" }),
+      "example/site",
+      42,
+      ARTIFACT_ID,
+    );
+    expect(result.review_service_origin).toBe(
+      "https://orinoco-curation-review.pages.dev",
+    );
   });
 
   it("appends the review route to a normalized site base path", async () => {
     const result = await loadReviewProposal(
       client({
-        siteConfig: ORINOCO_CONFIG.replace(
+        siteData: SITE_DATA.replace(
           "https://site.example/",
           "https://site.example/project",
-        ).replace("https://review.example/", "https://review.example"),
+        ),
+        siteConfig: ORINOCO_CONFIG.replace(
+          "https://review.example/",
+          "https://review.example",
+        ),
       }),
       "example/site",
       42,
@@ -434,7 +528,7 @@ describe("artifact-backed GitHub proposal loading", () => {
           ARTIFACT_ID,
         ),
       ).rejects.toThrow("outside the metadata roots");
-      expectOnlySiteConfig(contentRequests);
+      expectOnlySiteConfiguration(contentRequests);
     }
   });
 
@@ -465,7 +559,7 @@ describe("artifact-backed GitHub proposal loading", () => {
         ARTIFACT_ID,
       ),
     ).rejects.toThrow("unsupported number of candidate records");
-    expectOnlySiteConfig(contentRequests);
+    expectOnlySiteConfiguration(contentRequests);
   });
 
   it("rejects incomplete or operation-mismatched presentation bundles", async () => {

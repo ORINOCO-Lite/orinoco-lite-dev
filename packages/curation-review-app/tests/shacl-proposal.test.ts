@@ -9,7 +9,7 @@ import {
   SHACL_BUNDLE_PATH,
   serializeShaclReviewBundle,
 } from "../functions/lib/shacl";
-import { ORINOCO_CONFIG } from "./fixtures";
+import { ORINOCO_CONFIG, SITE_DATA } from "./fixtures";
 
 const HEAD = "a".repeat(40);
 const COMMIT = "b".repeat(40);
@@ -152,10 +152,15 @@ describe("attributed existing-PR SHACL handoff", () => {
             variables: Record<string, unknown>;
           };
           if (graphql.query.includes("query ReviewRecords")) {
-            expect(graphql.variables).toMatchObject({
-              expression0: `${BASE}:orinoco.yaml`,
-            });
-            return siteConfigResponse();
+            expect([
+              `${BASE}:orinoco.yaml`,
+              `${BASE}:site-specific/site.yaml`,
+            ]).toContain(graphql.variables.expression0);
+            return siteConfigResponse(
+              graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+                ? ORINOCO_CONFIG
+                : SITE_DATA,
+            );
           }
           if (graphql.query.includes("query ExactPath")) {
             expect(graphql.variables).toMatchObject({
@@ -273,9 +278,14 @@ describe("attributed existing-PR SHACL handoff", () => {
         }
         const graphql = JSON.parse(String(init?.body)) as {
           query: string;
+          variables: Record<string, unknown>;
         };
         if (graphql.query.includes("query ReviewRecords")) {
-          return siteConfigResponse();
+          return siteConfigResponse(
+            graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+              ? ORINOCO_CONFIG
+              : SITE_DATA,
+          );
         }
         return Response.json({
           data: { repository: { object: { __typename: "Blob" } } },
@@ -292,7 +302,7 @@ describe("attributed existing-PR SHACL handoff", () => {
         }),
       ),
     ).rejects.toMatchObject({ code: "shacl_handoff_pending", status: 409 });
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 });
 
@@ -335,10 +345,15 @@ function standaloneFetch(options: StandaloneOptions = {}): {
           variables: Record<string, unknown>;
         };
         if (graphql.query.includes("query ReviewRecords")) {
-          expect(graphql.variables).toMatchObject({
-            expression0: `${HEAD}:orinoco.yaml`,
-          });
-          return siteConfigResponse();
+          expect([
+            `${HEAD}:orinoco.yaml`,
+            `${HEAD}:site-specific/site.yaml`,
+          ]).toContain(graphql.variables.expression0);
+          return siteConfigResponse(
+            graphql.variables.expression0 === `${HEAD}:orinoco.yaml`
+              ? ORINOCO_CONFIG
+              : SITE_DATA,
+          );
         }
         if (graphql.query.includes("query ExactPath")) return pathResponse();
         if (options.commitFails) {
