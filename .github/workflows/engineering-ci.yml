@@ -44,10 +44,12 @@ jobs:
           git submodule sync -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
+            submodules/www-from-model \
             submodules/things-schemas
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
+            submodules/www-from-model \
             submodules/things-schemas
           git -C submodules/pool.psychoinformatics.de-ui submodule sync -- \
             shacl-vue
