@@ -35,6 +35,7 @@ DEFAULT_PATHS: dict[str, str] = {
     "extensions": "extensions",
     "build": "build",
 }
+FIXED_PATHS = frozenset({"site", "generated", "build"})
 
 DIRECTORY_PATHS = {
     "records",
@@ -366,6 +367,12 @@ def load_workspace(
     if unknown_paths:
         raise ConfigurationError(
             f"orinoco.yaml has unknown path keys: {', '.join(unknown_paths)}"
+        )
+    fixed_paths = sorted(set(path_values) & FIXED_PATHS)
+    if fixed_paths:
+        raise ConfigurationError(
+            "orinoco.yaml cannot override package-owned paths: "
+            + ", ".join(fixed_paths)
         )
     paths = {
         name: _relative_path(path_values.get(name, default), f"paths.{name}")

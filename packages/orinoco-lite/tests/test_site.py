@@ -154,8 +154,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 CONFIG
                 + "paths:\n"
                 + "  editorial: site-specific/content/pages\n"
-                + "  records: site-specific/metadata/records\n"
-                + "  site: site-specific\n",
+                + "  records: site-specific/metadata/records\n",
                 encoding="utf-8",
             )
             site_root = root / "site-specific"
@@ -257,13 +256,7 @@ class HugoCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = root / "orinoco.yaml"
-            config.write_text(
-                CONFIG
-                + "paths:\n"
-                + "  records: site-specific/metadata/records\n"
-                + "  site: site-specific\n",
-                encoding="utf-8",
-            )
+            config.write_text(CONFIG, encoding="utf-8")
             site_root = root / "site-specific"
             (site_root / "metadata/records").mkdir(parents=True)
             (site_root / "projection-templates").mkdir()
@@ -319,12 +312,7 @@ class HugoCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = root / "orinoco.yaml"
-            config.write_text(
-                CONFIG
-                + "paths:\n"
-                + "  site: site-specific\n",
-                encoding="utf-8",
-            )
+            config.write_text(CONFIG, encoding="utf-8")
             source = root / "site-specific/static/example.txt"
             source.parent.mkdir(parents=True)
             source.write_text("static\n", encoding="utf-8")
