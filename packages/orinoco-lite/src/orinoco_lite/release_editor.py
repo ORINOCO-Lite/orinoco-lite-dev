@@ -33,8 +33,8 @@ DOWNLOAD_AND_DISPATCH = (
     "dlJSON(bundle, reviewBundleFilename(bundle.records));\n"
     "            dispatchReviewBundle(bundle);"
 )
-POOL_UI_COMMIT = "3ea10f66836a9eeacabd21f4da5eefd472ec2fde"
-SHACL_VUE_COMMIT = "3a9cd8718c615e72a4c48fb8054a3254fdca45dd"
+POOL_UI_COMMIT = "e01d6e97d753667bc1d62ea539a35d75dec45155"
+SHACL_VUE_COMMIT = "72f08984238f63e3bd27a6e3dc5aa871e1219fff"
 
 
 def _installed_dependency_manifests(node_modules: Path) -> list[Path]:
