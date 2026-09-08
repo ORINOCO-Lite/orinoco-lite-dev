@@ -269,6 +269,8 @@ class StaticReviewBindingTests(unittest.TestCase):
             with (
                 patch.object(site, "_preflight_hugo"),
                 patch.object(site, "_assemble"),
+                patch.object(site, "_build_provenance", return_value={}),
+                patch.object(site, "_write_build_provenance_footer"),
                 patch.object(site, "_run", side_effect=run),
                 patch.object(site, "bind_editor", return_value={"version": 2}),
             ):

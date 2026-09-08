@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -24,6 +25,7 @@ from .integrity import sha256_file
 from .projection import load_contract
 from .presentation import resolve_presentation
 from .review import bind_review
+from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
 HUGO_REQUIREMENT = ">=0.161,<0.162"
@@ -53,6 +55,20 @@ SITE_IDENTITY_IMAGE_SUFFIXES = {
     ".svg",
     ".webp",
 }
+GITHUB_REPOSITORY_URL = "https://github.com/"
+FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
+  {{ with .engine }}
+    <p class="text-xs text-neutral-500 dark:text-neutral-400">
+      Orinoco Lite {{ .version }}
+      (<a class="hover:underline hover:decoration-primary-400 hover:text-primary-500" href="{{ .url }}">{{ .describe }}</a>)
+      {{ with $.Site.Data.orinoco_build.content }}
+        · content <a class="hover:underline hover:decoration-primary-400 hover:text-primary-500" href="{{ .url }}">{{ .describe }}</a>
+      {{ end }}
+      {{ with $.Site.Data.orinoco_build.built_at }} · built {{ . }}{{ end }}
+    </p>
+  {{ end }}
+{{ end }}
+"""
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
@@ -211,6 +227,99 @@ def _render_site_surfaces(
             destination,
             site_data=site_data,
         )
+
+
+def _git_output(root: Path, *arguments: str) -> str | None:
+    """Return one bounded Git value from an ordinary downstream checkout."""
+
+    try:
+        completed = subprocess.run(
+            ("git", "-C", str(root), *arguments),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except OSError:
+        return None
+    value = completed.stdout.strip()
+    if completed.returncode or not value or "\n" in value or len(value) > 200:
+        return None
+    return value
+
+
+def _build_timestamp(value: str | None) -> str | None:
+    """Normalize an explicitly supplied UTC build timestamp for static output."""
+
+    if value is None:
+        return None
+    if value != value.strip() or not value:
+        raise ConfigurationError("Build timestamp must be a non-empty UTC ISO 8601 value")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ConfigurationError("Build timestamp must be a UTC ISO 8601 value") from error
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise ConfigurationError("Build timestamp must be a UTC ISO 8601 value")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z"
+    )
+
+
+def _build_provenance(
+    workspace,
+    resources_root: Path,
+    repository: str | None,
+    build_timestamp: str | None,
+) -> dict[str, Any]:
+    """Return footer data derived from immutable release and checkout inputs."""
+
+    engine_commit = source_commit(resources_root)
+    provenance: dict[str, Any] = {
+        "engine": {
+            "describe": source_description(resources_root),
+            "repository": SOURCE_REPOSITORY,
+            "url": f"{SOURCE_REPOSITORY}/commit/{engine_commit}",
+            "version": __version__,
+        },
+        "built_at": _build_timestamp(build_timestamp),
+    }
+    content_commit = _git_output(workspace.root, "rev-parse", "--verify", "HEAD^{commit}")
+    content_description = _git_output(workspace.root, "describe", "--always")
+    if (
+        repository is not None
+        and content_commit is not None
+        and content_description is not None
+    ):
+        provenance["content"] = {
+            "describe": content_description,
+            "repository": repository,
+            "url": f"{GITHUB_REPOSITORY_URL}{repository}/commit/{content_commit}",
+        }
+    return provenance
+
+
+def _write_build_provenance_footer(assembly: Path, provenance: dict[str, Any]) -> None:
+    """Install the package-owned footer while preserving a site extension."""
+
+    data = assembly / "data" / "orinoco_build.json"
+    data.parent.mkdir(parents=True, exist_ok=True)
+    data.write_text(
+        json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    partials = assembly / "layouts" / "_partials"
+    partials.mkdir(parents=True, exist_ok=True)
+    footer = partials / "extend-footer.html"
+    if footer.exists():
+        if footer.is_symlink() or not footer.is_file():
+            raise DriverError(f"Site footer extension is not a regular file: {footer}")
+        try:
+            site_extension = footer.read_text(encoding="utf-8").rstrip() + "\n"
+        except UnicodeDecodeError as error:
+            raise DriverError(f"Site footer extension is not UTF-8: {footer}") from error
+    else:
+        site_extension = ""
+    footer.write_text(site_extension + FOOTER_PARTIAL, encoding="utf-8")
 
 
 def _safe_destination(workspace, destination: Path) -> Path:
@@ -406,6 +515,7 @@ def build_site(
     destination: Path,
     base_url: str,
     github_repository_coordinate: str | None = None,
+    build_timestamp: str | None = None,
 ) -> dict[str, Any]:
     workspace = load_config_path(config)
     resources_root = resources_root.resolve()
@@ -426,6 +536,10 @@ def build_site(
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)
     _assemble(workspace, resources_root, assembly)
+    _write_build_provenance_footer(
+        assembly,
+        _build_provenance(workspace, resources_root, repository, build_timestamp),
+    )
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -500,6 +614,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--build-timestamp")
     args = parser.parse_args(argv)
     try:
         report = build_site(
@@ -508,6 +623,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.destination,
             args.base_url,
             os.environ.get("ORINOCO_GITHUB_REPOSITORY"),
+            args.build_timestamp,
         )
     except (ConfigurationError, DriverError, IntegrityError) as error:
         print(f"orinoco build: {error}", file=sys.stderr)

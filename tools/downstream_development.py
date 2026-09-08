@@ -453,10 +453,25 @@ def prepare_candidate_resources(
     commit = completed.stdout.strip()
     if completed.returncode or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise DevelopmentError("Could not resolve the candidate package commit")
+    completed = subprocess.run(
+        ("git", "-C", str(package), "describe", "--always"),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    description = completed.stdout.strip()
+    if (
+        completed.returncode
+        or not description
+        or "\n" in description
+        or len(description) > 200
+    ):
+        raise DevelopmentError("Could not resolve the candidate package description")
     stage_package_resources(
         target_spec,
         destination / "package-resources",
         source_commit=commit,
+        source_description=description,
     )
 
 

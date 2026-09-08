@@ -6,7 +6,12 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite.errors import ConfigurationError, IntegrityError
-from orinoco_lite.resources import load_resources, resolve_resources, source_commit
+from orinoco_lite.resources import (
+    load_resources,
+    resolve_resources,
+    source_commit,
+    source_description,
+)
 from orinoco_lite.stage_resources import stage_package_resources
 
 
@@ -37,10 +42,11 @@ class PackageResourceTests(unittest.TestCase):
     def stage(self):
         return stage_package_resources(self.spec, self.destination, source_commit="a" * 40)
 
-    def test_stages_ordinary_resources_and_the_presentation_source_commit(self):
+    def test_stages_ordinary_resources_and_the_presentation_source_identity(self):
         self.stage()
         self.assertEqual((self.destination / "data/driver.py").read_text(), "print('driver')\n")
         self.assertEqual(source_commit(self.destination), "a" * 40)
+        self.assertEqual(source_description(self.destination), "a" * 12)
         self.assertEqual(load_resources(self.destination).root, self.destination.resolve())
         self.assertFalse((self.destination / "data/__pycache__").exists())
 
