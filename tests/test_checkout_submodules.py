@@ -191,6 +191,31 @@ class CheckoutSubmodulesTests(unittest.TestCase):
                 fixture.child_pin,
             )
 
+    def test_synchronizes_stale_nested_submodule_url(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = NestedFixture(root)
+            clone = fixture.clone(root / "checkout", shallow=False)
+            child = clone / "modules/child"
+            nested = child / "vendor/nested"
+            stale_url = (root / "retired-nested-mirror").resolve().as_uri()
+
+            git(child, "config", "submodule.vendor/nested.url", stale_url)
+            git(nested, "remote", "set-url", "origin", stale_url)
+
+            self.run_helper(clone)
+
+            expected_url = fixture.nested.resolve().as_uri()
+            self.assertEqual(
+                git(child, "config", "--get", "submodule.vendor/nested.url")
+                .stdout.strip(),
+                expected_url,
+            )
+            self.assertEqual(
+                git(nested, "remote", "get-url", "origin").stdout.strip(),
+                expected_url,
+            )
+
     def test_fails_clearly_when_remote_lacks_the_gitlink(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
