@@ -171,6 +171,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 ("content/german.md", "German editorial content\n"),
                 ("layouts/term.html", "upstream layout\n"),
                 ("static/upstream-identity.png", "branded image\n"),
+                ("assets/img/fzj.svg", "institution brand\n"),
                 ("static/graph.js", "/annex/objects/MD5E-s12--graph.js\n"),
                 ("layouts/.git/config", "must not ship\n"),
             ):
@@ -202,6 +203,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             )
             self.assertFalse((assembly / "content/german.md").exists())
             self.assertFalse((assembly / "static/upstream-identity.png").exists())
+            self.assertFalse((assembly / "assets/img/fzj.svg").exists())
             self.assertFalse(any(path.name == ".git" for path in assembly.rglob("*")))
 
             materialized.unlink()
