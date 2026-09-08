@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
-import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -29,14 +28,11 @@ from .annotations import (
 )
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
-from .integrity import sha256_file
 from .presentation import resolve_presentation
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
 
 
-MANIFEST_HEADER = "# orinoco-lite projection manifest v3"
-PROJECTION_ALGORITHM = "orinoco-projection-v3"
 PROJECTION_CONTROL_SIDECAR = ".gitattributes"
 FORBIDDEN_BRIDGE_PREDICATES = {
     "dcterms:contributor",
@@ -77,23 +73,6 @@ SEMANTIC_IDENTIFIER_FIELDS = {
     "specialization_of",
     "unit",
 }
-
-
-def _is_projection_control_sidecar(output: Path, path: Path) -> bool:
-    """Recognize the one reviewed, non-generated projection control file."""
-
-    return (
-        not path.is_symlink()
-        and path.is_file()
-        and path.relative_to(output).as_posix() == PROJECTION_CONTROL_SIDECAR
-    )
-
-
-def _is_historical_provenance(output: Path, path: Path) -> bool:
-    """Identify only the preserved top-level projection evidence directory."""
-
-    relative = path.relative_to(output)
-    return bool(relative.parts) and relative.parts[0] == "provenance"
 
 
 @dataclass(frozen=True)
@@ -936,38 +915,6 @@ def rendered_record_route(
     return _route_for_pid(pid, contract.route_prefix)
 
 
-def projection_manifest(
-    workspace: WorkspaceConfig,
-    resources_root: Path,
-    output: Path,
-) -> str:
-    presentation_root = _presentation_root(workspace, resources_root)
-    contract = load_contract(workspace, presentation_root)
-    lines: list[str] = []
-    for path in _projection_inputs(workspace, contract):
-        resolved = path.resolve()
-        workspace_root = workspace.root.resolve()
-        label = f"input:{resolved.relative_to(workspace_root).as_posix()}"
-        lines.append(f"{sha256_file(path)}  {label}")
-    closure_digest = _schema_closure_digest(resources_root)
-    lines.append(f"{closure_digest}  pin:schema-closure@{closure_digest}")
-    lines.append(
-        f"{hashlib.sha256((PROJECTION_ALGORITHM + chr(10)).encode()).hexdigest()}  "
-        f"pin:algorithm@{PROJECTION_ALGORITHM}"
-    )
-    for path in sorted(output.rglob("*")):
-        if (
-            path.is_file()
-            and path.name != "SHA256SUMS"
-            and not _is_historical_provenance(output, path)
-            and not _is_projection_control_sidecar(output, path)
-        ):
-            lines.append(
-                f"{sha256_file(path)}  output:{path.relative_to(output).as_posix()}"
-            )
-    return "\n".join([MANIFEST_HEADER, *sorted(lines)]) + "\n"
-
-
 def render_projection(
     workspace: WorkspaceConfig,
     resources_root: Path,
@@ -1064,52 +1011,7 @@ def render_projection(
     (output / "static" / "graph.json").write_text(
         graph_result.stdout.rstrip("\n") + "\n", encoding="utf-8"
     )
-    (output / "SHA256SUMS").write_text(
-        projection_manifest(workspace, resources_root, output), encoding="utf-8"
-    )
     return {**semantic, "pages": len(list((output / "content").rglob("*.md")))}
-
-
-def verify_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[str, Any]:
-    output = workspace.path("generated") / "projection"
-    ledger = output / "SHA256SUMS"
-    if not ledger.is_file():
-        raise DriverError(
-            "Projection ledger is missing; run `orinoco projection update`"
-        )
-    expected = projection_manifest(workspace, resources_root, output)
-    if ledger.read_text(encoding="utf-8") != expected:
-        raise DriverError(
-            "Projection output is stale; run `orinoco projection update`"
-        )
-    with tempfile.TemporaryDirectory(prefix="orinoco-projection-") as temporary:
-        candidate = Path(temporary) / "projection"
-        rendered = render_projection(workspace, resources_root, candidate)
-        expected_files = {
-            path.relative_to(output).as_posix(): path
-            for path in output.rglob("*")
-            if path.is_file()
-            and not _is_historical_provenance(output, path)
-            and not _is_projection_control_sidecar(output, path)
-        }
-        candidate_files = {
-            path.relative_to(candidate).as_posix(): path
-            for path in candidate.rglob("*")
-            if path.is_file()
-        }
-        changed = [
-            name
-            for name in sorted(set(expected_files) | set(candidate_files))
-            if name not in expected_files
-            or name not in candidate_files
-            or expected_files[name].read_bytes() != candidate_files[name].read_bytes()
-        ]
-        if changed:
-            raise DriverError(
-                "Projection output does not match deterministic regeneration: "
-                + ", ".join(changed[:10])
-            )
-    return {**rendered, "deterministic": True}
 
 
 def update_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[str, Any]:

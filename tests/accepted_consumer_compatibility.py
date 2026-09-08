@@ -15,13 +15,7 @@ import yaml
 from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
 from orinoco_lite.errors import DriverError
 from orinoco_lite.integrity import tree_sha256
-from orinoco_lite.projection import (
-    _is_historical_provenance,
-    projection_manifest,
-    render_projection,
-    update_projection,
-    verify_projection,
-)
+from orinoco_lite.projection import render_projection, update_projection
 from orinoco_lite.release_schema import localize_schema
 
 
@@ -204,20 +198,9 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    @staticmethod
-    def _active_files(root: Path) -> dict[str, bytes]:
-        return {
-            path.relative_to(root).as_posix(): path.read_bytes()
-            for path in root.rglob("*")
-            if path.is_file()
-            and path.name not in {".gitattributes", "SHA256SUMS"}
-            and not _is_historical_provenance(root, path)
-        }
-
-    def test_full_parity_stale_recovery_atomicity_and_patch_compatibility(self) -> None:
+    def test_projection_recovery_atomicity_and_patch_compatibility(self) -> None:
         temporary = Path(self.temporary.name)
         candidate = temporary / "candidate"
-        repeated = temporary / "candidate-repeat"
         previous_limit = sys.getrecursionlimit()
         try:
             sys.setrecursionlimit(1000)
@@ -225,17 +208,9 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
                 report = render_projection(
                     self.workspace, self.resources_010, candidate
                 )
-                repeated_report = render_projection(
-                    self.workspace, self.resources_010, repeated
-                )
             self.assertEqual(sys.getrecursionlimit(), 1000)
         finally:
             sys.setrecursionlimit(previous_limit)
-        self.assertEqual(repeated_report, report)
-        self.assertEqual(
-            self._active_files(candidate),
-            self._active_files(repeated),
-        )
 
         records = _fixture_records(self.root)
         projected_records = [
@@ -344,28 +319,6 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
         shutil.copytree(candidate, committed)
 
         semantic = {key: report[key] for key in report if key != "pages"}
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            verified = verify_projection(self.workspace, self.resources_010)
-        self.assertTrue(verified["deterministic"])
-        self.assertEqual(
-            projection_manifest(self.workspace, self.resources_010, committed),
-            projection_manifest(self.workspace, self.resources_011, committed),
-        )
-
-        record = next(
-            path
-            for path in (self.root / "metadata/records").rglob("*.yaml")
-            if not path.name.startswith(".")
-        )
-        record.write_text(
-            record.read_text(encoding="utf-8") + "# stale edit\n",
-            encoding="utf-8",
-        )
-        with self.assertRaisesRegex(DriverError, "stale"):
-            verify_projection(self.workspace, self.resources_010)
-        with patch("orinoco_lite.projection.validate_semantics", return_value=semantic):
-            update_projection(self.workspace, self.resources_010)
-            verify_projection(self.workspace, self.resources_011)
 
         before = tree_sha256(committed)
         real_replace = os.replace

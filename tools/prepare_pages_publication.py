@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from pathlib import Path, PurePosixPath
 import subprocess
@@ -132,8 +131,7 @@ def prepare(
     projection_relative: str,
     site_relative: str,
     bundle_relative: str,
-    metadata_relative: str,
-) -> dict[str, object]:
+) -> None:
     root = repository.resolve()
     if not (root / ".git").exists():
         raise PublicationError(f"Not a Git worktree: {root}")
@@ -141,10 +139,7 @@ def prepare(
     site = _relative_directory(root, site_relative, "site")
     projection_files = _files(projection)
     site_files = _files(site)
-    required_projection = {
-        "SHA256SUMS",
-        "records.jsonl",
-    }
+    required_projection = {"records.jsonl"}
     names = {path.relative_to(projection).as_posix() for path in projection_files}
     missing = sorted(required_projection - names)
     if missing or not any(name.startswith("content/") for name in names):
@@ -158,9 +153,7 @@ def prepare(
         raise PublicationError("Tracked worktree changes would make publication ambiguous")
     date = _run(["git", "show", "-s", "--format=%cI", source], cwd=root)
     bundle = root.joinpath(*PurePosixPath(bundle_relative).parts)
-    metadata = root.joinpath(*PurePosixPath(metadata_relative).parts)
     bundle.parent.mkdir(parents=True, exist_ok=True)
-    metadata.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="orinoco-pages-publication-") as temporary:
         temporary_root = Path(temporary)
@@ -217,46 +210,22 @@ def prepare(
         _run(["git", "update-ref", "-d", PROJECTION_REF], cwd=root)
         _run(["git", "update-ref", "-d", PAGES_REF], cwd=root)
 
-    result: dict[str, object] = {
-        "bundle": bundle.relative_to(root).as_posix(),
-        "pages": {
-            "commit": pages_commit,
-            "files": len(site_files),
-            "ref": "refs/heads/gh-pages",
-            "tree": pages_tree,
-        },
-        "projection": {
-            "commit": projection_commit,
-            "files": len(projection_files),
-            "ref": "refs/heads/latest-hugo-projection",
-            "tree": projection_tree,
-        },
-        "source": {"commit": source},
-        "version": 1,
-    }
-    metadata.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
-    return result
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--projection", default="generated/projection")
     parser.add_argument("--site", default="build/pages")
     parser.add_argument("--bundle", default="build/pages-publication.bundle")
-    parser.add_argument("--metadata", default="build/pages-publication.json")
     args = parser.parse_args()
     try:
-        result = prepare(
+        prepare(
             args.repository,
             args.projection,
             args.site,
             args.bundle,
-            args.metadata,
         )
     except PublicationError as error:
         parser.exit(1, f"prepare-pages-publication: {error}\n")
-    print(json.dumps(result, sort_keys=True))
     return 0
 
 

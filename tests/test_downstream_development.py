@@ -19,31 +19,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.downstream = self.root / "source"
         self.downstream.mkdir()
-        ownership = {
-            "classes": {
-                "template_owned": {
-                    "behavior": "copier-three-way-update",
-                    "paths": ["README.md"],
-                },
-                "site_data": {
-                    "behavior": "create-once-never-overwrite",
-                    "paths": ["orinoco.yaml", "site-specific/**"],
-                },
-                "extensions": {
-                    "behavior": "site-owned-stable-hook",
-                    "paths": ["extensions/**"],
-                },
-                "generated": {
-                    "behavior": "ignored-resources-output",
-                    "paths": ["generated/**"],
-                },
-            }
-        }
-        ownership_path = self.downstream / ".orinoco-lite/template-ownership.yml"
-        ownership_path.parent.mkdir()
-        ownership_path.write_text(
-            yaml.safe_dump(ownership, sort_keys=False), encoding="utf-8"
-        )
         (self.downstream / "orinoco.yaml").write_text(
             "contract_version: 2\n", encoding="utf-8"
         )
@@ -109,7 +84,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertEqual(
             (
                 "extensions",
-                "orinoco.yaml",
                 "site-specific",
             ),
             copied,
@@ -267,9 +241,8 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertEqual(
             (
                 "validate",
-                "projection-verify",
                 "verify-hugo",
-                "verify-ownership",
+                "verify-release-selection",
                 "verify-build",
             ),
             development.task_names("full", ()),
