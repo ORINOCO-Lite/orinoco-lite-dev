@@ -171,7 +171,8 @@ def _require_clean_submitted_head(repository: Path, submitted_head: str) -> None
     ).stdout.decode("ascii", "strict").strip()
     if actual_head != submitted_head:
         raise ConfigurationError(
-            "Submitted head is stale: the clean worktree HEAD no longer matches it"
+            "Submitted head is stale: the clean worktree HEAD no longer matches it; "
+            "rerun the source adapter from the current reviewed branch"
         )
     status = _git(
         repository,
@@ -482,8 +483,9 @@ def _apply_reverse_patch(
         )
     except ConfigurationError as error:
         raise ConfigurationError(
-            f"Candidate {candidate.pid} overlaps submitted-head metadata; "
-            "correct the conflict and resubmit: "
+            f"Candidate {candidate.pid} conflicts with submitted-head metadata; "
+            "the proposal is obsolete, so rerun the source adapter from the "
+            "current reviewed branch: "
             f"{error}"
         ) from error
 

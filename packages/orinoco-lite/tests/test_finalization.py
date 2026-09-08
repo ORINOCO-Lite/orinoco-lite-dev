@@ -389,7 +389,10 @@ class FinalizationTests(unittest.TestCase):
         self.repo.write_bytes(item.record_repository_path, human)
         self.repo.commit("human overlap")
 
-        with self.assertRaisesRegex(ConfigurationError, "overlaps submitted-head"):
+        with self.assertRaisesRegex(
+            ConfigurationError,
+            "proposal is obsolete, so rerun the source adapter",
+        ):
             self.finalize(plan, proposal, {pid: "reject"})
 
         self.assertEqual(
@@ -680,7 +683,10 @@ class FinalizationTests(unittest.TestCase):
         self.repo.write_bytes("review-note.txt", b"new head\n")
         current = self.repo.commit("human review")
 
-        with self.assertRaisesRegex(ConfigurationError, "Submitted head is stale"):
+        with self.assertRaisesRegex(
+            ConfigurationError,
+            "Submitted head is stale.*rerun the source adapter",
+        ):
             self.finalize(
                 plan,
                 proposal,

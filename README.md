@@ -65,7 +65,10 @@ pixi run test-downstream-candidate -- \
 ```
 
 Either candidate may be omitted.
-Quick mode validates a compact adapter sample, builds the site, and checks browser routes.
+When `--template` is selected, the task renders that template afresh and overlays only the downstream's declared site-owned inputs.
+A package-only run instead exercises the package in a disposable copy of the selected downstream.
+Quick mode runs the downstream `validate` and `build` tasks.
+Full mode also runs `projection-verify`, `verify-hugo`, `verify-ownership`, and `verify-build`.
 Use `--mode full` before release or adoption, and `--keep` or `--output /new/path` to inspect the staged downstream.
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.
