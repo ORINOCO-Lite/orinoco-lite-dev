@@ -17,8 +17,10 @@
   Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.
 - Use commit identifiers where software requires them, such as dependency locks, release inputs, and concurrency checks.
   Do not require per-file origins or before-and-after coordinate inventories for ordinary work.
-- Track each upstream mirror with three branches: `main` is the upstream commit currently pinned by this project, `orinoco-lite-diff` is the Orinoco Lite commit layer based on `main`, and `latest-upstream` is the current authoritative upstream commit.
-  Open a comparison pull request from either latter branch into `main` only when it differs from `main`; do not merge those pull requests.
+- Track each upstream mirror in Orinoco Lite with `main` (the accepted upstream base), `latest-upstream` (the most recently observed upstream commit), and `orinoco-lite-diff` (only the retained Orinoco Lite commits rebased on `main`).
+  An updater advances `latest-upstream` only.
+  A reviewed repin rebases the local layer onto it, advances `main`, and pins the parent to the rebased layer or to `main` when the layer is empty.
+  Keep non-empty `latest-upstream` and `orinoco-lite-diff` comparisons into `main` as draft pull requests; do not merge them.
   Delete superseded mirror branches after preserving active-purpose branches, including Git Annex branches.
 
 ## Minimum machinery
