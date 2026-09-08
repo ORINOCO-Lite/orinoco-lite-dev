@@ -5,7 +5,7 @@ description: Develop and exercise unreleased Orinoco Lite package or template ch
 
 # Develop Orinoco Lite
 
-Exercise package and template changes through a disposable content-only downstream before release.
+Exercise package and template changes through a disposable downstream before release.
 Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
 Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
@@ -26,7 +26,7 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Exercise the temporary downstream
 
 Run the engineering task from the `orinoco-lite-dev` working tree.
-It must materialize the selected template afresh and apply only the selected downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
+When a template candidate is selected, the task materializes it afresh and applies only the selected downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
 
 ```console
 pixi run test-downstream-candidate \
@@ -37,10 +37,13 @@ pixi run test-downstream-candidate \
 ```
 
 Select at least one of `--package` and `--template`; omit the other for a package-only or template-only candidate.
-The task leaves the source downstream unchanged and must not copy its framework files, workflows, framework tests, or duplicated template configuration.
+When `--template` is omitted, the task instead makes a disposable copy of the downstream framework and substitutes only the package candidate.
+In either mode, the task leaves the source downstream unchanged.
+Template-candidate runs must not copy downstream framework files, workflows, framework tests, or duplicated template configuration.
 
-Use quick mode while iterating.
-Use `--mode full` before release or adoption.
+Quick mode runs the downstream `validate` and `build` tasks while iterating.
+Full mode adds `projection-verify`, `verify-hugo`, `verify-ownership`, and `verify-build`; use it before release or adoption.
+Browser, source-adapter, offline-cache, and live GitHub behavior require their focused tests or acceptance exercises and are not implied by either mode.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
 
