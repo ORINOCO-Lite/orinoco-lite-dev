@@ -16,7 +16,7 @@ from orinoco_lite.release_editor import (
     REVIEW_BUNDLE_PROPOSAL,
     SHARED_ORIGIN_INFORMATION,
     SHARED_ORIGIN_WARNING,
-    SUBMISSION_EMBEDDED_DOWNLOAD_LABEL,
+    SUBMISSION_EMBEDDED_REVIEW_LABEL,
     SUBMISSION_ARIA_BINDING,
     SUBMISSION_HEADER_ICON,
     SUBMISSION_HEADER_TOOLTIP,
@@ -215,7 +215,7 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
                 "GitHub proposal unavailable inside this editor",
                 source,
             )
-            self.assertIn(SUBMISSION_EMBEDDED_DOWNLOAD_LABEL, source)
+            self.assertIn(SUBMISSION_EMBEDDED_REVIEW_LABEL, source)
             self.assertIn(SUBMISSION_STANDALONE_DOWNLOAD_LABEL, source)
             self.assertEqual(source.count("framedContext ||"), 1)
             self.assertNotIn("Confirm GitHub proposal", source)

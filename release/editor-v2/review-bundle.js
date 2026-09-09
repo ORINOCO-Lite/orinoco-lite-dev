@@ -176,7 +176,7 @@ export function isFramedContext(target = window) {
 export function beginReviewBundleProposal(value, target = window) {
     if (isFramedContext(target)) {
         throw new Error(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Send the bundle to the parent review page or open the editor in its own tab.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
         );
     }
     const { repository, serviceOrigin } = reviewProposalCoordinates(value);

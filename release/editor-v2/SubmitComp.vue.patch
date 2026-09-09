@@ -22,7 +22,7 @@ index 9621e55..b0787b0 100644
 +                    >
 +                        <strong>GitHub proposal unavailable inside this editor</strong>
 +                        <p>
-+                            Use “Send to review page” below to pass the selected changes
++                            Use “Add to review” below to pass the selected changes
 +                            to the parent page, or open this editor in its own tab to
 +                            propose via GitHub.
 +                        </p>
@@ -103,7 +103,7 @@ index 9621e55..b0787b0 100644
 -                <v-icon>mdi-download</v-icon>
 -                {{ patchDownloadMode ? 'Download review bundle' : 'Download RDF' }}
 +                <v-icon>{{ patchDownloadMode && framedContext ? 'mdi-send' : 'mdi-download' }}</v-icon>
-+                {{ patchDownloadMode ? (framedContext ? 'Send to review page' : 'Download review bundle') : 'Download RDF' }}
++                {{ patchDownloadMode ? (framedContext ? 'Add to review' : 'Download review bundle') : 'Download RDF' }}
 @@ -103,6 +158,17 @@
              <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
                  <v-icon>mdi-check-circle-outline</v-icon> Submit

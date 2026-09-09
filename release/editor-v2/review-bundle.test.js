@@ -417,7 +417,7 @@ describe('Orinoco review bundles', () => {
 
         expect(isFramedContext(framed)).toBe(true);
         expect(() => beginReviewBundleProposal(proposal, framed)).toThrow(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Send the bundle to the parent review page or open the editor in its own tab.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
         );
         expect(open).not.toHaveBeenCalled();
         expect(isFramedContext({ self: window, top: window })).toBe(false);
