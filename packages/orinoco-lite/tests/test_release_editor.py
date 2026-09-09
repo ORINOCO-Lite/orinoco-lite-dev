@@ -217,7 +217,11 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             )
             self.assertIn(SUBMISSION_EMBEDDED_REVIEW_LABEL, source)
             self.assertIn(SUBMISSION_STANDALONE_DOWNLOAD_LABEL, source)
-            self.assertEqual(source.count("framedContext ||"), 1)
+            self.assertIn(
+                'v-if="proposalMode && !framedContext && !responseReceived',
+                source,
+            )
+            self.assertNotIn("framedContext ||", source)
             self.assertNotIn("Confirm GitHub proposal", source)
             self.assertNotIn("Confirm and create draft pull request", source)
             self.assertLess(

@@ -109,9 +109,8 @@ index 9621e55..b0787b0 100644
                  <v-icon>mdi-check-circle-outline</v-icon> Submit
              </v-btn>
 +            <v-btn
-+                v-if="proposalMode && !responseReceived && nodesToSubmit.length"
++                v-if="proposalMode && !framedContext && !responseReceived && nodesToSubmit.length"
 +                :disabled="
-+                    framedContext ||
 +                    proposing
 +                "
 +                @click="proposeRecords()"
