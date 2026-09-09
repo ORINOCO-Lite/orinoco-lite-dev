@@ -13,8 +13,10 @@ export const REVIEW_PROPOSAL_RESULT_FORMAT =
     'orinoco-lite-shacl-proposal-result-v1';
 export const REVIEW_PROPOSAL_STARTED_FORMAT =
     'orinoco-lite-shacl-proposal-started-v1';
+export const CURATION_INSTALL_URL =
+    'https://github.com/apps/orinoco-lite-curation-review/installations/new';
 export const CURATION_SETUP_URL =
-    'https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/packages/curation-review-app/README.md#github-app-configuration';
+    'https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/packages/curation-review-app/README.md#fix-github-authorization';
 
 const GITHUB_REPOSITORY =
     /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
@@ -117,8 +119,35 @@ function setupUrl(value) {
     return candidate;
 }
 
+function installUrl(value) {
+    const candidate = value?.install_url || CURATION_INSTALL_URL;
+    let url;
+    try {
+        url = new URL(candidate);
+    } catch {
+        throw new Error('Review proposal has an invalid install URL');
+    }
+    if (
+        url.protocol !== 'https:' ||
+        url.origin !== 'https://github.com' ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        !/^\/apps\/[A-Za-z0-9-]+\/installations\/new$/.test(url.pathname) ||
+        url.href !== candidate
+    ) {
+        throw new Error('Review proposal has an invalid install URL');
+    }
+    return candidate;
+}
+
 export function curationSetupUrl(value) {
     return setupUrl(value);
+}
+
+export function curationInstallUrl(value) {
+    return installUrl(value);
 }
 
 function handoffNonce(target) {
@@ -147,11 +176,12 @@ export function isFramedContext(target = window) {
 export function beginReviewBundleProposal(value, target = window) {
     if (isFramedContext(target)) {
         throw new Error(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Send the bundle to the parent review page or open the editor in its own tab.',
         );
     }
     const { repository, serviceOrigin } = reviewProposalCoordinates(value);
     setupUrl(value);
+    installUrl(value);
     const sourceOrigin = editorOrigin(target);
     const nonce = handoffNonce(target);
     const url = new URL('/api/transport', serviceOrigin);
@@ -212,22 +242,15 @@ export function beginReviewBundleProposal(value, target = window) {
         }
         if (
             event.data?.format === 'orinoco-lite-transport-error-v1' &&
-            (exactKeys(event.data, [
+            exactKeys(event.data, [
+                'code',
                 'format',
                 'handoff_nonce',
                 'kind',
                 'message',
                 'repository',
-            ]) ||
-                exactKeys(event.data, [
-                    'code',
-                    'format',
-                    'handoff_nonce',
-                    'kind',
-                    'message',
-                    'repository',
-                    'status',
-                ])) &&
+                'status',
+            ]) &&
             event.data.kind === 'shacl'
         ) {
             const error = new Error(
@@ -255,24 +278,16 @@ export function beginReviewBundleProposal(value, target = window) {
         }
         if (
             event.data?.format === REVIEW_PROPOSAL_RESULT_FORMAT &&
-            (exactKeys(event.data, [
+            exactKeys(event.data, [
                 'error',
+                'error_code',
+                'error_status',
                 'format',
                 'handoff_nonce',
                 'repository',
                 'result',
                 'retry_safe',
-            ]) ||
-                exactKeys(event.data, [
-                    'error',
-                    'error_code',
-                    'error_status',
-                    'format',
-                    'handoff_nonce',
-                    'repository',
-                    'result',
-                    'retry_safe',
-                ]))
+            ])
         ) {
             if (!started || settled) return;
             const pullRequest = event.data.result?.pull_request;

@@ -25,6 +25,8 @@ GIT_IDENTITY = {
 SUBMISSION_ARIA_BINDING = ':aria-label="accessibleRecordSubmissionLabel(r)"'
 SUBMISSION_HEADER_ICON = "'mdi-send' : 'mdi-cloud-upload'"
 SUBMISSION_HEADER_TOOLTIP = "'Submit changes' : 'Submit'"
+SUBMISSION_EMBEDDED_DOWNLOAD_LABEL = "Send to review page"
+SUBMISSION_STANDALONE_DOWNLOAD_LABEL = "Download review bundle"
 REVIEW_BUNDLE_DISPATCH = "dispatchReviewBundle(bundle);"
 REVIEW_BUNDLE_PROPOSAL = "beginReviewBundleProposal("
 SHARED_ORIGIN_INFORMATION = "Another page could impersonate this path."

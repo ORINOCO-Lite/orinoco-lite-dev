@@ -23,6 +23,7 @@ vi.mock('@/modules/utils', () => ({
 const {
     buildReviewBundle,
     beginReviewBundleProposal,
+    curationInstallUrl,
     curationSetupUrl,
     dispatchReviewBundle,
     isFramedContext,
@@ -244,6 +245,8 @@ describe('Orinoco review bundles', () => {
         };
         receive({
             data: {
+                error_code: null,
+                error_status: null,
                 error: null,
                 format: REVIEW_PROPOSAL_RESULT_FORMAT,
                 handoff_nonce: nonce,
@@ -379,7 +382,10 @@ describe('Orinoco review bundles', () => {
 
     it('provides setup instructions for GitHub authorization failures', () => {
         expect(curationSetupUrl({})).toContain(
-            'packages/curation-review-app/README.md#github-app-configuration',
+            'packages/curation-review-app/README.md#fix-github-authorization',
+        );
+        expect(curationInstallUrl({})).toBe(
+            'https://github.com/apps/orinoco-lite-curation-review/installations/new',
         );
         expect(
             curationSetupUrl({
@@ -390,6 +396,11 @@ describe('Orinoco review bundles', () => {
         expect(() =>
             curationSetupUrl({ setup_url: 'https://example.test/setup' }),
         ).toThrow(/setup URL/);
+        expect(() =>
+            curationInstallUrl({
+                install_url: 'https://github.com/settings/apps/new',
+            }),
+        ).toThrow(/install URL/);
     });
 
     it('refuses direct GitHub proposals in framed contexts', () => {
@@ -406,7 +417,7 @@ describe('Orinoco review bundles', () => {
 
         expect(isFramedContext(framed)).toBe(true);
         expect(() => beginReviewBundleProposal(proposal, framed)).toThrow(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Send the bundle to the parent review page or open the editor in its own tab.',
         );
         expect(open).not.toHaveBeenCalled();
         expect(isFramedContext({ self: window, top: window })).toBe(false);

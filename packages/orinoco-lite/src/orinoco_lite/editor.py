@@ -149,11 +149,15 @@ def _editor_config(
     }
     if github_handoff:
         config["review_bundle_proposal"] = {
+            "install_url": (
+                "https://github.com/apps/orinoco-lite-curation-review/"
+                "installations/new"
+            ),
             "repository": resolved_repository,
             "service_origin": resolved_service,
             "setup_url": (
                 "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
-                "packages/curation-review-app/README.md#github-app-configuration"
+                "packages/curation-review-app/README.md#fix-github-authorization"
             ),
         }
         hostname = urlsplit(workspace.base_url).hostname or ""

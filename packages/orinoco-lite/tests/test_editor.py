@@ -217,11 +217,15 @@ class EditorBundleTests(unittest.TestCase):
         self.assertEqual(
             config["review_bundle_proposal"],
             {
+                "install_url": (
+                    "https://github.com/apps/orinoco-lite-curation-review/"
+                    "installations/new"
+                ),
                 "repository": "ORINOCO-Lite/example-site",
                 "service_origin": "https://orinoco-curation-review.pages.dev",
                 "setup_url": (
                     "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
-                    "packages/curation-review-app/README.md#github-app-configuration"
+                    "packages/curation-review-app/README.md#fix-github-authorization"
                 ),
             },
         )

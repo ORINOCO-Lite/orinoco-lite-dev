@@ -20,10 +20,11 @@ index 9621e55..b0787b0 100644
 +                        variant="tonal"
 +                        style="margin-top: 1em;"
 +                    >
-+                        <strong>Direct GitHub proposal unavailable while embedded</strong>
++                        <strong>GitHub proposal unavailable inside this editor</strong>
 +                        <p>
-+                            Open this editor in its own tab to propose via GitHub.
-+                            Download bundle remains available in this embedded view.
++                            Use “Send to review page” below to pass the selected changes
++                            to the parent page, or open this editor in its own tab to
++                            propose via GitHub.
 +                        </p>
 +                    </v-alert>
 +                    <v-alert
@@ -70,14 +71,24 @@ index 9621e55..b0787b0 100644
                  {{ responseText }}
 +                <span v-if="proposalHelpUrl">
 +                    <br /><br />
-+                    GitHub authorization may be missing for this repository. Check the
-+                    app installation, organization SSO approval, and your write or admin
-+                    permission, then retry.
++                    <strong>To submit this change:</strong> install the Orinoco Lite
++                    GitHub App for this repository, approve organization SSO if asked,
++                    and retry. The app authenticates you and creates a draft pull
++                    request with these selected changes; it does not store your
++                    metadata or credentials.
++                    <br /><br />
++                    <a
++                        v-if="proposalInstallUrl"
++                        :href="proposalInstallUrl"
++                        rel="noreferrer"
++                        target="_blank"
++                    >Install the Orinoco Lite GitHub App</a>
++                    <br v-if="proposalInstallUrl" />
 +                    <a
 +                        :href="proposalHelpUrl"
 +                        rel="noreferrer"
 +                        target="_blank"
-+                    >Open setup instructions</a>
++                    >Read authorization and custom-app instructions</a>
 +                </span>
 +                <a
 +                    v-if="proposalResult"
@@ -88,6 +99,11 @@ index 9621e55..b0787b0 100644
                  <br />
                  <br />
                  <v-btn
+@@ -100,2 +100,2 @@
+-                <v-icon>mdi-download</v-icon>
+-                {{ patchDownloadMode ? 'Download review bundle' : 'Download RDF' }}
++                <v-icon>{{ patchDownloadMode && framedContext ? 'mdi-send' : 'mdi-download' }}</v-icon>
++                {{ patchDownloadMode ? (framedContext ? 'Send to review page' : 'Download review bundle') : 'Download RDF' }}
 @@ -103,6 +158,17 @@
              <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
                  <v-icon>mdi-check-circle-outline</v-icon> Submit
@@ -114,6 +130,7 @@ index 9621e55..b0787b0 100644
 +import {
 +    beginReviewBundleProposal,
 +    buildReviewBundle,
++    curationInstallUrl,
 +    curationSetupUrl,
 +    dispatchReviewBundle,
 +    isFramedContext,
@@ -131,6 +148,7 @@ index 9621e55..b0787b0 100644
 +const proposalResult = ref(null);
 +const proposing = ref(false);
 +const proposalHelpUrl = ref(null);
++const proposalInstallUrl = ref(null);
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
@@ -180,6 +198,7 @@ index 9621e55..b0787b0 100644
 +    proposalResult.value = null;
 +    proposing.value = false;
 +    proposalHelpUrl.value = null;
++    proposalInstallUrl.value = null;
 +
 +}
 +
@@ -260,6 +279,9 @@ index 9621e55..b0787b0 100644
 +            code === 'github_app_setup_misdirected'
 +        ) {
 +            proposalHelpUrl.value = curationSetupUrl(
++                config.value.review_bundle_proposal
++            );
++            proposalInstallUrl.value = curationInstallUrl(
 +                config.value.review_bundle_proposal
 +            );
 +        }

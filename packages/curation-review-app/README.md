@@ -10,6 +10,16 @@ The package also implements the thin GitHub handoff in [`docs/agents/contract/gi
 It authenticates a curator and creates an explicit temporary Git handoff for the exact bundle confirmed in the downstream editor.
 It does not run adapters, convert metadata, apply decisions, or retain metadata, bundles, artifacts, or curation state.
 
+## Fix GitHub authorization
+
+The static `/edit/` page uses the **Orinoco Lite GitHub App** to sign you in and create a draft pull request in the configured repository containing only the changes you selected.
+It does not host the editor, store your metadata, or keep your GitHub credentials in the site.
+
+[Install the Orinoco Lite GitHub App](https://github.com/apps/orinoco-lite-curation-review/installations/new) for the repository, approve any organization or SSO request, and retry the submission.
+
+If a site maintainer needs a separate app, they can [create a GitHub App](https://github.com/settings/apps/new), install it only on the target repository, and configure a compatible curation service with that app.
+The required callback, permissions, and service settings are described below; ordinary editors should use the shared app installation above.
+
 ## Local verification
 
 Use the locked Node and npm versions declared in `.nvmrc` and `package.json`.
@@ -47,7 +57,6 @@ The source-adapter decision path never writes repository contents through the se
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
 
 If the editor reports a GitHub 401, 403, or 404, confirm that the App is installed for the target repository, approve any pending organization or SSO authorization, and sign in as a collaborator with `write` or `admin` permission.
-If the central App is unavailable, deploy a compatible instance and configure the downstream to use its service origin before retrying.
 
 Configure these Pages runtime values:
 

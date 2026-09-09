@@ -65,13 +65,6 @@ function exactKeys(value: object, expected: readonly string[]): boolean {
   );
 }
 
-function exactKeysEither(
-  value: object,
-  alternatives: readonly (readonly string[])[],
-): boolean {
-  return alternatives.some((expected) => exactKeys(value, expected));
-}
-
 function oneLine(value: unknown, maximum = 4_096): value is string {
   return (
     typeof value === "string" &&
@@ -487,17 +480,14 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       }
       if (value.format === "orinoco-lite-transport-error-v1") {
         if (
-          !exactKeysEither(value, [
-            ["format", "handoff_nonce", "kind", "message", "repository"],
-            [
-              "code",
-              "format",
-              "handoff_nonce",
-              "kind",
-              "message",
-              "repository",
-              "status",
-            ],
+          !exactKeys(value, [
+            "code",
+            "format",
+            "handoff_nonce",
+            "kind",
+            "message",
+            "repository",
+            "status",
           ]) ||
           value.kind !== "review" ||
           value.handoff_nonce !== state.nonce ||
@@ -549,29 +539,17 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         !state.postStarted ||
         state.resultReceived ||
         pending.current?.handoff !== state ||
-        !exactKeysEither(value, [
-          [
-            "artifact_id",
-            "comment_url",
-            "error",
-            "format",
-            "handoff_nonce",
-            "pull_request",
-            "repository",
-            "retry_safe",
-          ],
-          [
-            "artifact_id",
-            "comment_url",
-            "error",
-            "error_code",
-            "error_status",
-            "format",
-            "handoff_nonce",
-            "pull_request",
-            "repository",
-            "retry_safe",
-          ],
+        !exactKeys(value, [
+          "artifact_id",
+          "comment_url",
+          "error",
+          "error_code",
+          "error_status",
+          "format",
+          "handoff_nonce",
+          "pull_request",
+          "repository",
+          "retry_safe",
         ]) ||
         !exactCoordinates(value, target, state.nonce)
       ) {
