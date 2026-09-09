@@ -65,6 +65,13 @@ function exactKeys(value: object, expected: readonly string[]): boolean {
   );
 }
 
+function exactKeysEither(
+  value: object,
+  alternatives: readonly (readonly string[])[],
+): boolean {
+  return alternatives.some((expected) => exactKeys(value, expected));
+}
+
 function oneLine(value: unknown, maximum = 4_096): value is string {
   return (
     typeof value === "string" &&
@@ -480,12 +487,17 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       }
       if (value.format === "orinoco-lite-transport-error-v1") {
         if (
-          !exactKeys(value, [
-            "format",
-            "handoff_nonce",
-            "kind",
-            "message",
-            "repository",
+          !exactKeysEither(value, [
+            ["format", "handoff_nonce", "kind", "message", "repository"],
+            [
+              "code",
+              "format",
+              "handoff_nonce",
+              "kind",
+              "message",
+              "repository",
+              "status",
+            ],
           ]) ||
           value.kind !== "review" ||
           value.handoff_nonce !== state.nonce ||
@@ -495,7 +507,13 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         ) {
           return;
         }
-        failHandoff(state, new Error(value.message));
+        failHandoff(
+          state,
+          Object.assign(new Error(value.message), {
+            code: typeof value.code === "string" ? value.code : null,
+            status: Number.isSafeInteger(value.status) ? value.status : null,
+          }),
+        );
         return;
       }
       if (value.format === "orinoco-lite-review-post-started-v1") {
@@ -531,15 +549,29 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         !state.postStarted ||
         state.resultReceived ||
         pending.current?.handoff !== state ||
-        !exactKeys(value, [
-          "artifact_id",
-          "comment_url",
-          "error",
-          "format",
-          "handoff_nonce",
-          "pull_request",
-          "repository",
-          "retry_safe",
+        !exactKeysEither(value, [
+          [
+            "artifact_id",
+            "comment_url",
+            "error",
+            "format",
+            "handoff_nonce",
+            "pull_request",
+            "repository",
+            "retry_safe",
+          ],
+          [
+            "artifact_id",
+            "comment_url",
+            "error",
+            "error_code",
+            "error_status",
+            "format",
+            "handoff_nonce",
+            "pull_request",
+            "repository",
+            "retry_safe",
+          ],
         ]) ||
         !exactCoordinates(value, target, state.nonce)
       ) {
@@ -562,7 +594,12 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         oneLine(value.error) &&
         value.retry_safe === true
       ) {
-        const error = new Error(value.error);
+        const error = Object.assign(new Error(value.error), {
+          code: typeof value.error_code === "string" ? value.error_code : null,
+          status: Number.isSafeInteger(value.error_status)
+            ? value.error_status
+            : null,
+        });
         pending.current = null;
         handoff.current = null;
         setNonce(null);

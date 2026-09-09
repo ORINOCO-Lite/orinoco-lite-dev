@@ -68,6 +68,17 @@ index 9621e55..b0787b0 100644
                  <v-icon v-if="responseSuccess" style="color: green">mdi-check-circle</v-icon>
                  <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
                  {{ responseText }}
++                <span v-if="proposalHelpUrl">
++                    <br /><br />
++                    GitHub authorization may be missing for this repository. Check the
++                    app installation, organization SSO approval, and your write or admin
++                    permission, then retry.
++                    <a
++                        :href="proposalHelpUrl"
++                        rel="noreferrer"
++                        target="_blank"
++                    >Open setup instructions</a>
++                </span>
 +                <a
 +                    v-if="proposalResult"
 +                    :href="proposalResult.pull_request_url"
@@ -103,6 +114,7 @@ index 9621e55..b0787b0 100644
 +import {
 +    beginReviewBundleProposal,
 +    buildReviewBundle,
++    curationSetupUrl,
 +    dispatchReviewBundle,
 +    isFramedContext,
 +    isSharedGithubPagesOrigin,
@@ -118,6 +130,7 @@ index 9621e55..b0787b0 100644
  const responseFailure = ref(false);
 +const proposalResult = ref(null);
 +const proposing = ref(false);
++const proposalHelpUrl = ref(null);
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
@@ -166,6 +179,7 @@ index 9621e55..b0787b0 100644
      awaitingResponse.value = false;
 +    proposalResult.value = null;
 +    proposing.value = false;
++    proposalHelpUrl.value = null;
 +
 +}
 +
@@ -223,6 +237,32 @@ index 9621e55..b0787b0 100644
 +        responseFailure.value = true;
 +        responseReceived.value = true;
 +        responseText.value = `The GitHub proposal could not be completed: ${error.message}`;
++        const code = typeof error?.code === 'string' ? error.code : '';
++        const status = Number.isSafeInteger(error?.status)
++            ? error.status
++            : null;
++        responseErrors.value = [
++            {
++                message: error.message,
++                status: status ?? 'unknown',
++                statusText: code || 'proposal_error',
++            },
++        ];
++        if (
++            status === 401 ||
++            status === 403 ||
++            status === 404 ||
++            code === 'authentication_required' ||
++            code === 'curator_permission_required' ||
++            code === 'github_forbidden' ||
++            code === 'github_oauth_not_authorized' ||
++            code === 'github_oauth_error' ||
++            code === 'github_app_setup_misdirected'
++        ) {
++            proposalHelpUrl.value = curationSetupUrl(
++                config.value.review_bundle_proposal
++            );
++        }
 +    } finally {
 +        proposing.value = false;
 +    }

@@ -46,6 +46,9 @@ Contents write includes the read access needed by both profiles and is used for 
 The source-adapter decision path never writes repository contents through the service.
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
 
+If the editor reports a GitHub 401, 403, or 404, confirm that the App is installed for the target repository, approve any pending organization or SSO authorization, and sign in as a collaborator with `write` or `admin` permission.
+If the central App is unavailable, deploy a compatible instance and configure the downstream to use its service origin before retrying.
+
 Configure these Pages runtime values:
 
 | Name                   | Kind     | Purpose                               |

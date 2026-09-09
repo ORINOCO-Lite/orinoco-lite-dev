@@ -239,11 +239,104 @@ describe("minimal downstream OAuth transport", () => {
       expect(opener.postMessage).toHaveBeenCalledWith(
         {
           error: null,
+          error_code: null,
+          error_status: null,
           format: "orinoco-lite-shacl-proposal-result-v1",
           handoff_nonce: NONCE,
           repository: "example/site",
           result,
           retry_safe: false,
+        },
+        CLIENT_ORIGIN,
+      ),
+    );
+    dom.window.close();
+  });
+
+  it("forwards safe API error details through the SHACL popup", async () => {
+    const response = await transport(context(new Request(shaclUrl())));
+    const opener = { closed: false, postMessage: vi.fn() };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/session") {
+        return Response.json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "octocat",
+          review_grant: null,
+          shacl_grant: {
+            editor_origin: CLIENT_ORIGIN,
+            expected_head_sha: null,
+            handoff_nonce: NONCE,
+            pull_request: null,
+            repository: "example/site",
+          },
+        });
+      }
+      return Response.json(
+        {
+          error: {
+            code: "github_forbidden",
+            message: "GitHub denied the write.",
+          },
+        },
+        { status: 403 },
+      );
+    });
+    const dom = new JSDOM(await response.text(), {
+      beforeParse(window: Window & typeof globalThis) {
+        Object.defineProperty(window, "opener", { value: opener });
+        window.fetch = fetchMock as unknown as typeof window.fetch;
+      },
+      runScripts: "dangerously",
+      url: shaclUrl(),
+    });
+
+    await vi.waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        {
+          format: "orinoco-lite-shacl-proposal-ready-v1",
+          handoff_nonce: NONCE,
+          repository: "example/site",
+        },
+        CLIENT_ORIGIN,
+      ),
+    );
+    const message = new dom.window.Event("message");
+    Object.defineProperties(message, {
+      data: {
+        value: {
+          format: "orinoco-lite-shacl-proposal-message-v1",
+          handoff_nonce: NONCE,
+          proposal: {
+            bundle: {
+              format: "orinoco-shacl-review-bundle",
+              records: [],
+              source_commit: "a".repeat(40),
+              version: 2,
+            },
+            format: "orinoco-lite-shacl-proposal-v1",
+            repository: "example/site",
+            target: { kind: "standalone" },
+          },
+          repository: "example/site",
+        },
+      },
+      origin: { value: CLIENT_ORIGIN },
+      source: { value: opener },
+    });
+    dom.window.dispatchEvent(message);
+
+    await vi.waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        {
+          error: "GitHub denied the write.",
+          error_code: "github_forbidden",
+          error_status: 403,
+          format: "orinoco-lite-shacl-proposal-result-v1",
+          handoff_nonce: NONCE,
+          repository: "example/site",
+          result: null,
+          retry_safe: true,
         },
         CLIENT_ORIGIN,
       ),

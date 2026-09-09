@@ -149,6 +149,8 @@ export interface ReviewPostStartedMessage extends ReviewCoordinates {
 
 export interface ReviewSubmissionSuccessMessage extends ReviewCoordinates {
   comment_url: string;
+  error_code: null;
+  error_status: null;
   error: null;
   format: "orinoco-lite-review-submission-result-v1";
   retry_safe: false;
@@ -156,6 +158,8 @@ export interface ReviewSubmissionSuccessMessage extends ReviewCoordinates {
 
 export interface ReviewSubmissionFailureMessage extends ReviewCoordinates {
   comment_url: null;
+  error_code: string | null;
+  error_status: number | null;
   error: string;
   format: "orinoco-lite-review-submission-result-v1";
   retry_safe: boolean;

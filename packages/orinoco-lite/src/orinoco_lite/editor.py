@@ -151,6 +151,10 @@ def _editor_config(
         config["review_bundle_proposal"] = {
             "repository": resolved_repository,
             "service_origin": resolved_service,
+            "setup_url": (
+                "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
+                "packages/curation-review-app/README.md#github-app-configuration"
+            ),
         }
         hostname = urlsplit(workspace.base_url).hostname or ""
         if hostname.lower().endswith(".github.io"):

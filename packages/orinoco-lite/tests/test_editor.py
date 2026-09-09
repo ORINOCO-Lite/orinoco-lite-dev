@@ -219,6 +219,10 @@ class EditorBundleTests(unittest.TestCase):
             {
                 "repository": "ORINOCO-Lite/example-site",
                 "service_origin": "https://orinoco-curation-review.pages.dev",
+                "setup_url": (
+                    "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
+                    "packages/curation-review-app/README.md#github-app-configuration"
+                ),
             },
         )
         self.assertFalse(config["use_service"])

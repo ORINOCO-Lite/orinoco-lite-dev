@@ -13,6 +13,8 @@ export const REVIEW_PROPOSAL_RESULT_FORMAT =
     'orinoco-lite-shacl-proposal-result-v1';
 export const REVIEW_PROPOSAL_STARTED_FORMAT =
     'orinoco-lite-shacl-proposal-started-v1';
+export const CURATION_SETUP_URL =
+    'https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/packages/curation-review-app/README.md#github-app-configuration';
 
 const GITHUB_REPOSITORY =
     /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
@@ -33,7 +35,7 @@ function exactKeys(value, expected) {
 
 export function dispatchReviewBundle(bundle, target = window) {
     return target.dispatchEvent(
-        new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle })
+        new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle }),
     );
 }
 
@@ -44,7 +46,7 @@ function reviewProposalCoordinates(value) {
     }
     const serviceOrigin = requireString(
         value?.service_origin,
-        'proposal service origin'
+        'proposal service origin',
     );
     let service;
     try {
@@ -94,6 +96,31 @@ function editorOrigin(target) {
     return value;
 }
 
+function setupUrl(value) {
+    const candidate = value?.setup_url || CURATION_SETUP_URL;
+    let url;
+    try {
+        url = new URL(candidate);
+    } catch {
+        throw new Error('Review proposal has an invalid setup URL');
+    }
+    if (
+        url.protocol !== 'https:' ||
+        url.origin !== 'https://github.com' ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.href !== candidate
+    ) {
+        throw new Error('Review proposal has an invalid setup URL');
+    }
+    return candidate;
+}
+
+export function curationSetupUrl(value) {
+    return setupUrl(value);
+}
+
 function handoffNonce(target) {
     const bytes = new Uint8Array(32);
     target.crypto.getRandomValues(bytes);
@@ -120,10 +147,11 @@ export function isFramedContext(target = window) {
 export function beginReviewBundleProposal(value, target = window) {
     if (isFramedContext(target)) {
         throw new Error(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.'
+            'Direct GitHub proposal is unavailable while the editor is embedded. Download the review bundle instead.',
         );
     }
     const { repository, serviceOrigin } = reviewProposalCoordinates(value);
+    setupUrl(value);
     const sourceOrigin = editorOrigin(target);
     const nonce = handoffNonce(target);
     const url = new URL('/api/transport', serviceOrigin);
@@ -153,12 +181,15 @@ export function beginReviewBundleProposal(value, target = window) {
         proposal = undefined;
         if (!settled && reject) {
             settled = true;
-            rejectProposal?.(new Error(reject));
+            rejectProposal?.(
+                reject instanceof Error ? reject : new Error(reject),
+            );
         }
     }
 
     function sendIfReady() {
-        if (!ready || proposal === undefined || popup?.closed || started) return;
+        if (!ready || proposal === undefined || popup?.closed || started)
+            return;
         popup.postMessage(
             {
                 format: REVIEW_PROPOSAL_MESSAGE_FORMAT,
@@ -166,7 +197,7 @@ export function beginReviewBundleProposal(value, target = window) {
                 proposal,
                 repository,
             },
-            serviceOrigin
+            serviceOrigin,
         );
     }
 
@@ -181,30 +212,42 @@ export function beginReviewBundleProposal(value, target = window) {
         }
         if (
             event.data?.format === 'orinoco-lite-transport-error-v1' &&
-            exactKeys(event.data, [
+            (exactKeys(event.data, [
                 'format',
                 'handoff_nonce',
                 'kind',
                 'message',
                 'repository',
-            ]) &&
+            ]) ||
+                exactKeys(event.data, [
+                    'code',
+                    'format',
+                    'handoff_nonce',
+                    'kind',
+                    'message',
+                    'repository',
+                    'status',
+                ])) &&
             event.data.kind === 'shacl'
         ) {
+            const error = new Error(
+                typeof event.data.message === 'string'
+                    ? event.data.message
+                    : 'The GitHub transport failed',
+            );
+            error.code =
+                typeof event.data.code === 'string' ? event.data.code : null;
+            error.status = Number.isSafeInteger(event.data.status)
+                ? event.data.status
+                : null;
             dispose({
-                reject:
-                    typeof event.data.message === 'string'
-                        ? event.data.message
-                        : 'The GitHub transport failed',
+                reject: error,
             });
             return;
         }
         if (
             event.data?.format === REVIEW_PROPOSAL_STARTED_FORMAT &&
-            exactKeys(event.data, [
-                'format',
-                'handoff_nonce',
-                'repository',
-            ])
+            exactKeys(event.data, ['format', 'handoff_nonce', 'repository'])
         ) {
             if (!ready || proposal === undefined || started) return;
             started = true;
@@ -212,14 +255,24 @@ export function beginReviewBundleProposal(value, target = window) {
         }
         if (
             event.data?.format === REVIEW_PROPOSAL_RESULT_FORMAT &&
-            exactKeys(event.data, [
+            (exactKeys(event.data, [
                 'error',
                 'format',
                 'handoff_nonce',
                 'repository',
                 'result',
                 'retry_safe',
-            ])
+            ]) ||
+                exactKeys(event.data, [
+                    'error',
+                    'error_code',
+                    'error_status',
+                    'format',
+                    'handoff_nonce',
+                    'repository',
+                    'result',
+                    'retry_safe',
+                ]))
         ) {
             if (!started || settled) return;
             const pullRequest = event.data.result?.pull_request;
@@ -260,7 +313,15 @@ export function beginReviewBundleProposal(value, target = window) {
                 settled = true;
                 const message = event.data.error;
                 dispose();
-                rejectProposal?.(new Error(message));
+                const error = new Error(message);
+                error.code =
+                    typeof event.data.error_code === 'string'
+                        ? event.data.error_code
+                        : null;
+                error.status = Number.isSafeInteger(event.data.error_status)
+                    ? event.data.error_status
+                    : null;
+                rejectProposal?.(error);
             } else if (
                 event.data.result === null &&
                 typeof event.data.error === 'string' &&
@@ -269,21 +330,23 @@ export function beginReviewBundleProposal(value, target = window) {
                 settled = true;
                 const message = event.data.error;
                 dispose();
-                rejectProposal?.(
-                    new Error(
-                        `${message} The GitHub proposal result is uncertain. Check the repository before retrying.`
-                    )
+                const error = new Error(
+                    `${message} The GitHub proposal result is uncertain. Check the repository before retrying.`,
                 );
+                error.code =
+                    typeof event.data.error_code === 'string'
+                        ? event.data.error_code
+                        : null;
+                error.status = Number.isSafeInteger(event.data.error_status)
+                    ? event.data.error_status
+                    : null;
+                rejectProposal?.(error);
             }
             return;
         }
         if (
             event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
-            !exactKeys(event.data, [
-                'format',
-                'handoff_nonce',
-                'repository',
-            ]) ||
+            !exactKeys(event.data, ['format', 'handoff_nonce', 'repository']) ||
             ready
         ) {
             return;
@@ -296,7 +359,7 @@ export function beginReviewBundleProposal(value, target = window) {
     popup = target.open(
         url.toString(),
         `orinoco-lite-shacl-proposal-${nonce}`,
-        'popup,width=720,height=760,resizable=yes,scrollbars=yes'
+        'popup,width=720,height=760,resizable=yes,scrollbars=yes',
     );
     if (!popup) {
         dispose();
@@ -309,7 +372,7 @@ export function beginReviewBundleProposal(value, target = window) {
                     ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
                     : 'The GitHub proposal transport expired before writing.',
             }),
-        HANDOFF_TIMEOUT_MS
+        HANDOFF_TIMEOUT_MS,
     );
     closedPoll = target.setInterval(() => {
         if (popup.closed) {
@@ -327,7 +390,7 @@ export function beginReviewBundleProposal(value, target = window) {
         deliver(reviewProposal) {
             if (proposal !== undefined || settled) {
                 return Promise.reject(
-                    new Error('The GitHub proposal was already delivered')
+                    new Error('The GitHub proposal was already delivered'),
                 );
             }
             // Vue exposes the editor state through reactive Proxy objects.
@@ -356,7 +419,7 @@ export function recordSubmissionLabel({
             (value, index, values) =>
                 typeof value === 'string' &&
                 value.length &&
-                values.indexOf(value) === index
+                values.indexOf(value) === index,
         )
         .join(': ');
 }
@@ -384,7 +447,7 @@ export function validateRecordCatalog(catalog) {
         const pid = requireString(record?.pid, 'PID');
         if (byPid.has(pid)) {
             throw new Error(
-                `Static record catalog contains duplicate PID ${pid}`
+                `Static record catalog contains duplicate PID ${pid}`,
             );
         }
         requireString(record.schema_type, `${pid} schema type`);
@@ -392,7 +455,7 @@ export function validateRecordCatalog(catalog) {
         requireString(record.rdf_turtle, `${pid} RDF`);
         if (!/^[0-9a-f]{64}$/.test(record.sha256 || '')) {
             throw new Error(
-                `Static record catalog has an invalid ${pid} digest`
+                `Static record catalog has an invalid ${pid} digest`,
             );
         }
         byPid.set(pid, record);
@@ -408,7 +471,7 @@ export async function buildReviewBundle({
 }) {
     const catalogByPid = validateRecordCatalog(catalog);
     const selected = [...selectedNodes].sort((left, right) =>
-        left.node_iri.localeCompare(right.node_iri)
+        left.node_iri.localeCompare(right.node_iri),
     );
     if (!selected.length) {
         throw new Error('Select at least one edited record');
@@ -420,7 +483,7 @@ export async function buildReviewBundle({
         const source = catalogByPid.get(pid);
         if (!source) {
             throw new Error(
-                `Edited record is not in the static catalog: ${pid}`
+                `Edited record is not in the static catalog: ${pid}`,
             );
         }
         const dataset = new Store();
