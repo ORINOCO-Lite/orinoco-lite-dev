@@ -10,3 +10,9 @@ __pycache__/
 
 # APM dependencies
 apm_modules/
+
+# Local browser download used by desktop automation.
+chrome/
+
+# Nested repositories are licensed by their own projects.
+submodules/
