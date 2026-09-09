@@ -1,0 +1,41 @@
+version = 1
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Center for Open Neuroscience and contributors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+  "*.md",
+  "**/*.md",
+  "*.markdown",
+  "**/*.markdown",
+  "*.rst",
+  "**/*.rst",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Center for Open Neuroscience and contributors"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = [
+  "tests/fixtures/template-candidate/site-specific/metadata/**",
+  "packages/orinoco-lite/src/orinoco_lite/default_projection.yaml",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Center for Open Neuroscience and contributors"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = [".agents/skills/asd-ste100-skill/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Dustin Yuchen Teng"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [".agents/skills/introduce-reuse-compliance/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "LicenseRef-Not-Declared"

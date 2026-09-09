@@ -1,0 +1,5 @@
+This file records that the imported source does not declare a license.
+
+This repository does not assert a license for that source and this file does
+not grant any rights. Review the source repository before redistributing or
+modifying the imported material.
