@@ -16,9 +16,11 @@ from orinoco_lite.release_editor import (
     REVIEW_BUNDLE_PROPOSAL,
     SHARED_ORIGIN_INFORMATION,
     SHARED_ORIGIN_WARNING,
+    SUBMISSION_EMBEDDED_REVIEW_LABEL,
     SUBMISSION_ARIA_BINDING,
     SUBMISSION_HEADER_ICON,
     SUBMISSION_HEADER_TOOLTIP,
+    SUBMISSION_STANDALONE_DOWNLOAD_LABEL,
     _apply_submission_accessibility_patch,
     _apply_submission_header_patch,
     _dependency_inventory,
@@ -210,10 +212,16 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             self.assertEqual(source.count("Propose via GitHub"), 1)
             self.assertIn("const framedContext = isFramedContext();", source)
             self.assertIn(
-                "Direct GitHub proposal unavailable while embedded",
+                "GitHub proposal unavailable inside this editor",
                 source,
             )
-            self.assertEqual(source.count("framedContext ||"), 1)
+            self.assertIn(SUBMISSION_EMBEDDED_REVIEW_LABEL, source)
+            self.assertIn(SUBMISSION_STANDALONE_DOWNLOAD_LABEL, source)
+            self.assertIn(
+                'v-if="proposalMode && !framedContext && !responseReceived',
+                source,
+            )
+            self.assertNotIn("framedContext ||", source)
             self.assertNotIn("Confirm GitHub proposal", source)
             self.assertNotIn("Confirm and create draft pull request", source)
             self.assertLess(

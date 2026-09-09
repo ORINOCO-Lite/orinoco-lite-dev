@@ -481,11 +481,13 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       if (value.format === "orinoco-lite-transport-error-v1") {
         if (
           !exactKeys(value, [
+            "code",
             "format",
             "handoff_nonce",
             "kind",
             "message",
             "repository",
+            "status",
           ]) ||
           value.kind !== "review" ||
           value.handoff_nonce !== state.nonce ||
@@ -495,7 +497,13 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         ) {
           return;
         }
-        failHandoff(state, new Error(value.message));
+        failHandoff(
+          state,
+          Object.assign(new Error(value.message), {
+            code: typeof value.code === "string" ? value.code : null,
+            status: Number.isSafeInteger(value.status) ? value.status : null,
+          }),
+        );
         return;
       }
       if (value.format === "orinoco-lite-review-post-started-v1") {
@@ -535,6 +543,8 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
           "artifact_id",
           "comment_url",
           "error",
+          "error_code",
+          "error_status",
           "format",
           "handoff_nonce",
           "pull_request",
@@ -562,7 +572,12 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
         oneLine(value.error) &&
         value.retry_safe === true
       ) {
-        const error = new Error(value.error);
+        const error = Object.assign(new Error(value.error), {
+          code: typeof value.error_code === "string" ? value.error_code : null,
+          status: Number.isSafeInteger(value.error_status)
+            ? value.error_status
+            : null,
+        });
         pending.current = null;
         handoff.current = null;
         setNonce(null);

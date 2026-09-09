@@ -99,9 +99,18 @@ function post(value) {
   if (source !== null && !source.closed) source.postMessage(value, target.client_origin);
 }
 
+function errorDetails(error) {
+  return {
+    code: typeof error?.code === "string" && error.code.length > 0 ? error.code : null,
+    status: Number.isSafeInteger(error?.status) ? error.status : null,
+  };
+}
+
 function transportError(error) {
   const message = error instanceof Error ? error.message : "The GitHub transport failed.";
+  const details = errorDetails(error);
   post({
+    ...details,
     format: "orinoco-lite-transport-error-v1",
     handoff_nonce: target.handoff_nonce,
     kind: target.kind,
@@ -129,6 +138,7 @@ async function requestJson(path, init = {}) {
     const detail = value && typeof value === "object" && value.error && typeof value.error === "object"
       ? value.error : {};
     const error = new Error(typeof detail.message === "string" ? detail.message : "The curation request failed.");
+    error.code = typeof detail.code === "string" ? detail.code : null;
     error.status = response.status;
     throw error;
   }
@@ -219,14 +229,19 @@ async function startReview(session) {
       result = {
         ...reviewCoordinates(),
         comment_url: submitted.comment_url,
+        error_code: null,
+        error_status: null,
         error: null,
         format: "orinoco-lite-review-submission-result-v1",
         retry_safe: false,
       };
     } catch (error) {
+      const details = errorDetails(error);
       result = {
         ...reviewCoordinates(),
         comment_url: null,
+        error_code: details.code,
+        error_status: details.status,
         error: error instanceof Error ? error.message : "The decisions could not be posted.",
         format: "orinoco-lite-review-submission-result-v1",
         retry_safe: Number.isInteger(error && error.status) && error.status >= 400 && error.status < 500,
@@ -281,14 +296,19 @@ async function startShacl(session) {
       });
       result = {
         ...shaclCoordinates(),
+        error_code: null,
+        error_status: null,
         error: null,
         format: "orinoco-lite-shacl-proposal-result-v1",
         result: created,
         retry_safe: false,
       };
     } catch (error) {
+      const details = errorDetails(error);
       result = {
         ...shaclCoordinates(),
+        error_code: details.code,
+        error_status: details.status,
         error: error instanceof Error ? error.message : "The bundle could not be proposed.",
         format: "orinoco-lite-shacl-proposal-result-v1",
         result: null,

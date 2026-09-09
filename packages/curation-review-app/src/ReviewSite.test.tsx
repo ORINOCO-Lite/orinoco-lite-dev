@@ -401,6 +401,8 @@ describe("deployed source-review route", () => {
     const result = {
       ...coordinates(nonce),
       comment_url: "https://github.com/example/site/pull/42#issuecomment-99",
+      error_code: null,
+      error_status: null,
       error: null,
       format: "orinoco-lite-review-submission-result-v1",
       retry_safe: false,
@@ -464,6 +466,8 @@ describe("deployed source-review route", () => {
     postFrom(popup, {
       ...coordinates(firstNonce),
       comment_url: null,
+      error_code: "github_forbidden",
+      error_status: 403,
       error: "GitHub rejected the authenticated comment.",
       format: "orinoco-lite-review-submission-result-v1",
       retry_safe: true,
@@ -506,6 +510,8 @@ describe("deployed source-review route", () => {
     postFrom(popup, {
       ...coordinates(secondNonce),
       comment_url: null,
+      error_code: "github_forbidden",
+      error_status: 403,
       error: "The response from GitHub was incomplete.",
       format: "orinoco-lite-review-submission-result-v1",
       retry_safe: false,
