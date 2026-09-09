@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: reuse
         name: REUSE compliance
-        entry: uvx --from reuse==5.1.1 reuse lint
+        entry: "pixi exec --spec 'reuse>=5.1,<6' reuse lint"
         language: system
         pass_filenames: false
       - id: snapper
