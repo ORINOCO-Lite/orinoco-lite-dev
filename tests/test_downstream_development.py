@@ -145,6 +145,16 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertEqual("1", environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"])
         self.assertEqual("example/downstream", environment["GITHUB_REPOSITORY"])
 
+    def test_candidate_environment_records_explicit_content_commit(self) -> None:
+        commit = "a" * 40
+        environment = development.candidate_environment(
+            None,
+            source_commit=commit,
+        )
+        self.assertEqual(commit, environment["ORINOCO_CANDIDATE_CONTENT_COMMIT"])
+        with self.assertRaisesRegex(development.DevelopmentError, "source-commit"):
+            development.candidate_environment(None, source_commit="main")
+
     def test_github_repository_is_discovered_from_ssh_origin(self) -> None:
         subprocess.run(
             ("git", "init", "--quiet"),

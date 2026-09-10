@@ -313,6 +313,7 @@ def render_template(
 def candidate_environment(
     package: Path | None,
     repository: str | None = None,
+    source_commit: str | None = None,
 ) -> dict[str, str]:
     """Return an environment that imports an unreleased package first."""
 
@@ -321,6 +322,10 @@ def candidate_environment(
         if GITHUB_REPOSITORY.fullmatch(repository) is None:
             raise DevelopmentError("Repository must use GitHub OWNER/REPOSITORY form")
         environment["GITHUB_REPOSITORY"] = repository
+    if source_commit is not None:
+        if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+            raise DevelopmentError("--source-commit must be a full lowercase Git SHA")
+        environment["ORINOCO_CANDIDATE_CONTENT_COMMIT"] = source_commit
     if package is None:
         return environment
     package = package.resolve()
@@ -556,6 +561,7 @@ def exercise_candidate(
     *,
     package: Path | None,
     repository: str | None = None,
+    source_commit: str | None = None,
     tasks: Sequence[str],
 ) -> None:
     manifest = candidate / "pixi.toml"
@@ -565,7 +571,7 @@ def exercise_candidate(
     if pixi is None:
         raise DevelopmentError("Pixi is unavailable")
     selected_tasks = tuple(tasks)
-    environment = candidate_environment(package, repository)
+    environment = candidate_environment(package, repository, source_commit)
     with tempfile.TemporaryDirectory(prefix="orinoco-candidate-shells-") as temporary:
         if package is not None and selected_tasks:
             application = package.resolve() / "packages/curation-review-app"
@@ -603,6 +609,10 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--repository",
         help="GitHub OWNER/REPOSITORY override; defaults to the downstream origin",
+    )
+    result.add_argument(
+        "--source-commit",
+        help="real downstream commit recorded by a deploy-preview candidate",
     )
     result.add_argument("--mode", choices=("quick", "full"), default="quick")
     result.add_argument(
@@ -675,6 +685,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidate,
             package=args.package,
             repository=repository,
+            source_commit=args.source_commit,
             tasks=task_names(args.mode, args.task),
         )
         succeeded = True
