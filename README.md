@@ -82,7 +82,7 @@ Initialize engineering submodules only when cross-component work needs them:
 pixi run checkout-submodules
 ```
 
-Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml).
+Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.
 
 ## Boundaries
