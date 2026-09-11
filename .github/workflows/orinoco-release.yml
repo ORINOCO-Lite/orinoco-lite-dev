@@ -176,6 +176,8 @@ jobs:
           python -m venv build/release-test
           build/release-test/bin/pip install --disable-pip-version-check \
             release/dist/orinoco_lite-*.whl
+          build/release-test/bin/orinoco-lite --version
+          build/release-test/bin/orinoco-lite --help
           build/release-test/bin/python - <<'PY'
           from pathlib import Path
           import sys

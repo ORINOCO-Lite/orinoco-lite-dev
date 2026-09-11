@@ -28,24 +28,13 @@ IGNORED_WORKING_TREE_NAMES = {
     "test-results",
 }
 SITE_OWNED_PATHS = ("site-specific", "extensions")
-RELEASE_COORDINATES = {
-    "package_version",
-    "package_url",
-    "package_sha256",
-    "template_source",
-    "template_version",
-    "workflow_repository",
-    "workflow_sha",
-    "workflow_ref",
-}
+RELEASE_COORDINATES = {"package_url", "package_sha256"}
 QUICK_TASKS = (
     "validate",
     "build",
 )
 FULL_TASKS = (
     "validate",
-    "verify-hugo",
-    "verify-release-selection",
     "verify-build",
 )
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -174,24 +163,6 @@ def _template_answers(downstream: Path, template: Path) -> dict[str, object]:
     return selected
 
 
-def _normalize_copier_answers(candidate: Path, answers: Mapping[str, object]) -> None:
-    path = candidate / ".copier-answers.yml"
-    rendered = dict(_load_yaml(path, "Rendered Copier answers"))
-    rendered.pop("_src_path", None)
-    rendered.pop("_commit", None)
-    source = answers.get("template_source")
-    version = answers.get("template_version")
-    if not isinstance(source, str) or not isinstance(version, str):
-        raise DevelopmentError(
-            "Candidate template defaults require template_source and template_version"
-        )
-    normalized = {"_src_path": source, **rendered, "_commit": version}
-    path.write_text(
-        yaml.safe_dump(normalized, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
 def _run(
     command: Sequence[str | Path],
     *,
@@ -306,7 +277,6 @@ def render_template(
         ),
         cwd=template,
     )
-    _normalize_copier_answers(candidate, selected_answers)
     overlay_site_owned(downstream, candidate)
 
 
@@ -343,8 +313,6 @@ def candidate_environment(
     environment["PYTHONPATH"] = (
         os.fspath(source) if not existing else os.pathsep.join((os.fspath(source), existing))
     )
-    environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = os.fspath(package)
-    environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
     return environment
 
 
@@ -590,12 +558,19 @@ def exercise_candidate(
             _run(("npm", "run", "build:review"), cwd=application)
             resources = Path(temporary) / "resources"
             prepare_candidate_resources(package, resources, environment)
-            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(
-                resources / "source/build/resources-editor-shell"
+            installed_source = candidate / ".orinoco" / "package"
+            shutil.copytree(package / "packages/orinoco-lite", installed_source,
+                            ignore=_ignore_working_tree)
+            bundled = installed_source / "src/orinoco_lite/_resources"
+            if bundled.exists():
+                shutil.rmtree(bundled)
+            shutil.copytree(resources / "package-resources", bundled)
+            _run(
+                (pixi, "add", "--manifest-path", manifest, "--pypi",
+                 f"orinoco-lite @ {installed_source}"),
+                cwd=candidate,
             )
-            environment["ORINOCO_CANDIDATE_RESOURCE_ROOT"] = os.fspath(
-                resources / "package-resources"
-            )
+        environment.pop("PYTHONPATH", None)
         for task in selected_tasks:
             _run(
                 (

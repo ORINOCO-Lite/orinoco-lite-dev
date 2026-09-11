@@ -23,7 +23,7 @@ from .annotations import (
     validate_stored_record,
 )
 from .canonical import canonical_yaml
-from .config import WorkspaceConfig, development_editor_shell, load_config_path
+from .config import WorkspaceConfig, load_config_path
 from .errors import ConfigurationError, DriverError
 from .records import record_sources
 from .schema_conversion import build_format_converters
@@ -46,17 +46,6 @@ BUNDLE_RECORD_KEYS = {
 
 
 def _git_commit(root: Path) -> str:
-    candidate_commit = os.environ.get("ORINOCO_CANDIDATE_CONTENT_COMMIT")
-    if candidate_commit is not None:
-        if (
-            os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") != "1"
-            or len(candidate_commit) != 40
-            or any(character not in "0123456789abcdef" for character in candidate_commit)
-        ):
-            raise DriverError("Candidate consumer source commit must be a full lowercase Git SHA")
-        return candidate_commit
-    if not (root / ".git").exists():
-        return "0" * 40
     result = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{commit}"],
         capture_output=True,
@@ -271,8 +260,7 @@ def bind_editor(
     from .presentation import resolve_presentation
     from .projection import load_contract
 
-    candidate_shell = development_editor_shell()
-    shell = candidate_shell or resources_root / "editor-shell"
+    shell = resources_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
         raise DriverError("Package does not contain the generic static editor shell")
     if destination.exists():
@@ -652,7 +640,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             workspace, args.resources.resolve(), args.bundle, write=args.write
         )
     except (ConfigurationError, DriverError) as error:
-        print(f"orinoco editor: {error}", file=sys.stderr)
+        print(f"orinoco-lite editor: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0

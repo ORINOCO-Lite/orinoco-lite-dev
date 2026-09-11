@@ -48,41 +48,6 @@ EXPECTED_CONFIG = """\
 
 
 class StaticReviewBindingTests(unittest.TestCase):
-    def test_explicit_development_candidate_supplies_the_review_shell(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
-            _write_site_data(root)
-            resources_shell = root / "resources/review-shell"
-            resources_shell.mkdir(parents=True)
-            (resources_shell / "index.html").write_text(
-                "released\n", encoding="utf-8"
-            )
-            candidate = root / "candidate"
-            package = candidate / "packages/orinoco-lite/src/orinoco_lite"
-            package.mkdir(parents=True)
-            (package / "__init__.py").write_text("", encoding="utf-8")
-            shell = candidate / "packages/curation-review-app/dist-review"
-            shell.mkdir(parents=True)
-            (shell / "index.html").write_text("candidate\n", encoding="utf-8")
-            environment = {
-                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
-                "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(candidate),
-            }
-
-            with patch.dict("os.environ", environment, clear=True):
-                bind_review(
-                    load_workspace(root),
-                    root / "resources",
-                    root / "build/site/review",
-                    repository="ORINOCO-Lite/example-site",
-                )
-
-            self.assertEqual(
-                "candidate\n",
-                (root / "build/site/review/index.html").read_text(encoding="utf-8"),
-            )
-
     def test_disabled_binding_removes_the_reserved_review_route(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -267,7 +232,6 @@ class StaticReviewBindingTests(unittest.TestCase):
                 return ""
 
             with (
-                patch.object(site, "_preflight_hugo"),
                 patch.object(site, "_assemble"),
                 patch.object(site, "_build_provenance", return_value={}),
                 patch.object(site, "_write_build_provenance_footer"),

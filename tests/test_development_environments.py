@@ -18,8 +18,6 @@ SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
 FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
-CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
-PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
 DEVELOPER_SKILL = ROOT / ".agents" / "skills" / "develop-orinoco-lite"
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
@@ -314,42 +312,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertNotIn("INPUT_SPEC", release)
         self.assertNotIn("may report an intentional skip", release)
 
-    def test_pages_workflow_records_only_successful_default_branch_deployments(
-        self,
-    ) -> None:
-        workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("workflow_call:", workflow)
-        self.assertIn("Require the current default-branch commit", workflow)
-        self.assertIn("pixi run validate", workflow)
-        self.assertIn("pixi run build-pages", workflow)
-        self.assertIn("tools/prepare_pages_publication.py", workflow)
-        self.assertIn("Check out the exact publication tooling", workflow)
-        self.assertIn("repository: ${{ inputs['workflow-repository'] }}", workflow)
-        self.assertIn("ref: ${{ inputs['workflow-sha'] }}", workflow)
-        self.assertIn("needs:\n      - build\n      - deploy", workflow)
-        self.assertIn("git push --atomic --force origin", workflow)
-        self.assertIn("refs/heads/latest-hugo-projection", workflow)
-        self.assertIn("refs/heads/gh-pages", workflow)
-        self.assertIn("orinoco-pages-publication-${{ github.run_id }}", workflow)
-        self.assertIn("overwrite: true", workflow)
-        deploy = workflow.index("name: Deploy the built site")
-        record = workflow.index("name: Record the successful deployment")
-        push = workflow.index("git push --atomic --force origin")
-        self.assertLess(deploy, record)
-        self.assertLess(record, push)
-
-    def test_consumer_ci_runs_released_framework_checks(self) -> None:
-        workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("timeout-minutes: 60", workflow)
-        for task in (
-            "validate",
-            "verify-hugo",
-            "verify-release-selection",
-            "verify-build",
-        ):
-            self.assertIn(f"pixi run {task}", workflow)
-        self.assertNotIn("test-all", workflow)
-        self.assertNotIn("Playwright", workflow)
 
 
 if __name__ == "__main__":

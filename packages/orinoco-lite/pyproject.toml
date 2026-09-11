@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 [project.scripts]
-orinoco = "orinoco_lite.cli:main"
+orinoco-lite = "orinoco_lite.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

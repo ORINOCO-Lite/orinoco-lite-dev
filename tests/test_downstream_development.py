@@ -48,9 +48,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                     "project_name": "Downstream name",
                     "site_description": "Obsolete downstream description",
                     "site_base_url": "https://obsolete.example.invalid/",
-                    "package_version": "0.1.0",
-                    "template_source": "gh:old/template",
-                    "template_version": "v0.1.0",
+                    "package_url": "https://example.invalid/old.whl",
                 },
                 sort_keys=False,
             ),
@@ -138,11 +136,6 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             ),
             environment["PYTHONPATH"],
         )
-        self.assertEqual(
-            os.fspath(package.resolve()),
-            environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"],
-        )
-        self.assertEqual("1", environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"])
         self.assertEqual("example/downstream", environment["GITHUB_REPOSITORY"])
 
     def test_candidate_environment_records_explicit_content_commit(self) -> None:
@@ -202,15 +195,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 {
                     "_subdirectory": "copier-template",
                     "project_slug": {"type": "str", "default": "template-site"},
-                    "package_version": {"type": "str", "default": "0.2.0"},
-                    "template_source": {
-                        "type": "str",
-                        "default": "gh:new/template",
-                    },
-                    "template_version": {
-                        "type": "str",
-                        "default": "v0.2.0",
-                    },
+                    "package_url": {"type": "str", "default": "https://example.invalid/new.whl"},
                 },
                 sort_keys=False,
             ),
@@ -220,34 +205,10 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         answers = development._template_answers(self.downstream, template)
 
         self.assertEqual("downstream-site", answers["project_slug"])
-        self.assertEqual("0.2.0", answers["package_version"])
-        self.assertEqual("gh:new/template", answers["template_source"])
-        self.assertEqual("v0.2.0", answers["template_version"])
+        self.assertEqual("https://example.invalid/new.whl", answers["package_url"])
         self.assertNotIn("project_name", answers)
         self.assertNotIn("site_description", answers)
         self.assertNotIn("site_base_url", answers)
-
-    def test_normalized_answers_use_candidate_release_identity(self) -> None:
-        candidate = self.root / "candidate"
-        candidate.mkdir()
-        (candidate / ".copier-answers.yml").write_text(
-            "_src_path: .\nproject_name: Example\n_commit: HEAD\n",
-            encoding="utf-8",
-        )
-
-        development._normalize_copier_answers(
-            candidate,
-            {
-                "template_source": "gh:new/template",
-                "template_version": "v0.2.0",
-            },
-        )
-
-        normalized = yaml.safe_load(
-            (candidate / ".copier-answers.yml").read_text(encoding="utf-8")
-        )
-        self.assertEqual("gh:new/template", normalized["_src_path"])
-        self.assertEqual("v0.2.0", normalized["_commit"])
 
     def test_quick_and_full_modes_have_distinct_scopes(self) -> None:
         self.assertEqual(
@@ -260,9 +221,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertEqual(
             (
                 "validate",
-                "verify-hugo",
-                "verify-release-selection",
-                "verify-build",
+                            "verify-build",
             ),
             development.task_names("full", ()),
         )
@@ -315,6 +274,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
             patch.object(development, "prepare_candidate_resources") as resources,
             patch.object(development, "_run") as run,
+            patch.object(development.shutil, "copytree"),
         ):
             development.exercise_candidate(
                 candidate,
@@ -327,9 +287,9 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             run.call_args_list[0].args[0],
         )
         resources.assert_called_once()
-        self.assertEqual("build", run.call_args_list[1].args[0][-1])
-        environment = run.call_args_list[1].kwargs["environment"]
-        self.assertIn("ORINOCO_CANDIDATE_EDITOR_SHELL", environment)
+        self.assertEqual("build", run.call_args_list[-1].args[0][-1])
+        environment = run.call_args_list[-1].kwargs["environment"]
+        self.assertNotIn("PYTHONPATH", environment)
 
     def test_focused_indirect_build_task_prepares_candidate_review_shell(self) -> None:
         candidate = self.root / "candidate"
@@ -346,6 +306,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
             patch.object(development, "prepare_candidate_resources"),
             patch.object(development, "_run") as run,
+            patch.object(development.shutil, "copytree"),
         ):
             development.exercise_candidate(
                 candidate,
@@ -359,7 +320,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         )
         self.assertEqual(
             "build-browser-pages",
-            run.call_args_list[1].args[0][-1],
+            run.call_args_list[-1].args[0][-1],
         )
 
     def test_selected_tasks_are_run(self) -> None:
@@ -372,6 +333,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
             patch.object(development, "_run") as run,
+            patch.object(development.shutil, "copytree"),
         ):
             development.exercise_candidate(
                 candidate,

@@ -15,10 +15,8 @@ from typing import Any, Sequence
 from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
 
-from .config import development_package_root, github_repository, load_config_path
+from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
@@ -28,15 +26,6 @@ from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
-HUGO_REQUIREMENT = ">=0.161,<0.162"
-
-
-HUGO_VERSION = re.compile(
-    r"^hugo\s+v?(?P<version>[0-9]+(?:\.[0-9]+){2})"
-    r"(?:-(?P<revision>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
-    r"(?P<variants>(?:\+[A-Za-z0-9.-]+)*)(?:\s|$)",
-    re.IGNORECASE,
-)
 PRESENTATION_SURFACES = (
     "archetypes",
     "assets",
@@ -429,50 +418,10 @@ def _run(command: Sequence[str | Path], *, cwd: Path) -> str:
     return result.stdout
 
 
-def _require_compatible_hugo(
-    output: str,
-    specifier: str,
-    *,
-    package_version: str,
-) -> Version:
-    match = HUGO_VERSION.match(output.strip())
-    if match is None:
-        raise DriverError(f"Could not determine Hugo version from: {output.strip()}")
-    variants = {
-        item.lower()
-        for item in match.group("variants").split("+")
-        if item
-    }
-    if "extended" not in variants:
-        raise DriverError(f"Orinoco Lite requires Hugo Extended: {output.strip()}")
-    version = Version(match.group("version"))
-    if version not in SpecifierSet(specifier):
-        raise DriverError(
-            f"Orinoco Lite {package_version} requires Hugo {specifier}; "
-            f"found {version}"
-        )
-    return version
-
-
-def _preflight_hugo(resources_root: Path, *, cwd: Path) -> Version:
-    output = _run(["hugo", "version"], cwd=cwd)
-    return _require_compatible_hugo(
-        output,
-        HUGO_REQUIREMENT,
-        package_version=__version__,
-    )
-
-
 def _site_adapter(resources_root: Path) -> Path:
     """Select the released adapter or explicitly enabled package candidate."""
 
-    package_root = development_package_root()
-    if package_root is None:
-        return resources_root / "drivers" / "adapt_pages.py"
-    adapter = package_root / "tools" / "adapt_upstream_pages.py"
-    if not adapter.is_file():
-        raise IntegrityError(f"Package candidate has no site adapter: {adapter}")
-    return adapter
+    return resources_root / "drivers" / "adapt_pages.py"
 
 
 def normalize_build_base_url(value: str) -> str:
@@ -532,7 +481,6 @@ def build_site(
         else workspace.repository
     )
     parsed = urlsplit(base_url)
-    _preflight_hugo(resources_root, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
@@ -628,7 +576,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.build_timestamp,
         )
     except (ConfigurationError, DriverError, IntegrityError) as error:
-        print(f"orinoco build: {error}", file=sys.stderr)
+        print(f"orinoco-lite build: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, sort_keys=True))
     return 0

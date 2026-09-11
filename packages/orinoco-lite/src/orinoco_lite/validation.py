@@ -189,12 +189,13 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     downstream structure fails before projection or website generation.
     """
 
-    if (workspace.root / ".gitmodules").exists():
+    links = _gitlinks(workspace.root)
+    site_submodule = links == ["site-specific"]
+    if (workspace.root / ".gitmodules").exists() and not site_submodule:
         raise ConfigurationError(
             "A downstream Orinoco repository must not contain .gitmodules"
         )
-    links = _gitlinks(workspace.root)
-    if links:
+    if links and not site_submodule:
         raise ConfigurationError(
             f"A downstream Orinoco repository must not contain gitlinks: {links}"
         )
