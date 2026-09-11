@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORINOCO-Lite/orinoco-lite-template
-          ref: 9d7b93bca1d391367a911b15cc30678c71bfe1aa
+          ref: 10eeec570bde89f3b799576db855eb0c7c9d63bf
           path: build/orinoco-lite-template
           persist-credentials: false
           fetch-depth: 1
