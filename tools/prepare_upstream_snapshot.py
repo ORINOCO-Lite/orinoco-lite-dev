@@ -11,7 +11,7 @@ from pathlib import Path
 
 from orinoco_lite import upstream_snapshot
 from orinoco_lite import upstream_orinoco_records
-import prepare_local_stack as source
+import upstream_pool_snapshot as source
 
 
 ROOT = Path(__file__).resolve().parents[1]
