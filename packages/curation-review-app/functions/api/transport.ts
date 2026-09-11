@@ -250,7 +250,6 @@ async function startReview(session) {
     finished = true;
     post(result);
     setStatus(result.error === null ? "GitHub received the confirmed decisions." : result.error);
-    window.setTimeout(() => window.close(), 250);
   };
   window.addEventListener("message", listener);
   post({ ...reviewCoordinates(), format: "orinoco-lite-review-transport-ready-v1" });
@@ -318,7 +317,6 @@ async function startShacl(session) {
     finished = true;
     post(result);
     setStatus(result.error === null ? "GitHub created the proposal." : result.error);
-    window.setTimeout(() => window.close(), 250);
   };
   window.addEventListener("message", listener);
   post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-ready-v1" });

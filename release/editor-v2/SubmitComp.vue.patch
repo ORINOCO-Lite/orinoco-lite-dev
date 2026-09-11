@@ -57,30 +57,6 @@ index 9621e55..b0787b0 100644
 +                            >Improve this with a custom domain</a>
 +                        </p>
 +                    </v-alert>
-+                    <v-alert
-+                        v-if="proposalMode && !framedContext"
-+                        type="warning"
-+                        variant="tonal"
-+                        style="margin-top: 1em;"
-+                    >
-+                        <strong>GitHub App required</strong>
-+                        <p>
-+                            GitHub proposals require the Orinoco Lite GitHub App.
-+                            If it is not installed for this repository, install it
-+                            before proposing a change.
-+                        </p>
-+                        <a
-+                            :href="curationInstallUrl(config.review_bundle_proposal)"
-+                            rel="noreferrer"
-+                            target="_blank"
-+                        >Install the Orinoco Lite GitHub App</a>
-+                        <br />
-+                        <a
-+                            :href="curationSetupUrl(config.review_bundle_proposal)"
-+                            rel="noreferrer"
-+                            target="_blank"
-+                        >Read authorization and custom-app instructions</a>
-+                    </v-alert>
 +                    <p v-if="proposalMode && !framedContext">
 +                        <strong>GitHub repository:</strong>
 +                        {{ config.review_bundle_proposal.repository }}.
@@ -92,16 +68,15 @@ index 9621e55..b0787b0 100644
                  <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
                  {{ responseText }}
 +                <v-alert
-+                    v-if="proposalMode && responseFailure"
++                    v-if="proposalAuthorizationFailure"
 +                    type="warning"
 +                    variant="tonal"
 +                    style="margin-top: 1em;"
 +                >
-+                    <strong>Check GitHub App access before retrying</strong>
++                    <strong>The GitHub App cannot access this repository</strong>
 +                    <p>
-+                        GitHub did not confirm that it created a draft pull request.
-+                        Check the repository first. If no pull request exists,
-+                        install or authorize the Orinoco Lite GitHub App, then retry.
++                        Install the Orinoco Lite GitHub App for this repository,
++                        approve any pending organization or SSO request, and retry.
 +                    </p>
 +                    <a
 +                        :href="curationInstallUrl(config.review_bundle_proposal)"
@@ -188,6 +163,20 @@ index 9621e55..b0787b0 100644
 +    () =>
 +        config.value?.review_bundle_proposal?.shared_github_pages_origin === true ||
 +        isSharedGithubPagesOrigin()
++);
++const proposalAuthorizationFailure = computed(
++    () =>
++        proposalMode.value &&
++        responseFailure.value &&
++        responseErrors.value.some((error) =>
++            [401, 403, 404].includes(Number(error.status)) ||
++            [
++                'authentication_required',
++                'curator_permission_required',
++                'github_forbidden',
++                'github_not_found',
++            ].includes(error.statusText)
++        )
 +);
 +
 +function accessibleRecordSubmissionLabel(record) {
