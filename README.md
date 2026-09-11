@@ -82,6 +82,9 @@ Initialize engineering submodules only when cross-component work needs them:
 pixi run checkout-submodules
 ```
 
+`pixi run serve-upstream-static` captures or reuses the public upstream Pool snapshot, verifies its YAML storage projection, regenerates the Hugo projection with Orinoco Lite and the selected `www-from-model` templates, and serves the result without starting metadata or editor services.
+Set `REFRESH_UPSTREAM_POOL=1` to replace the cached snapshot deliberately.
+
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.
 

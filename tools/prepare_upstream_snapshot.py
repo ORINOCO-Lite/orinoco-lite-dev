@@ -10,11 +10,11 @@ import os
 from pathlib import Path
 
 if __package__:
-    from . import prepare_local_stack as source
+    from . import upstream_pool_snapshot as source
     from . import upstream_orinoco_records
     from . import upstream_snapshot
 else:  # Direct ``python tools/...`` use.
-    import prepare_local_stack as source
+    import upstream_pool_snapshot as source
     import upstream_orinoco_records
     import upstream_snapshot
 

@@ -87,11 +87,17 @@ site_git \
   annex get --from "$annex_remote_name" .
 test -z "$(site_git -c annex.private=true annex find --not --in=here)"
 
+site_source="$site_root"
+if [[ "${ORINOCO_UPSTREAM_SNAPSHOT_PROJECTION:-}" == 1 ]]; then
+  python3 "$repository_root/tools/project_upstream_static.py"
+  site_source="$repository_root/build/upstream-static/hugo-source"
+fi
+
 hugo version | grep -q 'hugo v0\.161\.1.*extended'
 hugo \
   --minify \
   --cleanDestinationDir \
-  --source "$site_root" \
+  --source "$site_source" \
   --destination "$destination" \
   --baseURL "$base_url"
 
