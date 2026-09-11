@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite.errors import IntegrityError
-from orinoco_lite.presentation import resolve_presentation
+from orinoco_lite.presentation import hugo_requirement, resolve_presentation
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -203,6 +203,37 @@ class PresentationResolverTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(IntegrityError, "source commit"):
                 resolve_presentation(self.workspace, resources)
+
+    def test_hugo_requirement_comes_from_the_deployment_workflow(self) -> None:
+        workflow = self.website / ".forgejo/workflows/deploy.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text(
+            "jobs:\n"
+            "  deploy:\n"
+            "    steps:\n"
+            "      - uses: https://github.com/peaceiris/actions-hugo@v3\n"
+            "        with:\n"
+            "          hugo-version: '1.2.3'\n"
+            "          extended: true\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(hugo_requirement(self.website), "==1.2.3")
+
+    def test_hugo_requirement_rejects_ambiguous_or_nonextended_inputs(self) -> None:
+        workflow = self.website / ".forgejo/workflows/deploy.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text(
+            "jobs:\n"
+            "  deploy:\n"
+            "    steps:\n"
+            "      - uses: peaceiris/actions-hugo@v3\n"
+            "        with:\n"
+            "          hugo-version: latest\n"
+            "          extended: false\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(IntegrityError, "Hugo Extended"):
+            hugo_requirement(self.website)
 
 
 if __name__ == "__main__":

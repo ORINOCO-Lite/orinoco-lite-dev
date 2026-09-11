@@ -7,6 +7,27 @@ requires-pixi = ">=0.76,<0.77"
 [dependencies]
 python = ">=3.12,<3.13"
 
+[feature.upstream.dependencies]
+python = ">=3.12,<3.13"
+hugo = "==0.154.5"
+
+[feature.upstream.target.linux-64.dependencies]
+git-annex = "==10.20260601"
+
+[feature.upstream.target.osx-arm64-macos-14-0.pypi-dependencies]
+git-annex = "==10.20260601"
+
+[feature.upstream-full.dependencies]
+nodejs = ">=22,<23"
+make = "==4.4.1"
+
+[feature.upstream-full.pypi-dependencies]
+dump-things-service = { path = "submodules/dump-things-service", editable = true }
+
+[environments]
+upstream-static = { features = ["upstream"], no-default-feature = true }
+upstream-full = { features = ["upstream", "upstream-full"], no-default-feature = true }
+
 [tasks]
 test-package = "python tools/run_unittests.py --discover packages/orinoco-lite/tests"
 test-package-strict = "python tools/run_unittests.py --fail-on-skip --discover packages/orinoco-lite/tests"
@@ -14,10 +35,10 @@ test-development = "python -m unittest tests.test_checkout_submodules tests.test
 test = { depends-on = ["test-package", "test-development"] }
 test-ci = { depends-on = ["test-package-strict", "test-development"] }
 checkout-submodules = "python tools/checkout_submodules.py"
-build-upstream-static = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build'
-serve-upstream-static = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve'
-build-upstream-static-worktree = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build --checkout worktree'
-serve-upstream-static-worktree = '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve --checkout worktree'
+build-upstream-static = '"$PIXI_EXE" run --frozen --environment upstream-static python tools/upstream_static.py build'
+serve-upstream-static = '"$PIXI_EXE" run --frozen --environment upstream-static python tools/upstream_static.py serve'
+build-upstream-static-worktree = '"$PIXI_EXE" run --frozen --environment upstream-static python tools/upstream_static.py build --checkout worktree'
+serve-upstream-static-worktree = '"$PIXI_EXE" run --frozen --environment upstream-static python tools/upstream_static.py serve --checkout worktree'
 serve-upstream = "python tools/upstream_full_launcher.py serve recorded"
 serve-upstream-worktree = "python tools/upstream_full_launcher.py serve worktree"
 check-upstream = "python tools/upstream_full_launcher.py check recorded"

@@ -11,6 +11,9 @@ import subprocess
 import tempfile
 from typing import Sequence
 
+from packaging.version import InvalidVersion, Version
+import yaml
+
 from .config import development_package_root
 from .errors import IntegrityError
 from .resources import SOURCE_REPOSITORY, source_commit
@@ -18,6 +21,48 @@ from .resources import SOURCE_REPOSITORY, source_commit
 
 _GIT_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 _PRESENTATION_GITLINK = "submodules/www-from-model"
+_DEPLOY_WORKFLOW = Path(".forgejo/workflows/deploy.yml")
+
+
+def hugo_requirement(presentation: Path) -> str:
+    """Return the exact Hugo Extended requirement declared by the site."""
+
+    workflow = presentation / _DEPLOY_WORKFLOW
+    if workflow.is_symlink() or not workflow.is_file():
+        raise IntegrityError(f"Presentation has no deployment workflow: {workflow}")
+    try:
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        raise IntegrityError(f"Could not read presentation deployment workflow: {error}") from error
+    if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
+        raise IntegrityError("Presentation deployment workflow has no jobs mapping")
+
+    declarations: list[str] = []
+    for job in document["jobs"].values():
+        if not isinstance(job, dict) or not isinstance(job.get("steps"), list):
+            continue
+        for step in job["steps"]:
+            if not isinstance(step, dict) or not str(step.get("uses", "")).endswith(
+                "/actions-hugo@v3"
+            ):
+                continue
+            inputs = step.get("with")
+            if not isinstance(inputs, dict) or inputs.get("extended") is not True:
+                raise IntegrityError("Presentation must select Hugo Extended")
+            version = inputs.get("hugo-version")
+            if not isinstance(version, str):
+                raise IntegrityError("Presentation Hugo version must be an exact string")
+            declarations.append(version)
+
+    if len(declarations) != 1:
+        raise IntegrityError("Presentation must declare exactly one Hugo version")
+    try:
+        version = Version(declarations[0])
+    except InvalidVersion as error:
+        raise IntegrityError("Presentation Hugo version is invalid") from error
+    if version.is_prerelease or version.is_devrelease or len(version.release) != 3:
+        raise IntegrityError("Presentation Hugo version must be an exact release")
+    return f"=={version}"
 
 
 def _git_environment() -> dict[str, str]:

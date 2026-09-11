@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare full upstream gitlinks before resolving their inline environment."""
+"""Prepare full upstream gitlinks before entering its Pixi environment."""
 
 from __future__ import annotations
 
@@ -13,9 +13,6 @@ from upstream_checkout import UpstreamCheckoutError, prepare_full_checkout
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "tools" / "upstream_full.py"
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("serve", "check", "test"))
@@ -33,8 +30,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             pixi,
             "run",
             "--frozen",
-            "--script",
-            str(SCRIPT),
+            "--environment",
+            "upstream-full",
+            "python",
+            "tools/upstream_full.py",
             args.command,
             "--checkout",
             args.mode,

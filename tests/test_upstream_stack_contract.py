@@ -71,7 +71,7 @@ class UpstreamStackContractTests(unittest.TestCase):
                     mode="recorded",
                 )
 
-    def test_full_tasks_and_inline_environment_are_scoped(self) -> None:
+    def test_full_tasks_and_repository_environment_are_scoped(self) -> None:
         tasks = tomllib.loads((ROOT / "pixi.toml").read_text())["tasks"]
         self.assertEqual(
             tasks["serve-upstream"],
@@ -101,22 +101,16 @@ class UpstreamStackContractTests(unittest.TestCase):
             tasks["refresh-upstream-records"],
             "python tools/prepare_upstream_snapshot.py --refresh",
         )
-        source = (ROOT / "tools" / "upstream_full.py").read_text()
-        self.assertIn("[tool.pixi.pypi-dependencies]", source)
+        manifest = (ROOT / "pixi.toml").read_text()
         self.assertIn(
-            'dump-things-service = { path = "../submodules/dump-things-service"',
-            source,
+            'dump-things-service = { path = "submodules/dump-things-service"',
+            manifest,
         )
-        self.assertIn('nodejs = ">=22,<23"', source)
-        self.assertTrue((ROOT / "tools" / "upstream_full.py.pixi.lock").is_file())
-        lock = (ROOT / "tools" / "upstream_full.py.pixi.lock").read_text()
-        for package, version in (
-            ("linkml", "1.11.1"),
-            ("linkml-runtime", "1.11.1"),
-            ("pydantic", "2.13.4"),
-            ("rdflib", "7.6.0"),
-        ):
-            self.assertIn(f"name: {package}\n  version: {version}", lock)
+        self.assertIn('nodejs = ">=22,<23"', manifest)
+        self.assertFalse((ROOT / "tools" / "upstream_full.py.pixi.lock").exists())
+        lock = (ROOT / "pixi.lock").read_text()
+        self.assertIn("upstream-full:", lock)
+        self.assertIn("name: dump-things-service", lock)
 
     def test_snapshot_is_materialized_for_snapshot_and_full_stack_tasks(self) -> None:
         preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()
