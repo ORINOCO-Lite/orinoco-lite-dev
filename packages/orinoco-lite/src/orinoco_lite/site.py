@@ -28,7 +28,7 @@ from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
-HUGO_REQUIREMENT = ">=0.161,<0.162"
+HUGO_REQUIREMENT = ">=0.154,<0.155"
 
 
 HUGO_VERSION = re.compile(
