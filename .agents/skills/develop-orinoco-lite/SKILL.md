@@ -6,7 +6,8 @@ description: Develop and exercise unreleased Orinoco Lite package or template ch
 # Develop Orinoco Lite
 
 Exercise package and template changes through a disposable downstream before release.
-When more than one repository changes and a browser preview is needed, use a downstream deploy preview with exact candidate package and template commits before releasing either component.
+When more than one repository changes, use a downstream deploy preview with exact candidate package and template commits for rendering and read-only browser checks before releasing either component.
+Exercise an authenticated GitHub write from the canonical origin of a user-owned demo, because the service must reject an untrusted deploy-preview origin.
 Do not cut a release merely to discover whether an unreleased package or template composes with a downstream.
 Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
 Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
@@ -23,6 +24,7 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    A deploy preview builds the downstream pull request head plus the explicit full-SHA package and, when relevant, template candidates.
    A branch name is not an adequate candidate coordinate.
    Keep candidate selectors preview-only; a merged downstream must retain its released, checksum-locked dependencies.
+   Do not use a successful deploy-preview build as evidence that the authenticated popup-to-GitHub path works.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
    Resolve missing access early.
 4. Treat a release and reference-downstream merge as separate gates.
@@ -70,6 +72,18 @@ Standing authority covers the mechanics of the exercise, not invented metadata o
 Use supplied fixture decisions or retained reviewed state.
 Follow `docs/agents/contract/github-curation-review.md` and `docs/agents/contract/source-adapters.md` for the current curation contract rather than restating it in this skill.
 
+When package, template, browser, or service behavior affects the GitHub proposal path:
+
+- build the demo's exact default-branch commit with explicit full-SHA package and template candidates;
+- deploy the candidate temporarily at the demo's canonical editor origin without changing its default branch or released locks;
+- when the backend changed, deploy the matching backend candidate and retain the previous deployment coordinate for rollback;
+- navigate the editor in a real browser, make a harmless fixture edit, and click the actual **Propose via GitHub** action;
+- verify the browser result, created draft pull request, bundle-materialization commit, and downstream checks; and
+- close the exercise pull request and restore both the prior demo deployment and its normal deployment mode.
+
+Record the exact deployment refs before changing them and use lease-protected updates when restoring a deployment branch.
+An authorization failure from an untrusted preview origin is not evidence that the GitHub App is missing.
+
 ## Recover quickly
 
 Use GitHub's current state rather than polling by guesswork:
@@ -80,9 +94,9 @@ Use GitHub's current state rather than polling by guesswork:
 - for a deterministic failure, repair the owning working tree, pass the local candidate again, push the repair, and watch the replacement checks.
 
 The full local candidate run may replace duplicate pull-request CI when speed is more valuable than a second copy of the same evidence.
-Exercise editor and popup behavior in the browser against a local transport that structured-clones the proposal and simulates the ready, started, and result messages.
-Create scratch exercise pull requests with `gh`, not through the browser.
-A live authenticated popup-to-pull-request run is a separate manual acceptance check and must not block the normal autonomous development loop.
+Exercise editor and popup protocol details against a local transport that structured-clones the proposal and simulates the ready, started, and result messages.
+Create routine scratch exercise pull requests with `gh`.
+When the popup-to-pull-request behavior itself is under test, use the real browser action from the canonical demo candidate and inspect the pull request it creates.
 Merge a curation pull request according to the repository's current policy.
 After merge, verify the exact default-branch validation and Pages runs and the relevant deployed routes.
 If a merged demo change breaks validation or deployment, recover through a checked repair or revert pull request and verify the replacement deployment before reporting completion.

@@ -11,7 +11,9 @@
   Released package and template tasks and downstream website builds must not invoke or depend on Git Annex.
   DataLad remains a downstream dependency for recording source-adapter run provenance; correctly configured downstream repositories keep those records in Git without requiring Git Annex.
 - Test unreleased package and template work together by applying a selected downstream's declared inputs to a fresh disposable template instance with `pixi run test-downstream-candidate` when practical.
-  When multi-repository behavior or browser integration remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.
+  When multi-repository rendering remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.
+  A deploy preview is not the canonical trusted editor origin, so exercise authenticated GitHub writes from a temporary exact-SHA candidate deployed at the canonical origin of a user-owned demo.
+  Use the real browser action, verify the resulting pull request and trusted workflow, and restore the demo deployment afterward.
   Candidate selectors are preview-only; merged downstreams retain released, checksum-locked dependencies.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.

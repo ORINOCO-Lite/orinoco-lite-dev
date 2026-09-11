@@ -135,6 +135,7 @@ describe('Orinoco review bundles', () => {
     it('sends a confirmed proposal only to the exact transport popup', async () => {
         const listeners = new Map();
         const popup = {
+            close: vi.fn(),
             closed: false,
             postMessage: vi.fn((message) => structuredClone(message)),
         };
@@ -264,6 +265,7 @@ describe('Orinoco review bundles', () => {
         );
         expect(target.clearTimeout).toHaveBeenCalledWith(17);
         expect(target.clearInterval).toHaveBeenCalledWith(18);
+        expect(popup.close).toHaveBeenCalledOnce();
     });
 
     it('distinguishes retry-safe failures from uncertain post-start results', async () => {
