@@ -115,27 +115,16 @@ class DownstreamDevelopmentTests(unittest.TestCase):
             (candidate / "extensions/source-adapters/example/.pixi").exists()
         )
 
-    def test_package_environment_prefers_candidate_source(self) -> None:
+    def test_package_environment_uses_installed_candidate(self) -> None:
         package = self.root / "package"
-        source = package / "packages/orinoco-lite/src/orinoco_lite"
+        source = package / "packages/orinoco-lite"
         source.mkdir(parents=True)
-        (source / "__init__.py").write_text("", encoding="utf-8")
+        (source / "pyproject.toml").write_text("", encoding="utf-8")
 
         with patch.dict(os.environ, {"PYTHONPATH": "/existing"}, clear=False):
-            environment = development.candidate_environment(
-                package,
-                "example/downstream",
-            )
+            environment = development.candidate_environment(package, "example/downstream")
 
-        self.assertEqual(
-            os.pathsep.join(
-                (
-                    os.fspath(package.resolve() / "packages/orinoco-lite/src"),
-                    "/existing",
-                )
-            ),
-            environment["PYTHONPATH"],
-        )
+        self.assertNotIn("PYTHONPATH", environment)
         self.assertEqual("example/downstream", environment["GITHUB_REPOSITORY"])
 
     def test_candidate_environment_records_explicit_content_commit(self) -> None:
@@ -259,69 +248,29 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertIn("site-specific/metadata/records/one.yaml", committed)
         self.assertNotIn("generated/stale.txt", committed)
 
-    def test_build_task_prepares_candidate_shells(self) -> None:
+    def test_build_task_installs_source_candidate(self) -> None:
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
         package = self.root / "package"
-        source = package / "packages/orinoco-lite/src/orinoco_lite"
+        source = package / "packages/orinoco-lite"
         source.mkdir(parents=True)
-        (source / "__init__.py").write_text("", encoding="utf-8")
-        application = package / "packages/curation-review-app"
-        (application / "node_modules").mkdir(parents=True)
+        (source / "pyproject.toml").write_text("", encoding="utf-8")
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
-            patch.object(development, "prepare_candidate_resources") as resources,
             patch.object(development, "_run") as run,
-            patch.object(development.shutil, "copytree"),
         ):
-            development.exercise_candidate(
-                candidate,
-                package=package,
-                tasks=("build",),
-            )
+            development.exercise_candidate(candidate, package=package, tasks=("build",))
 
+        self.assertEqual(2, run.call_count)
         self.assertEqual(
-            ("npm", "run", "build:review"),
+            ("/bin/pixi", "add", "--manifest-path", candidate / "pixi.toml", "--pypi",
+             f"orinoco-lite @ {source.resolve()}"),
             run.call_args_list[0].args[0],
         )
-        resources.assert_called_once()
         self.assertEqual("build", run.call_args_list[-1].args[0][-1])
-        environment = run.call_args_list[-1].kwargs["environment"]
-        self.assertNotIn("PYTHONPATH", environment)
-
-    def test_focused_indirect_build_task_prepares_candidate_review_shell(self) -> None:
-        candidate = self.root / "candidate"
-        candidate.mkdir()
-        (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
-        package = self.root / "package"
-        source = package / "packages/orinoco-lite/src/orinoco_lite"
-        source.mkdir(parents=True)
-        (source / "__init__.py").write_text("", encoding="utf-8")
-        application = package / "packages/curation-review-app"
-        (application / "node_modules").mkdir(parents=True)
-
-        with (
-            patch.object(development.shutil, "which", return_value="/bin/pixi"),
-            patch.object(development, "prepare_candidate_resources"),
-            patch.object(development, "_run") as run,
-            patch.object(development.shutil, "copytree"),
-        ):
-            development.exercise_candidate(
-                candidate,
-                package=package,
-                tasks=("build-browser-pages",),
-            )
-
-        self.assertEqual(
-            ("npm", "run", "build:review"),
-            run.call_args_list[0].args[0],
-        )
-        self.assertEqual(
-            "build-browser-pages",
-            run.call_args_list[-1].args[0][-1],
-        )
+        self.assertNotIn("PYTHONPATH", run.call_args_list[-1].kwargs["environment"])
 
     def test_selected_tasks_are_run(self) -> None:
         candidate = self.root / "candidate"

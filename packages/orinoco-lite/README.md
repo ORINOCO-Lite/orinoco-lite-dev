@@ -26,6 +26,11 @@ Any resource specification or manifest needed to build or operate Orinoco Lite i
 
 ## Development
 
+Wheel, source, and editable installations provide the same CLI and bundled resources.
+Installing from the engineering checkout builds the resources automatically and requires Git, Make, and the initialized `pool.psychoinformatics.de-ui` (including `shacl-vue`) and `things-schemas` submodules.
+Python's isolated build environment supplies Node and npm.
+An editable installation picks up Python changes immediately; reinstall after changing bundled UI or schema sources.
+
 From the engineering repository root:
 
 ```console

@@ -24,8 +24,8 @@ def load_resources(root: Path) -> PackageResources:
     root = root.resolve()
     if not root.is_dir():
         raise IntegrityError(
-            "orinoco-lite package resources are absent; install a released wheel "
-            "or build the package resources before installing from source"
+            "orinoco-lite package resources are absent; reinstall orinoco-lite "
+            "to restore its bundled resources"
         )
     return PackageResources(root=root)
 

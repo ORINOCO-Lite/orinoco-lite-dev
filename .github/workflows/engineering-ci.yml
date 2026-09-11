@@ -81,6 +81,28 @@ jobs:
           ORINOCO_TEMPLATE_CANDIDATE: ${{ github.workspace }}/build/orinoco-lite-template
         run: pixi run test-template-candidate-quick
 
+      - name: Build the source archive and verify its installed wheel
+        shell: bash
+        run: |
+          pixi exec --spec python=3.12 --spec python-build -- \
+            python -m build packages/orinoco-lite --outdir build/package
+          wheels=(build/package/*.whl)
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi run orinoco-lite --help
+          pixi run python - <<'PY'
+          from orinoco_lite.resources import resolve_resources
+
+          root = resolve_resources().root
+          for name in (
+              "schema/demo-research-information/unreleased.yaml",
+              "editor-shell/index.html",
+              "review-shell/index.html",
+              "drivers/adapt_pages.py",
+          ):
+              assert (root / name).is_file(), name
+          PY
+          pixi run test-package-strict
+
       - name: Build the pinned upstream static site from a non-recursive clone
         run: pixi run build-upstream-static
 
