@@ -87,7 +87,6 @@ site_git \
   annex get --from "$annex_remote_name" .
 test -z "$(site_git -c annex.private=true annex find --not --in=here)"
 
-hugo version | grep -q 'hugo v0\.154\.5.*extended'
 hugo \
   --minify \
   --cleanDestinationDir \
