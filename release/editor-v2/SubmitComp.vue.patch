@@ -10,7 +10,7 @@ index 9621e55..b0787b0 100644
                                  :value="r.node_iri"
                                  align="start"
                                  class="align-start"
-@@ -55,12 +56,66 @@
+@@ -55,12 +56,113 @@
                              <em><h3>Nothing to submit</h3></em>
                          </div>
                      </span>
@@ -57,6 +57,30 @@ index 9621e55..b0787b0 100644
 +                            >Improve this with a custom domain</a>
 +                        </p>
 +                    </v-alert>
++                    <v-alert
++                        v-if="proposalMode && !framedContext"
++                        type="warning"
++                        variant="tonal"
++                        style="margin-top: 1em;"
++                    >
++                        <strong>GitHub App required</strong>
++                        <p>
++                            GitHub proposals require the Orinoco Lite GitHub App.
++                            If it is not installed for this repository, install it
++                            before proposing a change.
++                        </p>
++                        <a
++                            :href="curationInstallUrl(config.review_bundle_proposal)"
++                            rel="noreferrer"
++                            target="_blank"
++                        >Install the Orinoco Lite GitHub App</a>
++                        <br />
++                        <a
++                            :href="curationSetupUrl(config.review_bundle_proposal)"
++                            rel="noreferrer"
++                            target="_blank"
++                        >Read authorization and custom-app instructions</a>
++                    </v-alert>
 +                    <p v-if="proposalMode && !framedContext">
 +                        <strong>GitHub repository:</strong>
 +                        {{ config.review_bundle_proposal.repository }}.
@@ -68,26 +92,25 @@ index 9621e55..b0787b0 100644
                  <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
                  {{ responseText }}
 +                <v-alert
-+                    v-if="proposalHelpUrl"
++                    v-if="proposalMode && responseFailure"
 +                    type="warning"
 +                    variant="tonal"
 +                    style="margin-top: 1em;"
 +                >
-+                    <strong>GitHub authorization needs attention</strong>
++                    <strong>Check GitHub App access before retrying</strong>
 +                    <p>
-+                        The Orinoco Lite GitHub App may not be installed for this
-+                        repository, or GitHub may still need organization SSO
-+                        approval. Install or authorize the app, then retry.
++                        GitHub did not confirm that it created a draft pull request.
++                        Check the repository first. If no pull request exists,
++                        install or authorize the Orinoco Lite GitHub App, then retry.
 +                    </p>
 +                    <a
-+                        v-if="proposalInstallUrl"
-+                        :href="proposalInstallUrl"
++                        :href="curationInstallUrl(config.review_bundle_proposal)"
 +                        rel="noreferrer"
 +                        target="_blank"
 +                    >Install the Orinoco Lite GitHub App</a>
-+                    <br v-if="proposalInstallUrl" />
++                    <br />
 +                    <a
-+                        :href="proposalHelpUrl"
++                        :href="curationSetupUrl(config.review_bundle_proposal)"
 +                        rel="noreferrer"
 +                        target="_blank"
 +                    >Read authorization and custom-app instructions</a>
@@ -148,8 +171,6 @@ index 9621e55..b0787b0 100644
  const responseFailure = ref(false);
 +const proposalResult = ref(null);
 +const proposing = ref(false);
-+const proposalHelpUrl = ref(null);
-+const proposalInstallUrl = ref(null);
 
  const showCompleteFailure = ref(false);
  const responseText = ref('');
@@ -198,8 +219,6 @@ index 9621e55..b0787b0 100644
      awaitingResponse.value = false;
 +    proposalResult.value = null;
 +    proposing.value = false;
-+    proposalHelpUrl.value = null;
-+    proposalInstallUrl.value = null;
 +
 +}
 +
@@ -268,24 +287,6 @@ index 9621e55..b0787b0 100644
 +                statusText: code || 'proposal_error',
 +            },
 +        ];
-+        if (
-+            status === 401 ||
-+            status === 403 ||
-+            status === 404 ||
-+            code === 'authentication_required' ||
-+            code === 'curator_permission_required' ||
-+            code === 'github_forbidden' ||
-+            code === 'github_oauth_not_authorized' ||
-+            code === 'github_oauth_error' ||
-+            code === 'github_app_setup_misdirected'
-+        ) {
-+            proposalHelpUrl.value = curationSetupUrl(
-+                config.value.review_bundle_proposal
-+            );
-+            proposalInstallUrl.value = curationInstallUrl(
-+                config.value.review_bundle_proposal
-+            );
-+        }
 +    } finally {
 +        proposing.value = false;
 +    }

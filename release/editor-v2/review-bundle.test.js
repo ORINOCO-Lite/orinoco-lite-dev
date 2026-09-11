@@ -337,7 +337,7 @@ describe('Orinoco review bundles', () => {
             status: 403,
         });
         await expect(runFailure(false)).rejects.toThrow(
-            /result is uncertain.*before retrying/,
+            /did not confirm.*If no pull request exists.*then retry/,
         );
     });
 

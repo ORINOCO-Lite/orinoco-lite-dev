@@ -346,7 +346,9 @@ export function beginReviewBundleProposal(value, target = window) {
                 const message = event.data.error;
                 dispose();
                 const error = new Error(
-                    `${message} The GitHub proposal result is uncertain. Check the repository before retrying.`,
+                    `${message} GitHub did not confirm that it created a pull ` +
+                        'request. Check the repository first. If no pull request ' +
+                        'exists, install or authorize the GitHub App, then retry.',
                 );
                 error.code =
                     typeof event.data.error_code === 'string'
@@ -384,7 +386,11 @@ export function beginReviewBundleProposal(value, target = window) {
         () =>
             dispose({
                 reject: started
-                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    ? (
+                        'GitHub did not confirm that it created a pull request. ' +
+                        'Check the repository first. If no pull request exists, ' +
+                        'install or authorize the GitHub App, then retry.'
+                    )
                     : 'The GitHub proposal transport expired before writing.',
             }),
         HANDOFF_TIMEOUT_MS,
@@ -393,7 +399,11 @@ export function beginReviewBundleProposal(value, target = window) {
         if (popup.closed) {
             dispose({
                 reject: started
-                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    ? (
+                        'GitHub did not confirm that it created a pull request. ' +
+                        'Check the repository first. If no pull request exists, ' +
+                        'install or authorize the GitHub App, then retry.'
+                    )
                     : 'The GitHub proposal window was closed before writing.',
             });
         }

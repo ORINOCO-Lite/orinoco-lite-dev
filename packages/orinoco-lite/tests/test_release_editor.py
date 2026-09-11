@@ -215,9 +215,13 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
                 "GitHub proposal unavailable inside this editor",
                 source,
             )
-            self.assertIn("GitHub authorization needs attention", source)
+            self.assertIn("GitHub App required", source)
             self.assertIn(
-                "The Orinoco Lite GitHub App may not be installed for this",
+                "If it is not installed for this repository, install it",
+                source,
+            )
+            self.assertIn(
+                "GitHub did not confirm that it created a draft pull request.",
                 source,
             )
             self.assertNotIn("The button below submits", source)
