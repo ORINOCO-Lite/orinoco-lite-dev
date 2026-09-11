@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: Orinoco Lite
+version: 0.3.0rc5
+type: software
+abstract: >-
+  Location-independent build and release interface for Orinoco Lite sites.
+authors:
+  - name: Center for Open Neuroscience
+license: MIT
+repository-code: https://github.com/ORINOCO-Lite/orinoco-lite-dev
+url: https://github.com/ORINOCO-Lite/orinoco-lite-dev
+keywords:
+  - metadata curation
+  - knowledge graphs
+  - static websites
+message: >-
+  If you use Orinoco Lite, please cite the specific release you used. The
+  release DOI will be added here after Zenodo archiving is enabled.

@@ -27,9 +27,24 @@ dependencies:
   content_hash: sha256:e8369d16ff72f99dfb6ffe04111bb5e8e7eba533bab21c64be8cda91fa3f9c3e
   skill_subset:
   - asd-ste100
+- repo_url: leej3/skills
+  name: introduce-reuse-compliance
+  host: github.com
+  resolved_commit: 512e58d193d22a29ba37df26a25321b695890384
+  resolved_ref: 512e58d193d22a29ba37df26a25321b695890384
+  version: unknown
+  virtual_path: introduce-reuse-compliance
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/introduce-reuse-compliance
+  - .agents/skills/introduce-reuse-compliance/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/introduce-reuse-compliance/SKILL.md: sha256:bc286bc60229150e83112a1d0058adb6e38de10d1b200f0ad67fbb7fda92e761
+  content_hash: sha256:a7e4a66d61a0ee37096ee361150dec083e9a2c8ea784e3544c8feb2cfc1b048e
 deployments:
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill
   runtime: null
   scope: project
@@ -38,7 +53,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: null
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/LICENSE
   runtime: null
   scope: project
@@ -47,7 +62,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:d3c674e8592076c9021a59b55177adbcba6fd7e1710082becb922522b22ec672
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/README.md
   runtime: null
   scope: project
@@ -56,7 +71,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:4e6f924cf42a6eee485ea844b5caa7e39f31e67040dc7fe12a0c78aeb92ce8cd
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/SKILL.md
   runtime: null
   scope: project
@@ -65,7 +80,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:8d017c4b2bd83aa94588ca9ac3a83dc9a05a47949102aab643eb972ce9efe659
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/examples/before-after.md
   runtime: null
   scope: project
@@ -74,7 +89,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:d7bf2b4a390f1997a18790b243dd4c0670018d0d4d5183ec8ed44cbbf282bc52
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/references/writing-rules.md
   runtime: null
   scope: project
@@ -83,7 +98,7 @@ deployments:
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:4b92c86bf803f9f54e069767d34dc7356fbb95fb52a3f28476093917c608c102
 - kind: project-relative
-  target: codex
+  target: agents
   value: .agents/skills/asd-ste100-skill/scripts/ste-lint.py
   runtime: null
   scope: project
@@ -91,3 +106,21 @@ deployments:
   - danyuchn/asd-ste100-skill
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:c2c2013476d1a4737db91f6e44c9f89554b3df28f91547deac8638b13437c55f
+- kind: project-relative
+  target: agents
+  value: .agents/skills/introduce-reuse-compliance
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills/introduce-reuse-compliance
+  active_owner: leej3/skills/introduce-reuse-compliance
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/introduce-reuse-compliance/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/skills/introduce-reuse-compliance
+  active_owner: leej3/skills/introduce-reuse-compliance
+  content_hash: sha256:bc286bc60229150e83112a1d0058adb6e38de10d1b200f0ad67fbb7fda92e761
