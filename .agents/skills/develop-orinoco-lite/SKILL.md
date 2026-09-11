@@ -6,6 +6,8 @@ description: Develop and exercise unreleased Orinoco Lite package or template ch
 # Develop Orinoco Lite
 
 Exercise package and template changes through a disposable downstream before release.
+When more than one repository changes and a browser preview is needed, use a downstream deploy preview with exact candidate package and template commits before releasing either component.
+Do not cut a release merely to discover whether an unreleased package or template composes with a downstream.
 Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
 Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
@@ -18,6 +20,9 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    Local candidate testing is the default.
    When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.
    Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
+   A deploy preview builds the downstream pull request head plus the explicit full-SHA package and, when relevant, template candidates.
+   A branch name is not an adequate candidate coordinate.
+   Keep candidate selectors preview-only; a merged downstream must retain its released, checksum-locked dependencies.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
    Resolve missing access early.
 4. Treat a release and reference-downstream merge as separate gates.

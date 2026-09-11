@@ -46,6 +46,15 @@ BUNDLE_RECORD_KEYS = {
 
 
 def _git_commit(root: Path) -> str:
+    candidate_commit = os.environ.get("ORINOCO_CANDIDATE_CONTENT_COMMIT")
+    if candidate_commit is not None:
+        if (
+            os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") != "1"
+            or len(candidate_commit) != 40
+            or any(character not in "0123456789abcdef" for character in candidate_commit)
+        ):
+            raise DriverError("Candidate consumer source commit must be a full lowercase Git SHA")
+        return candidate_commit
     if not (root / ".git").exists():
         return "0" * 40
     result = subprocess.run(

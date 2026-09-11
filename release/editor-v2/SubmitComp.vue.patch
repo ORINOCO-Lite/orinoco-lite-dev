@@ -60,8 +60,6 @@ index 9621e55..b0787b0 100644
 +                    <p v-if="proposalMode && !framedContext">
 +                        <strong>GitHub repository:</strong>
 +                        {{ config.review_bundle_proposal.repository }}.
-+                        The button below submits the selected records above as a draft
-+                        pull request.
 +                    </p>
                  </span>
              </v-skeleton-loader>
@@ -69,14 +67,18 @@ index 9621e55..b0787b0 100644
                  <v-icon v-if="responseSuccess" style="color: green">mdi-check-circle</v-icon>
                  <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
                  {{ responseText }}
-+                <span v-if="proposalHelpUrl">
-+                    <br /><br />
-+                    <strong>To submit this change:</strong> install the Orinoco Lite
-+                    GitHub App for this repository, approve organization SSO if asked,
-+                    and retry. The app authenticates you and creates a draft pull
-+                    request with these selected changes; it does not store your
-+                    metadata or credentials.
-+                    <br /><br />
++                <v-alert
++                    v-if="proposalHelpUrl"
++                    type="warning"
++                    variant="tonal"
++                    style="margin-top: 1em;"
++                >
++                    <strong>GitHub authorization needs attention</strong>
++                    <p>
++                        The Orinoco Lite GitHub App may not be installed for this
++                        repository, or GitHub may still need organization SSO
++                        approval. Install or authorize the app, then retry.
++                    </p>
 +                    <a
 +                        v-if="proposalInstallUrl"
 +                        :href="proposalInstallUrl"
@@ -89,7 +91,7 @@ index 9621e55..b0787b0 100644
 +                        rel="noreferrer"
 +                        target="_blank"
 +                    >Read authorization and custom-app instructions</a>
-+                </span>
++                </v-alert>
 +                <a
 +                    v-if="proposalResult"
 +                    :href="proposalResult.pull_request_url"
