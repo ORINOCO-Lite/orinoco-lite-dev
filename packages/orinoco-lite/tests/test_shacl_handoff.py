@@ -190,15 +190,16 @@ class HandoffHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(HANDOFF.HandoffError, "regular Git blob"):
             self.inspect()
 
-    def test_reverted_code_change_in_prior_history_is_rejected(self) -> None:
+    def test_feature_changes_before_exact_handoff_are_not_payload(self) -> None:
         self.repository.write("untrusted.py", "raise SystemExit('do not run')\n")
-        self.repository.commit("temporarily add code")
-        (self.repository.root / "untrusted.py").unlink()
-        self.repository.commit("remove code")
+        feature = self.repository.commit("feature under review")
         self.repository.handoff()
 
-        with self.assertRaisesRegex(HANDOFF.HandoffError, "unapproved path"):
-            self.inspect()
+        report = self.inspect()
+
+        self.assertEqual("handoff", report["phase"])
+        self.assertEqual(feature, report["source_commit"])
+        self.assertEqual(2, report["commit_count"])
 
     def test_canonical_head_may_only_change_approved_metadata(self) -> None:
         self.repository.write(
@@ -292,27 +293,23 @@ class HandoffHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(HANDOFF.HandoffError, "one-parent commit"):
             self.inspect(base_sha=base)
 
-    def test_merge_history_still_rejects_reverted_untrusted_code(self) -> None:
-        self.repository.git("checkout", "-qb", "proposal")
+    def test_canonical_head_can_follow_feature_history(self) -> None:
         self.repository.write("untrusted.py", "raise SystemExit('do not run')\n")
-        self.repository.commit("temporarily add code")
-        (self.repository.root / "untrusted.py").unlink()
-        self.repository.commit("remove code")
+        feature = self.repository.commit("feature under review")
         self.repository.write(
             "site-specific/metadata/records/XYZProject/example.yaml",
             "pid: https://example.test/projects/example\n"
             "schema_type: xyzri:XYZProject\n"
             "title: Canonical proposal\n",
         )
-        self.repository.commit("canonical proposal")
-        self.repository.git("checkout", "-q", "main")
-        self.repository.write("README.md", "reviewed trusted update\n")
-        base = self.repository.commit("trusted default update")
-        self.repository.git("checkout", "-q", "proposal")
-        self.repository.git("merge", "--no-edit", base)
+        head = self.repository.commit("canonical proposal")
 
-        with self.assertRaisesRegex(HANDOFF.HandoffError, "unapproved path"):
-            self.inspect(base_sha=base)
+        report = self.inspect()
+
+        self.assertEqual("canonical", report["phase"])
+        self.assertEqual(feature, report["parent_sha"])
+        self.assertEqual(head, report["head_sha"])
+        self.assertEqual(2, report["commit_count"])
 
     def test_merge_resolution_may_not_add_an_unapproved_path(self) -> None:
         self.repository.git("checkout", "-qb", "proposal")
