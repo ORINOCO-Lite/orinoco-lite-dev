@@ -171,6 +171,18 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 3. Orinoco Lite combines that projection with the upstream website and template.
    It adds downstream content and applies configured overrides.
 
+## Rebuild verification
+
+The live upstream rebuild verifies three boundaries independently:
+
+1. **Record fidelity:** the captured Pool records survive canonical YAML storage and the Orinoco machine-provenance split and join.
+2. **Projection ownership:** the joined records produce the graph and entity pages, and those generated files replace the corresponding committed Hugo projection in the assembled source.
+3. **Published behavior:** Hugo renders every projected route, and the final link, asset, graph, and edit-link audit passes.
+
+Unit tests cover the conversion and composition rules and their important failure boundaries.
+The live rebuild exercises those rules together against current upstream data and the exact Gitlink-selected presentation revision.
+Verification does not require byte-identical HTML or make the current upstream record inventory a downstream contract; intentional Orinoco Lite adaptations remain explicit and bounded.
+
 ## Generated publication records
 
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.

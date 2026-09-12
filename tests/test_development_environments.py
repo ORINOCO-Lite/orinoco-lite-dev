@@ -146,6 +146,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("--no-write-fetch-head", builder)
 
     def test_static_builder_projects_the_pool_snapshot(self) -> None:
+        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
         launcher = SCRIPT.read_text(encoding="utf-8")
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
             encoding="utf-8"
@@ -159,6 +160,28 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn("prepare_upstream_snapshot.main([])", projector)
         self.assertIn("render_projection(workspace, resources, projection)", projector)
         self.assertIn('(HUGO_SOURCE / "static" / "graph.json").unlink', projector)
+        self.assertEqual(
+            {
+                name: tasks[name]
+                for name in (
+                    "verify-upstream-records",
+                    "verify-upstream-projection",
+                    "verify-upstream-static",
+                )
+            },
+            {
+                "verify-upstream-records": (
+                    "python tools/verify_upstream_rebuild.py records"
+                ),
+                "verify-upstream-projection": (
+                    "python tools/verify_upstream_rebuild.py projection"
+                ),
+                "verify-upstream-static": (
+                    "python tools/verify_upstream_rebuild.py site"
+                ),
+            },
+        )
+        self.assertEqual(builder.count("verify_upstream_rebuild.py"), 3)
 
     def test_static_builder_uses_one_authoritative_annex_pin(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
