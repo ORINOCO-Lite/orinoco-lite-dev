@@ -29,6 +29,28 @@ class DriverEnvironmentTests(unittest.TestCase):
                 environment = driver_environment(workspace, resources)
             self.assertNotIn("PYTHONPATH", environment)
 
+    def test_candidate_preview_coordinates_reach_the_installed_driver(self) -> None:
+        root = Path("/tmp/site")
+        workspace = WorkspaceConfig(
+            root=root,
+            config_path=root / "orinoco.yaml",
+            site_name="fixture",
+            base_url="https://example.invalid/",
+            paths={"build": "build"},
+            raw={},
+        )
+        resources = PackageResources(root=Path("/package/_resources"))
+        expected = {
+            "ORINOCO_CANDIDATE_CONTENT_COMMIT": "a" * 40,
+            "ORINOCO_CANDIDATE_PULL_REQUEST": "8",
+            "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+        }
+        with patch.dict(os.environ, expected, clear=False):
+            environment = driver_environment(workspace, resources)
+
+        for name, value in expected.items():
+            self.assertEqual(value, environment[name])
+
     def test_driver_runs_the_installed_module_without_a_shell(self) -> None:
         root = Path("/tmp/site")
         workspace = WorkspaceConfig(

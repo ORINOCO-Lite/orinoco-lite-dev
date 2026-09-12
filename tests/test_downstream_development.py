@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -126,6 +127,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
 
         self.assertNotIn("PYTHONPATH", environment)
         self.assertEqual("example/downstream", environment["GITHUB_REPOSITORY"])
+        self.assertEqual("1", environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"])
 
     def test_candidate_environment_records_explicit_content_commit(self) -> None:
         commit = "a" * 40
@@ -248,7 +250,7 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         self.assertIn("site-specific/metadata/records/one.yaml", committed)
         self.assertNotIn("generated/stale.txt", committed)
 
-    def test_build_task_installs_source_candidate(self) -> None:
+    def test_build_task_installs_fresh_candidate_wheel(self) -> None:
         candidate = self.root / "candidate"
         candidate.mkdir()
         (candidate / "pixi.toml").write_text("[workspace]\n", encoding="utf-8")
@@ -256,6 +258,9 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         source = package / "packages/orinoco-lite"
         source.mkdir(parents=True)
         (source / "pyproject.toml").write_text("", encoding="utf-8")
+        wheel = candidate / ".orinoco/candidate-wheel/orinoco_lite-0.whl"
+        wheel.parent.mkdir(parents=True)
+        wheel.write_bytes(b"fixture")
 
         with (
             patch.object(development.shutil, "which", return_value="/bin/pixi"),
@@ -263,11 +268,16 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         ):
             development.exercise_candidate(candidate, package=package, tasks=("build",))
 
-        self.assertEqual(2, run.call_count)
+        self.assertEqual(3, run.call_count)
+        self.assertEqual(
+            (sys.executable, "-m", "build", "--wheel", "--outdir", wheel.parent,
+             source.resolve()),
+            run.call_args_list[0].args[0],
+        )
         self.assertEqual(
             ("/bin/pixi", "add", "--manifest-path", candidate / "pixi.toml", "--pypi",
-             f"orinoco-lite @ {source.resolve()}"),
-            run.call_args_list[0].args[0],
+             f"orinoco-lite @ {wheel.resolve()}"),
+            run.call_args_list[1].args[0],
         )
         self.assertEqual("build", run.call_args_list[-1].args[0][-1])
         self.assertNotIn("PYTHONPATH", run.call_args_list[-1].kwargs["environment"])
