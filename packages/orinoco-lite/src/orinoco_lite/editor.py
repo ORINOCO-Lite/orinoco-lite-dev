@@ -172,6 +172,26 @@ def _editor_config(
         hostname = urlsplit(workspace.base_url).hostname or ""
         if hostname.lower().endswith(".github.io"):
             config["review_bundle_proposal"]["shared_github_pages_origin"] = True
+        candidate_pull = os.environ.get("ORINOCO_CANDIDATE_PULL_REQUEST")
+        candidate_commit = os.environ.get("ORINOCO_CANDIDATE_CONTENT_COMMIT")
+        if candidate_pull is not None:
+            if (
+                os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") != "1"
+                or candidate_commit is None
+                or not candidate_pull.isdigit()
+                or int(candidate_pull) < 1
+                or len(candidate_commit) != 40
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in candidate_commit
+                )
+            ):
+                raise DriverError("Candidate pull-request target is invalid")
+            config["review_bundle_proposal"]["target"] = {
+                "expected_head_sha": candidate_commit,
+                "kind": "pull_request",
+                "pull_request": int(candidate_pull),
+            }
     return config
 
 

@@ -70,7 +70,26 @@ function reviewProposalCoordinates(value) {
     ) {
         throw new Error('Review proposal has an invalid service origin');
     }
-    return { repository, serviceOrigin };
+    return { repository, serviceOrigin, target: reviewProposalTarget(value) };
+}
+
+export function reviewProposalTarget(value) {
+    if (value?.target === undefined) return { kind: 'standalone' };
+    const target = value.target;
+    if (
+        !exactKeys(target, ['kind', 'pull_request', 'expected_head_sha']) ||
+        target.kind !== 'pull_request' ||
+        !Number.isSafeInteger(target.pull_request) ||
+        target.pull_request < 1 ||
+        !/^[0-9a-f]{40}$/.test(target.expected_head_sha)
+    ) {
+        throw new Error('Review proposal has an invalid pull-request target');
+    }
+    return {
+        expected_head_sha: target.expected_head_sha,
+        kind: 'pull_request',
+        pull_request: target.pull_request,
+    };
 }
 
 function editorOrigin(target) {
@@ -179,7 +198,8 @@ export function beginReviewBundleProposal(value, target = window) {
             'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
         );
     }
-    const { repository, serviceOrigin } = reviewProposalCoordinates(value);
+    const { repository, serviceOrigin, target: proposalTarget } =
+        reviewProposalCoordinates(value);
     setupUrl(value);
     installUrl(value);
     const sourceOrigin = editorOrigin(target);
@@ -189,6 +209,13 @@ export function beginReviewBundleProposal(value, target = window) {
     url.searchParams.set('repository', repository);
     url.searchParams.set('editor_origin', sourceOrigin);
     url.searchParams.set('handoff_nonce', nonce);
+    if (proposalTarget.kind === 'pull_request') {
+        url.searchParams.set('pull_request', String(proposalTarget.pull_request));
+        url.searchParams.set(
+            'expected_head_sha',
+            proposalTarget.expected_head_sha,
+        );
+    }
     let popup;
     let proposal;
     let ready = false;
@@ -346,7 +373,9 @@ export function beginReviewBundleProposal(value, target = window) {
                 const message = event.data.error;
                 dispose();
                 const error = new Error(
-                    `${message} The GitHub proposal result is uncertain. Check the repository before retrying.`,
+                    `${message} GitHub did not confirm that it created a pull ` +
+                        'request. Check the repository first. If no pull request ' +
+                        'exists, install or authorize the GitHub App, then retry.',
                 );
                 error.code =
                     typeof event.data.error_code === 'string'
@@ -384,7 +413,11 @@ export function beginReviewBundleProposal(value, target = window) {
         () =>
             dispose({
                 reject: started
-                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    ? (
+                        'GitHub did not confirm that it created a pull request. ' +
+                        'Check the repository first. If no pull request exists, ' +
+                        'install or authorize the GitHub App, then retry.'
+                    )
                     : 'The GitHub proposal transport expired before writing.',
             }),
         HANDOFF_TIMEOUT_MS,
@@ -393,7 +426,11 @@ export function beginReviewBundleProposal(value, target = window) {
         if (popup.closed) {
             dispose({
                 reject: started
-                    ? 'The GitHub proposal result is uncertain. Check the repository before retrying.'
+                    ? (
+                        'GitHub did not confirm that it created a pull request. ' +
+                        'Check the repository first. If no pull request exists, ' +
+                        'install or authorize the GitHub App, then retry.'
+                    )
                     : 'The GitHub proposal window was closed before writing.',
             });
         }

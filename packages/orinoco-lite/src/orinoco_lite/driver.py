@@ -89,9 +89,15 @@ def driver_environment(
         environment["PYTHONPATH"] = str(development_source)
         environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
         environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = str(development_root)
-        editor_shell = os.environ.get("ORINOCO_CANDIDATE_EDITOR_SHELL")
-        if editor_shell is not None:
-            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = editor_shell
+        for name in (
+            "ORINOCO_CANDIDATE_CONTENT_COMMIT",
+            "ORINOCO_CANDIDATE_PULL_REQUEST",
+            "ORINOCO_CANDIDATE_EDITOR_SHELL",
+            "ORINOCO_CANDIDATE_RESOURCE_ROOT",
+        ):
+            value = os.environ.get(name)
+            if value is not None:
+                environment[name] = value
     if additions:
         environment.update(additions)
     return environment

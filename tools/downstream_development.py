@@ -314,6 +314,7 @@ def candidate_environment(
     package: Path | None,
     repository: str | None = None,
     source_commit: str | None = None,
+    pull_request: int | None = None,
 ) -> dict[str, str]:
     """Return an environment that imports an unreleased package first."""
 
@@ -326,6 +327,12 @@ def candidate_environment(
         if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
             raise DevelopmentError("--source-commit must be a full lowercase Git SHA")
         environment["ORINOCO_CANDIDATE_CONTENT_COMMIT"] = source_commit
+    if pull_request is not None:
+        if pull_request < 1 or source_commit is None:
+            raise DevelopmentError(
+                "--pull-request requires a positive number and --source-commit"
+            )
+        environment["ORINOCO_CANDIDATE_PULL_REQUEST"] = str(pull_request)
     if package is None:
         return environment
     package = package.resolve()
@@ -562,6 +569,7 @@ def exercise_candidate(
     package: Path | None,
     repository: str | None = None,
     source_commit: str | None = None,
+    pull_request: int | None = None,
     tasks: Sequence[str],
 ) -> None:
     manifest = candidate / "pixi.toml"
@@ -571,7 +579,9 @@ def exercise_candidate(
     if pixi is None:
         raise DevelopmentError("Pixi is unavailable")
     selected_tasks = tuple(tasks)
-    environment = candidate_environment(package, repository, source_commit)
+    environment = candidate_environment(
+        package, repository, source_commit, pull_request
+    )
     with tempfile.TemporaryDirectory(prefix="orinoco-candidate-shells-") as temporary:
         if package is not None and selected_tasks:
             application = package.resolve() / "packages/curation-review-app"
@@ -613,6 +623,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--source-commit",
         help="real downstream commit recorded by a deploy-preview candidate",
+    )
+    result.add_argument(
+        "--pull-request",
+        type=int,
+        help="draft pull request that owns this deploy-preview candidate",
     )
     result.add_argument("--mode", choices=("quick", "full"), default="quick")
     result.add_argument(
@@ -686,6 +701,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             package=args.package,
             repository=repository,
             source_commit=args.source_commit,
+            pull_request=args.pull_request,
             tasks=task_names(args.mode, args.task),
         )
         succeeded = True

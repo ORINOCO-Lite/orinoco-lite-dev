@@ -29,6 +29,7 @@ const {
     isFramedContext,
     isSharedGithubPagesOrigin,
     recordSubmissionLabel,
+    reviewProposalTarget,
     REVIEW_BUNDLE_EVENT,
     REVIEW_PROPOSAL_MESSAGE_FORMAT,
     REVIEW_PROPOSAL_READY_FORMAT,
@@ -60,6 +61,21 @@ const catalog = {
 };
 
 describe('Orinoco review bundles', () => {
+    it('binds a candidate preview to one exact draft pull request', () => {
+        const target = {
+            expected_head_sha: SOURCE_COMMIT,
+            kind: 'pull_request',
+            pull_request: 42,
+        };
+        expect(
+            reviewProposalTarget({ target: new Proxy(target, {}) }),
+        ).toEqual(target);
+        expect(reviewProposalTarget({})).toEqual({ kind: 'standalone' });
+        expect(() =>
+            reviewProposalTarget({ target: { ...target, pull_request: 0 } }),
+        ).toThrow('invalid pull-request target');
+    });
+
     it('names submission controls with the canonical catalog PID', () => {
         expect(
             recordSubmissionLabel({
@@ -135,6 +151,7 @@ describe('Orinoco review bundles', () => {
     it('sends a confirmed proposal only to the exact transport popup', async () => {
         const listeners = new Map();
         const popup = {
+            close: vi.fn(),
             closed: false,
             postMessage: vi.fn((message) => structuredClone(message)),
         };
@@ -264,6 +281,7 @@ describe('Orinoco review bundles', () => {
         );
         expect(target.clearTimeout).toHaveBeenCalledWith(17);
         expect(target.clearInterval).toHaveBeenCalledWith(18);
+        expect(popup.close).toHaveBeenCalledOnce();
     });
 
     it('distinguishes retry-safe failures from uncertain post-start results', async () => {
@@ -337,7 +355,7 @@ describe('Orinoco review bundles', () => {
             status: 403,
         });
         await expect(runFailure(false)).rejects.toThrow(
-            /result is uncertain.*before retrying/,
+            /did not confirm.*If no pull request exists.*then retry/,
         );
     });
 

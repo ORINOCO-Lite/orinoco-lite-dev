@@ -92,6 +92,7 @@ describe("minimal downstream OAuth transport", () => {
     expect(html).toContain("event.source !== source");
     expect(html).toContain("event.origin !== target.client_origin");
     expect(html).toContain('credentials: "same-origin"');
+    expect(html).not.toContain("window.close()");
     expect(html).not.toMatch(/<(?:button|form|input|textarea)\b/i);
     expect(html).not.toContain("Download bundle");
     expect(html).not.toContain("Confirm and");

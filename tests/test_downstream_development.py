@@ -155,6 +155,15 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         with self.assertRaisesRegex(development.DevelopmentError, "source-commit"):
             development.candidate_environment(None, source_commit="main")
 
+        environment = development.candidate_environment(
+            None,
+            source_commit=commit,
+            pull_request=42,
+        )
+        self.assertEqual("42", environment["ORINOCO_CANDIDATE_PULL_REQUEST"])
+        with self.assertRaisesRegex(development.DevelopmentError, "pull-request"):
+            development.candidate_environment(None, pull_request=42)
+
     def test_github_repository_is_discovered_from_ssh_origin(self) -> None:
         subprocess.run(
             ("git", "init", "--quiet"),

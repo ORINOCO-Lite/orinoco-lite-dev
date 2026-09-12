@@ -240,6 +240,15 @@ export class GitHubClient {
     return this.json(endpoint(repository, `/pulls/${number}`));
   }
 
+  async commitStatus(repository: string, sha: string): Promise<unknown> {
+    if (!/^[0-9a-f]{40}$/.test(sha)) {
+      throw new HttpError(400, "invalid_request", "Invalid commit SHA.");
+    }
+    return this.json(
+      endpoint(repository, `/commits/${sha}/status?per_page=100`),
+    );
+  }
+
   async repository(repository: string): Promise<RepositoryCoordinates> {
     parseRepository(repository);
     const value = await this.json(endpoint(repository, ""));
