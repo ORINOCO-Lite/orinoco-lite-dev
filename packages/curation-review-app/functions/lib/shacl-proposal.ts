@@ -118,23 +118,75 @@ async function requireTrustedEditorDeployment(
   baseSha: string,
   grant: ShaclGrant,
   serviceOrigin: string,
+  pull: PullRequestCoordinates | null = null,
 ): Promise<SiteCoordinates> {
   const { coordinates: site } = await loadSiteCoordinates(
     github,
     repository,
     baseSha,
   );
-  if (
-    new URL(site.editorSiteUrl).origin !== grant.editor_origin ||
-    site.reviewServiceOrigin !== serviceOrigin
-  ) {
+  if (site.reviewServiceOrigin !== serviceOrigin) {
     throw new HttpError(
       403,
       "shacl_transport_mismatch",
-      "This editor does not match the repository's trusted deployment.",
+      "This repository does not trust the selected review service.",
     );
   }
-  return site;
+  if (new URL(site.editorSiteUrl).origin === grant.editor_origin) return site;
+  if (pull !== null) {
+    const value = await github.commitStatus(repository, pull.headSha);
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Array.isArray((value as Record<string, unknown>).statuses)
+    ) {
+      const statuses = (value as { statuses: unknown[] }).statuses;
+      const trusted = statuses.some((item: unknown) => {
+        if (item === null || typeof item !== "object" || Array.isArray(item)) {
+          return false;
+        }
+        const status = item as Record<string, unknown>;
+        if (
+          status.state !== "success" ||
+          typeof status.context !== "string" ||
+          !/^netlify\/[A-Za-z0-9_.-]+\/deploy-preview$/.test(status.context) ||
+          typeof status.target_url !== "string"
+        ) {
+          return false;
+        }
+        let target: URL;
+        try {
+          target = new URL(status.target_url);
+        } catch {
+          return false;
+        }
+        const match = /^deploy-preview-(\d+)--[a-z0-9-]+\.netlify\.app$/.exec(
+          target.hostname,
+        );
+        return (
+          target.protocol === "https:" &&
+          target.origin === grant.editor_origin &&
+          target.pathname === "/" &&
+          target.search === "" &&
+          target.hash === "" &&
+          target.username === "" &&
+          target.password === "" &&
+          target.port === "" &&
+          match !== null &&
+          Number(match[1]) === pull.number
+        );
+      });
+      if (trusted) return site;
+    }
+  }
+  throw new HttpError(
+    403,
+    "shacl_transport_mismatch",
+    pull === null
+      ? "Open the editor from the repository's configured site before proposing."
+      : "GitHub does not show a successful Netlify deploy preview for this exact pull-request commit and editor origin.",
+  );
 }
 
 export async function createShaclProposal(
@@ -191,6 +243,7 @@ export async function createShaclProposal(
       pull.baseSha,
       grant,
       serviceOrigin,
+      pull,
     );
     validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
     await requireEmptyHandoffPath(github, proposal.repository, pull.headSha);

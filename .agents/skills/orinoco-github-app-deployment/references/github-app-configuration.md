@@ -19,6 +19,7 @@ App registration, ownership transfer, permission changes, secret creation/deleti
 - Grant repository permissions:
   - Metadata: read;
   - Actions: read;
+  - Commit statuses: read;
   - Contents: write; and
   - Pull requests: write.
 - Install the App only on the selected downstream repositories.
@@ -40,6 +41,7 @@ The GitHub App does not need account-email permission: the authenticated login a
 It uses state and PKCE S256, rejects callbacks that did not begin at its own start route, rejects non-bearer or non-expiring tokens, discards refresh tokens, and independently checks that the signed-in curator has `write` or `admin` collaborator permission.
 
 `Contents: write` supplies repository reads for both product profiles and is used for writes only by the explicitly requested fixed-path SHACL Vue handoff.
+`Commit statuses: read` lets the service verify that GitHub recorded the exact successful Netlify deploy preview before allowing that preview to update its own draft pull request.
 The source-adapter review path posts authenticated pull-request comments but does not write repository contents.
 
 ## Ownership, installation, and deployment are separate

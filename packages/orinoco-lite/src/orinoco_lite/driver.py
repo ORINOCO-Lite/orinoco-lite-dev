@@ -91,6 +91,7 @@ def driver_environment(
         environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = str(development_root)
         for name in (
             "ORINOCO_CANDIDATE_CONTENT_COMMIT",
+            "ORINOCO_CANDIDATE_PULL_REQUEST",
             "ORINOCO_CANDIDATE_EDITOR_SHELL",
             "ORINOCO_CANDIDATE_RESOURCE_ROOT",
         ):

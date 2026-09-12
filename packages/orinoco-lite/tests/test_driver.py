@@ -49,6 +49,7 @@ class DriverEnvironmentTests(unittest.TestCase):
             resources = PackageResources(root=root / "resources")
             enabled = {
                 "ORINOCO_CANDIDATE_CONTENT_COMMIT": "a" * 40,
+                "ORINOCO_CANDIDATE_PULL_REQUEST": "42",
                 "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
                 "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(candidate),
                 "ORINOCO_CANDIDATE_EDITOR_SHELL": str(root / "editor-shell"),
@@ -76,6 +77,7 @@ class DriverEnvironmentTests(unittest.TestCase):
             self.assertEqual(
                 environment["ORINOCO_CANDIDATE_CONTENT_COMMIT"], "a" * 40
             )
+            self.assertEqual(environment["ORINOCO_CANDIDATE_PULL_REQUEST"], "42")
             self.assertEqual(
                 environment["ORINOCO_CANDIDATE_RESOURCE_ROOT"],
                 str(root / "resources"),

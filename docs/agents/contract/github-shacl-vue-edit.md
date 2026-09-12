@@ -43,6 +43,10 @@ It MUST verify:
 - allowed bundle format, size, record coordinates, and changed paths; and
 - the one-time session grant.
 
+A standalone proposal MUST originate at the configured canonical editor origin.
+A Netlify deploy preview MAY update only its own open same-repository draft pull request.
+For that exception, the service MUST verify GitHub's successful Netlify deploy-preview status for the exact pull-request head, preview origin, and pull-request number.
+
 The service MUST NOT retarget a stale bundle, create a cross-repository pull request, convert metadata, or retain the bundle after processing.
 
 ## Trusted replacement

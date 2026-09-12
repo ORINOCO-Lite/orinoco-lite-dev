@@ -48,11 +48,13 @@ Disable callback-URL wildcard matching and webhooks, configure the exact callbac
 
 - Metadata: read (the GitHub-required baseline permission)
 - Actions: read
+- Commit statuses: read
 - Contents: write
 - Pull requests: write
 
 `Pull requests: write` supports authenticated decision comments and creation of an explicit standalone draft proposal.
 Contents write includes the read access needed by both profiles and is used for writes only to create the exact, fixed-path SHACL Vue handoff branch and commit requested by the curator.
+Commit-status read access verifies an exact successful Netlify deploy preview before that preview may update its own draft pull request.
 The source-adapter decision path never writes repository contents through the service.
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
 

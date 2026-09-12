@@ -15,6 +15,7 @@ const HEAD = "a".repeat(40);
 const COMMIT = "b".repeat(40);
 const BASE = "c".repeat(40);
 const EDITOR_ORIGIN = "https://site.example";
+const PREVIEW_ORIGIN = "https://deploy-preview-42--example.netlify.app";
 const SERVICE_ORIGIN = "https://review.example";
 const HANDOFF_NONCE = "d".repeat(64);
 
@@ -146,6 +147,17 @@ describe("attributed existing-PR SHACL handoff", () => {
             state: "open",
           });
         }
+        if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
+          return Response.json({
+            statuses: [
+              {
+                context: "netlify/example/deploy-preview",
+                state: "success",
+                target_url: `${PREVIEW_ORIGIN}/`,
+              },
+            ],
+          });
+        }
         if (url === "https://api.github.com/graphql") {
           const graphql = JSON.parse(String(init?.body)) as {
             query: string;
@@ -203,6 +215,7 @@ describe("attributed existing-PR SHACL handoff", () => {
           kind: "pull_request",
           pull_request: 42,
         }),
+        PREVIEW_ORIGIN,
       ),
     ).resolves.toEqual({
       commit_sha: COMMIT,
@@ -215,6 +228,67 @@ describe("attributed existing-PR SHACL handoff", () => {
         "Bearer ghu_curator",
       );
     }
+  });
+
+  it("rejects a noncanonical editor without the exact successful preview", async () => {
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        const common = commonResponse(url);
+        if (common !== null) return common;
+        if (url.endsWith("/pulls/42")) {
+          return Response.json({
+            base: {
+              ref: "main",
+              repo: { full_name: "example/site" },
+              sha: BASE,
+            },
+            draft: true,
+            head: {
+              ref: "curation/edit",
+              repo: { full_name: "example/site" },
+              sha: HEAD,
+            },
+            html_url: "https://github.com/example/site/pull/42",
+            number: 42,
+            state: "open",
+          });
+        }
+        if (url === "https://api.github.com/graphql") {
+          const graphql = JSON.parse(String(init?.body)) as {
+            variables: Record<string, unknown>;
+          };
+          return siteConfigResponse(
+            graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+              ? ORINOCO_CONFIG
+              : SITE_DATA,
+          );
+        }
+        if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
+          return Response.json({
+            statuses: [
+              {
+                context: "netlify/example/deploy-preview",
+                state: "success",
+                target_url: "https://deploy-preview-43--example.netlify.app/",
+              },
+            ],
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
+    await expect(
+      createProposal(
+        new GitHubClient("ghu_curator", fetchMock),
+        request({
+          expected_head_sha: HEAD,
+          kind: "pull_request",
+          pull_request: 42,
+        }),
+        PREVIEW_ORIGIN,
+      ),
+    ).rejects.toMatchObject({ code: "shacl_transport_mismatch", status: 403 });
   });
 
   it("rejects a changed PR head before creating a commit", async () => {

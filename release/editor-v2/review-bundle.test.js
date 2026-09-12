@@ -29,6 +29,7 @@ const {
     isFramedContext,
     isSharedGithubPagesOrigin,
     recordSubmissionLabel,
+    reviewProposalTarget,
     REVIEW_BUNDLE_EVENT,
     REVIEW_PROPOSAL_MESSAGE_FORMAT,
     REVIEW_PROPOSAL_READY_FORMAT,
@@ -60,6 +61,21 @@ const catalog = {
 };
 
 describe('Orinoco review bundles', () => {
+    it('binds a candidate preview to one exact draft pull request', () => {
+        const target = {
+            expected_head_sha: SOURCE_COMMIT,
+            kind: 'pull_request',
+            pull_request: 42,
+        };
+        expect(
+            reviewProposalTarget({ target: new Proxy(target, {}) }),
+        ).toEqual(target);
+        expect(reviewProposalTarget({})).toEqual({ kind: 'standalone' });
+        expect(() =>
+            reviewProposalTarget({ target: { ...target, pull_request: 0 } }),
+        ).toThrow('invalid pull-request target');
+    });
+
     it('names submission controls with the canonical catalog PID', () => {
         expect(
             recordSubmissionLabel({

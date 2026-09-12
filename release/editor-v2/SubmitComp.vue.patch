@@ -135,6 +135,7 @@ index 9621e55..b0787b0 100644
 +    isFramedContext,
 +    isSharedGithubPagesOrigin,
 +    recordSubmissionLabel,
++    reviewProposalTarget,
 +    reviewBundleFilename,
 +} from '@/modules/review-bundle';
 
@@ -253,13 +254,19 @@ index 9621e55..b0787b0 100644
 +            bundle,
 +            format: 'orinoco-lite-shacl-proposal-v1',
 +            repository: config.value.review_bundle_proposal.repository,
-+            target: { kind: 'standalone' },
++            target: reviewProposalTarget(
++                config.value.review_bundle_proposal
++            ),
 +        });
 +        proposalResult.value = result;
 +        responseSuccess.value = true;
 +        responseFailure.value = false;
 +        responseReceived.value = true;
-+        responseText.value = 'GitHub created the draft pull request.';
++        responseText.value =
++            result.pull_request ===
++            config.value.review_bundle_proposal?.target?.pull_request
++                ? 'GitHub updated the draft pull request.'
++                : 'GitHub created the draft pull request.';
 +    } catch (error) {
 +        handoff?.cancel();
 +        responseFailure.value = true;

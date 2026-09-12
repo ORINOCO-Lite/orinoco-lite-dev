@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -243,6 +244,30 @@ class EditorBundleTests(unittest.TestCase):
         )
         self.assertFalse(config["use_service"])
         self.assertFalse(config["use_token"])
+
+    def test_editor_config_binds_candidate_preview_to_pull_request(self) -> None:
+        commit = "a" * 40
+        with patch.dict(
+            os.environ,
+            {
+                "ORINOCO_CANDIDATE_CONTENT_COMMIT": commit,
+                "ORINOCO_CANDIDATE_PULL_REQUEST": "42",
+                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+            },
+            clear=False,
+        ):
+            config = _editor_config(
+                self.workspace,
+                repository="ORINOCO-Lite/example-site",
+            )
+        self.assertEqual(
+            config["review_bundle_proposal"]["target"],
+            {
+                "expected_head_sha": commit,
+                "kind": "pull_request",
+                "pull_request": 42,
+            },
+        )
 
     def test_combined_editor_rdf_scopes_blank_nodes_per_record(self) -> None:
         from rdflib import BNode, Graph
