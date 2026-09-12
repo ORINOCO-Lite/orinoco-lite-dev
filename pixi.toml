@@ -8,6 +8,8 @@ requires-pixi = ">=0.76,<0.77"
 python = ">=3.12,<3.13"
 
 [tasks]
+build-package = '"$PIXI_EXE" exec --spec python=3.12 --spec python-build -- python -m build packages/orinoco-lite --outdir build/package'
+check-locks = "pixi lock --check && pixi lock --script tools/upstream_static.py --check && pixi lock --script tools/upstream_full.py --check && pixi lock --script tools/materialize_presentation_assets.py --check"
 test-package = "python tools/run_unittests.py --discover packages/orinoco-lite/tests"
 test-package-strict = "python tools/run_unittests.py --fail-on-skip --discover packages/orinoco-lite/tests"
 test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_downstream_development tests.test_materialize_presentation_assets tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_adapt_upstream_pages -v"

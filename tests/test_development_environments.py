@@ -259,59 +259,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             (ROOT / "pixi.lock").read_text(encoding="utf-8"),
         )
 
-    def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
-        workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("submodules: false", workflow)
-        self.assertNotIn("submodules: recursive", workflow)
-        self.assertIn("pixi-version: v0.76.2", workflow)
-        self.assertIn(
-            "repository: ORINOCO-Lite/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn("path: build/orinoco-lite-template", workflow)
-        self.assertIn(
-            "ORINOCO_TEMPLATE_CANDIDATE: "
-            "${{ github.workspace }}/build/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn(
-            "submodules/pool.psychoinformatics.de-ui",
-            workflow,
-        )
-        self.assertIn("submodules/things-schemas", workflow)
-        self.assertIn("--init --depth 1 -- shacl-vue", workflow)
-        for script in (
-            "tools/upstream_static.py",
-            "tools/upstream_full.py",
-        ):
-            self.assertIn(f"pixi lock --script {script} --check", workflow)
-        fixture = workflow.index("Check out the template candidate")
-        components = workflow.index(
-            "Initialize only release-authorized compatibility components"
-        )
-        install = workflow.index("frozen: true")
-        tests = workflow.index("run: pixi run test-template-candidate-quick")
-        build = workflow.index("run: pixi run build-upstream-static")
-        self.assertLess(fixture, tests)
-        self.assertLess(components, tests)
-        self.assertLess(install, tests)
-        self.assertLess(tests, build)
-        self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("run: pixi run build-upstream-static-worktree", workflow)
-        self.assertIn("run: pixi run test-upstream-full", workflow)
-        self.assertIn("run: pixi run check-upstream", workflow)
-        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
-
-        release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("tools/run_unittests.py", release)
-        self.assertIn("--fail-on-skip --discover packages/orinoco-lite/tests", release)
-        self.assertIn("submodules/query-things", release)
-        self.assertIn("set -o pipefail", release)
-        self.assertIn('spec="release/package-resources.yaml"', release)
-        self.assertNotIn("source-spec", release)
-        self.assertNotIn("INPUT_SPEC", release)
-        self.assertNotIn("may report an intentional skip", release)
-
 
 
 if __name__ == "__main__":

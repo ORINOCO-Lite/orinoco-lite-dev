@@ -14,6 +14,19 @@ from orinoco_lite.stage_resources import stage_package_resources
 
 
 class PackageResourceTests(unittest.TestCase):
+    def test_installed_package_contains_its_build_resources(self):
+        root = resolve_resources().root
+        source_commit(root)
+        source_description(root)
+        for name in (
+            "schema/demo-research-information/unreleased.yaml",
+            "editor-shell/index.html",
+            "review-shell/index.html",
+            "drivers/adapt_pages.py",
+        ):
+            with self.subTest(resource=name):
+                self.assertTrue((root / name).is_file())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
