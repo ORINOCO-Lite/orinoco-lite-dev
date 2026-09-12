@@ -188,7 +188,7 @@ class AcceptedConsumerCompatibilityTests(unittest.TestCase):
         self.workspace = WorkspaceConfig(
             root=self.root,
             config_path=self.root / "orinoco.yaml",
-            lock_path=self.root / "orinoco.lock",
+
             site_name="Full fixture",
             base_url="https://example.invalid/",
             paths=DEFAULT_PATHS,

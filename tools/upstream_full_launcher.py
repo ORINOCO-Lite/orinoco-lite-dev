@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Prepare full upstream gitlinks before resolving their inline environment."""
+"""Prepare full upstream gitlinks before running the engineering environment."""
 
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Sequence
 
 from upstream_checkout import UpstreamCheckoutError, prepare_full_checkout
@@ -25,20 +25,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         prepare_full_checkout(args.mode)
     except UpstreamCheckoutError as error:
         parser.exit(1, f"upstream-full: {error}\n")
-    pixi = os.environ.get("PIXI_EXE")
-    if not pixi:
-        parser.exit(1, "upstream-full: PIXI_EXE is unavailable; run as a Pixi task\n")
     return subprocess.run(
-        [
-            pixi,
-            "run",
-            "--frozen",
-            "--script",
-            str(SCRIPT),
-            args.command,
-            "--checkout",
-            args.mode,
-        ],
+        [sys.executable, str(SCRIPT), args.command, "--checkout", args.mode],
         cwd=ROOT,
     ).returncode
 

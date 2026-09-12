@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Mapping, Sequence
 
-from .config import PackageLock, WorkspaceConfig, development_package_root
+from .config import WorkspaceConfig
 from .errors import DriverError, IntegrityError
 from .resources import PackageResources
 
@@ -18,6 +18,9 @@ PASSTHROUGH_ENVIRONMENT = {
     "HOME",
     "LANG",
     "LC_ALL",
+    "ORINOCO_CANDIDATE_CONTENT_COMMIT",
+    "ORINOCO_CANDIDATE_PULL_REQUEST",
+    "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE",
     "PATH",
     "REQUESTS_CA_BUNDLE",
     "SSL_CERT_FILE",
@@ -83,21 +86,6 @@ def driver_environment(
         if name in PASSTHROUGH_ENVIRONMENT
     }
     environment.update(workspace.environment())
-    development_root = development_package_root()
-    if development_root is not None:
-        development_source = development_root / "packages/orinoco-lite/src"
-        environment["PYTHONPATH"] = str(development_source)
-        environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
-        environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = str(development_root)
-        for name in (
-            "ORINOCO_CANDIDATE_CONTENT_COMMIT",
-            "ORINOCO_CANDIDATE_PULL_REQUEST",
-            "ORINOCO_CANDIDATE_EDITOR_SHELL",
-            "ORINOCO_CANDIDATE_RESOURCE_ROOT",
-        ):
-            value = os.environ.get(name)
-            if value is not None:
-                environment[name] = value
     if additions:
         environment.update(additions)
     return environment
@@ -106,7 +94,6 @@ def driver_environment(
 def invoke_driver(
     action: str,
     workspace: WorkspaceConfig,
-    lock: PackageLock,
     resources: PackageResources,
     *,
     values: Mapping[str, str] | None = None,
@@ -126,7 +113,6 @@ def invoke_driver(
         "base_url": workspace.base_url,
         "build": str(workspace.path("build")),
         "config": str(workspace.config_path),
-        "lock": str(workspace.lock_path),
         "python": sys.executable,
         "root": str(workspace.root),
         "resources": str(resources.root),

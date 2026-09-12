@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 import re
 import subprocess
@@ -13,24 +12,21 @@ from orinoco_lite.release_editor import POOL_UI_COMMIT, SHACL_VUE_COMMIT
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "pixi.toml"
-SCRIPT = ROOT / "tools" / "upstream_static.py"
-SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
-FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
-CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
-PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-pages.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
 DEVELOPER_SKILL = ROOT / ".agents" / "skills" / "develop-orinoco-lite"
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
-    def test_root_environment_is_package_only_and_bootstrappable(self) -> None:
+    def test_root_environment_contains_the_engineering_toolchain(self) -> None:
         manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
         workspace = manifest["workspace"]
         self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
-        self.assertEqual(manifest["dependencies"], {"python": ">=3.12,<3.13"})
+        self.assertEqual(manifest["dependencies"]["python"], ">=3.12,<3.13")
+        for name in ("hugo", "nodejs", "make"):
+            self.assertIn(name, manifest["dependencies"])
         self.assertEqual(
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": "packages/orinoco-lite", "editable": True},
@@ -39,41 +35,28 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertNotIn("environments", manifest)
         serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
-            'path = "submodules/',
-            'hugo =',
-            'git-annex =',
-            'nodejs =',
-            'serve =',
-            'build =',
-            'serve-static =',
+            'path = "submodules/dump-things-service"',
         ):
             self.assertNotIn(forbidden, serialized)
 
-    def test_upstream_tasks_use_the_locked_standalone_script(self) -> None:
+    def test_upstream_tasks_use_the_engineering_environment(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
         self.assertEqual(
             tasks["build-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build',
+            "python tools/upstream_static.py build",
         )
         self.assertEqual(
             tasks["serve-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve',
+            "python tools/upstream_static.py serve",
         )
         self.assertEqual(
             tasks["build-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build '
-            "--checkout worktree",
+            "python tools/upstream_static.py build --checkout worktree",
         )
         self.assertEqual(
             tasks["serve-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve '
-            "--checkout worktree",
+            "python tools/upstream_static.py serve --checkout worktree",
         )
-        self.assertTrue(SCRIPT_LOCK.is_file())
-        lock = yaml.safe_load(SCRIPT_LOCK.read_text(encoding="utf-8"))
-        self.assertEqual(lock["version"], 7)
-        self.assertEqual(set(lock["environments"]), {"default"})
-        self.assertTrue(FULL_SCRIPT_LOCK.is_file())
 
     def test_ci_tasks_require_package_and_development_contracts(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
@@ -100,30 +83,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )["interface"]
         self.assertEqual(interface["display_name"], "Develop Orinoco Lite")
         self.assertIn("$develop-orinoco-lite", interface["default_prompt"])
-
-    def test_script_metadata_is_exact_and_platform_complete(self) -> None:
-        source = SCRIPT.read_text(encoding="utf-8")
-        match = re.search(r"^# /// script\n(?P<body>.*?)^# ///$", source, re.M | re.S)
-        self.assertIsNotNone(match)
-        metadata = "\n".join(
-            line.removeprefix("# ") if line != "#" else ""
-            for line in match.group("body").splitlines()
-        )
-        document = tomllib.loads(metadata)
-        self.assertEqual(document["requires-python"], ">=3.12,<3.13")
-        pixi = document["tool"]["pixi"]
-        self.assertEqual(pixi["dependencies"]["hugo"], "==0.161.1")
-        self.assertEqual(
-            pixi["target"]["linux-64"]["dependencies"]["git-annex"],
-            "==10.20260601",
-        )
-        self.assertEqual(
-            pixi["target"]["osx-arm64-macos-14-0"]["pypi-dependencies"][
-                "git-annex"
-            ],
-            "==10.20260601",
-        )
-        ast.parse(source)
 
     def test_builder_never_moves_gitlinks_after_scoped_preparation(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
@@ -261,95 +220,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             (ROOT / "pixi.lock").read_text(encoding="utf-8"),
         )
 
-    def test_ci_proves_bootstrap_before_the_targeted_build(self) -> None:
-        workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("submodules: false", workflow)
-        self.assertNotIn("submodules: recursive", workflow)
-        self.assertIn("pixi-version: v0.76.2", workflow)
-        self.assertIn(
-            "repository: ORINOCO-Lite/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn("path: build/orinoco-lite-template", workflow)
-        self.assertIn(
-            "ORINOCO_TEMPLATE_CANDIDATE: "
-            "${{ github.workspace }}/build/orinoco-lite-template",
-            workflow,
-        )
-        self.assertIn(
-            "submodules/pool.psychoinformatics.de-ui",
-            workflow,
-        )
-        self.assertIn("submodules/things-schemas", workflow)
-        self.assertIn("--init --depth 1 -- shacl-vue", workflow)
-        for script in (
-            "tools/upstream_static.py",
-            "tools/upstream_full.py",
-        ):
-            self.assertIn(f"pixi lock --script {script} --check", workflow)
-        fixture = workflow.index("Check out the template candidate")
-        components = workflow.index(
-            "Initialize only release-authorized compatibility components"
-        )
-        install = workflow.index("frozen: true")
-        tests = workflow.index("run: pixi run test-template-candidate-quick")
-        build = workflow.index("run: pixi run build-upstream-static")
-        self.assertLess(fixture, tests)
-        self.assertLess(components, tests)
-        self.assertLess(install, tests)
-        self.assertLess(tests, build)
-        self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("run: pixi run build-upstream-static-worktree", workflow)
-        self.assertIn("run: pixi run test-upstream-full", workflow)
-        self.assertIn("run: pixi run check-upstream", workflow)
-        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
-
-        release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("tools/run_unittests.py", release)
-        self.assertIn("--fail-on-skip --discover packages/orinoco-lite/tests", release)
-        self.assertIn("submodules/query-things", release)
-        self.assertIn("set -o pipefail", release)
-        self.assertIn('spec="release/package-resources.yaml"', release)
-        self.assertNotIn("source-spec", release)
-        self.assertNotIn("INPUT_SPEC", release)
-        self.assertNotIn("may report an intentional skip", release)
-
-    def test_pages_workflow_records_only_successful_default_branch_deployments(
-        self,
-    ) -> None:
-        workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("workflow_call:", workflow)
-        self.assertIn("Require the current default-branch commit", workflow)
-        self.assertIn("pixi run validate", workflow)
-        self.assertIn("pixi run build-pages", workflow)
-        self.assertIn("tools/prepare_pages_publication.py", workflow)
-        self.assertIn("Check out the exact publication tooling", workflow)
-        self.assertIn("repository: ${{ inputs['workflow-repository'] }}", workflow)
-        self.assertIn("ref: ${{ inputs['workflow-sha'] }}", workflow)
-        self.assertIn("needs:\n      - build\n      - deploy", workflow)
-        self.assertIn("git push --atomic --force origin", workflow)
-        self.assertIn("refs/heads/latest-hugo-projection", workflow)
-        self.assertIn("refs/heads/gh-pages", workflow)
-        self.assertIn("orinoco-pages-publication-${{ github.run_id }}", workflow)
-        self.assertIn("overwrite: true", workflow)
-        deploy = workflow.index("name: Deploy the built site")
-        record = workflow.index("name: Record the successful deployment")
-        push = workflow.index("git push --atomic --force origin")
-        self.assertLess(deploy, record)
-        self.assertLess(record, push)
-
-    def test_consumer_ci_runs_released_framework_checks(self) -> None:
-        workflow = CONSUMER_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("timeout-minutes: 60", workflow)
-        for task in (
-            "validate",
-            "verify-hugo",
-            "verify-release-selection",
-            "verify-build",
-        ):
-            self.assertIn(f"pixi run {task}", workflow)
-        self.assertNotIn("test-all", workflow)
-        self.assertNotIn("Playwright", workflow)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,6 @@ from orinoco_lite.config import (
     DEFAULT_CURATION_SERVICE,
     find_workspace_root,
     github_repository,
-    load_lock,
     load_workspace,
 )
 
@@ -28,22 +27,11 @@ identity:
 """
 
 
-LOCK = """\
-lock_version: 1
-package:
-  distribution: orinoco-lite
-  version: 0.1.0
-  url: https://example.invalid/releases/orinoco_lite-0.1.0-py3-none-any.whl
-  sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-"""
-
-
 class WorkspaceConfigTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
-        (self.root / "orinoco.lock").write_text(LOCK, encoding="utf-8")
         (self.root / "site-specific").mkdir()
         (self.root / "site-specific/site.yaml").write_text(
             SITE_DATA, encoding="utf-8"
@@ -346,22 +334,6 @@ class WorkspaceConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, "contract_version must be 2"):
             load_workspace(self.root)
 
-    def test_lock_carries_only_the_wheel_coordinate(self) -> None:
-        lock = load_lock(self.root / "orinoco.lock")
-        self.assertEqual(lock.package_version, "0.1.0")
-
-    def test_lock_rejects_placeholder_digests_and_mismatched_wheel(self) -> None:
-        for digest in ("c" * 64,):
-            value = LOCK.replace(digest, "0" * 64)
-            (self.root / "orinoco.lock").write_text(value, encoding="utf-8")
-            with self.assertRaisesRegex(ConfigurationError, "sha256"):
-                load_lock(self.root / "orinoco.lock")
-        (self.root / "orinoco.lock").write_text(
-            LOCK.replace("orinoco_lite-0.1.0-", "orinoco_lite-0.1.1-"),
-            encoding="utf-8",
-        )
-        with self.assertRaisesRegex(ConfigurationError, "exact locked.*wheel"):
-            load_lock(self.root / "orinoco.lock")
 
 
 if __name__ == "__main__":

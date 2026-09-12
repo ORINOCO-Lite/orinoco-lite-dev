@@ -207,18 +207,6 @@ class EditorBundleTests(unittest.TestCase):
 
             self.assertEqual(_git_commit(root), "0" * 40)
 
-    def test_candidate_content_commit_overrides_staged_repository(self) -> None:
-        commit = "a" * 40
-        with patch.dict(
-            "os.environ",
-            {
-                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
-                "ORINOCO_CANDIDATE_CONTENT_COMMIT": commit,
-            },
-            clear=False,
-        ):
-            self.assertEqual(_git_commit(self.root), commit)
-
     def test_editor_config_exposes_only_trusted_github_handoff(self) -> None:
         self.assertNotIn("review_bundle_proposal", _editor_config(self.workspace))
 

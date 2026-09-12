@@ -28,24 +28,13 @@ IGNORED_WORKING_TREE_NAMES = {
     "test-results",
 }
 SITE_OWNED_PATHS = ("site-specific", "extensions")
-RELEASE_COORDINATES = {
-    "package_version",
-    "package_url",
-    "package_sha256",
-    "template_source",
-    "template_version",
-    "workflow_repository",
-    "workflow_sha",
-    "workflow_ref",
-}
+RELEASE_COORDINATES = {"package_url", "package_sha256"}
 QUICK_TASKS = (
     "validate",
     "build",
 )
 FULL_TASKS = (
     "validate",
-    "verify-hugo",
-    "verify-release-selection",
     "verify-build",
 )
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -174,24 +163,6 @@ def _template_answers(downstream: Path, template: Path) -> dict[str, object]:
     return selected
 
 
-def _normalize_copier_answers(candidate: Path, answers: Mapping[str, object]) -> None:
-    path = candidate / ".copier-answers.yml"
-    rendered = dict(_load_yaml(path, "Rendered Copier answers"))
-    rendered.pop("_src_path", None)
-    rendered.pop("_commit", None)
-    source = answers.get("template_source")
-    version = answers.get("template_version")
-    if not isinstance(source, str) or not isinstance(version, str):
-        raise DevelopmentError(
-            "Candidate template defaults require template_source and template_version"
-        )
-    normalized = {"_src_path": source, **rendered, "_commit": version}
-    path.write_text(
-        yaml.safe_dump(normalized, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
 def _run(
     command: Sequence[str | Path],
     *,
@@ -306,7 +277,6 @@ def render_template(
         ),
         cwd=template,
     )
-    _normalize_copier_answers(candidate, selected_answers)
     overlay_site_owned(downstream, candidate)
 
 
@@ -316,9 +286,10 @@ def candidate_environment(
     source_commit: str | None = None,
     pull_request: int | None = None,
 ) -> dict[str, str]:
-    """Return an environment that imports an unreleased package first."""
+    """Run the installed package with the downstream's repository identity."""
 
     environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
     if repository is not None:
         if GITHUB_REPOSITORY.fullmatch(repository) is None:
             raise DevelopmentError("Repository must use GitHub OWNER/REPOSITORY form")
@@ -333,158 +304,13 @@ def candidate_environment(
                 "--pull-request requires a positive number and --source-commit"
             )
         environment["ORINOCO_CANDIDATE_PULL_REQUEST"] = str(pull_request)
-    if package is None:
-        return environment
-    package = package.resolve()
-    source = package / "packages/orinoco-lite/src"
-    if not (source / "orinoco_lite/__init__.py").is_file():
-        raise DevelopmentError(f"Package candidate has no Orinoco source tree: {package}")
-    existing = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        os.fspath(source) if not existing else os.pathsep.join((os.fspath(source), existing))
-    )
-    environment["ORINOCO_CANDIDATE_PACKAGE_ROOT"] = os.fspath(package)
-    environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
-    return environment
-
-
-def prepare_candidate_editor_shell(
-    package: Path,
-    destination: Path,
-    environment: Mapping[str, str],
-    *,
-    licenses: Path | None = None,
-) -> None:
-    """Build the working-tree editor used by a downstream candidate."""
-
-    pool_ui = package.resolve() / "submodules/pool.psychoinformatics.de-ui"
-    if not (pool_ui / "Makefile").is_file() or not (
-        pool_ui / "shacl-vue/package.json"
+    if package is not None and not (
+        package / "packages/orinoco-lite/pyproject.toml"
     ).is_file():
-        raise DevelopmentError(
-            "Package candidate editor sources are missing; initialize the "
-            "pool.psychoinformatics.de-ui submodule recursively"
-        )
-    source = destination.parent / "editor-source"
-    shutil.copytree(pool_ui, source)
-    _run(
-        (
-            sys.executable,
-            "-m",
-            "orinoco_lite.release_editor",
-            "--pool-ui",
-            source,
-            "--overlay",
-            package.resolve() / "release/editor-v2",
-            "--shell",
-            destination,
-            "--licenses",
-            licenses or destination.parent / "editor-licenses",
-        ),
-        cwd=package.resolve(),
-        environment=environment,
-    )
-
-
-def prepare_candidate_resources(
-    package: Path,
-    destination: Path,
-    environment: Mapping[str, str],
-) -> None:
-    """Stage the candidate package's generated resources for one exercise."""
-
-    candidate_source = package.resolve() / "packages/orinoco-lite/src"
-    if str(candidate_source) not in sys.path:
-        sys.path.insert(0, str(candidate_source))
-    from orinoco_lite.stage_resources import stage_package_resources
-
-    package = package.resolve()
-    source = destination / "source"
-    build = source / "build"
-    editor_shell = build / "resources-editor-shell"
-    prepare_candidate_editor_shell(
-        package,
-        editor_shell,
-        environment,
-        licenses=build / "resources-editor-licenses",
-    )
-    _run(
-        (
-            sys.executable,
-            "-m",
-            "orinoco_lite.release_schema",
-            "--source-root",
-            package / "submodules/things-schemas/src",
-            "--entry",
-            package / "submodules/things-schemas/src/demo-research-information/unreleased.yaml",
-            "--destination",
-            build / "resources-schema",
-        ),
-        cwd=package,
-        environment=environment,
-    )
-    _run(
-        (
-            sys.executable,
-            "-m",
-            "orinoco_lite.release_review",
-            "--application",
-            package / "packages/curation-review-app",
-            "--shell",
-            build / "resources-review-shell",
-            "--licenses",
-            build / "resources-review-licenses",
-        ),
-        cwd=package,
-        environment=environment,
-    )
-    for relative in (
-        "tools/adapt_upstream_pages.py",
-        "release/package-licenses/README.md",
-        "packages/orinoco-lite/LICENSE",
-        "LICENSE",
-        "submodules/pool.psychoinformatics.de-ui/LICENSE",
-        "submodules/things-schemas/LICENSE",
-        "submodules/pool.psychoinformatics.de-ui/dlschemas_owl.ttl",
-        "submodules/pool.psychoinformatics.de-ui/dlschemas_shacl.ttl",
-        "submodules/pool.psychoinformatics.de-ui/config_default_xyzri.yaml",
-    ):
-        target = source / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(package / relative, target)
-    spec = package / "release/package-resources.yaml"
-    target_spec = source / "release/package-resources.yaml"
-    target_spec.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(spec, target_spec)
-    completed = subprocess.run(
-        ("git", "-C", str(package), "rev-parse", "HEAD"),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    commit = completed.stdout.strip()
-    if completed.returncode or not re.fullmatch(r"[0-9a-f]{40}", commit):
-        raise DevelopmentError("Could not resolve the candidate package commit")
-    completed = subprocess.run(
-        ("git", "-C", str(package), "describe", "--always"),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    description = completed.stdout.strip()
-    if (
-        completed.returncode
-        or not description
-        or "\n" in description
-        or len(description) > 200
-    ):
-        raise DevelopmentError("Could not resolve the candidate package description")
-    stage_package_resources(
-        target_spec,
-        destination / "package-resources",
-        source_commit=commit,
-        source_description=description,
-    )
+        raise DevelopmentError(f"Package candidate has no Orinoco source tree: {package}")
+    if package is not None:
+        environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
+    return environment
 
 
 def github_repository(downstream: Path, explicit: str | None = None) -> str:
@@ -582,33 +408,39 @@ def exercise_candidate(
     environment = candidate_environment(
         package, repository, source_commit, pull_request
     )
-    with tempfile.TemporaryDirectory(prefix="orinoco-candidate-shells-") as temporary:
-        if package is not None and selected_tasks:
-            application = package.resolve() / "packages/curation-review-app"
-            if not (application / "node_modules").is_dir():
-                _run(("npm", "ci", "--ignore-scripts"), cwd=application)
-            _run(("npm", "run", "build:review"), cwd=application)
-            resources = Path(temporary) / "resources"
-            prepare_candidate_resources(package, resources, environment)
-            environment["ORINOCO_CANDIDATE_EDITOR_SHELL"] = os.fspath(
-                resources / "source/build/resources-editor-shell"
-            )
-            environment["ORINOCO_CANDIDATE_RESOURCE_ROOT"] = os.fspath(
-                resources / "package-resources"
-            )
-        for task in selected_tasks:
-            _run(
-                (
-                    pixi,
-                    "run",
-                    "--frozen",
-                    "--manifest-path",
-                    manifest,
-                    task,
-                ),
-                cwd=candidate,
-                environment=environment,
-            )
+    if package is not None and selected_tasks:
+        wheel_directory = candidate / ".orinoco/candidate-wheel"
+        wheel_directory.mkdir(parents=True, exist_ok=True)
+        _run(
+            (
+                sys.executable,
+                "-m",
+                "build",
+                "--wheel",
+                "--outdir",
+                wheel_directory,
+                package.resolve() / "packages/orinoco-lite",
+            ),
+            cwd=package.resolve(),
+            environment=environment,
+        )
+        wheels = tuple(wheel_directory.glob("orinoco_lite-*.whl"))
+        if len(wheels) != 1:
+            raise DevelopmentError("Package candidate did not produce exactly one wheel")
+        _run(
+            (
+                pixi, "add", "--manifest-path", manifest, "--pypi",
+                f"orinoco-lite @ {wheels[0].resolve()}",
+            ),
+            cwd=candidate,
+            environment=environment,
+        )
+    for task in selected_tasks:
+        _run(
+            (pixi, "run", "--frozen", "--manifest-path", manifest, task),
+            cwd=candidate,
+            environment=environment,
+        )
 
 
 def parser() -> argparse.ArgumentParser:

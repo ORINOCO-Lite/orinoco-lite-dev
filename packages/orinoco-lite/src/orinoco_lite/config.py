@@ -1,11 +1,10 @@
-"""Downstream workspace and release-lock contracts."""
+"""Downstream workspace configuration."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 import ipaddress
 from pathlib import Path, PurePosixPath
-import os
 import re
 from typing import Any, Mapping
 from urllib.parse import urlsplit
@@ -16,9 +15,7 @@ from .errors import ConfigurationError
 
 
 CONFIG_CONTRACT_VERSION = 2
-LOCK_CONTRACT_VERSION = 1
 SITE_DATA_VERSION = 1
-SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GITHUB_REPOSITORY = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})/[A-Za-z0-9_.-]{1,100}$"
 )
@@ -281,7 +278,6 @@ class WorkspaceConfig:
 
     root: Path
     config_path: Path
-    lock_path: Path
     site_name: str
     base_url: str
     paths: Mapping[str, str]
@@ -303,24 +299,11 @@ class WorkspaceConfig:
         values = {
             "ORINOCO_ROOT": str(self.root),
             "ORINOCO_CONFIG": str(self.config_path),
-            "ORINOCO_LOCK": str(self.lock_path),
         }
         for name in sorted(self.paths):
             variable = "ORINOCO_" + name.upper().replace("-", "_") + "_ROOT"
             values[variable] = str(self.path(name))
         return values
-
-
-@dataclass(frozen=True)
-class PackageLock:
-    """Resolved immutable package pin from ``orinoco.lock``."""
-
-    path: Path
-    distribution: str
-    package_version: str
-    package_url: str
-    package_sha256: str
-    raw: Mapping[str, Any]
 
 
 def find_workspace_root(start: Path | None = None) -> Path:
@@ -341,7 +324,6 @@ def load_workspace(
     root: Path | None = None,
     *,
     config_name: str = "orinoco.yaml",
-    lock_name: str = "orinoco.lock",
 ) -> WorkspaceConfig:
     """Load and resolve a version-2 downstream workspace."""
 
@@ -349,9 +331,7 @@ def load_workspace(
     if not resolved_root.is_dir():
         raise ConfigurationError(f"Workspace root is not a directory: {resolved_root}")
     config_relative = _relative_path(config_name, "configuration path")
-    lock_relative = _relative_path(lock_name, "lock path")
     config_path = _inside(resolved_root, config_relative, "configuration path")
-    lock_path = _inside(resolved_root, lock_relative, "lock path")
     raw = _load_mapping(config_path, "Orinoco configuration")
     if raw.get("contract_version") != CONFIG_CONTRACT_VERSION:
         raise ConfigurationError(
@@ -422,7 +402,6 @@ def load_workspace(
     return WorkspaceConfig(
         root=resolved_root,
         config_path=config_path,
-        lock_path=lock_path,
         site_name=site_name,
         base_url=base_url,
         site_data=site_data,
@@ -438,97 +417,3 @@ def load_config_path(path: Path) -> WorkspaceConfig:
 
     path = path.resolve()
     return load_workspace(path.parent, config_name=path.name)
-
-
-def load_lock(path: Path) -> PackageLock:
-    """Load a strict immutable package lock."""
-
-    raw = _load_mapping(path, "Orinoco lock")
-    if raw.get("lock_version") != LOCK_CONTRACT_VERSION:
-        raise ConfigurationError(
-            f"orinoco.lock lock_version must be {LOCK_CONTRACT_VERSION}"
-        )
-    package = raw.get("package")
-    if not isinstance(package, dict):
-        raise ConfigurationError("orinoco.lock requires a package mapping")
-    distribution = package.get("distribution")
-    package_version = package.get("version")
-    package_url = package.get("url")
-    package_digest = package.get("sha256")
-    if distribution != "orinoco-lite":
-        raise ConfigurationError("orinoco.lock package.distribution must be orinoco-lite")
-    if not isinstance(package_version, str) or not package_version:
-        raise ConfigurationError("orinoco.lock package.version must be a string")
-    package_url = _absolute_http_url(
-        package_url, "orinoco.lock package.url", https_only=True
-    )
-    if (
-        not isinstance(package_digest, str)
-        or not SHA256.fullmatch(package_digest)
-        or set(package_digest) == {"0"}
-    ):
-        raise ConfigurationError("orinoco.lock package.sha256 must be lowercase SHA-256")
-    wheel_name = PurePosixPath(urlsplit(package_url).path).name
-    expected_wheel_prefix = f"orinoco_lite-{package_version.replace('-', '_')}-"
-    if not wheel_name.startswith(expected_wheel_prefix) or not wheel_name.endswith(
-        ".whl"
-    ):
-        raise ConfigurationError(
-            "orinoco.lock package.url must name the exact locked orinoco-lite wheel"
-        )
-
-    return PackageLock(
-        path=path.resolve(),
-        distribution=distribution,
-        package_version=package_version,
-        package_url=package_url,
-        package_sha256=package_digest,
-        raw=raw,
-    )
-
-
-def load_workspace_lock(workspace: WorkspaceConfig) -> PackageLock:
-    return load_lock(workspace.lock_path)
-
-
-def development_package_allowed() -> bool:
-    """Return whether local package candidate execution is explicitly enabled."""
-
-    return os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") == "1"
-
-
-def development_package_root() -> Path | None:
-    """Resolve the explicitly selected local engineering working tree."""
-
-    if not development_package_allowed():
-        return None
-    root_value = os.environ.get("ORINOCO_CANDIDATE_PACKAGE_ROOT")
-    if root_value is None:
-        return None
-    root = Path(root_value).resolve()
-    source = root / "packages/orinoco-lite/src"
-    if not (source / "orinoco_lite/__init__.py").is_file():
-        raise ConfigurationError(
-            "ORINOCO_CANDIDATE_PACKAGE_ROOT does not contain "
-            "packages/orinoco-lite/src/orinoco_lite"
-        )
-    return root
-
-
-def development_editor_shell() -> Path | None:
-    """Resolve the editor shell built for a local package candidate."""
-
-    if development_package_root() is None:
-        return None
-    shell_value = os.environ.get("ORINOCO_CANDIDATE_EDITOR_SHELL")
-    if shell_value is None:
-        raise ConfigurationError(
-            "Local package candidate has no editor shell; run it through the "
-            "downstream candidate command"
-        )
-    shell = Path(shell_value).resolve()
-    if not shell.is_dir() or not (shell / "index.html").is_file():
-        raise ConfigurationError(
-            "ORINOCO_CANDIDATE_EDITOR_SHELL does not contain a built editor"
-        )
-    return shell
