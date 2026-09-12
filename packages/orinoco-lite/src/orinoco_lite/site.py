@@ -23,13 +23,10 @@ from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
 from .projection import load_contract
-from .presentation import resolve_presentation
+from .presentation import hugo_requirement, resolve_presentation
 from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
-
-HUGO_REQUIREMENT = ">=0.161,<0.162"
-
 
 HUGO_VERSION = re.compile(
     r"^hugo\s+v?(?P<version>[0-9]+(?:\.[0-9]+){2})"
@@ -454,11 +451,11 @@ def _require_compatible_hugo(
     return version
 
 
-def _preflight_hugo(resources_root: Path, *, cwd: Path) -> Version:
+def _preflight_hugo(presentation: Path, *, cwd: Path) -> Version:
     output = _run(["hugo", "version"], cwd=cwd)
     return _require_compatible_hugo(
         output,
-        HUGO_REQUIREMENT,
+        hugo_requirement(presentation),
         package_version=__version__,
     )
 
@@ -532,12 +529,13 @@ def build_site(
         else workspace.repository
     )
     parsed = urlsplit(base_url)
-    _preflight_hugo(resources_root, cwd=workspace.root)
+    presentation = resolve_presentation(workspace.root, resources_root)
+    _preflight_hugo(presentation, cwd=workspace.root)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)
-    _assemble(workspace, resources_root, assembly)
+    _assemble(workspace, resources_root, assembly, presentation=presentation)
     _write_build_provenance_footer(
         assembly,
         _build_provenance(workspace, resources_root, repository, build_timestamp),

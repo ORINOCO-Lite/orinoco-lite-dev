@@ -64,6 +64,18 @@ def _presentation(root: Path) -> Path:
         "print('{\"nodes\": [], \"edges\": []}')\n",
         encoding="utf-8",
     )
+    workflow = upstream / ".forgejo" / "workflows" / "deploy.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  deploy:\n"
+        "    steps:\n"
+        "      - uses: https://github.com/peaceiris/actions-hugo@v3\n"
+        "        with:\n"
+        "          hugo-version: '1.2.3'\n"
+        "          extended: true\n",
+        encoding="utf-8",
+    )
     materialized = root / ".orinoco-lite" / "materialized-presentation"
     materialized.mkdir(parents=True, exist_ok=True)
     (materialized / "LICENSE").write_text("Template MIT\n", encoding="utf-8")
@@ -500,6 +512,11 @@ class HugoCompatibilityTests(unittest.TestCase):
 
                     destination = root / "build" / name
                     with (
+                        patch.object(
+                            site,
+                            "resolve_presentation",
+                            return_value=root / "presentation",
+                        ),
                         patch.object(site, "_preflight_hugo"),
                         patch.object(site, "_assemble"),
                         patch.object(site, "_build_provenance", return_value={}),
@@ -535,19 +552,19 @@ class HugoCompatibilityTests(unittest.TestCase):
 
     def test_supported_extended_hugo_is_accepted(self) -> None:
         outputs = (
-            "hugo v0.154.5+extended darwin/arm64 BuildDate=unknown "
+            "hugo v1.2.3+extended darwin/arm64 BuildDate=unknown "
             "VendorInfo=conda-forge",
-            "hugo v0.154.5-conda-forge+extended linux/amd64 "
+            "hugo v1.2.3-conda-forge+extended linux/amd64 "
             "BuildDate=unknown VendorInfo=conda-forge",
         )
         for output in outputs:
             with self.subTest(output=output):
                 version = site._require_compatible_hugo(
                     output,
-                    ">=0.154,<0.155",
+                    "==1.2.3",
                     package_version="0.1.7",
                 )
-                self.assertEqual(str(version), "0.154.5")
+                self.assertEqual(str(version), "1.2.3")
 
     def test_site_adapter_prefers_explicit_package_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -583,22 +600,22 @@ class HugoCompatibilityTests(unittest.TestCase):
         cases = (
             (
                 "too old",
-                "hugo v0.153.9+extended linux/amd64",
-                "requires Hugo >=0.154,<0.155; found 0.153.9",
+                "hugo v1.2.2+extended linux/amd64",
+                "requires Hugo ==1.2.3; found 1.2.2",
             ),
             (
                 "too new",
-                "hugo v0.155.0-conda-forge+extended linux/amd64",
-                "requires Hugo >=0.154,<0.155; found 0.155.0",
+                "hugo v1.2.4-conda-forge+extended linux/amd64",
+                "requires Hugo ==1.2.3; found 1.2.4",
             ),
             (
                 "standard edition",
-                "hugo v0.154.5-conda-forge linux/amd64",
+                "hugo v1.2.3-conda-forge linux/amd64",
                 "requires Hugo Extended",
             ),
             (
                 "malformed",
-                "hugo v0.154.5-+extended linux/amd64",
+                "hugo v1.2.3-+extended linux/amd64",
                 "Could not determine Hugo version",
             ),
         )
@@ -607,7 +624,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 with self.assertRaisesRegex(DriverError, message):
                     site._require_compatible_hugo(
                         output,
-                        ">=0.154,<0.155",
+                        "==1.2.3",
                         package_version="0.1.7",
                     )
 
@@ -624,19 +641,21 @@ class HugoCompatibilityTests(unittest.TestCase):
             (assembly / "sentinel").write_text("existing\n", encoding="utf-8")
             resources = root / "resources"
             resources.mkdir()
-            manifest = SimpleNamespace(
-                compatibility={"hugo": ">=0.154,<0.155"},
-                release="0.1.3",
-            )
+            presentation = _presentation(root)
             with (
-                patch.object(site, "HUGO_REQUIREMENT", ">=0.154,<0.155"),
+                patch.object(
+                    site,
+                    "resolve_presentation",
+                    return_value=presentation,
+                ),
+                patch.object(site, "hugo_requirement", return_value="==1.2.3"),
                 patch.object(
                     site,
                     "_run",
-                    return_value="hugo v0.155.0+extended linux/amd64",
+                    return_value="hugo v1.2.4+extended linux/amd64",
                 ) as run,
             ):
-                with self.assertRaisesRegex(DriverError, "found 0.155.0"):
+                with self.assertRaisesRegex(DriverError, "found 1.2.4"):
                     site.build_site(
                         root / "orinoco.yaml",
                         resources,

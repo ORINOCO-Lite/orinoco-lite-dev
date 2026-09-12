@@ -267,6 +267,11 @@ class StaticReviewBindingTests(unittest.TestCase):
                 return ""
 
             with (
+                patch.object(
+                    site,
+                    "resolve_presentation",
+                    return_value=root / "presentation",
+                ),
                 patch.object(site, "_preflight_hugo"),
                 patch.object(site, "_assemble"),
                 patch.object(site, "_build_provenance", return_value={}),

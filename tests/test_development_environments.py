@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 import re
 import subprocess
@@ -9,13 +8,11 @@ import unittest
 import yaml
 
 from orinoco_lite.release_editor import POOL_UI_COMMIT, SHACL_VUE_COMMIT
+from orinoco_lite.presentation import hugo_requirement
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "pixi.toml"
-SCRIPT = ROOT / "tools" / "upstream_static.py"
-SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
-FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 CONSUMER_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-consumer-ci.yml"
@@ -35,45 +32,44 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": "packages/orinoco-lite", "editable": True},
         )
-        self.assertNotIn("feature", manifest)
-        self.assertNotIn("environments", manifest)
         serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
-            'path = "submodules/',
-            'hugo =',
-            'git-annex =',
-            'nodejs =',
             'serve =',
             'build =',
             'serve-static =',
         ):
             self.assertNotIn(forbidden, serialized)
 
-    def test_upstream_tasks_use_the_locked_standalone_script(self) -> None:
-        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
+    def test_upstream_tasks_use_the_repository_environments(self) -> None:
+        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        tasks = manifest["tasks"]
         self.assertEqual(
             tasks["build-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build',
+            '"$PIXI_EXE" run --frozen --environment upstream-static '
+            "python tools/upstream_static.py build",
         )
         self.assertEqual(
             tasks["serve-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve',
+            '"$PIXI_EXE" run --frozen --environment upstream-static '
+            "python tools/upstream_static.py serve",
         )
         self.assertEqual(
             tasks["build-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build '
-            "--checkout worktree",
+            '"$PIXI_EXE" run --frozen --environment upstream-static '
+            "python tools/upstream_static.py build --checkout worktree",
         )
         self.assertEqual(
             tasks["serve-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve '
-            "--checkout worktree",
+            '"$PIXI_EXE" run --frozen --environment upstream-static '
+            "python tools/upstream_static.py serve --checkout worktree",
         )
-        self.assertTrue(SCRIPT_LOCK.is_file())
-        lock = yaml.safe_load(SCRIPT_LOCK.read_text(encoding="utf-8"))
-        self.assertEqual(lock["version"], 7)
-        self.assertEqual(set(lock["environments"]), {"default"})
-        self.assertTrue(FULL_SCRIPT_LOCK.is_file())
+        self.assertEqual(
+            set(manifest["environments"]["upstream-full"]["features"]),
+            {"upstream", "upstream-full"},
+        )
+        self.assertTrue(
+            manifest["environments"]["upstream-full"]["no-default-feature"]
+        )
 
     def test_ci_tasks_require_package_and_development_contracts(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
@@ -101,29 +97,24 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(interface["display_name"], "Develop Orinoco Lite")
         self.assertIn("$develop-orinoco-lite", interface["default_prompt"])
 
-    def test_script_metadata_is_exact_and_platform_complete(self) -> None:
-        source = SCRIPT.read_text(encoding="utf-8")
-        match = re.search(r"^# /// script\n(?P<body>.*?)^# ///$", source, re.M | re.S)
-        self.assertIsNotNone(match)
-        metadata = "\n".join(
-            line.removeprefix("# ") if line != "#" else ""
-            for line in match.group("body").splitlines()
-        )
-        document = tomllib.loads(metadata)
-        self.assertEqual(document["requires-python"], ">=3.12,<3.13")
-        pixi = document["tool"]["pixi"]
-        self.assertEqual(pixi["dependencies"]["hugo"], "==0.161.1")
+    def test_upstream_environment_matches_selected_hugo(self) -> None:
+        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        upstream = manifest["feature"]["upstream"]
+        presentation = ROOT / "submodules" / "www-from-model"
         self.assertEqual(
-            pixi["target"]["linux-64"]["dependencies"]["git-annex"],
+            upstream["dependencies"]["hugo"],
+            hugo_requirement(presentation),
+        )
+        self.assertEqual(
+            upstream["target"]["linux-64"]["dependencies"]["git-annex"],
             "==10.20260601",
         )
         self.assertEqual(
-            pixi["target"]["osx-arm64-macos-14-0"]["pypi-dependencies"][
+            upstream["target"]["osx-arm64-macos-14-0"]["pypi-dependencies"][
                 "git-annex"
             ],
             "==10.20260601",
         )
-        ast.parse(source)
 
     def test_builder_never_moves_gitlinks_after_scoped_preparation(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
@@ -282,11 +273,8 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         self.assertIn("submodules/things-schemas", workflow)
         self.assertIn("--init --depth 1 -- shacl-vue", workflow)
-        for script in (
-            "tools/upstream_static.py",
-            "tools/upstream_full.py",
-        ):
-            self.assertIn(f"pixi lock --script {script} --check", workflow)
+        self.assertIn("pixi lock --check", workflow)
+        self.assertNotIn("pixi lock --script tools/upstream_", workflow)
         fixture = workflow.index("Check out the template candidate")
         components = workflow.index(
             "Initialize only release-authorized compatibility components"

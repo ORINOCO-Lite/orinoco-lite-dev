@@ -1,30 +1,9 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12,<3.13"
-# dependencies = []
-#
-# [tool.pixi.workspace]
-# channels = ["conda-forge"]
-# platforms = [
-#   { platform = "osx-arm64", macos = "14.0" },
-#   "linux-64",
-# ]
-#
-# [tool.pixi.dependencies]
-# python = ">=3.12,<3.13"
-# hugo = "==0.161.1"
-#
-# [tool.pixi.target.linux-64.dependencies]
-# git-annex = "==10.20260601"
-#
-# [tool.pixi.target.osx-arm64-macos-14-0.pypi-dependencies]
-# git-annex = "==10.20260601"
-# ///
 """Build or serve the pinned upstream Psychoinformatics static site.
 
-Run this file through Pixi 0.76 or newer.  Its inline environment is isolated
-from the engineering workspace, while the builder checks out the exact site
-and theme gitlinks recorded by the current parent commit.
+Run this file in the repository's ``upstream-static`` Pixi environment.  The
+builder checks out the exact site and theme gitlinks recorded by the current
+parent commit.
 """
 
 from __future__ import annotations
@@ -67,13 +46,8 @@ def run(arguments: Sequence[str | Path], *, environment: dict[str, str]) -> None
         )
 
 
-def require_script_environment() -> None:
-    """Reject direct Python execution that bypasses the locked Pixi script."""
-    manifest = os.environ.get("PIXI_PROJECT_MANIFEST", "")
-    if not manifest or Path(manifest).resolve() != Path(__file__).resolve():
-        raise UpstreamStaticError(
-            "Run with 'pixi run --frozen --script tools/upstream_static.py'"
-        )
+def require_environment() -> None:
+    """Reject execution without the repository's upstream dependencies."""
     for command in ("hugo", "git-annex"):
         result = subprocess.run(
             [command, "version"],
@@ -82,7 +56,7 @@ def require_script_environment() -> None:
         )
         if result.returncode:
             raise UpstreamStaticError(
-                f"The standalone Pixi environment does not provide {command}"
+                f"The upstream Pixi environment does not provide {command}"
             )
 
 
@@ -126,7 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--port", default=DEFAULT_PORT, type=int)
     args = parser.parse_args(argv)
     try:
-        require_script_environment()
+        require_environment()
         if args.command == "build":
             build(host=args.host, port=args.port, checkout=args.checkout)
         else:
