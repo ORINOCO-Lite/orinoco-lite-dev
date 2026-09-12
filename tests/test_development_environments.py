@@ -114,6 +114,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         pixi = document["tool"]["pixi"]
         self.assertEqual(pixi["dependencies"]["hugo"], "==0.161.1")
         self.assertEqual(
+            pixi["pypi-dependencies"]["orinoco-lite"],
+            {"path": "../packages/orinoco-lite", "editable": True},
+        )
+        self.assertEqual(
             pixi["target"]["linux-64"]["dependencies"]["git-annex"],
             "==10.20260601",
         )
@@ -140,6 +144,44 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertIn('mode == "recorded"', checkout)
         self.assertIn("restore_local_state", builder)
         self.assertIn("--no-write-fetch-head", builder)
+
+    def test_static_builder_projects_the_pool_snapshot(self) -> None:
+        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
+        launcher = SCRIPT.read_text(encoding="utf-8")
+        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
+            encoding="utf-8"
+        )
+        projector = (ROOT / "tools" / "project_upstream_static.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"ORINOCO_UPSTREAM_SNAPSHOT_PROJECTION": "1"', launcher)
+        self.assertIn("project_upstream_static.py", builder)
+        self.assertIn('--source "$site_source"', builder)
+        self.assertIn("prepare_upstream_snapshot.main([])", projector)
+        self.assertIn("render_projection(workspace, resources, projection)", projector)
+        self.assertIn('(HUGO_SOURCE / "static" / "graph.json").unlink', projector)
+        self.assertEqual(
+            {
+                name: tasks[name]
+                for name in (
+                    "verify-upstream-records",
+                    "verify-upstream-projection",
+                    "verify-upstream-static",
+                )
+            },
+            {
+                "verify-upstream-records": (
+                    "python tools/verify_upstream_rebuild.py records"
+                ),
+                "verify-upstream-projection": (
+                    "python tools/verify_upstream_rebuild.py projection"
+                ),
+                "verify-upstream-static": (
+                    "python tools/verify_upstream_rebuild.py site"
+                ),
+            },
+        )
+        self.assertEqual(builder.count("verify_upstream_rebuild.py"), 3)
 
     def test_static_builder_uses_one_authoritative_annex_pin(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(

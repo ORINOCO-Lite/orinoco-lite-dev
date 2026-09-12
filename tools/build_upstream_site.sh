@@ -87,11 +87,19 @@ site_git \
   annex get --from "$annex_remote_name" .
 test -z "$(site_git -c annex.private=true annex find --not --in=here)"
 
+site_source="$site_root"
+if [[ "${ORINOCO_UPSTREAM_SNAPSHOT_PROJECTION:-}" == 1 ]]; then
+  python3 "$repository_root/tools/project_upstream_static.py"
+  python3 "$repository_root/tools/verify_upstream_rebuild.py" records
+  python3 "$repository_root/tools/verify_upstream_rebuild.py" projection
+  site_source="$repository_root/build/upstream-static/hugo-source"
+fi
+
 hugo version | grep -q 'hugo v0\.161\.1.*extended'
 hugo \
   --minify \
   --cleanDestinationDir \
-  --source "$site_root" \
+  --source "$site_source" \
   --destination "$destination" \
   --baseURL "$base_url"
 
@@ -104,5 +112,11 @@ python3 "$repository_root/tools/adapt_upstream_pages.py" \
   --base-path "$base_path" \
   --edit-url "$edit_url" \
   --check-only
+if [[ "${ORINOCO_UPSTREAM_SNAPSHOT_PROJECTION:-}" == 1 ]]; then
+  python3 "$repository_root/tools/verify_upstream_rebuild.py" site \
+    --site "$destination" \
+    --base-path "$base_path" \
+    --edit-url "$edit_url"
+fi
 
 printf 'Built the upstream site at %s\n' "$destination"
