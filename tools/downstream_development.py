@@ -308,6 +308,8 @@ def candidate_environment(
         package / "packages/orinoco-lite/pyproject.toml"
     ).is_file():
         raise DevelopmentError(f"Package candidate has no Orinoco source tree: {package}")
+    if package is not None:
+        environment["ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE"] = "1"
     return environment
 
 
@@ -407,10 +409,28 @@ def exercise_candidate(
         package, repository, source_commit, pull_request
     )
     if package is not None and selected_tasks:
+        wheel_directory = candidate / ".orinoco/candidate-wheel"
+        wheel_directory.mkdir(parents=True, exist_ok=True)
+        _run(
+            (
+                sys.executable,
+                "-m",
+                "build",
+                "--wheel",
+                "--outdir",
+                wheel_directory,
+                package.resolve() / "packages/orinoco-lite",
+            ),
+            cwd=package.resolve(),
+            environment=environment,
+        )
+        wheels = tuple(wheel_directory.glob("orinoco_lite-*.whl"))
+        if len(wheels) != 1:
+            raise DevelopmentError("Package candidate did not produce exactly one wheel")
         _run(
             (
                 pixi, "add", "--manifest-path", manifest, "--pypi",
-                f"orinoco-lite @ {package.resolve() / 'packages/orinoco-lite'}",
+                f"orinoco-lite @ {wheels[0].resolve()}",
             ),
             cwd=candidate,
             environment=environment,
