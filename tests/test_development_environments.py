@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 import re
 import subprocess
@@ -13,9 +12,6 @@ from orinoco_lite.release_editor import POOL_UI_COMMIT, SHACL_VUE_COMMIT
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "pixi.toml"
-SCRIPT = ROOT / "tools" / "upstream_static.py"
-SCRIPT_LOCK = ROOT / "tools" / "upstream_static.py.pixi.lock"
-FULL_SCRIPT_LOCK = ROOT / "tools" / "upstream_full.py.pixi.lock"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
 PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
@@ -24,11 +20,13 @@ ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
-    def test_root_environment_is_package_only_and_bootstrappable(self) -> None:
+    def test_root_environment_contains_the_engineering_toolchain(self) -> None:
         manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
         workspace = manifest["workspace"]
         self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
-        self.assertEqual(manifest["dependencies"], {"python": ">=3.12,<3.13"})
+        self.assertEqual(manifest["dependencies"]["python"], ">=3.12,<3.13")
+        for name in ("hugo", "nodejs", "make"):
+            self.assertIn(name, manifest["dependencies"])
         self.assertEqual(
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": "packages/orinoco-lite", "editable": True},
@@ -37,41 +35,28 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertNotIn("environments", manifest)
         serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
-            'path = "submodules/',
-            'hugo =',
-            'git-annex =',
-            'nodejs =',
-            'serve =',
-            'build =',
-            'serve-static =',
+            'path = "submodules/dump-things-service"',
         ):
             self.assertNotIn(forbidden, serialized)
 
-    def test_upstream_tasks_use_the_locked_standalone_script(self) -> None:
+    def test_upstream_tasks_use_the_engineering_environment(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
         self.assertEqual(
             tasks["build-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build',
+            "python tools/upstream_static.py build",
         )
         self.assertEqual(
             tasks["serve-upstream-static"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve',
+            "python tools/upstream_static.py serve",
         )
         self.assertEqual(
             tasks["build-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py build '
-            "--checkout worktree",
+            "python tools/upstream_static.py build --checkout worktree",
         )
         self.assertEqual(
             tasks["serve-upstream-static-worktree"],
-            '"$PIXI_EXE" run --frozen --script tools/upstream_static.py serve '
-            "--checkout worktree",
+            "python tools/upstream_static.py serve --checkout worktree",
         )
-        self.assertTrue(SCRIPT_LOCK.is_file())
-        lock = yaml.safe_load(SCRIPT_LOCK.read_text(encoding="utf-8"))
-        self.assertEqual(lock["version"], 7)
-        self.assertEqual(set(lock["environments"]), {"default"})
-        self.assertTrue(FULL_SCRIPT_LOCK.is_file())
 
     def test_ci_tasks_require_package_and_development_contracts(self) -> None:
         tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
@@ -98,30 +83,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )["interface"]
         self.assertEqual(interface["display_name"], "Develop Orinoco Lite")
         self.assertIn("$develop-orinoco-lite", interface["default_prompt"])
-
-    def test_script_metadata_is_exact_and_platform_complete(self) -> None:
-        source = SCRIPT.read_text(encoding="utf-8")
-        match = re.search(r"^# /// script\n(?P<body>.*?)^# ///$", source, re.M | re.S)
-        self.assertIsNotNone(match)
-        metadata = "\n".join(
-            line.removeprefix("# ") if line != "#" else ""
-            for line in match.group("body").splitlines()
-        )
-        document = tomllib.loads(metadata)
-        self.assertEqual(document["requires-python"], ">=3.12,<3.13")
-        pixi = document["tool"]["pixi"]
-        self.assertEqual(pixi["dependencies"]["hugo"], "==0.161.1")
-        self.assertEqual(
-            pixi["target"]["linux-64"]["dependencies"]["git-annex"],
-            "==10.20260601",
-        )
-        self.assertEqual(
-            pixi["target"]["osx-arm64-macos-14-0"]["pypi-dependencies"][
-                "git-annex"
-            ],
-            "==10.20260601",
-        )
-        ast.parse(source)
 
     def test_builder_never_moves_gitlinks_after_scoped_preparation(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
