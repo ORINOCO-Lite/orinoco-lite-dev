@@ -146,6 +146,23 @@ class PresentationResolverTests(unittest.TestCase):
             self.congo_commit,
         )
 
+    def test_commit_on_pull_request_ref_is_fetched(self) -> None:
+        _git(self.engineering, "checkout", "--detach", "--quiet")
+        _git(self.engineering, "commit", "--allow-empty", "--quiet", "-m", "PR merge")
+        merge_commit = _git(self.engineering, "rev-parse", "HEAD")
+        _git(self.engineering, "update-ref", "refs/pull/148/merge", merge_commit)
+        _git(self.engineering, "checkout", "--quiet", "-")
+
+        with patch(
+            "orinoco_lite.presentation._package_source",
+            return_value=(str(self.engineering), merge_commit),
+        ):
+            source = resolve_presentation(self.workspace, self.root / "resources")
+
+        self.assertEqual(_git(source.parent.parent, "rev-parse", "HEAD"), merge_commit)
+        self.assertEqual(_git(source, "rev-parse", "HEAD"), self.website_commit)
+        self.assertTrue((source / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
+
     def test_corrupt_cache_is_repaired(self) -> None:
         with patch("orinoco_lite.presentation._package_source", return_value=(str(self.engineering), self.engineering_commit)):
             first = resolve_presentation(self.workspace, self.root / "resources")

@@ -183,6 +183,19 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
         ),
         operation=f"clone {repository}",
     )
+    available = _git(
+        destination,
+        ("cat-file", "-e", f"{commit}^{{commit}}"),
+        operation="check whether the engineering commit was cloned",
+        check=False,
+    )
+    if available.returncode:
+        # Pull-request merge commits are not included in a normal branch clone.
+        _git(
+            destination,
+            ("fetch", "--quiet", "--no-tags", "origin", commit),
+            operation=f"fetch engineering commit {commit}",
+        )
     _git(
         destination,
         ("checkout", "--quiet", "--detach", "--force", commit),
