@@ -6,7 +6,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 ## Static editor
 
 The downstream `/edit/` route is the only editor.
-Its build combines the released editor shell and schema with records from the exact site source used for that deployment.
+Its build combines the downstream-selected editor shell and schema with records from the exact site source used for that deployment.
 Generated editor inputs are static output, not canonical metadata or durable curation state.
 
 The editor exposes both:
@@ -51,7 +51,7 @@ The service MUST NOT retarget a stale bundle, create a cross-repository pull req
 
 ## Trusted replacement
 
-A trusted workflow runs the released package against an isolated checkout of the handoff parent.
+A trusted workflow runs the downstream-selected package against an isolated checkout of the handoff parent.
 It verifies the bundle and allowed paths, applies the edits, validates all records and the joined graph, and replaces the temporary handoff with one ordinary metadata commit.
 
 The verified curator is the author and automation is the committer.

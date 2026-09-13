@@ -28,7 +28,7 @@ IGNORED_WORKING_TREE_NAMES = {
     "test-results",
 }
 SITE_OWNED_PATHS = ("site-specific", "extensions")
-RELEASE_COORDINATES = {"package_url", "package_sha256"}
+PACKAGE_SELECTION = {"package_repository", "package_revision"}
 QUICK_TASKS = (
     "validate",
     "build",
@@ -155,7 +155,7 @@ def _template_answers(downstream: Path, template: Path) -> dict[str, object]:
         {
             key: value
             for key, value in downstream_answers.items()
-            if key in selected and key not in RELEASE_COORDINATES
+            if key in selected and key not in PACKAGE_SELECTION
         }
     )
     if not selected:

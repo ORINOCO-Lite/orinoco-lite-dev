@@ -1,14 +1,14 @@
 ---
 name: develop-orinoco-lite
-description: Develop and exercise unreleased Orinoco Lite package or template changes against a selected downstream. Use for local package-only, template-only, or combined candidate testing and for autonomous end-to-end GitHub workflow experiments in a user-owned demo. Use maintain-orinoco-site instead for ordinary maintenance of a released downstream.
+description: Develop and exercise Orinoco Lite package or template changes against a selected downstream. Use for local package-only, template-only, or combined candidate testing and for autonomous end-to-end GitHub workflow experiments in a user-owned demo. Use maintain-orinoco-site instead for ordinary downstream maintenance.
 ---
 
 # Develop Orinoco Lite
 
-Exercise package and template changes through a disposable downstream before release.
-When more than one repository changes, use a downstream deploy preview with exact candidate package and template commits before releasing either component.
+Exercise package and template changes through a disposable downstream before adoption.
+When more than one repository changes, use a downstream deploy preview with exact candidate package and template commits before adopting either component.
 An exact-SHA Netlify preview may write only to its own open same-repository draft pull request after the service verifies GitHub's successful Netlify status for that exact head and origin.
-Do not cut a release merely to discover whether an unreleased package or template composes with a downstream.
+Do not cut a release merely to discover whether a package or template commit composes with a downstream.
 Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
 Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
@@ -23,11 +23,13 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    Use `ORINOCO-Lite/test-orinoco-downstream-website` as the human-gated reference downstream that exposes developers to the frequency and severity of updates experienced by downstream users.
    A deploy preview builds the downstream pull request head plus the explicit full-SHA package and, when relevant, template candidates.
    A branch name is not an adequate candidate coordinate.
-   Keep candidate selectors preview-only; a merged downstream must retain its released, checksum-locked dependencies.
+   A downstream may select an official release, a release from its own fork, or an exact commit from any suitable fork.
+   Prefer a full Git commit while iterating.
+   Do not require a central release or a separate release lock.
    Use the real browser proposal action and inspect its pull-request result; a successful build alone is not evidence that the authenticated path works.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
    Resolve missing access early.
-4. Treat a release and reference-downstream merge as separate gates.
+4. Treat publishing a release and merging a reference-downstream change as separate optional gates.
    Permission to test a working tree locally does not itself authorize either one.
 
 ## Exercise the temporary downstream
@@ -49,7 +51,7 @@ In either mode, the task leaves the source downstream unchanged.
 Template-candidate runs must not copy downstream framework files, workflows, framework tests, or duplicated template configuration.
 
 Quick mode runs the downstream `validate` and `build` tasks while iterating.
-Full mode runs `validate` and `verify-build`; use it before release or adoption.
+Full mode runs `validate` and `verify-build`; use it before adoption or release.
 Browser, source-adapter, offline-cache, and live GitHub behavior require their focused tests or acceptance exercises and are not implied by either mode.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
