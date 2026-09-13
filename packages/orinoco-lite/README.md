@@ -17,15 +17,19 @@ It independently selects exact Orinoco Lite package and template versions.
 
 ## Package selection and integrity
 
-The `package` mapping in `orinoco.lock` records the exact `orinoco-lite` distribution version, immutable wheel URL, and SHA-256 digest.
-Copier records the corresponding `package_version`, `package_url`, and `package_sha256` answers.
-The template passes the wheel URL and digest to Pixi as a hashed direct dependency, and the generated Pixi lock fixes the resolved environment.
-At runtime, Orinoco Lite verifies that `orinoco.lock` names the installed package version; it does not perform a second wheel-digest check.
+The environment's package manager selects and installs `orinoco-lite`.
+Downstreams using Pixi declare that dependency in `pixi.toml` and resolve it in `pixi.lock`.
+The `orinoco-lite` executable uses the installed package without a second version lock or development-selection variables.
 
 The package does not publish or consume a second resource artifact.
 Any resource specification or manifest needed to build or operate Orinoco Lite is internal to the package and shares its version and integrity boundary.
 
 ## Development
+
+Wheel, source, and editable installations provide the same CLI and bundled resources.
+Installing from the engineering checkout builds the resources automatically and requires Git, Make, and the initialized `pool.psychoinformatics.de-ui` (including `shacl-vue`) and `things-schemas` submodules.
+Python's isolated build environment supplies Node and npm.
+An editable installation picks up Python changes immediately; reinstall after changing bundled UI or schema sources.
 
 From the engineering repository root:
 

@@ -358,6 +358,34 @@ class DownstreamValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, "gitlinks"):
             validate_workspace(load_workspace(self.root))
 
+    def test_site_submodule_is_allowed(self) -> None:
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        subprocess.run(
+            [
+                "git", "-C", str(self.root), "update-index", "--add",
+                "--cacheinfo",
+                "160000,0123456789012345678901234567890123456789,site-specific",
+            ],
+            check=True,
+        )
+        (self.root / ".gitmodules").write_text(
+            '[submodule "site-specific"]\n'
+            '\tpath = site-specific\n'
+            '\turl = https://example.invalid/site.git\n',
+            encoding="utf-8",
+        )
+        validate_workspace(load_workspace(self.root))
+        subprocess.run(
+            [
+                "git", "-C", str(self.root), "update-index", "--add",
+                "--cacheinfo",
+                "160000,0123456789012345678901234567890123456789,component",
+            ],
+            check=True,
+        )
+        with self.assertRaisesRegex(ConfigurationError, "gitmodules"):
+            validate_workspace(load_workspace(self.root))
+
 
 if __name__ == "__main__":
     unittest.main()

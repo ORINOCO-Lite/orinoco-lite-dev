@@ -49,7 +49,7 @@ In either mode, the task leaves the source downstream unchanged.
 Template-candidate runs must not copy downstream framework files, workflows, framework tests, or duplicated template configuration.
 
 Quick mode runs the downstream `validate` and `build` tasks while iterating.
-Full mode adds `projection-verify`, `verify-hugo`, `verify-ownership`, and `verify-build`; use it before release or adoption.
+Full mode runs `validate` and `verify-build`; use it before release or adoption.
 Browser, source-adapter, offline-cache, and live GitHub behavior require their focused tests or acceptance exercises and are not implied by either mode.
 Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
 A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.

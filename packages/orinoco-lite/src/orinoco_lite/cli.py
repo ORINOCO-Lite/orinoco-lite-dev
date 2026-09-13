@@ -16,7 +16,6 @@ from . import __version__
 from .config import (
     github_repository,
     load_workspace,
-    load_workspace_lock,
 )
 from .driver import invoke_driver
 from .errors import ConfigurationError, OrinocoError
@@ -25,9 +24,9 @@ from .validation import report_json, validate_workspace
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(prog="orinoco-lite", description=__doc__)
     parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
-    parser.add_argument("--version", action="version", version=f"orinoco {__version__}")
+    parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     validate = commands.add_parser("validate", help="validate site-owned inputs")
@@ -40,7 +39,7 @@ def _parser() -> argparse.ArgumentParser:
 
     build = commands.add_parser("build", help="build the deterministic static site")
     build.add_argument("--destination", type=Path)
-    build.add_argument("--base-url")
+    build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"))
     build.add_argument(
         "--build-timestamp",
         default=os.environ.get("ORINOCO_BUILD_TIMESTAMP"),
@@ -80,6 +79,14 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
     run.add_argument("arguments", nargs=argparse.REMAINDER)
+    from . import local_preview, publication, shacl_handoff
+
+    commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
+                        help="check the built site through localhost and 127.0.0.1")
+    commands.add_parser("publication", parents=[publication.parser()], add_help=False,
+                        help="record generated projection and deployed website commits")
+    commands.add_parser("shacl-handoff", parents=[shacl_handoff._parser()], add_help=False,
+                        help="inspect and materialize GitHub editor proposals")
     return parser
 
 
@@ -89,8 +96,7 @@ def _workspace(args: argparse.Namespace):
 
 def _resolve(args: argparse.Namespace):
     workspace = _workspace(args)
-    lock = load_workspace_lock(workspace)
-    return workspace, lock, resolve_resources(workspace, lock)
+    return workspace, resolve_resources()
 
 
 def _safe_build_destination(workspace, value: Path | None) -> Path:
@@ -110,9 +116,8 @@ def _validate(args: argparse.Namespace) -> int:
     workspace = _workspace(args)
     report = validate_workspace(workspace)
     if not args.structural_only:
-        lock = load_workspace_lock(workspace)
-        resources = resolve_resources(workspace, lock)
-        status = invoke_driver("validate", workspace, lock, resources)
+        resources = resolve_resources()
+        status = invoke_driver("validate", workspace, resources)
         if status:
             return status
         report["package_version"] = __version__
@@ -124,7 +129,7 @@ def _validate(args: argparse.Namespace) -> int:
 
 
 def _build(args: argparse.Namespace) -> int:
-    workspace, lock, resources = _resolve(args)
+    workspace, resources = _resolve(args)
     build_repository = (
         github_repository(
             args.github_repository,
@@ -135,7 +140,7 @@ def _build(args: argparse.Namespace) -> int:
     )
     if not args.skip_structural_validation:
         validate_workspace(workspace)
-    semantic_status = invoke_driver("validate", workspace, lock, resources)
+    semantic_status = invoke_driver("validate", workspace, resources)
     if semantic_status:
         return semantic_status
     destination = _safe_build_destination(workspace, args.destination)
@@ -156,7 +161,6 @@ def _build(args: argparse.Namespace) -> int:
     return invoke_driver(
         "build",
         workspace,
-        lock,
         resources,
         values={"base_url": base_url, "destination": str(destination)},
         environment=build_environment,
@@ -176,7 +180,7 @@ def _serve(args: argparse.Namespace) -> int:
     directory = directory.resolve()
     if not directory.is_dir() or not (directory / "index.html").is_file():
         raise ConfigurationError(
-            f"Static site is absent at {directory}; run `orinoco build` first"
+            f"Static site is absent at {directory}; run `orinoco-lite build` first"
         )
     if not 0 <= args.port <= 65535:
         raise ConfigurationError("Serve port must be between 0 and 65535")
@@ -194,13 +198,12 @@ def _serve(args: argparse.Namespace) -> int:
 
 
 def _editor(args: argparse.Namespace) -> int:
-    workspace, lock, resources = _resolve(args)
+    workspace, resources = _resolve(args)
     bundle = args.bundle.resolve()
     extra = ["--write"] if args.write else []
     return invoke_driver(
         "editor-apply",
         workspace,
-        lock,
         resources,
         values={"bundle": str(bundle)},
         extra_arguments=extra,
@@ -208,22 +211,21 @@ def _editor(args: argparse.Namespace) -> int:
 
 
 def _projection(args: argparse.Namespace) -> int:
-    workspace, lock, resources = _resolve(args)
+    workspace, resources = _resolve(args)
     validate_workspace(workspace)
     return invoke_driver(
-        f"projection-{args.projection_command}", workspace, lock, resources
+        f"projection-{args.projection_command}", workspace, resources
     )
 
 
 def _run(args: argparse.Namespace) -> int:
-    workspace, lock, resources = _resolve(args)
+    workspace, resources = _resolve(args)
     arguments = args.arguments
     if arguments and arguments[0] == "--":
         arguments = arguments[1:]
     return invoke_driver(
         args.driver,
         workspace,
-        lock,
         resources,
         extra_arguments=arguments,
     )
@@ -233,6 +235,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
+        if args.command in {"verify-site", "publication", "shacl-handoff"}:
+            from . import local_preview, publication, shacl_handoff
+            return {"verify-site": local_preview, "publication": publication,
+                    "shacl-handoff": shacl_handoff}[args.command].execute(args)
         if args.command == "validate":
             return _validate(args)
         if args.command == "build":
@@ -246,6 +252,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "run":
             return _run(args)
     except OrinocoError as error:
-        parser.exit(2, f"orinoco: {error}\n")
+        parser.exit(2, f"orinoco-lite: {error}\n")
     parser.error(f"Unknown command: {args.command}")
     return 2

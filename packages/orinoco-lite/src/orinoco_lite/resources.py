@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
 import re
 
-from . import __version__
-from .config import PackageLock, WorkspaceConfig, development_package_root
-from .errors import ConfigurationError, IntegrityError
+from .errors import IntegrityError
 
 SOURCE_REPOSITORY = "https://github.com/ORINOCO-Lite/orinoco-lite-dev"
 SOURCE_COMMIT_NAME = "source-commit.txt"
@@ -27,27 +24,15 @@ def load_resources(root: Path) -> PackageResources:
     root = root.resolve()
     if not root.is_dir():
         raise IntegrityError(
-            "orinoco-lite package resources are absent; install a released wheel "
-            "or stage candidate resources"
+            "orinoco-lite package resources are absent; reinstall orinoco-lite "
+            "to restore its bundled resources"
         )
     return PackageResources(root=root)
 
 
-def require_package_version(lock: PackageLock) -> None:
-    if lock.package_version != __version__ and development_package_root() is None:
-        raise ConfigurationError(
-            f"orinoco.lock requires orinoco-lite {lock.package_version}, "
-            f"but {__version__} is installed"
-        )
+def resolve_resources() -> PackageResources:
+    """Use the resources belonging to the installed package."""
 
-
-def resolve_resources(
-    _workspace: WorkspaceConfig, lock: PackageLock
-) -> PackageResources:
-    require_package_version(lock)
-    candidate = os.environ.get("ORINOCO_CANDIDATE_RESOURCE_ROOT")
-    if candidate and development_package_root() is not None:
-        return load_resources(Path(candidate))
     return load_resources(Path(__file__).parent / "_resources")
 
 

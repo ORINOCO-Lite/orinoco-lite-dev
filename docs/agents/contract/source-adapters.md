@@ -143,7 +143,8 @@ It does not change source-adapter candidate or decision semantics.
 
 ## Guardrails
 
-- A supported downstream is one ordinary Git repository without submodules.
+- Website builds may read `site-specific` from a submodule.
+  Source-adapter and GitHub editing writes remain confined to one repository.
 - Static validation, review, build, and publication require no metadata service.
 - Git commits and Git revert are the transaction and recovery mechanisms.
 - Do not add candidate ledgers, duplicated diffs, exhaustive manifests, attestation graphs, or another persistent store.

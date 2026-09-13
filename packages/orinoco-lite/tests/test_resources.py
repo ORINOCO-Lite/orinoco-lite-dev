@@ -1,6 +1,4 @@
 from pathlib import Path
-from types import SimpleNamespace
-from orinoco_lite import __version__
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,6 +14,19 @@ from orinoco_lite.stage_resources import stage_package_resources
 
 
 class PackageResourceTests(unittest.TestCase):
+    def test_installed_package_contains_its_build_resources(self):
+        root = resolve_resources().root
+        source_commit(root)
+        source_description(root)
+        for name in (
+            "schema/demo-research-information/unreleased.yaml",
+            "editor-shell/index.html",
+            "review-shell/index.html",
+            "drivers/adapt_pages.py",
+        ):
+            with self.subTest(resource=name):
+                self.assertTrue((root / name).is_file())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -68,12 +79,10 @@ class PackageResourceTests(unittest.TestCase):
             self.stage()
         self.assertEqual(outside.read_text(), "outside\n")
 
-    def test_candidate_resources_require_explicit_package_development(self):
-        self.stage()
-        with patch.dict("os.environ", {"ORINOCO_CANDIDATE_RESOURCE_ROOT": str(self.destination)}, clear=True):
-            with patch("orinoco_lite.resources.load_resources") as load:
-                resolve_resources(None, SimpleNamespace(package_version=__version__))
-                self.assertNotEqual(load.call_args.args[0], self.destination)
+    def test_resources_come_from_the_installed_package(self):
+        with patch("orinoco_lite.resources.load_resources") as load:
+            resolve_resources()
+            self.assertEqual(load.call_args.args[0].name, "_resources")
 
     def test_duplicate_destination_and_invalid_source_pin_are_rejected(self):
         self.spec.write_text(self.spec.read_text() + "  - source: inputs\n    destination: data\n")

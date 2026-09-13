@@ -210,7 +210,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_candidate_content_commit_overrides_staged_repository(self) -> None:
         commit = "a" * 40
         with patch.dict(
-            "os.environ",
+            os.environ,
             {
                 "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
                 "ORINOCO_CANDIDATE_CONTENT_COMMIT": commit,

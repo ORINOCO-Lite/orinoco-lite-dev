@@ -1,25 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12,<3.13"
-# dependencies = []
-#
-# [tool.pixi.workspace]
-# channels = ["conda-forge"]
-# platforms = [
-#   { platform = "osx-arm64", macos = "14.0" },
-#   "linux-64",
-# ]
-#
-# [tool.pixi.dependencies]
-# python = ">=3.12,<3.13"
-# git = ">=2.55.0,<3"
-#
-# [tool.pixi.target.linux-64.dependencies]
-# git-annex = "==10.20260601"
-#
-# [tool.pixi.target.osx-arm64-macos-14-0.pypi-dependencies]
-# git-annex = "==10.20260601"
-# ///
 """Materialize selected Annex presentation payloads into the thin template."""
 
 from __future__ import annotations

@@ -46,7 +46,7 @@ The system has three layers: development sources, released components, and each 
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also assembles releases and maintains reusable CI. | Downstreams do not receive its multi-repository engineering structure. |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also assembles releases. | Downstreams do not receive its multi-repository engineering structure. |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the website presentation, page templates, graph production, and its exact Congo selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
 ### Released components

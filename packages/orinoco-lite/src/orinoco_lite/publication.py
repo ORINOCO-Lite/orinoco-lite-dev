@@ -210,14 +210,43 @@ def prepare(
         _run(["git", "update-ref", "-d", PROJECTION_REF], cwd=root)
         _run(["git", "update-ref", "-d", PAGES_REF], cwd=root)
 
-def main() -> int:
+def publish(root: Path, bundle_name: str) -> None:
+    """Record the deployed output without changing the source branch."""
+
+    root = root.resolve()
+    bundle = root / bundle_name
+    source = _run(["git", "rev-parse", "HEAD"], cwd=root)
+    _run(["git", "bundle", "verify", bundle], cwd=root)
+    projection = "refs/remotes/orinoco-publication/latest-hugo-projection"
+    pages = "refs/remotes/orinoco-publication/gh-pages"
+    _run(["git", "fetch", bundle, f"{PROJECTION_REF}:{projection}",
+          f"{PAGES_REF}:{pages}"], cwd=root)
+    if _run(["git", "rev-parse", f"{projection}^"], cwd=root) != source:
+        raise PublicationError("Publication bundle does not belong to this source commit")
+    if _run(["git", "rev-parse", f"{pages}^"], cwd=root) != _run(
+        ["git", "rev-parse", projection], cwd=root
+    ):
+        raise PublicationError("Pages commit does not belong to this projection")
+    _run(["git", "push", "--atomic", "--force", "origin",
+          f"{projection}:refs/heads/latest-hugo-projection",
+          f"{pages}:refs/heads/gh-pages"], cwd=root)
+
+
+def parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("publication_command", choices=("prepare", "publish"))
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--projection", default="generated/projection")
     parser.add_argument("--site", default="build/pages")
     parser.add_argument("--bundle", default="build/pages-publication.bundle")
-    args = parser.parse_args()
+    return parser
+
+
+def execute(args: argparse.Namespace) -> int:
     try:
+        if args.publication_command == "publish":
+            publish(args.repository, args.bundle)
+            return 0
         prepare(
             args.repository,
             args.projection,
@@ -225,8 +254,12 @@ def main() -> int:
             args.bundle,
         )
     except PublicationError as error:
-        parser.exit(1, f"prepare-pages-publication: {error}\n")
+        raise SystemExit(f"publication: {error}")
     return 0
+
+
+def main() -> int:
+    return execute(parser().parse_args())
 
 
 if __name__ == "__main__":

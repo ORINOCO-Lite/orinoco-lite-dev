@@ -3,12 +3,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "tools" / "prepare_pages_publication.py"
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "Publication Test",
     "GIT_AUTHOR_EMAIL": "publication-test@example.invalid",
@@ -62,7 +61,7 @@ class PagesPublicationTests(unittest.TestCase):
     def test_bundle_records_exact_two_commit_publication_chain(self) -> None:
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:
             repository, source = self.make_repository(temporary)
-            run(["python", SCRIPT], repository)
+            run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository)
             bundle = repository / "build/pages-publication.bundle"
             run(["git", "bundle", "verify", bundle], repository)
             run(
@@ -102,11 +101,25 @@ class PagesPublicationTests(unittest.TestCase):
             self.assertEqual(["graph.json", "index.html"], pages_paths)
             self.assertEqual(source, run(["git", "rev-parse", "main"], repository).stdout.strip())
 
+    def test_publish_updates_only_generated_branches(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="orinoco-pages-publish-") as temporary:
+            repository, source = self.make_repository(temporary)
+            remote = Path(temporary) / "remote.git"
+            run(["git", "init", "--bare", remote], repository)
+            run(["git", "remote", "add", "origin", remote], repository)
+            run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository)
+            run([sys.executable, "-m", "orinoco_lite.publication", "publish"], repository)
+            pages = run(["git", "rev-parse", "refs/heads/gh-pages"], remote).stdout.strip()
+            projection = run(["git", "rev-parse", "refs/heads/latest-hugo-projection"], remote).stdout.strip()
+            self.assertEqual(projection, run(["git", "rev-parse", f"{pages}^"], remote).stdout.strip())
+            self.assertEqual(source, run(["git", "rev-parse", f"{projection}^"], remote).stdout.strip())
+            self.assertEqual(source, run(["git", "rev-parse", "HEAD"], repository).stdout.strip())
+
     def test_dirty_tracked_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:
             repository, _ = self.make_repository(temporary)
             (repository / "README.md").write_text("changed\n")
-            result = run(["python", SCRIPT], repository, check=False)
+            result = run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository, check=False)
             self.assertNotEqual(0, result.returncode)
             self.assertIn("Tracked worktree changes", result.stderr)
 

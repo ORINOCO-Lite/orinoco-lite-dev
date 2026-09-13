@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import call, patch
 
-from orinoco_lite import cli, resources
+from orinoco_lite import cli
 from orinoco_lite.errors import ConfigurationError
 
 
@@ -31,7 +31,6 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
                 path=lambda name: build_root if name == "build" else root / name,
             )
             resources = root / "resources"
-            lock = object()
             args = SimpleNamespace(
                 base_url=None,
                 build_timestamp="2026-09-08T12:34:56Z",
@@ -41,7 +40,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             )
 
             with (
-                patch.object(cli, "_resolve", return_value=(workspace, lock, resources)),
+                patch.object(cli, "_resolve", return_value=(workspace, resources)),
                 patch.object(cli, "invoke_driver", side_effect=(0, 0)) as invoke,
             ):
                 result = cli._build(args)
@@ -50,11 +49,10 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             self.assertEqual(
                 invoke.call_args_list,
                 [
-                    call("validate", workspace, lock, resources),
+                    call("validate", workspace, resources),
                     call(
                         "build",
                         workspace,
-                        lock,
                         resources,
                         values={
                             "base_url": "https://example.invalid/site/",
@@ -77,7 +75,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             patch.object(
                 cli,
                 "_resolve",
-                return_value=(workspace, object(), Path("resources")),
+                return_value=(workspace, Path("resources")),
             ),
             patch.object(cli, "invoke_driver") as invoke,
             self.assertRaisesRegex(ConfigurationError, "owner/repository"),
@@ -86,33 +84,6 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
 
         invoke.assert_not_called()
 
-
-class DevelopmentPackageVersionTests(unittest.TestCase):
-    def test_release_execution_rejects_a_package_version_mismatch(self) -> None:
-        lock = SimpleNamespace(package_version="0.1.0")
-        with (
-            patch.object(resources, "__version__", "0.2.0"),
-            patch.dict("os.environ", {}, clear=True),
-            self.assertRaisesRegex(ConfigurationError, "requires orinoco-lite"),
-        ):
-            resources.require_package_version(lock)
-
-    def test_explicit_local_candidate_may_differ_from_release_lock(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            package = root / "packages/orinoco-lite/src/orinoco_lite"
-            package.mkdir(parents=True)
-            (package / "__init__.py").write_text("", encoding="utf-8")
-            lock = SimpleNamespace(package_version="0.1.0")
-            environment = {
-                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
-                "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(root),
-            }
-            with (
-                patch.object(resources, "__version__", "0.2.0"),
-                patch.dict("os.environ", environment, clear=True),
-            ):
-                resources.require_package_version(lock)
 
 
 if __name__ == "__main__":

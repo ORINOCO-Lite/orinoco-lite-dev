@@ -1,5 +1,7 @@
 # Local deployment output and credentials.
 /build/
+/packages/orinoco-lite/build/
+/packages/orinoco-lite/src/orinoco_lite/_resources/
 /dist/
 /node_modules/
 *.env

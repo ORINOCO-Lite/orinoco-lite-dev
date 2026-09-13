@@ -10,6 +10,7 @@ from tools.upstream_checkout import UpstreamCheckoutError, prepare_gitlink
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = ROOT / "pixi.toml"
 
 
 class UpstreamStackContractTests(unittest.TestCase):
@@ -101,22 +102,8 @@ class UpstreamStackContractTests(unittest.TestCase):
             tasks["refresh-upstream-records"],
             "python tools/prepare_upstream_snapshot.py --refresh",
         )
-        source = (ROOT / "tools" / "upstream_full.py").read_text()
-        self.assertIn("[tool.pixi.pypi-dependencies]", source)
-        self.assertIn(
-            'dump-things-service = { path = "../submodules/dump-things-service"',
-            source,
-        )
-        self.assertIn('nodejs = ">=22,<23"', source)
-        self.assertTrue((ROOT / "tools" / "upstream_full.py.pixi.lock").is_file())
-        lock = (ROOT / "tools" / "upstream_full.py.pixi.lock").read_text()
-        for package, version in (
-            ("linkml", "1.11.1"),
-            ("linkml-runtime", "1.11.1"),
-            ("pydantic", "2.13.4"),
-            ("rdflib", "7.6.0"),
-        ):
-            self.assertIn(f"name: {package}\n  version: {version}", lock)
+        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["dependencies"]["nodejs"], ">=22,<23")
 
     def test_snapshot_is_materialized_for_snapshot_and_full_stack_tasks(self) -> None:
         preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()

@@ -27,32 +27,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          submodules: false
 
       - name: Check out the template candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORINOCO-Lite/orinoco-lite-template
-          ref: 9d7b93bca1d391367a911b15cc30678c71bfe1aa
+          ref: a4794a095d0bb6462c02353f0277747cae64ab83
           path: build/orinoco-lite-template
           persist-credentials: false
-          fetch-depth: 1
 
       - name: Initialize only release-authorized compatibility components
         shell: bash
         run: |
-          git submodule sync -- \
-            submodules/pool.psychoinformatics.de-ui \
-            submodules/query-things \
-            submodules/www-from-model \
-            submodules/things-schemas
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
             submodules/www-from-model \
             submodules/things-schemas
-          git -C submodules/pool.psychoinformatics.de-ui submodule sync -- \
-            shacl-vue
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
@@ -63,23 +54,28 @@ jobs:
           frozen: true
           pixi-version: v0.76.2
 
-      - name: Verify the root environment and standalone script locks
-        run: |
-          pixi lock --check
-          pixi lock --script tools/upstream_static.py --check
-          pixi lock --script tools/upstream_full.py --check
-          pixi lock --script tools/materialize_presentation_assets.py --check
+      - name: Check dependency locks
+        run: pixi run check-locks
 
       - name: Verify pre-commit formatting
         run: pixi run check-format
 
       - name: Run strict package and engineering tests
-        run: pixi run test
+        run: pixi run test-ci
 
       - name: Prove the forward template contract with compact mock content
         env:
           ORINOCO_TEMPLATE_CANDIDATE: ${{ github.workspace }}/build/orinoco-lite-template
         run: pixi run test-template-candidate-quick
+
+      - name: Build the source archive and verify its installed wheel
+        shell: bash
+        run: |
+          pixi run build-package
+          wheels=(build/package/*.whl)
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi run orinoco-lite --help
+          pixi run test-package-strict
 
       - name: Build the pinned upstream static site from a non-recursive clone
         run: pixi run build-upstream-static
@@ -99,7 +95,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          submodules: false
+
+      - name: Initialize package sources
+        run: |
+          git submodule update --init --recursive --depth 1 -- \
+            submodules/pool.psychoinformatics.de-ui submodules/things-schemas
 
       - name: Install the locked engineering environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1

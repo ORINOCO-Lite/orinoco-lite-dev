@@ -3,14 +3,14 @@
 Orinoco Lite turns schema-backed records and editorial inputs into a static website with browser-based metadata editing and source-adapter review.
 See the concise [`project design charter`](docs/project-design.md) for the durable objective, component boundaries, and data flows.
 
-This repository contains the Python package, engineering tests, release assembly, and reusable CI.
+This repository contains the Python package, engineering tests and release assembly.
 The package reuses an exact upstream website revision, [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) supplies a thin adaptation and scaffold, and each deployed website is configured by one ordinary downstream repository.
 
 ## Repository roles
 
 | Repository | Role |
 | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Package development, release assembly, engineering tests, and reusable CI |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Package development, release assembly, and engineering tests |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Submodule-pinned presentation and projection source |
 | [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks |
 | `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
@@ -68,7 +68,7 @@ Either candidate may be omitted.
 When `--template` is selected, the task renders that template afresh and overlays only the downstream's declared site-owned inputs.
 A package-only run instead exercises the package in a disposable copy of the selected downstream.
 Quick mode runs the downstream `validate` and `build` tasks.
-Full mode also runs `verify-hugo`, `verify-release-selection`, and `verify-build`.
+Full mode also runs `verify-build`.
 Use `--mode full` before release or adoption, and `--keep` or `--output /new/path` to inspect the staged downstream.
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.

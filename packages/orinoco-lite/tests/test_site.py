@@ -500,7 +500,6 @@ class HugoCompatibilityTests(unittest.TestCase):
 
                     destination = root / "build" / name
                     with (
-                        patch.object(site, "_preflight_hugo"),
                         patch.object(site, "_assemble"),
                         patch.object(site, "_build_provenance", return_value={}),
                         patch.object(site, "_write_build_provenance_footer"),
@@ -533,125 +532,10 @@ class HugoCompatibilityTests(unittest.TestCase):
                         expected_edit_url,
                     )
 
-    def test_supported_extended_hugo_is_accepted(self) -> None:
-        outputs = (
-            "hugo v0.154.5+extended darwin/arm64 BuildDate=unknown "
-            "VendorInfo=conda-forge",
-            "hugo v0.154.5-conda-forge+extended linux/amd64 "
-            "BuildDate=unknown VendorInfo=conda-forge",
-        )
-        for output in outputs:
-            with self.subTest(output=output):
-                version = site._require_compatible_hugo(
-                    output,
-                    ">=0.154,<0.155",
-                    package_version="0.1.7",
-                )
-                self.assertEqual(str(version), "0.154.5")
+    def test_site_adapter_uses_installed_resources(self) -> None:
+        root = Path("/package/resources")
+        self.assertEqual(site._site_adapter(root), root / "drivers/adapt_pages.py")
 
-    def test_site_adapter_prefers_explicit_package_candidate(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            resources_adapter = root / "resources/drivers/adapt_pages.py"
-            resources_adapter.parent.mkdir(parents=True)
-            resources_adapter.write_text("# released\n", encoding="utf-8")
-            candidate_adapter = root / "package/tools/adapt_upstream_pages.py"
-            candidate_adapter.parent.mkdir(parents=True)
-            candidate_adapter.write_text("# candidate\n", encoding="utf-8")
-
-            with patch.object(
-                site, "development_package_root", return_value=root / "package"
-            ):
-                self.assertEqual(
-                    site._site_adapter(root / "resources"), candidate_adapter
-                )
-            with patch.object(site, "development_package_root", return_value=None):
-                self.assertEqual(
-                    site._site_adapter(root / "resources"), resources_adapter
-                )
-
-    def test_site_adapter_requires_candidate_driver(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            with patch.object(
-                site, "development_package_root", return_value=root / "package"
-            ):
-                with self.assertRaisesRegex(IntegrityError, "no site adapter"):
-                    site._site_adapter(root / "resources")
-
-    def test_unsupported_or_malformed_hugo_is_rejected(self) -> None:
-        cases = (
-            (
-                "too old",
-                "hugo v0.153.9+extended linux/amd64",
-                "requires Hugo >=0.154,<0.155; found 0.153.9",
-            ),
-            (
-                "too new",
-                "hugo v0.155.0-conda-forge+extended linux/amd64",
-                "requires Hugo >=0.154,<0.155; found 0.155.0",
-            ),
-            (
-                "standard edition",
-                "hugo v0.154.5-conda-forge linux/amd64",
-                "requires Hugo Extended",
-            ),
-            (
-                "malformed",
-                "hugo v0.154.5-+extended linux/amd64",
-                "Could not determine Hugo version",
-            ),
-        )
-        for label, output, message in cases:
-            with self.subTest(label=label):
-                with self.assertRaisesRegex(DriverError, message):
-                    site._require_compatible_hugo(
-                        output,
-                        ">=0.154,<0.155",
-                        package_version="0.1.7",
-                    )
-
-    def test_build_preflight_preserves_existing_outputs_on_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
-            _write_site_data(root)
-            destination = root / "build" / "site"
-            destination.mkdir(parents=True)
-            (destination / "index.html").write_text("existing\n", encoding="utf-8")
-            assembly = root / "build" / "assembly"
-            assembly.mkdir()
-            (assembly / "sentinel").write_text("existing\n", encoding="utf-8")
-            resources = root / "resources"
-            resources.mkdir()
-            manifest = SimpleNamespace(
-                compatibility={"hugo": ">=0.154,<0.155"},
-                release="0.1.3",
-            )
-            with (
-                patch.object(site, "HUGO_REQUIREMENT", ">=0.154,<0.155"),
-                patch.object(
-                    site,
-                    "_run",
-                    return_value="hugo v0.155.0+extended linux/amd64",
-                ) as run,
-            ):
-                with self.assertRaisesRegex(DriverError, "found 0.155.0"):
-                    site.build_site(
-                        root / "orinoco.yaml",
-                        resources,
-                        destination,
-                        "https://example.invalid/orinoco/",
-                    )
-            run.assert_called_once_with(["hugo", "version"], cwd=root.resolve())
-            self.assertEqual(
-                (destination / "index.html").read_text(encoding="utf-8"),
-                "existing\n",
-            )
-            self.assertEqual(
-                (assembly / "sentinel").read_text(encoding="utf-8"),
-                "existing\n",
-            )
 
 
 if __name__ == "__main__":

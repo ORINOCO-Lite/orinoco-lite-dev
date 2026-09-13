@@ -121,20 +121,14 @@ class PresentationResolverTests(unittest.TestCase):
         self.addCleanup(source_patch.stop)
         return root
 
-    def _candidate_environment(self) -> dict[str, str]:
-        return {
-            "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
-            "ORINOCO_CANDIDATE_PACKAGE_ROOT": str(self.engineering),
-        }
-
-    def test_candidate_uses_committed_gitlink_and_resolves_recursively(self) -> None:
+    def test_package_uses_committed_gitlink_and_resolves_recursively(self) -> None:
         (self.engineering / ".gitmodules").write_text(
             "working-tree tampering must not select the presentation\n",
             encoding="utf-8",
         )
 
-        with patch.dict(os.environ, self._candidate_environment()):
-            source = resolve_presentation(self.workspace)
+        with patch("orinoco_lite.presentation._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+            source = resolve_presentation(self.workspace, self.root / "resources")
 
         self.assertEqual(
             (source / "page_templates/record.md").read_text(encoding="utf-8"),
@@ -152,13 +146,30 @@ class PresentationResolverTests(unittest.TestCase):
             self.congo_commit,
         )
 
+    def test_commit_on_pull_request_ref_is_fetched(self) -> None:
+        _git(self.engineering, "checkout", "--detach", "--quiet")
+        _git(self.engineering, "commit", "--allow-empty", "--quiet", "-m", "PR merge")
+        merge_commit = _git(self.engineering, "rev-parse", "HEAD")
+        _git(self.engineering, "update-ref", "refs/pull/148/merge", merge_commit)
+        _git(self.engineering, "checkout", "--quiet", "-")
+
+        with patch(
+            "orinoco_lite.presentation._package_source",
+            return_value=(str(self.engineering), merge_commit),
+        ):
+            source = resolve_presentation(self.workspace, self.root / "resources")
+
+        self.assertEqual(_git(source.parent.parent, "rev-parse", "HEAD"), merge_commit)
+        self.assertEqual(_git(source, "rev-parse", "HEAD"), self.website_commit)
+        self.assertTrue((source / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
+
     def test_corrupt_cache_is_repaired(self) -> None:
-        with patch.dict(os.environ, self._candidate_environment()):
-            first = resolve_presentation(self.workspace)
+        with patch("orinoco_lite.presentation._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+            first = resolve_presentation(self.workspace, self.root / "resources")
             (first / "page_templates/record.md").write_text(
                 "tampered\n", encoding="utf-8"
             )
-            repaired = resolve_presentation(self.workspace)
+            repaired = resolve_presentation(self.workspace, self.root / "resources")
             self.assertEqual(
                 (repaired / "page_templates/record.md").read_text(
                     encoding="utf-8"
@@ -173,7 +184,7 @@ class PresentationResolverTests(unittest.TestCase):
 
         with patch.dict(
             os.environ,
-            {"ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "0"},
+            {},
         ):
             first = resolve_presentation(self.workspace, resources)
             offline_sources = self.root / "offline-sources"
@@ -199,7 +210,7 @@ class PresentationResolverTests(unittest.TestCase):
         (resources / "source-commit.txt").unlink()
         with patch.dict(
             os.environ,
-            {"ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "0"},
+            {},
         ):
             with self.assertRaisesRegex(IntegrityError, "source commit"):
                 resolve_presentation(self.workspace, resources)

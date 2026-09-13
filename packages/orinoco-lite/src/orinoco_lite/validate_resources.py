@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
         workspace = load_config_path(args.config)
         report = validate_workspace(workspace)
     except OrinocoError as error:
-        print(f"orinoco validate: {error}", file=sys.stderr)
+        print(f"orinoco-lite validate: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, sort_keys=True))
     return 0

@@ -365,7 +365,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.licenses.resolve(),
         )
     except DriverError as error:
-        parser.exit(1, f"orinoco editor release: {error}\n")
+        parser.exit(1, f"orinoco-lite editor release: {error}\n")
     print(json.dumps(result, sort_keys=True))
     return 0
 

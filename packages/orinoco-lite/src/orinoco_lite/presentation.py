@@ -11,7 +11,6 @@ import subprocess
 import tempfile
 from typing import Sequence
 
-from .config import development_package_root
 from .errors import IntegrityError
 from .resources import SOURCE_REPOSITORY, source_commit
 
@@ -184,6 +183,19 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
         ),
         operation=f"clone {repository}",
     )
+    available = _git(
+        destination,
+        ("cat-file", "-e", f"{commit}^{{commit}}"),
+        operation="check whether the engineering commit was cloned",
+        check=False,
+    )
+    if available.returncode:
+        # Pull-request merge commits are not included in a normal branch clone.
+        _git(
+            destination,
+            ("fetch", "--quiet", "--no-tags", "origin", commit),
+            operation=f"fetch engineering commit {commit}",
+        )
     _git(
         destination,
         ("checkout", "--quiet", "--detach", "--force", commit),
@@ -268,22 +280,9 @@ def resolve_presentation(workspace: Path, resources_root: Path | None = None) ->
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():
         raise IntegrityError(f"Presentation workspace is not a directory: {workspace}")
-    candidate = development_package_root()
-    if candidate is not None:
-        candidate = candidate.resolve()
-        engineering_repository = os.fspath(candidate)
-        engineering_commit = _repository_head(
-            candidate, label="Candidate engineering source"
-        )
-    else:
-        if resources_root is None:
-            raise IntegrityError(
-                "Presentation resolution requires package resources outside "
-                "candidate mode"
-            )
-        engineering_repository, engineering_commit = _package_source(
-            resources_root
-        )
+    if resources_root is None:
+        raise IntegrityError("Presentation resolution requires package resources")
+    engineering_repository, engineering_commit = _package_source(resources_root)
     return _ensure_checkout(
         workspace / ".orinoco" / "presentation",
         repository=engineering_repository,

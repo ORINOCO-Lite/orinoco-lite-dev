@@ -22,7 +22,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         workspace = load_config_path(args.config)
         report = update_projection(workspace, args.resources.resolve())
     except OrinocoError as error:
-        parser.exit(1, f"orinoco projection: {error}\n")
+        parser.exit(1, f"orinoco-lite projection: {error}\n")
     print(json.dumps(report, sort_keys=True))
     return 0
 
