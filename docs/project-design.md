@@ -40,23 +40,24 @@ Static hosting serves the build output.
 
 ## System organization
 
-The system has three layers: development sources, released components, and each deployed site.
+The system has three layers: development sources, reusable components, and each deployed site.
 
 ### Development sources
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also assembles releases. | Downstreams do not receive its multi-repository engineering structure. |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also publishes optional releases. | Downstreams do not receive its multi-repository engineering structure. |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the website presentation, page templates, graph production, and its exact Congo selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
-### Released components
+### Reusable components
 
-An Orinoco Lite release is one Python package whose code and bundled resources share one version and integrity boundary.
+An Orinoco Lite package commit contains code and bundled resources under one Git identity.
+A downstream selects the official repository or a fork and may use an exact commit directly; publishing a central release is optional.
 
 | Part | Role | Boundary |
 | --- | --- | --- |
 | [`orinoco-lite`](../packages/orinoco-lite/) | Contains the code and data that validate metadata, derive projections, and assemble the site. It also adds the static `/edit/` and `/review/` interfaces. | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, and notices. It also records the engineering commit that selects the presentation source. It contains no organization content, organization policy, or copy of the upstream website. |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the versioned Copier source that creates and updates downstream repositories. | It contains the scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, helper tools, and initial locks. It does not contain a website copy, German content, or site identity. |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the Copier source that creates and updates downstream repositories. | It contains the scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, and helper tools. It does not contain a website copy, German content, or site identity. |
 
 ### Deployment
 
@@ -65,8 +66,8 @@ An Orinoco Lite release is one Python package whose code and bundled resources s
 | A downstream repository, exemplified by [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Owns one organization's canonical site inputs and source adapters. It also owns review policy, deployment, and upgrade timing. | Generated projections, site output, and caches are build products. They are not canonical input. |
 | The [curation service](../packages/curation-review-app/) | Signs users in and performs verified GitHub operations for online editing and review. | It is outside the build path and the public-read path. It hosts no editor or review interface. It stores no metadata, decisions, bundles, or durable sessions. |
 
-The diagram follows reusable ORINOCO capabilities into an Orinoco Lite release.
-It then shows how one downstream uses the release to curate metadata and regenerate representations.
+The diagram follows reusable ORINOCO capabilities into a selected Orinoco Lite package revision.
+It then shows how one downstream uses that revision to curate metadata and regenerate representations.
 
 ```mermaid
 flowchart TB
@@ -88,14 +89,14 @@ flowchart TB
     presentation -->|"generates"| representations
   end
 
-  subgraph release["Orinoco Lite release"]
+  subgraph package["Selected Orinoco Lite package revision"]
     direction TB
     components["ORINOCO components"]
     curation_integration["GitHub curation integration"]
     site_assembly["Static-site assembly"]
   end
 
-  orinoco -->|"is pinned by"| release
+  orinoco -->|"is selected by"| package
 
   subgraph downstream["Downstream GitHub repository"]
     direction LR
@@ -118,7 +119,7 @@ flowchart TB
     site -.->|"provides"| interfaces
   end
 
-  release -->|"runs in"| actions
+  package -->|"runs in"| actions
 ```
 
 ## Downstream data boundary
@@ -223,12 +224,13 @@ The normative contracts define the precise behavior:
   Only signed-in GitHub operations use the curation service.
 - **Keep people and Git in control.** Automation only reads external sources.
   It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
-- **Record each fact once.** Versions and integrity data belong in the locks, package metadata, Gitlinks, and release inputs that use them.
+- **Record each fact once.** Source revisions belong in dependency declarations, ordinary tool locks, package metadata, and Gitlinks.
+  A separate release lock is unnecessary.
   Change history belongs in Git and GitHub.
   Do not add parallel ledgers or inventories merely for explanation or proof.
 - **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
   DataLad records downstream adapter runs in ordinary Git.
-  Released builds and adapter runs do not require Git Annex.
+  Downstream builds and adapter runs do not require Git Annex.
 
 ## Documentation and change control
 

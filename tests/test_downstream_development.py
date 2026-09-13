@@ -49,7 +49,8 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                     "project_name": "Downstream name",
                     "site_description": "Obsolete downstream description",
                     "site_base_url": "https://obsolete.example.invalid/",
-                    "package_url": "https://example.invalid/old.whl",
+                    "package_repository": "https://example.invalid/old.git",
+                    "package_revision": "old-revision",
                 },
                 sort_keys=False,
             ),
@@ -186,7 +187,14 @@ class DownstreamDevelopmentTests(unittest.TestCase):
                 {
                     "_subdirectory": "copier-template",
                     "project_slug": {"type": "str", "default": "template-site"},
-                    "package_url": {"type": "str", "default": "https://example.invalid/new.whl"},
+                    "package_repository": {
+                        "type": "str",
+                        "default": "https://example.invalid/new.git",
+                    },
+                    "package_revision": {
+                        "type": "str",
+                        "default": "new-revision",
+                    },
                 },
                 sort_keys=False,
             ),
@@ -196,7 +204,10 @@ class DownstreamDevelopmentTests(unittest.TestCase):
         answers = development._template_answers(self.downstream, template)
 
         self.assertEqual("downstream-site", answers["project_slug"])
-        self.assertEqual("https://example.invalid/new.whl", answers["package_url"])
+        self.assertEqual(
+            "https://example.invalid/new.git", answers["package_repository"]
+        )
+        self.assertEqual("new-revision", answers["package_revision"])
         self.assertNotIn("project_name", answers)
         self.assertNotIn("site_description", answers)
         self.assertNotIn("site_base_url", answers)

@@ -5,7 +5,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
 ## Workflow
 
-1. A trusted workflow runs the adapter with released code and opens a draft pull request containing one proposal commit.
+1. A trusted workflow runs the adapter with the downstream-selected code and opens a draft pull request containing one proposal commit.
 2. The pull request identifies the adapter, links to the downstream `/review/` route, and places the source coordinate in a closed details block.
 3. The workflow publishes one expiring review artifact derived from the proposal.
    The artifact is presentation input, not durable authority.
@@ -59,7 +59,7 @@ An uncertain result after a write begins requires inspection of the pull request
 ## Trusted workflow boundary
 
 Untrusted pull-request code MUST NOT receive write credentials.
-Finalization runs trusted released code against the identified proposal and submitted head.
+Finalization runs trusted downstream-selected code against the identified proposal and submitted head.
 Each automated write uses an exact-head compare-and-swap so a concurrent change cannot be silently overwritten.
 
 Metadata changes run full validation.

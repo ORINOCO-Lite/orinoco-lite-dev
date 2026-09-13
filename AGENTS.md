@@ -14,12 +14,13 @@
   When multi-repository rendering remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.
   An exact-SHA Netlify deploy preview may exercise an authenticated GitHub write only into its own open same-repository draft pull request after the service verifies GitHub's successful Netlify status for that exact head and origin.
   Use the real browser action and verify the resulting pull-request commit and trusted workflow.
-  Candidate selectors are preview-only; merged downstreams retain released, checksum-locked dependencies.
+  A downstream may select an official release, a release from its own fork, or an exact package commit from any suitable fork.
+  An immutable Git commit is a sufficient reproducibility coordinate; do not require a central release or a separate release lock.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
 - Prefer one source of truth.
   Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.
-- Use commit identifiers where software requires them, such as dependency locks, release inputs, and concurrency checks.
+- Use commit identifiers where software requires them, such as dependency selections and concurrency checks.
   Do not require per-file origins or before-and-after coordinate inventories for ordinary work.
 - Track each upstream mirror in Orinoco Lite with `main` (the accepted upstream base), `latest-upstream` (the most recently observed upstream commit), and `orinoco-lite-diff` (only the retained Orinoco Lite commits rebased on `main`).
   An updater advances `latest-upstream` only.
