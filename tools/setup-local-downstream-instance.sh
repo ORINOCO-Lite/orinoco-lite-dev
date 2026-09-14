@@ -71,7 +71,6 @@ pixi exec --spec datalad --spec copier -- \
     datalad run -m 'instantiate template' -- \
     copier copy --vcs-ref HEAD \
     -d include_site_specific=false \
-    -d pr_previews=netlify \
     "$TEMPLATE" .
 
 pixi exec --spec datalad --spec copier -- datalad run \
