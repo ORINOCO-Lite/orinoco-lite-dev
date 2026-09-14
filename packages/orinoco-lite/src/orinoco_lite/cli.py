@@ -12,7 +12,7 @@ import sys
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
-from . import __version__
+from . import __version__, source_description
 from .config import (
     github_repository,
     load_workspace,
@@ -24,9 +24,9 @@ from .validation import report_json, validate_workspace
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="orinoco-lite", description=__doc__)
+    parser = argparse.ArgumentParser(prog="orinoco-lite", description=__doc__, epilog="Use `orinoco-lite dev --help` for development-only commands.")
     parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
-    parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
+    parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}\nsource: {source_description()}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     validate = commands.add_parser("validate", help="validate site-owned inputs")
@@ -79,6 +79,9 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
     run.add_argument("arguments", nargs=argparse.REMAINDER)
+    dev = commands.add_parser("dev", help="development-only commands")
+    dev_commands = dev.add_subparsers(dest="dev_command", required=True)
+    dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     from . import local_preview, publication, shacl_handoff
 
     commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
@@ -239,6 +242,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from . import local_preview, publication, shacl_handoff
             return {"verify-site": local_preview, "publication": publication,
                     "shacl-handoff": shacl_handoff}[args.command].execute(args)
+        if args.command == "dev" and args.dev_command == "prepare-resources":
+            from .prepare_resources import main as prepare_resources
+            prepare_resources()
+            return 0
         if args.command == "validate":
             return _validate(args)
         if args.command == "build":
