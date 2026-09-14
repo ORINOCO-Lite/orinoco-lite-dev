@@ -33,7 +33,7 @@ from orinoco_lite.projection import (
 from orinoco_lite.schema_conversion import build_format_converters
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SOURCE = PACKAGE_ROOT / "submodules/things-schemas/src"
 
 

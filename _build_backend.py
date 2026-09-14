@@ -11,11 +11,8 @@ _PACKAGE = Path(__file__).resolve().parent
 
 
 def _checkout():
-    root = _PACKAGE.parent.parent
-    if _PACKAGE == root / "packages/orinoco-lite" and (
-        root / "release/package-resources.yaml"
-    ).is_file():
-        return root
+    if (_PACKAGE / "release/package-resources.yaml").is_file():
+        return _PACKAGE
     return None
 
 

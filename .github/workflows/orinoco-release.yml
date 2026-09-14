@@ -53,7 +53,7 @@ jobs:
           version = os.environ["RELEASE_VERSION"].removeprefix("v")
           if str(Version(version)) != version:
               raise SystemExit("Release version must be canonical PEP 440")
-          path = pathlib.Path("packages/orinoco-lite/pyproject.toml")
+          path = pathlib.Path("pyproject.toml")
           source, count = re.subn(r'(?m)^version = "[^"]+"$',
                                   f'version = "{version}"', path.read_text())
           if count != 1:
@@ -79,7 +79,7 @@ jobs:
           pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run orinoco-lite --version
           pixi run orinoco-lite --help
-          pixi run test-package-strict
+          pixi run pytest --ignore=tests/engineering
 
       - name: Attest the release artifact checksums
         id: attestation

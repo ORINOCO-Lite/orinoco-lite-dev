@@ -16,16 +16,17 @@ except PackageNotFoundError:  # Release preparation before package installation.
 
 def source_description() -> str:
     """Describe the source checkout when running from one."""
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "release/package-resources.yaml").is_file() and (parent / ".git").exists():
-            try:
-                commit = subprocess.check_output(
-                    ["git", "-C", str(parent), "rev-parse", "--short", "HEAD"],
-                    text=True, stderr=subprocess.DEVNULL,
-                ).strip()
-            except (OSError, subprocess.CalledProcessError):
-                commit = "unknown commit"
-            return f"development checkout @ {commit}"
+    module = Path(__file__).resolve()
+    checkout = module.parents[2]
+    if module.parent == checkout / "src/orinoco_lite" and (checkout / ".git").exists():
+        try:
+            commit = subprocess.check_output(
+                ["git", "-C", str(checkout), "rev-parse", "--short", "HEAD"],
+                text=True, stderr=subprocess.DEVNULL,
+            ).strip()
+        except (OSError, subprocess.CalledProcessError):
+            commit = "unknown commit"
+        return f"development checkout @ {commit}"
     return "installed package"
 
 __all__ = ["__version__"]

@@ -18,38 +18,13 @@ git-annex = "==10.20260601"
 git-annex = "==10.20260601"
 
 [pypi-dependencies]
-orinoco-lite = { path = "packages/orinoco-lite", editable = true }
+orinoco-lite = { path = ".", editable = true }
 build = "==1.6.0"
 snapper-fmt = "==0.10.0"
 pre-commit = "==4.3.0"
+pytest = ">=9,<10"
 
 [tasks]
-build-package = "python -m build packages/orinoco-lite --outdir build/package"
-check-locks = "pixi lock --check"
-test-package = "python tools/run_unittests.py --discover packages/orinoco-lite/tests"
-test-package-strict = "python tools/run_unittests.py --fail-on-skip --discover packages/orinoco-lite/tests"
-prepare-package-resources = "orinoco-lite dev prepare-resources"
-test-development = "python -m unittest tests.test_checkout_submodules tests.test_development_environments tests.test_downstream_development tests.test_materialize_presentation_assets tests.test_restore_annex_status tests.test_run_unittests tests.test_upstream_stack_contract tests.test_upstream_pool_diff tests.test_upstream_snapshot tests.test_upstream_orinoco_records tests.test_adapt_upstream_pages -v"
-test = { depends-on = ["test-package", "test-development"] }
-test-ci = { depends-on = ["test-package-strict", "test-development"] }
-checkout-submodules = "python tools/checkout_submodules.py"
-build-upstream-static = "python tools/upstream_static.py build"
-serve-upstream-static = "python tools/upstream_static.py serve"
-build-upstream-static-worktree = "python tools/upstream_static.py build --checkout worktree"
-serve-upstream-static-worktree = "python tools/upstream_static.py serve --checkout worktree"
-serve-upstream = "python tools/upstream_full_launcher.py serve recorded"
-serve-upstream-worktree = "python tools/upstream_full_launcher.py serve worktree"
-check-upstream = "python tools/upstream_full_launcher.py check recorded"
-check-upstream-worktree = "python tools/upstream_full_launcher.py check worktree"
-test-upstream-full = "python tools/upstream_full_launcher.py test recorded"
-test-downstream-candidate = "python tools/downstream_development.py"
-setup-local-downstream = "bash tools/setup-local-downstream-instance.sh"
-test-template-candidate-quick = "python tools/run_template_candidate.py quick"
-test-template-candidate-full = "python tools/run_template_candidate.py full"
-diff-upstream-pool = "python tools/upstream_pool_diff.py"
-snapshot-upstream-records = "python tools/prepare_upstream_snapshot.py"
-refresh-upstream-records = "python tools/prepare_upstream_snapshot.py --refresh"
-materialize-presentation-assets = "python tools/materialize_presentation_assets.py"
-format-docs = { cmd = "snapper --in-place README.md AGENTS.md docs/*.md" }
-install-hooks = { cmd = "git config core.hooksPath .githooks" }
-check-format = { cmd = "pre-commit run --all-files" }
+build-package = "python -m build --outdir build/package"
+setup-local-downstream = "orinoco-lite dev setup"
+install-hooks = "git config core.hooksPath .githooks"

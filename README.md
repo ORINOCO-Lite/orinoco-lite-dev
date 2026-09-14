@@ -28,7 +28,7 @@ Site maintainers use the tasks supplied by their template version:
 
 ```console
 pixi install --frozen
-pixi run validate
+pixi run orinoco-lite validate
 pixi run build
 pixi run serve
 ```
@@ -44,7 +44,6 @@ Precise interfaces and normative engineering behavior are documented in:
 - [`curation review`](docs/agents/contract/github-curation-review.md)
 - [`SHACL Vue editing`](docs/agents/contract/github-shacl-vue-edit.md)
 - [`curation-service authentication`](docs/agents/contract/curation-service-authentication-options.md)
-- [`packages/orinoco-lite/README.md`](packages/orinoco-lite/README.md)
 
 ## Engineering workflow
 
@@ -52,24 +51,39 @@ Pixi 0.76 or newer is required:
 
 ```console
 pixi install --locked
-pixi run test
+pixi run pytest
 ```
 
-Test unreleased package and template changes by applying a selected downstream's declared inputs to a fresh disposable template instance before publishing them:
+Create an inspectable downstream with the local template and cached upstream pool snapshot:
 
 ```console
-pixi run test-downstream-candidate -- \
-  --downstream /path/to/downstream \
-  --package "$PWD" \
-  --template /path/to/orinoco-lite-template
+pixi run orinoco-lite dev setup
 ```
 
-Either candidate may be omitted.
-When `--template` is selected, the task renders that template afresh and overlays only the downstream's declared site-owned inputs.
-A package-only run instead exercises the package in a disposable copy of the selected downstream.
-Quick mode runs the downstream `validate` and `build` tasks.
-Full mode also runs `verify-build`.
-Use `--mode full` before release or adoption, and `--keep` or `--output /new/path` to inspect the staged downstream.
+The default destination is `../orinoco-lite-test-downstream`.
+Use `--site-specific ../con-site-specific` to install that repository instead of converting the cached pool.
+Use `--populate` to clone missing template or site-specific repositories, and `--force` to remove and recreate the destination.
+Setup records its changes in DataLad, prepares editable package resources, and stops before projection or website building.
+
+In any downstream, enable or undo editable package development:
+
+```console
+pixi run orinoco-lite dev enable
+pixi run orinoco-lite dev disable
+```
+
+`enable` uses `../orinoco-lite-dev` by default; an optional path selects another checkout.
+If missing, it clones the repository and checks out the running package’s source commit.
+It records a relative development link and editable dependency, then prepares resources using the engineering environment.
+Python edits take effect immediately.
+After changing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` from the engineering checkout.
+`disable` restores the prior package selection from Git history while preserving site edits and unrelated dependency changes.
+Upgrading to a newer release is a separate operation.
+
+The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
+Pixi's downstream tasks only supply convenient arguments.
+Use `pixi run pytest`, a test path, or pytest's selection flags to exercise code changes.
+The original upstream application retains its own native development commands.
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.
 Edit them there directly; they do not require APM or a setup hook.
@@ -79,7 +93,7 @@ Introduce dependency management only when the project first consumes an independ
 Initialize engineering submodules only when cross-component work needs them:
 
 ```console
-pixi run checkout-submodules
+pixi run python tools/checkout_submodules.py
 ```
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.

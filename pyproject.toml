@@ -20,6 +20,7 @@ dependencies = [
   "packaging==26.3",
   "pydantic==2.13.4",
   "PyYAML==6.0.2",
+  "tomlkit>=0.13,<1",
   "rdflib==7.6.0",
   "things-enrichment-tools @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
 ]
@@ -43,5 +44,6 @@ orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
 testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --import-mode=importlib"

@@ -21,7 +21,7 @@ from orinoco_lite.schema_conversion import build_format_converters
 AGENT = "xyzrins:source-adapters/example/v1"
 SOURCE = "https://source.example/records/one"
 SCHEMA = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[1]
     / "submodules/things-schemas/src/demo-research-information/unreleased.yaml"
 )
 

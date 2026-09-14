@@ -7,10 +7,7 @@ import shutil
 from pathlib import Path
 
 import prepare_local_stack as shared
-if __package__:
-    from . import upstream_snapshot
-else:  # Direct ``python tools/prepare_upstream_stack.py`` use.
-    import upstream_snapshot
+from orinoco_lite import upstream_snapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]

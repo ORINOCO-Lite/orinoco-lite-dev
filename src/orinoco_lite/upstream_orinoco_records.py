@@ -22,10 +22,7 @@ from orinoco_lite.annotations import (
 )
 import yaml
 
-if __package__:
-    from . import upstream_snapshot
-else:  # Direct ``python tools/...`` use.
-    import upstream_snapshot
+from . import upstream_snapshot
 
 
 FORMAT_NAME = "orinoco-upstream-storage-projection-v2"

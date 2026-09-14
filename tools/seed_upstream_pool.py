@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import upstream_service_helpers as shared
-import upstream_snapshot
+from orinoco_lite import upstream_snapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]

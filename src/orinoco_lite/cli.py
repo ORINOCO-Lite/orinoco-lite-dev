@@ -9,6 +9,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import sys
+import subprocess
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
@@ -82,6 +83,16 @@ def _parser() -> argparse.ArgumentParser:
     dev = commands.add_parser("dev", help="development-only commands")
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
+    enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
+    enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
+    dev_commands.add_parser("disable", help="restore the package selection used before editable development")
+    setup = dev_commands.add_parser("setup", help="instantiate a downstream from local template and captured site inputs")
+    setup.add_argument("destination", nargs="?", type=Path)
+    setup.add_argument("--template", type=Path)
+    setup.add_argument("--site-specific", type=Path, help="install this repository instead of converting the cached pool")
+    setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
+    setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
+    setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
     from . import local_preview, publication, shacl_handoff
 
     commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
@@ -120,6 +131,9 @@ def _validate(args: argparse.Namespace) -> int:
     report = validate_workspace(workspace)
     if not args.structural_only:
         resources = resolve_resources()
+        status = invoke_driver("projection-update", workspace, resources)
+        if status:
+            return status
         status = invoke_driver("validate", workspace, resources)
         if status:
             return status
@@ -143,6 +157,9 @@ def _build(args: argparse.Namespace) -> int:
     )
     if not args.skip_structural_validation:
         validate_workspace(workspace)
+    projection_status = invoke_driver("projection-update", workspace, resources)
+    if projection_status:
+        return projection_status
     semantic_status = invoke_driver("validate", workspace, resources)
     if semantic_status:
         return semantic_status
@@ -242,6 +259,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             from . import local_preview, publication, shacl_handoff
             return {"verify-site": local_preview, "publication": publication,
                     "shacl-handoff": shacl_handoff}[args.command].execute(args)
+        if args.command == "dev" and args.dev_command in {"enable", "disable", "setup"}:
+            from . import development, instantiate
+            if args.dev_command == "setup":
+                instantiate.setup(args.destination, template=args.template, site_specific=args.site_specific,
+                                  snapshot=args.snapshot, populate=args.populate, force=args.force)
+            elif args.dev_command == "enable":
+                development.enable(args.root or Path.cwd(), args.path)
+            else:
+                development.disable(args.root or Path.cwd())
+            return 0
         if args.command == "dev" and args.dev_command == "prepare-resources":
             from .prepare_resources import main as prepare_resources
             prepare_resources()
@@ -258,7 +285,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _projection(args)
         if args.command == "run":
             return _run(args)
-    except OrinocoError as error:
+    except (OrinocoError, subprocess.CalledProcessError) as error:
         parser.exit(2, f"orinoco-lite: {error}\n")
     parser.error(f"Unknown command: {args.command}")
     return 2

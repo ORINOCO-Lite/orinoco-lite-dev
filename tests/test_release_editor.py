@@ -173,7 +173,7 @@ class DependencyInventoryTests(unittest.TestCase):
 
 class SubmissionAccessibilityOverlayTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.source_root = Path(__file__).resolve().parents[3]
+        self.source_root = Path(__file__).resolve().parents[1]
         self.shacl = (
             self.source_root
             / "submodules/pool.psychoinformatics.de-ui/shacl-vue"
