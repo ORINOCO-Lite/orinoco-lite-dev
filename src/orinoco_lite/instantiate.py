@@ -98,8 +98,10 @@ def setup(destination: Path | None = None, *, template: Path | None = None,
     for source in (engineering, template, site_specific, snapshot):
         if source is not None and (destination == source or destination in source.parents):
             raise ConfigurationError("The downstream destination must not contain a setup input.")
+    if site_specific is None and not (engineering / "submodules/www-from-model/.git").exists():
+        run("git", "submodule", "update", "--init", "--", "submodules/www-from-model", cwd=engineering)
     # Check inputs before honoring a destructive recreation request.
-    if destination.is_symlink():
+    if destination.is_symlink() or destination.is_file():
         destination.unlink()
     elif destination.exists():
         shutil.rmtree(destination)
