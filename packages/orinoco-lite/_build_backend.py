@@ -1,4 +1,4 @@
-"""Build complete wheels, source archives, and editable installations."""
+"""Build wheels and source archives with prepared resources."""
 
 from pathlib import Path
 import shutil
@@ -54,7 +54,7 @@ def get_requires_for_build_sdist(config_settings=None):
 
 
 def get_requires_for_build_editable(config_settings=None):
-    return _requirements(_setuptools.get_requires_for_build_editable, config_settings)
+    return _setuptools.get_requires_for_build_editable(config_settings)
 
 
 prepare_metadata_for_build_wheel = _setuptools.prepare_metadata_for_build_wheel
@@ -76,5 +76,4 @@ def build_sdist(sdist_directory, config_settings=None):
 
 
 def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
-    _resources()
     return _setuptools.build_editable(wheel_directory, config_settings, metadata_directory)
