@@ -52,7 +52,7 @@ def previous_selection(root: Path) -> object:
     if not commits:
         raise ConfigurationError("Cannot find the development link's introduction in Git history.")
     try:
-        before = tomllib.loads(git(root, "show", f"{commits[0]}^:pixi.toml"))
+        before = tomlkit.parse(git(root, "show", f"{commits[0]}^:pixi.toml"))
         return before["pypi-dependencies"]["orinoco-lite"]
     except (subprocess.CalledProcessError, KeyError) as error:
         raise ConfigurationError("Cannot recover the previous package selection from Git history.") from error
@@ -72,7 +72,8 @@ def apply(root: Path, action: str, checkout: Path | None) -> None:
             raise ConfigurationError("A development link already exists. Disable it before selecting another checkout.")
         if selection is None:
             raise ConfigurationError("pixi.toml does not select an orinoco-lite package.")
-        replacement = EDITABLE
+        replacement = tomlkit.inline_table()
+        replacement.update(EDITABLE)
     # Pixi can write the manifest before a solve fails. Restore only our files.
     saved = {name: (root / name).read_bytes() if (root / name).exists() else None
              for name in FILES[:2]}
