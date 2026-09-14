@@ -5,31 +5,44 @@ set -euo pipefail
 # Use --populate to clone only repositories that are missing locally.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK_DIR="/tmp/orinoco-lite-test-downstream"
+WORK_DIR="$ROOT/../orinoco-lite-test-downstream"
 TEMPLATE="$ROOT/../orinoco-lite-template"
 PACKAGE="$ROOT"
 SITE_SPECIFIC="$ROOT/../con-site-specific"
 POPULATE=false
+FORCE=false
 
 usage() {
     cat <<'EOF'
-Usage: setup-local-downstream-instance.sh [--populate]
+Usage: setup-local-downstream-instance.sh [--populate] [--force]
 
-  --populate  clone a missing repository using its configured origin URL
+  --populate  clone missing repositories (default: ORINOCO-Lite on GitHub)
+  --force     remove and recreate the disposable downstream
 
 The sibling checkouts ../orinoco-lite-template and ../con-site-specific are
-used directly. The disposable downstream is /tmp/orinoco-lite-test-downstream.
+used directly. The disposable downstream is ../orinoco-lite-test-downstream.
+Setup installs the editable package and prepares its resources, then stops.
+It does not run projection or build the website.
 EOF
 }
 
 while (($#)); do
     case "$1" in
         --populate) POPULATE=true ;;
+        --force) FORCE=true ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; exit 2 ;;
     esac
     shift
 done
+
+if [[ -e "$WORK_DIR" || -L "$WORK_DIR" ]]; then
+    if [[ "$FORCE" != true ]]; then
+        printf 'Destination already exists: %s\nUse --force to remove and recreate it.\n' \
+            "$WORK_DIR" >&2
+        exit 1
+    fi
+fi
 
 repo_remote() { git -C "$1" remote get-url origin 2>/dev/null || true; }
 
@@ -52,13 +65,15 @@ ensure_repo() {
 }
 
 TEMPLATE_REMOTE="${TEMPLATE_REMOTE:-$(repo_remote "$TEMPLATE")}"
-PACKAGE_REMOTE="${PACKAGE_REMOTE:-$(repo_remote "$PACKAGE")}"
 SITE_SPECIFIC_REMOTE="${SITE_SPECIFIC_REMOTE:-$(repo_remote "$SITE_SPECIFIC")}"
-ensure_repo template "$TEMPLATE" "$TEMPLATE_REMOTE"
-ensure_repo package "$PACKAGE" "$PACKAGE_REMOTE"
-ensure_repo site-specific "$SITE_SPECIFIC" "$SITE_SPECIFIC_REMOTE"
+ensure_repo template "$TEMPLATE" \
+    "${TEMPLATE_REMOTE:-git@github.com:ORINOCO-Lite/orinoco-lite-template.git}"
+ensure_repo site-specific "$SITE_SPECIFIC" \
+    "${SITE_SPECIFIC_REMOTE:-git@github.com:ORINOCO-Lite/con-site-specific.git}"
 
-rm -rf -- "$WORK_DIR"
+if [[ "$FORCE" == true ]]; then
+    rm -rf -- "$WORK_DIR"
+fi
 
 printf 'Disposable downstream: %s\n' "$WORK_DIR"
 
@@ -68,21 +83,26 @@ pixi exec --spec datalad --spec git -- \
 cd "$WORK_DIR"
 
 pixi exec --spec datalad --spec copier -- \
-    datalad run -m 'instantiate template' -- \
+    datalad run -m 'chore: instantiate local template' -- \
     copier copy --vcs-ref HEAD \
     -d include_site_specific=false \
     "$TEMPLATE" .
 
 pixi exec --spec datalad --spec copier -- datalad run \
-    -m "Add site-specific subdataset" -- \
+    -m 'chore: install site-specific subdataset' -- \
     datalad install --dataset . --source "$SITE_SPECIFIC" site-specific
 
 pixi exec --spec datalad --spec copier -- datalad run \
-    -m 'link local package checkout' -- bash -c '
+    -m 'chore: link local package checkout' -- bash -c '
+    mkdir -p .orinoco-lite
     ln -s "$1" .orinoco-lite/dev
-' -- "$PACKAGE"
+' -- "../../$(basename "$PACKAGE")"
 
 pixi exec --spec datalad --spec copier -- datalad run \
-    -m 'add editable local package dependency' -- \
+    -m 'chore: install editable local package' -- \
     pixi add --pypi --editable \
     'orinoco-lite @ ./.orinoco-lite/dev/packages/orinoco-lite'
+
+pixi run --manifest-path "$ROOT/pixi.toml" orinoco-lite dev prepare-resources
+
+printf '\nSetup complete: %s\nInspect: git log --oneline; git status\nBuild when ready: pixi run build\nServe afterward: pixi run serve\n' "$PWD"

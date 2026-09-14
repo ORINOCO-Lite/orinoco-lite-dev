@@ -31,6 +31,12 @@ An editable installation is quick and picks up Python changes immediately; prepa
 That task requires Git, Make, Node, npm, and the initialized `pool.psychoinformatics.de-ui` (including `shacl-vue`) and `things-schemas` submodules.
 The same operation is available to people as `orinoco-lite dev prepare-resources`.
 
+For a local downstream, run `pixi run setup-local-downstream` from the engineering checkout.
+It uses the sibling `orinoco-lite-template` working tree and installs the committed `con-site-specific` subdataset into `../orinoco-lite-test-downstream`.
+Setup records a relative development symlink and editable dependency, prepares package resources, and stops before projection or website building.
+Use `--populate` to clone missing siblings from Orinoco Lite on GitHub, or `--force` to remove and recreate the disposable downstream.
+After changing bundled resource sources, rerun `pixi run prepare-package-resources` from the engineering checkout.
+
 From the engineering repository root:
 
 ```console
