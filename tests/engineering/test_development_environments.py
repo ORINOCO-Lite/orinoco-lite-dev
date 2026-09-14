@@ -109,6 +109,10 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             },
         )
         self.assertEqual(builder.count("verify_upstream_rebuild.py"), 3)
+        self.assertIn(
+            "run: pixi run verify-upstream-static",
+            WORKFLOW.read_text(encoding="utf-8"),
+        )
 
     def test_static_builder_uses_one_authoritative_annex_pin(self) -> None:
         builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(

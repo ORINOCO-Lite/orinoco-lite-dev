@@ -9,11 +9,11 @@ from pathlib import Path
 
 from orinoco_lite.config import load_workspace
 from orinoco_lite.records import joined_records
+from orinoco_lite import upstream_orinoco_records
+from orinoco_lite import upstream_snapshot
 
 import adapt_upstream_pages
 import prepare_upstream_snapshot
-import upstream_orinoco_records
-import upstream_snapshot
 from project_upstream_static import BUILD, ENTITY_SECTIONS, HUGO_SOURCE, WORKSPACE
 
 
