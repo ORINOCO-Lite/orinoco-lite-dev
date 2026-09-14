@@ -80,7 +80,6 @@ pixi exec --spec datalad --spec copier -- datalad run \
 pixi exec --spec datalad --spec copier -- datalad run \
     -m 'link local package checkout' -- bash -c '
     ln -s "$1" .orinoco-lite/dev
-    printf "\\n/.orinoco-lite/dev\\n" >> .gitignore
 ' -- "$PACKAGE"
 
 pixi exec --spec datalad --spec copier -- datalad run \
