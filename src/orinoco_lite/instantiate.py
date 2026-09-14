@@ -105,19 +105,19 @@ def setup(destination: Path | None = None, *, template: Path | None = None,
         destination.unlink()
     elif destination.exists():
         shutil.rmtree(destination)
-    run("pixi", "exec", "--spec", "datalad", "--", "datalad", "--report-status", "failure", "create", "--no-annex", destination, cwd=engineering)
-    run("pixi", "exec", "--spec", "datalad", "--spec", "copier", "--", "datalad", "--report-status", "failure", "run",
+    run("pixi", "exec", "--spec", "datalad", "--", "datalad", "create", "--no-annex", destination, cwd=engineering)
+    run("pixi", "exec", "--spec", "datalad", "--spec", "copier", "--", "datalad", "run",
         "-m", "chore: instantiate local template", "--", "copier", "copy", "--vcs-ref", "HEAD",
         "-d", "include_site_specific=false", template, ".", cwd=destination)
     if site_specific is not None:
-        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "--report-status", "failure", "run",
+        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
             "-m", "chore: install site-specific subdataset", "--", "datalad", "install",
             "--dataset", ".", "--source", site_specific, "site-specific", cwd=destination)
     else:
         print("Converting the cached pool snapshot into site-specific inputs...", flush=True)
-        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "--report-status", "failure", "run",
+        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
             "-m", "chore: convert captured upstream site inputs", "--", sys.executable,
-            "-m", "orinoco_lite.instantiate", engineering, snapshot, "site-specific", cwd=destination)
+            "-m", "orinoco_lite.instantiate", engineering, snapshot, "site-specific", cwd=destination, quiet=True)
     enable(destination, engineering)
     print(f"\nSetup complete.\n\ncd {destination}\ngit log --oneline\ngit status\n"
           "\nBuild when ready: pixi run orinoco-lite build\nServe afterward: pixi run orinoco-lite serve")

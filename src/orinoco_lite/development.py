@@ -20,8 +20,12 @@ FILES = ("pixi.toml", "pixi.lock", LINK)
 EDITABLE = {"path": f"./{LINK}", "editable": True}
 
 
-def run(*arguments: str | Path, cwd: Path) -> None:
-    subprocess.run([str(value) for value in arguments], cwd=cwd, check=True)
+def run(*arguments: str | Path, cwd: Path, quiet: bool = False) -> None:
+    result = subprocess.run([str(value) for value in arguments], cwd=cwd,
+                            capture_output=quiet, text=True)
+    if result.returncode and quiet:
+        print(result.stdout + result.stderr, file=sys.stderr)
+    result.check_returncode()
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -39,7 +43,7 @@ def check_workspace(root: Path) -> None:
 
 def record(root: Path, action: str, *arguments: str | Path) -> None:
     """Record only the package connection; leave unrelated site edits alone."""
-    command = ["pixi", "exec", "--spec", "datalad", "--", "datalad", "--report-status", "failure", "run",
+    command = ["pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
                "--explicit", "-m", f"chore: {action} editable Orinoco Lite"]
     for path in FILES:
         command.extend(("--output", path))
