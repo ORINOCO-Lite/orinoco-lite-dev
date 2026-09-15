@@ -1,113 +1,183 @@
-# Review upstream deployments
+# Upstream comparison: current findings
 
-Maintainers and agents use this guide to assess the [thin deployment layer](../project-design.md#validate-the-deployment-layer).
-Keep current differences here, disposable diagnostics untracked, and history in Git and pull requests.
-Known differences are not automatically accepted deviations.
+## Summary
 
-## Current comparison
+The same retained Pool capture can generate a website through native ORINOCO and through Orinoco Lite.
+The earlier comparison found matching record pages, graph relationships, and search entries after the package fixes below.
+It also found presentation differences, missing downloads, inherited broken links, and one source-value change that still needs a decision.
+This is not evidence that Lite matches today's production or draft website.
 
-The September 2026 comparison regenerated both sites from one retained 5,030-record Pool capture, not committed record pages.
-The capture is `build/upstream-stack/pool/public-thing.jsonl`, SHA-256 `2b11038f95b953867356fa7bdce370a10a143d263814a835af29b69c662acd38`; this is not a claim about today's live Pool.
-Package candidate `a7a9cfa` is based on merged PR 150; template candidate `3bfa867` is based on merged PR 74.
-Both use gitlink-selected `www-from-model` (`a2e4534`), its declared Congo dependency, and Hugo 0.154.5.
+Use the [comparison procedure](../upstream-comparison.md) to repeat the checks.
+That procedure names the retained repositories, the native generation steps, the comparison tool, and its limits.
+This report records findings, not another set of package pins.
 
-Native generation used the selected DumpThings service, its SQLite backend, an isolated public collection, and a fresh query cache.
-All 5,030 captured record dictionaries survived the native API/cache exactly, including schema types. Extra cache entries were 32 missing-record results and an equivalent URI lookup of captured `isil:DE-Juel1`, not external records. All 228 committed generated pages and the graph were removed before replaying the selected query/Jinja workflow.
-No metadata reads went to the live Pool.
+## What the checks used
 
-Lite used ordinary `dev setup`, editable package development, Copier update, `build`, and `verify-site` in a separate disposable downstream.
-Its 5,030 canonical records and 787 machine-provenance companions remain distinct from generated output.
-The final fixture also supplies the same 25 already-materialized page-bundle images as native, as ordinary downstream inputs—not package/template assets.
-Their upstream VURL keys identify URLs rather than immutable image bytes; this establishes equal input bytes, not fresh acquisition or redistribution rights.
+The native reference used the selected [`www-from-model` commit](https://github.com/ORINOCO-Lite/www-from-model/commit/a2e4534bc38a6dc0f30effed354773f1da984a18).
+It follows upstream `main`, with retained changes to mobile navigation labels, publication-date handling, and a Congo branch hint.
+Both builds use its declared Congo dependency and Hugo 0.154.5.
+Shared source changes are therefore not independent evidence that those changes match upstream.
 
-The final rebuild retains all 254 native HTML routes and titles; Lite adds only `/edit/` and its OIDC callback.
-All 228 metadata pages match by PID, route, title, and Markdown body.
-Graph node objects (1,072), counted relationship endpoints (2,288), and all 253 search entries match semantically.
-Restored portraits and record logos have identical output paths and bytes.
-Only the extra Lite homepage heading differs in shared main text.
-Remaining media variation is four native-only branding files and four changed favicons (67 native media files, 63 Lite); there are no introduced missing local references.
-This supports the core generation claim for the capture, not unconditional visual, data-normalization, or interaction parity.
+The native run loaded all 5,030 captured records into a temporary local Pool and used a new query cache.
+It removed 228 committed generated pages and the graph before running the selected query, Jinja, and Hugo commands.
+The API and cache retained the captured values.
+No metadata reads used the live Pool.
+The temporary Pool stopped after generation.
 
-## Differences and resolution
+The repeat build uses the persistent [Psychoinformatics downstream](https://github.com/ORINOCO-Lite/psychoinformatics-downstream/tree/d5b82c583c84db65688f467689f43b7d6ad998f7).
+Its recorded site-specific submodule supplies the capture, 5,030 YAML records, 787 annotation companions, authored pages, and 25 images.
+Its dependency files select package `836fed5` and template `3bfa867`.
+A fresh recursive clone passed frozen installation, the ordinary build, and `verify-site`, producing 846 files.
+The raw capture matches the native run's input byte-for-byte.
+The retained YAML also passes the capture comparison under the existing conversion rules, including the date omission described below.
+The capture's original time and API origin remain unknown.
+The repository creation date does not establish either fact.
 
-| Difference / source | Resolution |
+Upstream deploys `main` to [the draft site](https://www-draft.psychoinformatics.de/) and `published` to [the production site](https://www.psychoinformatics.de/).
+The [deployment workflow](https://hub.psychoinformatics.de/www/www-from-model/src/commit/dc2a3f2d4734cdd16b33bbcdd654687f809ef29a/.forgejo/workflows/deploy.yml#L45-L51) confirms the distinction.
+The `published` workflow uses older query commands and different page-selection rules.
+Neither live deployment's exact build commit was established by this comparison.
+
+## Which tools produced the findings
+
+**Earlier generation comparison:** A disposable Python `review.py` script compared routes, page text, graph data, media, and local link targets.
+Separate checks compared generated record Markdown and search entries.
+Playwright with headless Chromium checked representative pages and interactions.
+SiteDiff was investigated but did not produce those results.
+The scratch scripts are not a maintained package feature.
+
+**Current tool check:** The procedure now uses [`summarized-sitediff`](https://github.com/yarikoptic/summarized-sitediff/tree/487f39bf6dd6e8b2810a23385b51ea8baa6048bf), specifically `sitediff (3).py`.
+It compares all HTML files in both output directories, including pages without incoming links.
+The run uses `--no-cache --strict-unicode --max-hunk-lines 10000` and writes JSON and Markdown reports.
+It uses no exclusions and makes no LLM call.
+An unfiltered `git diff --no-index` accompanies the report because the tool misses some changes.
+The review links the generated reports separately.
+The supplementary Python check still supplies graph, media, and broken-link results that this tool cannot produce.
+
+| Tool result | Count |
 | --- | --- |
-| Member-based publication/dataset selection; five named URLs | **Fixed regression.** Match native query filters and scalar annotations passed to Jinja. Keep focused pytest coverage; never ignore missing routes. |
-| Collaboration Hub URL/target and Contact footer | **Fixed regression.** Preserve captured navigation and render external URLs. Empty Outputs links are dropdown controls, not the same defect. |
-| Five missing listing introductions | **Fixed setup regression.** Preserve authored section indexes, never old generated home/record pages. Check search content too. |
-| Missing portraits and record logos | **Input gap, corrected in this fixture.** Metadata capture does not contain image bytes. Initially 57 native image files/renditions were absent, including visible resources. Supply matching ordinary page-bundle media through site-specific inputs. **Address soon** if snapshot-only setup must produce a visually complete replica; do not add personal media to the template or Annex to downstream builds. |
-| Header/institution logos, Windows tile image, four favicon contents, copyright, extra home heading and Hub label | **Presentation choice; not accepted as replica fidelity.** Neutral defaults avoid inheriting another site's identity. Configure an explicit identity/presentation fixture when needed. The extra heading/label are not required by static curation and need separate review. |
-| Editing routes/data, package/content/build footer and license notices | **Deliberate architecture; ignore for upstream-content parity.** Validate these features separately. This does not excuse missing native content or navigation. |
-| Graph edge IDs/order; graph fetch cache-query suffix | **Safe narrow heuristic.** Compare full node objects and counted endpoints; ignore IDs/order only while edges contain only `id`, `source`, `target`. Strip only the known graph fetch cache query, not arbitrary URLs. |
-| Graph node positions and label visibility between page loads | **Runtime layout variation.** Ignore force-layout geometry in paired screenshots only after graph data, filters and navigation agree. Do not mistake changing positions or label culling for changed metadata, or mask the entire graph without functional checks. |
-| Annotation envelopes; 21 records' full-URI versus declared CURIE PAV tags | **Representation-only for this capture.** Compare joined records using schema-declared namespace equivalence. Nine person frontmatters also differ in nested annotation representation; Michael Hanke's ISIL creator is not expanded in Lite. Current identifier links/icons are unaffected. **Later** if those fields become visible or consumed. |
-| Publication `fec91e0d-f22a-42c8-8170-a0dd87da53f7` loses `generated_by[0].at_time: "-"` | **Decision required; soon.** Existing conversion omits an invalid optional datetime sentinel. This is a source-value change, not formatting noise. Retain the capture and review explicit conversion policy or an upstream correction before general acceptance. |
-| Nine broken HTML-link references and 790 unresolved graph paths, shared by both | **Inherited upstream behavior; visible broken links soon, graph-scope policy later.** Examples: a scheme-less `hub.datalad.org/datalad/datalad-core` link, `/orcid:0000-0003-3456-2493`, and `/depictions/logo_abcd-j`. Graph links also target filtered-out people/publications because graph records and page selectors have different scopes. Matching upstream proves inheritance, not correctness; never suppress all broken links. |
-| Three native-only dataset JSON/JSON.gz payloads under `datasets/e511f0bb-9baf-4c29-88e0-079836868273/` | **Scope decision / later.** These unlinked bundle resources are not regenerated by either metadata pipeline. Supply them as site-owned resources if direct-download compatibility is required; do not copy them merely to equalize file counts. |
+| Shared HTML pages | 254 |
+| Shared pages with HTML differences | 254 |
+| Native-only HTML pages | 0 |
+| Lite-only HTML pages | 2 |
+| Grouped changes | 471 |
 
-For each new difference record an example, source, visible impact, owner, and disposition: fixed, deliberate, narrow heuristic, later, soon, or decision required.
-Hashes, successful builds, and a zero normalized diff do not replace that judgment.
+Every shared page changes because navigation, branding, footer, or editing markup differs.
+That count is not a count of regressions.
+The explanations below separate those repeated changes from missing content and metadata changes.
 
-## Repeat the exercise
+The tool's self-comparison found 254 identical pages.
+Small test pages confirmed that it detects added and removed pages without incoming links.
+Those tests also showed that it misses hexadecimal identity changes, script URLs, image URLs, and graph data.
+Do not use a zero tool diff as an acceptance decision.
 
-Choose package/template candidates and one capture.
-For a fresh capture use `pixi run python tools/prepare_upstream_snapshot.py --refresh`, optionally `--api URL`.
-An unknown or different cached API origin requires explicit refresh; never refresh one side independently.
-Acquisition alone is not a deployment test.
+## Differences and proposed action
 
-Create a new downstream without replacing a developer's existing checkout:
+### Deliberate: editing links and build information
 
-```console
-pixi run orinoco-lite dev setup /path/to/new-downstream \
-  --template /path/to/orinoco-lite-template --snapshot /path/to/pool.jsonl
-cd /path/to/new-downstream
-pixi run orinoco-lite build --base-url /
-pixi run orinoco-lite verify-site build/site
-pixi run orinoco-lite serve
-```
+On 228 generated pages, Lite replaces the Pool editing link with its own `/edit/` link.
+It adds the editor and its sign-in callback pages.
+It also adds package and build information to the footer.
+These differences follow the static editing design and can remain.
+The package owns them, and authenticated editing needs separate tests.
 
-Setup uses the normal Copier questionnaire and DataLad recording path, and stops before projection/building.
-Use `--site-specific /path/to/input-repository` for a prepared Git repository of site inputs instead of snapshot conversion.
-Place required ordinary media under `site-specific/content/<record-route>/`; never place old generated record Markdown there, because site-owned content overrides generated pages.
-Use `dev enable` for an existing downstream, Copier for template changes, and `dev prepare-resources` after resource-source changes.
-Editable presentation resolution uses committed objects from the local package checkout; unpublished commits do not require pushing to GitHub.
+### Deliberate: the Explore notice
 
-For the native reference:
+The retained inputs change `/explore/` to say that this is an unofficial site built from a retained capture.
+They also say that it does not refresh automatically.
+Keep this notice while those statements remain true.
+The site-specific repository owns it.
+Its latest Explore page uses the template's graph shortcode instead of copied graph markup.
 
-1. Select the service, query client, schema and website checkouts; resolve Congo through the website's declaration.
-   Required presentation assets must already be available.
-   Media acquisition remains a separate operation.
-2. Start `dump-things-service STORE --config CONFIG --host 127.0.0.1 --port PORT` with a fresh `public` collection, selected research-information schema, `sqlite+stl`, anonymous `READ_CURATED`, and a disposable local `CURATOR` token.
-   Never seed an existing service or the public Pool.
-   SQLite avoids repeated full-directory scans during reverse-link injection.
-3. Using the selected client and local token, seed with `jq -c '.record' CAPTURE | dtc post-records --curated LOCAL_API public '*'`.
-   Read back and check PIDs and values, not merely the count.
-   Supply selected query/client sources and their declared dependencies; do not accidentally install a moving client branch.
-4. Copy the selected presentation to scratch.
-   Remove generated Markdown identified by `params.graphRootNodePID`/`params.generated`, plus `static/graph.json`; retain authored pages, section introductions and bundle resources.
-   Use a fresh `QRI_RECORD_CACHE` and local `DUMPTHINGS_APIURL`.
-   A warm cache plus live API mixes datasets.
-5. Read [the selected update workflow](../../submodules/www-from-model/.forgejo/workflows/update-from-pool.yaml) and execute its graph, member-selection, seven entity and frontpage commands with pipeline failures enabled.
-   Omit checkout, provisioning, deposit and Annex operations; remove only the graph step's trailing Annex-recording command.
-   Do not maintain copies of its query pipelines.
-   Run selected Hugo with `--minify --baseURL /` into a fresh destination, then stop the service.
+### Decision needed: site identity
 
-Compare complete HTML route sets, including orphans; Markdown paths are not necessarily published URLs.
-Compare joined record meaning, graph objects/endpoints, search entries, page text, referenced media and downloads. Inspect home and one page of each rendered class at the same viewport; exercise search, menus and graph navigation. Missing images can disappear from HTML without broken URLs, so compare expected visible resources too. Retain pytest coverage of changed/deleted record regeneration instead of a second deployment framework.
+Lite omits the upstream institution logos and copyright text and supplies different favicon images.
+For example, the native home page links institutional logos to FZ Jülich and HHU, while Lite omits those blocks.
+These are neutral template defaults, not proof of an exact visual match.
+The site maintainer must choose the required identity and confirm media rights.
+Do not copy institutional branding into the reusable template to hide this difference.
 
-## Tools and limits
+### Fix soon or explicitly accept: extra heading and mobile menu entry
 
-[SiteDiff](https://github.com/evolvingweb/sitediff#comparing-2-sites) is optional, not a package dependency.
-Supply the union of routes explicitly and use `--cached=none`; a crawl misses orphan pages.
-Check unchanged, changed and missing pages before trusting normalization.
-The investigated 1.2.11 installation had MIME/doctype parsing caveats, so this run used disposable static inspection plus browser checks instead of adopting it as a gate. [BackstopJS](https://github.com/garris/BackstopJS#comparing-different-endpoints-eg-comparing-staging-and-production) supports paired visual checks if recurring review justifies its configuration.
-Keep scratch checkers and detailed output untracked; no bespoke framework or new Pixi task suite is required.
+Lite adds a `Psychoinformatics` heading on `/`.
+Its mobile menu also includes `Collaboration hub`, which the native mobile menu lacks.
+Neither difference is required by static editing.
+The template maintainer should remove these differences or explain the intended presentation change before claiming visual agreement.
 
-Package pytest passed 325 tests; template pytest passed 22 source tests.
-The final Lite build produced 846 files and passed the site check for localhost and 127.0.0.1 (60 homepage references each); that check is not an all-route/asset test. An isolated headless Chromium 151 context rendered 16 representative pages (home and seven record classes on both sites) at 1273×768, with expected images and graphs, no console/page errors, and no external requests.
-Paired home/person screenshots confirmed the restored media and remaining presentation differences. Lite interaction checks passed: keyboard search for DataLad to its named project/instrument, Outputs menu to Datasets, appearance toggle/restore, graph Project filter off/on, and double-click on the rendered DataLad node to its project page.
-Native search, navigation and graph double-click were also exercised in Safari before the desktop locked; the isolated Chromium checks completed without unlocking it or using a user browser profile.
-These are bounded desktop-browser checks, not exhaustive responsive or cross-browser coverage.
-Authenticated curation, live Pool freshness, upstream publication and media acquisition were not tested.
-The local fixture has no configured GitHub repository, so review is disabled.
-No repositories were merged and no hosted workflow was changed.
+### Decision needed: Explore graph height
+
+The new site-specific Explore page uses the template graph shortcode.
+Native gives the graph a full viewport of height, while the shortcode uses 55 percent with a 320-pixel minimum.
+At the checked 1273×768 viewport, that changes the graph from 768 to about 422 pixels high.
+The graph still renders, filters, and navigates correctly.
+The site and template maintainers should choose the intended height.
+This is a layout change, not random graph positioning.
+
+### Decision needed soon: one date value disappears
+
+Publication `xyzrins:publications/fec91e0d-f22a-42c8-8170-a0dd87da53f7` contains `generated_by[0].at_time: "-"` in the capture.
+The converter omits it because it is not a valid date value.
+This changes source data, even though the optional value did not change the checked page content.
+The package maintainer needs an explicit conversion decision or an upstream correction.
+A successful conversion check does not approve this existing rule.
+
+### Fix soon: broken page links inherited from upstream
+
+Both outputs contain nine broken local HTML references.
+Examples include `/depictions/logo_abcd-j` and `/orcid:0000-0003-3456-2493` from project pages.
+The DataLad instrument link also lacks a URL scheme, so browsers interpret it as a local path.
+The upstream or site maintainer should correct the data or link handling.
+Matching upstream does not make a broken link acceptable.
+
+### Decision needed later: graph links without pages
+
+Both graphs contain 790 paths without a corresponding local page.
+The graph includes records that the website's page-selection rules exclude.
+The project must decide whether those nodes should link elsewhere, have no page link, or gain pages.
+Do not suppress all missing graph targets as harmless.
+
+### Later: annotations stored or expanded differently
+
+Lite stores machine provenance in separate annotation companions.
+The earlier check found equivalent long and short provenance annotation names in 21 records, such as `http://purl.org/pav/importedBy` and `pav:importedBy`.
+Nine person pages also differ in nested metadata, including Michael Hanke's unexpanded ISIL creator reference.
+The checked identifier links and icons remain unchanged.
+The package maintainer should revisit these differences if a template starts to display or consume those nested values.
+Ignore only established identifier equivalence, not arbitrary changes to metadata.
+
+### Decision needed later: three dataset downloads
+
+Native output includes `dataset.json` and two commit-named `.json.gz` files under `/datasets/e511f0bb-9baf-4c29-88e0-079836868273/`.
+Lite omits them.
+Neither metadata generation process recreates these retained resources, and the checked pages do not link to them.
+The site maintainer should include them as site-specific files if their direct download URLs must remain available.
+
+### Ignore by a narrow rule: generated graph variation
+
+Edge identifiers, edge order, and the graph request's cache suffix can differ without changing graph relationships.
+Compare full node objects and counted source/target pairs before ignoring these differences.
+Stop applying that rule if edges gain other fields.
+Graph positions and visible labels also change during the browser's force-layout calculation.
+Ignore geometry only after checking the graph data, filters, and navigation.
+
+## Fixes and remaining limits
+
+The package fixes restore member-based publication and dataset selection, five named page URLs, external navigation, the Contact footer, and five authored section introductions.
+The retained inputs now supply the missing portraits and record logos.
+Those images match the native output paths and bytes, but their fresh acquisition and publication rights remain outside this check.
+
+The earlier comparison found all 254 native routes in Lite, with two additional editor routes.
+It found matching content for 228 generated record pages, 1,072 graph nodes, 2,288 relationships, and 253 search entries.
+The fresh tool run and supplementary checks confirm the route and graph results.
+Shared page text differs only on the home and Explore pages, apart from navigation, editing links, and footers.
+The latest package checks pass 326 tests after reverting PID-derived filenames and protecting captures whose cache information is missing.
+The earlier template candidate passed 22 source tests.
+
+Fresh Playwright/Chromium checks rendered 18 pages: home, seven record classes, and Explore on both sites.
+All expected images loaded, and no browser errors or external requests occurred.
+Lite passed search, menus, appearance switching, graph filtering, and graph navigation.
+The reviewer inspected the Explore screenshots to confirm the height difference.
+These checks do not cover mobile layouts, every viewport, or other browsers.
+Live-site differences, authenticated editing, upstream publication, and fresh media acquisition remain untested here.
+Native regeneration still requires the documented maintainer procedure.
+This PR provides tested generation fixes and a concrete comparison method, not an unattended end-to-end publication test.

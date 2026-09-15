@@ -193,7 +193,18 @@ Compare record meaning, page selection and URLs, graph relationships, visible co
 The objective is an explained overview of deployment differences, not byte-identical output.
 Distinguish deliberate static curation and GitHub adaptations from regressions, unexplained differences, source-data changes, and checks not performed.
 Neither passing unit tests nor a successful Lite build alone establishes native-versus-Lite parity.
-Keep the current procedure and unresolved differences in the [comparison guide](agents/upstream-deployment-validation.md); use existing comparison tools when useful, without maintaining a bespoke comparison framework.
+Each comparison must include a tool-generated report and an explanation of the differences.
+Record the tool, its options, the compared inputs, and the checks it cannot perform.
+Use existing tools rather than a separate comparison framework.
+
+The Psychoinformatics downstream records the package, template, and site-specific submodule used for repeat builds.
+Its site-specific repository retains the Pool capture, converted records, authored content, and media.
+Use those recorded inputs when testing a software repin before changing the capture.
+The [comparison procedure](upstream-comparison.md) describes the steps, and the [current report](agents/upstream-deployment-validation.md) records unresolved differences.
+
+Upstream deploys its `main` branch to the draft site and its `published` branch to the production site.
+A comparison must name the chosen commit and distinguish a local rebuild from a live deployment.
+A branch head alone does not identify the commit from the last successful deployment.
 
 ## Generated publication records
 
