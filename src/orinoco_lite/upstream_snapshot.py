@@ -28,6 +28,7 @@ import re
 import shutil
 import tempfile
 from typing import Any
+from urllib.parse import quote
 
 from dump_things_service.utils import json2yaml, order_dict
 import yaml
@@ -270,10 +271,25 @@ def class_schema_types(
 
 
 def record_relative_path(envelope: RecordEnvelope) -> Path:
-    """Return a collision-resistant path independent of PID punctuation."""
+    """Use the full PID reference as a readable, class-qualified YAML path."""
 
-    digest = hashlib.sha256(envelope.pid.encode("utf-8")).hexdigest()
-    return Path(envelope.class_name) / f"{digest}.yaml"
+    if not CLASS_NAME.fullmatch(envelope.class_name):
+        raise SnapshotError(f"invalid class directory name {envelope.class_name!r}")
+    pid = envelope.pid
+    reference = (
+        pid.split("://", 1)[1]
+        if pid.lower().startswith(("http://", "https://"))
+        else pid.split(":", 1)[-1]
+    )
+    if reference == ".":
+        reference = "_root"
+    elif not reference:
+        reference = "_empty"
+    segments = reference.split("/")
+    if "\\" in reference or any(not part or part.startswith(".") for part in segments):
+        raise SnapshotError(f"PID has an unsafe record path reference: {pid!r}")
+    encoded = [quote(part, safe="") for part in segments]
+    return Path(envelope.class_name, *encoded[:-1], encoded[-1] + ".yaml")
 
 
 def _assert_safe_destination(path: Path) -> None:
@@ -295,6 +311,20 @@ def write_records_tree(
         raise SnapshotError("snapshot has no records")
     _check_unique(ordered, location="snapshot")
     _assert_safe_destination(records_root)
+    planned = [(envelope, record_relative_path(envelope)) for envelope in ordered]
+    paths: dict[tuple[str, ...], Path] = {}
+    for _, relative in planned:
+        folded = tuple(part.casefold() for part in relative.parts)
+        if folded in paths:
+            raise SnapshotError(f"record path collision: {paths[folded]} and {relative}")
+        paths[folded] = relative
+    for folded, relative in paths.items():
+        for length in range(1, len(folded)):
+            if folded[:length] in paths:
+                raise SnapshotError(
+                    f"record file/directory path collision: "
+                    f"{paths[folded[:length]]} and {relative}"
+                )
     records_root.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(
         tempfile.mkdtemp(
@@ -303,12 +333,7 @@ def write_records_tree(
         )
     )
     try:
-        paths: set[Path] = set()
-        for envelope in ordered:
-            relative = record_relative_path(envelope)
-            if relative in paths:
-                raise SnapshotError(f"record path collision at {relative}")
-            paths.add(relative)
+        for envelope, relative in planned:
             target = temporary / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(canonical_yaml_bytes(envelope.record))
