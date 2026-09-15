@@ -22,6 +22,13 @@ homepage:
 pages:
   xyzri:XYZDataset:
     template: presentation:page_templates/dataset.md.j2
+    select:
+      links_to:
+        field: attributed_to
+        targets_linked_from:
+          pid: xyzrins:.
+          field: associated_with
+          schema_type: xyzri:XYZPerson
     inline: [about, attributed_to::object, kind, rules, characterized_by::object]
   xyzri:XYZObjective:
     template: presentation:page_templates/objective.md.j2
@@ -57,6 +64,13 @@ pages:
     inline: [delegated_by::object, delegated_by::roles, identifiers::creator]
   xyzri:XYZPublication:
     template: presentation:page_templates/publication.md.j2
+    select:
+      links_to:
+        field: attributed_to
+        targets_linked_from:
+          pid: xyzrins:.
+          field: associated_with
+          schema_type: xyzri:XYZPerson
     inline: [about, attributed_to::object]
   xyzri:XYZInstrument:
     template: presentation:page_templates/instrument.md.j2

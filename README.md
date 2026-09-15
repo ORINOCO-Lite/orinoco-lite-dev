@@ -102,6 +102,9 @@ Initialize the remaining engineering submodules only when broader cross-componen
 pixi run python tools/checkout_submodules.py
 ```
 
+For upstream validation, use a captured Pool as the inputs to `dev setup --snapshot`, then build that downstream with the ordinary package CLI.
+The [comparison guide](docs/agents/upstream-deployment-validation.md) distinguishes this package exercise from a native-versus-Lite deployment comparison and tracks unresolved differences.
+
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.
 

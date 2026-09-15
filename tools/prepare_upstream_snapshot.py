@@ -6,12 +6,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 
 from orinoco_lite import upstream_snapshot
 from orinoco_lite import upstream_orinoco_records
-import prepare_local_stack as source
+
+if __package__:
+    from . import upstream_pool_snapshot as source
+else:
+    import upstream_pool_snapshot as source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,17 +29,18 @@ SNAPSHOT_MANIFEST = SNAPSHOT / "manifest.json"
 ORINOCO_STORAGE = SNAPSHOT / "orinoco-storage"
 
 
-def configure_source() -> None:
-    source.STACK = STACK
-    source.SNAPSHOT = RAW_JSONL
-    source.MANIFEST = POOL_MANIFEST
-
-
-def prepare_raw(*, refresh: bool = False) -> tuple[int, str, dict]:
-    configure_source()
-    refresh = refresh or os.environ.get("REFRESH_UPSTREAM_POOL", "") == "1"
+def prepare_raw(
+    *, refresh: bool = False, api: str = source.DEFAULT_API
+) -> tuple[int, str, dict]:
+    api = api.rstrip("/")
     if RAW_JSONL.exists() and POOL_MANIFEST.exists() and not refresh:
         pool_manifest = json.loads(POOL_MANIFEST.read_text(encoding="utf-8"))
+        cached_api = pool_manifest.get("source_api")
+        if not isinstance(cached_api, str) or cached_api.rstrip("/") != api:
+            raise RuntimeError(
+                f"Cached upstream snapshot is from {cached_api!r}, not {api!r}; "
+                "use --refresh to capture the requested API"
+            )
         records, digest = source.snapshot_fingerprint(RAW_JSONL)
         if int(pool_manifest.get("record_count", -1)) != records:
             raise RuntimeError(
@@ -51,11 +55,11 @@ def prepare_raw(*, refresh: bool = False) -> tuple[int, str, dict]:
             server = {}
         print(
             f"Reusing {records} prepared upstream records "
-            "(set REFRESH_UPSTREAM_POOL=1 to refresh)"
+            "(use --refresh to capture the pool again)"
         )
         return records, digest, server
 
-    records, server = source.write_snapshot()
+    records, server = source.write_snapshot(RAW_JSONL, api=api)
     verified_records, digest = source.snapshot_fingerprint(RAW_JSONL)
     if verified_records != records:
         raise RuntimeError("New upstream snapshot failed its count check")
@@ -69,10 +73,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="replace the verified cache with a fresh public-pool capture",
     )
+    parser.add_argument(
+        "--api",
+        default=source.DEFAULT_API,
+        help="Pool API to capture; a cache from another API requires --refresh",
+    )
     args = parser.parse_args(argv)
     POOL.mkdir(parents=True, exist_ok=True)
-    records, raw_digest, server = prepare_raw(refresh=args.refresh)
-    source_api = source.POOL_API
+    source_api = args.api.rstrip("/")
+    records, raw_digest, server = prepare_raw(refresh=args.refresh, api=source_api)
     upstream_snapshot.write_json(
         POOL_MANIFEST,
         {

@@ -177,6 +177,24 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 3. Orinoco Lite combines that projection with the upstream website and template.
    It adds downstream content and applies configured overrides.
 
+## Validate the deployment layer
+
+Validate the thin adaptation by generating two deployments from the same captured Pool records, with the selected upstream presentation and its declared dependencies:
+
+- Native ORINOCO uses its own Pool, query, graph, Jinja, and Hugo operations.
+- Orinoco Lite converts the capture into downstream YAML records and annotation companions, then uses the selected template and ordinary package build to regenerate the graph, pages, and static site.
+
+Serving the committed `www-from-model` graph and record pages is a presentation preview, not evidence that either data flow works.
+Test local contributions in an ordinary downstream with an editable package connection, rather than a second renderer or a parallel deployment framework.
+Use pytest for conversion, projection, composition, and their important failure boundaries.
+Fresh capture and cache invalidation must be explicit command options, separate from software revision selection.
+
+Compare record meaning, page selection and URLs, graph relationships, visible content, assets, and browser behavior.
+The objective is an explained overview of deployment differences, not byte-identical output.
+Distinguish deliberate static curation and GitHub adaptations from regressions, unexplained differences, source-data changes, and checks not performed.
+Neither passing unit tests nor a successful Lite build alone establishes native-versus-Lite parity.
+Keep the current procedure and unresolved differences in the [comparison guide](agents/upstream-deployment-validation.md); use existing comparison tools when useful, without maintaining a bespoke comparison framework.
+
 ## Generated publication records
 
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
