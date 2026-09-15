@@ -67,6 +67,7 @@ def build(*, host: str, port: int, checkout: CheckoutMode) -> None:
             "BASE_URL": f"http://{host}:{port}/",
             "DESTINATION": str(DESTINATION),
             "SHACL_VUE_URL": "https://pool.psychoinformatics.de/ui/",
+            "ORINOCO_UPSTREAM_SNAPSHOT_PROJECTION": "1",
         }
     )
     run([ROOT / "tools" / "build_upstream_site.sh"], environment=environment)

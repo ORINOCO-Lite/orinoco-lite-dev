@@ -58,6 +58,9 @@ jobs:
       - name: Run package and engineering tests
         run: pixi run pytest
 
+      - name: Verify the snapshot-driven upstream rebuild
+        run: pixi run verify-upstream-static
+
       - name: Build the source archive and verify its installed wheel
         shell: bash
         run: |
