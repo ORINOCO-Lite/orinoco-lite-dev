@@ -39,8 +39,9 @@ def snapshot_site(engineering: Path, snapshot: Path, destination: Path) -> None:
                                ("identifier", "identifier"), ("parent", "parent"), ("weight", "weight")):
             if source in entry:
                 item[target] = entry[source]
-        if "icon" in entry.get("params", {}):
-            item["icon"] = entry["params"]["icon"]
+        for name in ("icon", "target"):
+            if name in entry.get("params", {}):
+                item[name] = entry["params"][name]
         navigation.append(item)
     project(snapshot, destination)
     # The conversion's audit report is not downstream configuration or history.
@@ -52,6 +53,11 @@ def snapshot_site(engineering: Path, snapshot: Path, destination: Path) -> None:
                      "description": language["params"]["description"],
                      "base_url": config["baseURL"].rstrip("/") + "/"},
         "navigation": navigation,
+        "footer_navigation": [
+            {"name": entry["name"], "page_ref": entry["pageRef"]}
+            for entry in menu.get("footer", [])
+            if "name" in entry and "pageRef" in entry
+        ],
         "presentation": {"color_scheme": theme["colorScheme"],
                          "default_appearance": theme["defaultAppearance"],
                          "header_layout": theme["header"]["layout"]},
