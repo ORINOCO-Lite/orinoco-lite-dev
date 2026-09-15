@@ -47,8 +47,8 @@ def semantic_digest(records: Mapping[str, Mapping[str, object]]) -> str:
 def load_cache(path: Path) -> tuple[dict[str, dict[str, object]], str]:
     if not path.is_file():
         raise PoolDiffError(
-            f"Prepared cache is missing: {path}. Run `pixi run check-upstream` "
-            "or `pixi run serve-upstream` first."
+            f"Prepared cache is missing: {path}. Run "
+            "`pixi run python tools/prepare_upstream_snapshot.py --refresh` first."
         )
     records: dict[str, dict[str, object]] = {}
     file_digest = hashlib.sha256()

@@ -119,7 +119,36 @@ class PresentationResolverTests(unittest.TestCase):
         source_patch = patch("orinoco_lite.presentation.SOURCE_REPOSITORY", self.source_repository)
         source_patch.start()
         self.addCleanup(source_patch.stop)
+        module_patch = patch(
+            "orinoco_lite.presentation.__file__",
+            str(self.engineering / ".pixi/envs/default/lib/python3.12/site-packages/orinoco_lite/presentation.py"),
+        )
+        module_patch.start()
+        self.addCleanup(module_patch.stop)
         return root
+
+    def test_editable_package_resolves_an_unpublished_resource_commit(self) -> None:
+        resources = self._resources(repository=self.root / "unavailable-remote")
+        _git(self.engineering, "commit", "--allow-empty", "--quiet", "-m", "newer HEAD")
+        (self.engineering / ".gitmodules").write_text("uncommitted declarations\n")
+        dirty = self.engineering / "submodules/www-from-model/page_templates/record.md"
+        dirty.parent.mkdir(parents=True)
+        dirty.write_text("uncommitted presentation content\n")
+
+        with patch(
+            "orinoco_lite.presentation.__file__",
+            str(self.engineering / "src/orinoco_lite/presentation.py"),
+        ):
+            source = resolve_presentation(self.workspace, resources)
+
+        self.assertEqual(_git(source.parent.parent, "rev-parse", "HEAD"), self.engineering_commit)
+        self.assertEqual(_git(source, "rev-parse", "HEAD"), self.website_commit)
+        self.assertEqual((source / "page_templates/record.md").read_text(), "Presentation fixture\n")
+        self.assertEqual(
+            (source / "themes/congo/vendor/leaf/assets/leaf.txt").read_text(),
+            "nested dependency\n",
+        )
+        self.assertEqual(dirty.read_text(), "uncommitted presentation content\n")
 
     def test_package_uses_committed_gitlink_and_resolves_recursively(self) -> None:
         (self.engineering / ".gitmodules").write_text(
