@@ -41,7 +41,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
 
             with (
                 patch.object(cli, "_resolve", return_value=(workspace, resources)),
-                patch.object(cli, "invoke_driver", side_effect=(0, 0)) as invoke,
+                patch.object(cli, "invoke_driver", side_effect=(0, 0, 0)) as invoke,
             ):
                 result = cli._build(args)
 
@@ -49,6 +49,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             self.assertEqual(
                 invoke.call_args_list,
                 [
+                    call("projection-update", workspace, resources),
                     call("validate", workspace, resources),
                     call(
                         "build",
@@ -88,3 +89,13 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_installed_package_inside_engineering_environment_is_not_a_checkout(tmp_path, monkeypatch):
+    import orinoco_lite
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "release").mkdir()
+    (tmp_path / "release/package-resources.yaml").touch()
+    module = tmp_path / ".pixi/envs/default/lib/python3.12/site-packages/orinoco_lite/__init__.py"
+    monkeypatch.setattr(orinoco_lite, "__file__", str(module))
+    assert orinoco_lite.source_description() == "installed package"

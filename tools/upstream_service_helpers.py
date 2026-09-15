@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-import upstream_snapshot
+from orinoco_lite import upstream_snapshot
 
 
 SERVICE_URL = "http://127.0.0.1:8111"

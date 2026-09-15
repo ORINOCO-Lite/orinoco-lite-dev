@@ -12,7 +12,7 @@ resources:
     destination: drivers/adapt_pages.py
   - source: release/package-licenses/README.md
     destination: licenses/README.md
-  - source: packages/orinoco-lite/LICENSE
+  - source: LICENSE
     destination: licenses/orinoco-lite-MIT.txt
   - source: LICENSE
     destination: licenses/curation-review-app-MIT.txt

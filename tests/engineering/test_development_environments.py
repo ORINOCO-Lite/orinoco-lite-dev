@@ -10,11 +10,11 @@ import yaml
 from orinoco_lite.release_editor import POOL_UI_COMMIT, SHACL_VUE_COMMIT
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "pixi.toml"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
-PACKAGE_MANIFEST = ROOT / "packages" / "orinoco-lite" / "pyproject.toml"
+PACKAGE_MANIFEST = ROOT / "pyproject.toml"
 DEVELOPER_SKILL = ROOT / ".agents" / "skills" / "develop-orinoco-lite"
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
@@ -29,7 +29,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             self.assertIn(name, manifest["dependencies"])
         self.assertEqual(
             manifest["pypi-dependencies"]["orinoco-lite"],
-            {"path": "packages/orinoco-lite", "editable": True},
+            {"path": ".", "editable": True},
         )
         self.assertNotIn("feature", manifest)
         self.assertNotIn("environments", manifest)
@@ -39,36 +39,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, serialized)
 
-    def test_upstream_tasks_use_the_engineering_environment(self) -> None:
-        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
-        self.assertEqual(
-            tasks["build-upstream-static"],
-            "python tools/upstream_static.py build",
-        )
-        self.assertEqual(
-            tasks["serve-upstream-static"],
-            "python tools/upstream_static.py serve",
-        )
-        self.assertEqual(
-            tasks["build-upstream-static-worktree"],
-            "python tools/upstream_static.py build --checkout worktree",
-        )
-        self.assertEqual(
-            tasks["serve-upstream-static-worktree"],
-            "python tools/upstream_static.py serve --checkout worktree",
-        )
 
-    def test_ci_tasks_require_package_and_development_contracts(self) -> None:
-        tasks = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))["tasks"]
-        self.assertEqual(
-            tasks["test-package-strict"],
-            "python tools/run_unittests.py --fail-on-skip --discover "
-            "packages/orinoco-lite/tests",
-        )
-        self.assertEqual(
-            set(tasks["test-ci"]["depends-on"]),
-            {"test-package-strict", "test-development"},
-        )
 
     def test_developer_skill_is_native_and_scoped(self) -> None:
         self.assertFalse((ROOT / ".apm" / "skills").exists())

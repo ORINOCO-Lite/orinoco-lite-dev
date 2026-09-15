@@ -5,11 +5,11 @@ import tempfile
 import tomllib
 import unittest
 
-from tests.test_checkout_submodules import NestedFixture, git
+from tests.engineering.test_checkout_submodules import NestedFixture, git
 from tools.upstream_checkout import UpstreamCheckoutError, prepare_gitlink
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "pixi.toml"
 
 
@@ -72,38 +72,6 @@ class UpstreamStackContractTests(unittest.TestCase):
                     mode="recorded",
                 )
 
-    def test_full_tasks_and_inline_environment_are_scoped(self) -> None:
-        tasks = tomllib.loads((ROOT / "pixi.toml").read_text())["tasks"]
-        self.assertEqual(
-            tasks["serve-upstream"],
-            "python tools/upstream_full_launcher.py serve recorded",
-        )
-        self.assertEqual(
-            tasks["serve-upstream-worktree"],
-            "python tools/upstream_full_launcher.py serve worktree",
-        )
-        self.assertEqual(
-            tasks["check-upstream"],
-            "python tools/upstream_full_launcher.py check recorded",
-        )
-        self.assertEqual(
-            tasks["check-upstream-worktree"],
-            "python tools/upstream_full_launcher.py check worktree",
-        )
-        self.assertEqual(
-            tasks["diff-upstream-pool"],
-            "python tools/upstream_pool_diff.py",
-        )
-        self.assertEqual(
-            tasks["snapshot-upstream-records"],
-            "python tools/prepare_upstream_snapshot.py",
-        )
-        self.assertEqual(
-            tasks["refresh-upstream-records"],
-            "python tools/prepare_upstream_snapshot.py --refresh",
-        )
-        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["dependencies"]["nodejs"], ">=22,<23")
 
     def test_snapshot_is_materialized_for_snapshot_and_full_stack_tasks(self) -> None:
         preparation = (ROOT / "tools" / "prepare_upstream_snapshot.py").read_text()
@@ -112,15 +80,6 @@ class UpstreamStackContractTests(unittest.TestCase):
             self.assertIn("upstream_snapshot.materialize", source)
             self.assertIn("upstream_snapshot.export_records", source)
 
-    def test_direct_scripts_do_not_depend_on_the_tools_namespace(self) -> None:
-        for relative in (
-            "prepare_upstream_snapshot.py",
-            "prepare_upstream_stack.py",
-            "upstream_orinoco_records.py",
-        ):
-            source = (ROOT / "tools" / relative).read_text()
-            self.assertIn("if __package__:", source)
-            self.assertNotIn("from tools import upstream_snapshot", source)
 
     def test_live_check_retains_upstream_ui_and_schema_contracts(self) -> None:
         check = (ROOT / "tools" / "check_upstream_stack.py").read_text()

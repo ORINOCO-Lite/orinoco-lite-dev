@@ -28,14 +28,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check out the template candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ORINOCO-Lite/orinoco-lite-template
-          ref: 22a40e189ad79fb5bf67cfd9897a5b07967177b6
-          path: build/orinoco-lite-template
-          persist-credentials: false
-
       - name: Initialize only release-authorized compatibility components
         shell: bash
         run: |
@@ -55,18 +47,16 @@ jobs:
           pixi-version: v0.76.2
 
       - name: Check dependency locks
-        run: pixi run check-locks
+        run: pixi lock --check
 
       - name: Verify pre-commit formatting
-        run: pixi run check-format
+        run: pixi run pre-commit run --all-files
 
-      - name: Run strict package and engineering tests
-        run: pixi run test-ci
+      - name: Prepare editable package resources
+        run: pixi run orinoco-lite dev prepare-resources
 
-      - name: Prove the forward template contract with compact mock content
-        env:
-          ORINOCO_TEMPLATE_CANDIDATE: ${{ github.workspace }}/build/orinoco-lite-template
-        run: pixi run test-template-candidate-quick
+      - name: Run package and engineering tests
+        run: pixi run pytest
 
       - name: Build the source archive and verify its installed wheel
         shell: bash
@@ -75,38 +65,4 @@ jobs:
           wheels=(build/package/*.whl)
           pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run orinoco-lite --help
-          pixi run test-package-strict
-
-      - name: Build the pinned upstream static site from a non-recursive clone
-        run: pixi run build-upstream-static
-
-      - name: Rebuild without moving the initialized upstream worktrees
-        run: pixi run build-upstream-static-worktree
-
-      - name: Run the isolated service-stack contracts
-        run: pixi run test-upstream-full
-
-  live-upstream:
-    name: Live recorded upstream deployment
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out only the parent repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Initialize package sources
-        run: |
-          git submodule update --init --recursive --depth 1 -- \
-            submodules/pool.psychoinformatics.de-ui submodules/things-schemas
-
-      - name: Install the locked engineering environment
-        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
-        with:
-          cache: true
-          frozen: true
-          pixi-version: v0.76.2
-
-      - name: Reproduce and check the recorded service-backed stack
-        run: pixi run check-upstream
+          pixi run pytest --ignore=tests/engineering

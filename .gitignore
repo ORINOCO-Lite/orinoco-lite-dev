@@ -1,7 +1,6 @@
 # Local deployment output and credentials.
-/build/
-/packages/orinoco-lite/build/
-/packages/orinoco-lite/src/orinoco_lite/_resources/
+build/
+/src/orinoco_lite/_resources/
 /dist/
 /node_modules/
 *.env
@@ -12,3 +11,5 @@ __pycache__/
 
 # APM dependencies
 apm_modules/
+
+.pytest_cache/

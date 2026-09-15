@@ -5,15 +5,20 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import types
 import unittest
 from unittest.mock import Mock, patch
 
+import pytest
+import yaml
+
 from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.canonical import canonical_yaml
-from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig
+from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig, load_workspace
+from orinoco_lite.editor import _render_rdf_sources
 from orinoco_lite.errors import DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
@@ -31,9 +36,11 @@ from orinoco_lite.projection import (
     validate_semantics,
 )
 from orinoco_lite.schema_conversion import build_format_converters
+from orinoco_lite.records import record_sources
+from orinoco_lite.resources import resolve_resources
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SOURCE = PACKAGE_ROOT / "submodules/things-schemas/src"
 
 
@@ -888,6 +895,50 @@ class GenericProjectionContractTests(unittest.TestCase):
         backups = list((self.root / "generated").glob(".projection-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
+
+
+def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypatch):
+    root = tmp_path / "site"
+    shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
+    presentation = PACKAGE_ROOT / "submodules/www-from-model"
+    # Use real pinned templates and schema without resolving a network source.
+    monkeypatch.setattr(
+        "orinoco_lite.projection.resolve_presentation", lambda *_: presentation
+    )
+    workspace = load_workspace(root)
+    resources = resolve_resources().root
+    record = {
+        "pid": "xyzrins:files/ancillary",
+        "schema_type": "xyzri:XYZFile",
+        "display_label": "Ancillary file",
+    }
+    path = workspace.path("records") / "XYZFile/ancillary.yaml"
+    path.parent.mkdir()
+    content = canonical_yaml(record)
+    path.write_text(content, encoding="utf-8")
+
+    update_projection(workspace, resources)
+    projection = workspace.path("generated") / "projection"
+    machine = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
+    assert record in machine
+    assert not (projection / "content/files/ancillary/_index.md").exists()
+    to_rdf, to_json = build_format_converters(
+        resources / "schema/demo-research-information/unreleased.yaml"
+    )
+    rdf, _ = _render_rdf_sources(record_sources(workspace), to_rdf)
+    restored = to_json.convert(rdf[record["pid"]], "XYZFile")
+    assert restored["display_label"] == record["display_label"]
+    assert path.read_text(encoding="utf-8") == content
+
+    # A local page policy cannot make an unknown schema class valid.
+    contract = load_contract(workspace, presentation)
+    policy = yaml.safe_load(contract.path.read_text())
+    policy["unrendered_classes"].append("xyzri:Unknown")
+    (workspace.path("site") / "projection.yaml").write_text(yaml.safe_dump(policy))
+    record["schema_type"] = "xyzri:Unknown"
+    path.write_text(canonical_yaml(record), encoding="utf-8")
+    with pytest.raises(DriverError, match="unknown CURIE schema type xyzri:Unknown"):
+        update_projection(workspace, resources)
 
 
 if __name__ == "__main__":

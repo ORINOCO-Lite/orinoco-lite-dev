@@ -9,8 +9,8 @@ from unittest.mock import Mock
 
 from orinoco_lite.projection import load_contract
 
-from tools import upstream_orinoco_records as storage
-from tools import upstream_snapshot as snapshot
+from orinoco_lite import upstream_orinoco_records as storage
+from orinoco_lite import upstream_snapshot as snapshot
 
 
 class UpstreamPresentationTests(unittest.TestCase):

@@ -32,34 +32,30 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 4. Treat publishing a release and merging a reference-downstream change as separate optional gates.
    Permission to test a working tree locally does not itself authorize either one.
 
-## Exercise the temporary downstream
+## Exercise a local downstream
 
-Run the engineering task from the `orinoco-lite-dev` working tree.
-When a template candidate is selected, the task materializes it afresh and applies only the selected downstream's declared `site-specific/` inputs and `extensions/` metadata adapters:
+Use the public CLI from the engineering checkout:
 
 ```console
-pixi run test-downstream-candidate \
-  --downstream /path/to/orinoco-lite-demo \
-  --package /path/to/orinoco-lite-dev \
-  --template /path/to/orinoco-lite-template \
-  --mode quick
+pixi run orinoco-lite dev setup
 ```
 
-Select at least one of `--package` and `--template`; omit the other for a package-only or template-only candidate.
-When `--template` is omitted, the task instead makes a disposable copy of the downstream framework and substitutes only the package candidate.
-In either mode, the task leaves the source downstream unchanged.
-Template-candidate runs must not copy downstream framework files, workflows, framework tests, or duplicated template configuration.
+This creates `../orinoco-lite-test-downstream` from the sibling template, converts the cached pool snapshot into ordinary committed site inputs, enables the editable package, and prepares resources.
+It does not run projection or build the website.
+Use `--site-specific /path/to/site-specific` for an existing input repository, `--snapshot /path/to/pool.jsonl` for another captured pool, and `--template /path/to/template` for another template checkout.
+Use `--populate` for missing template or site-specific repositories and `--force` only to deliberately replace the output.
+Never recreate a developer's existing downstream as part of routine validation.
 
-Quick mode runs the downstream `validate` and `build` tasks while iterating.
-Full mode runs `validate` and `verify-build`; use it before adoption or release.
-Browser, source-adapter, offline-cache, and live GitHub behavior require their focused tests or acceptance exercises and are not implied by either mode.
-Use repeated `--task` arguments only for focused diagnosis, and use `--output` or `--keep` when the staged tree needs inspection.
-A failed candidate is retained for diagnosis; a successful automatic candidate is removed unless requested.
+In any downstream, `pixi run orinoco-lite dev enable [PATH]` records an editable package connection.
+The default source is `../orinoco-lite-dev`, cloned when absent.
+`pixi run orinoco-lite dev disable` restores the prior package selection from Git history, preserving unrelated changes.
+These operations do not upgrade the selected release.
 
-When a candidate failure exposes generic source resolution, metadata, projection, or composition behavior, fix the package.
-When it exposes an Orinoco adaptation or scaffold, fix the template.
-When required Annex-backed upstream content is missing, repair the maintainer dependency-closure hydration and materialization path; do not remove upstream functionality or add Git Annex to the downstream.
-Change downstream inputs only for site data, policy, supported presentation choices or overrides, or executable metadata adapters.
+Use ordinary `orinoco-lite validate`, `build`, and `serve` commands when requested.
+The package owns projection and validation sequencing.
+Use `pixi run pytest` and pytest selection flags for automated tests, rather than separate quick/full task wrappers.
+When setup-only validation is requested, do not run projection or a website build.
+When testing package, template, or upstream integration, fix generic behavior in the package, Orinoco adaptation in the template, and site inputs only for actual site data or policy changes.
 
 ## Complete the user-owned demo
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tools import upstream_snapshot as snapshot
+from orinoco_lite import upstream_snapshot as snapshot
 
 
 def record(

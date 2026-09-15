@@ -53,7 +53,7 @@ class PresentationResolverTests(unittest.TestCase):
         self.engineering = self._repository(
             "engineering",
             {
-                "packages/orinoco-lite/src/orinoco_lite/__init__.py": "",
+                "src/orinoco_lite/__init__.py": "",
                 "README.md": "Engineering fixture\n",
             },
             modules=(

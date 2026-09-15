@@ -10,7 +10,7 @@ from linkml_runtime import SchemaView
 from orinoco_lite.release_schema import localize_schema
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SOURCE = PACKAGE_ROOT / "submodules/things-schemas/src"
 
 
