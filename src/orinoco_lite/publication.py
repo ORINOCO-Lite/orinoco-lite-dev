@@ -1,4 +1,4 @@
-"""Create reproducible projection and Pages commits for one site build."""
+"""Retain one successfully deployed build outside the source branch."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from pathlib import Path, PurePosixPath
 import subprocess
 import tempfile
 
+from .errors import OrinocoError
+
 
 PROJECTION_REF = "refs/orinoco-publication/latest-hugo-projection"
 PAGES_REF = "refs/orinoco-publication/gh-pages"
@@ -15,7 +17,7 @@ BOT_NAME = "github-actions[bot]"
 BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
 
-class PublicationError(RuntimeError):
+class PublicationError(OrinocoError):
     """Report a publication input or Git-history contract failure."""
 
 
@@ -126,6 +128,16 @@ def _tree_from_directory(root: Path, source: Path, index: Path) -> str:
     return _run(["git", "write-tree"], cwd=root, env=env)
 
 
+def require_clean_source(root: Path) -> str:
+    """Reject uncommitted publication inputs before an expensive build."""
+    if not (root / ".git").exists():
+        raise PublicationError(f"Not a Git worktree: {root}")
+    source = _run(["git", "rev-parse", "HEAD^{commit}"], cwd=root)
+    if _run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=root):
+        raise PublicationError("Tracked worktree changes would make publication ambiguous")
+    return source
+
+
 def prepare(
     repository: Path,
     projection_relative: str,
@@ -148,9 +160,7 @@ def prepare(
     if not any(path.relative_to(site).as_posix() == "index.html" for path in site_files):
         raise PublicationError("Site is incomplete; missing index.html")
 
-    source = _run(["git", "rev-parse", "HEAD^{commit}"], cwd=root)
-    if _run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=root):
-        raise PublicationError("Tracked worktree changes would make publication ambiguous")
+    source = require_clean_source(root)
     date = _run(["git", "show", "-s", "--format=%cI", source], cwd=root)
     bundle = root.joinpath(*PurePosixPath(bundle_relative).parts)
     bundle.parent.mkdir(parents=True, exist_ok=True)
@@ -234,25 +244,15 @@ def publish(root: Path, bundle_name: str) -> None:
 
 def parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("publication_command", choices=("prepare", "publish"))
+    parser.add_argument("publication_command", choices=("record",))
     parser.add_argument("--repository", type=Path, default=Path.cwd())
-    parser.add_argument("--projection", default="generated/projection")
-    parser.add_argument("--site", default="build/pages")
     parser.add_argument("--bundle", default="build/pages-publication.bundle")
     return parser
 
 
 def execute(args: argparse.Namespace) -> int:
     try:
-        if args.publication_command == "publish":
-            publish(args.repository, args.bundle)
-            return 0
-        prepare(
-            args.repository,
-            args.projection,
-            args.site,
-            args.bundle,
-        )
+        publish(args.repository, args.bundle)
     except PublicationError as error:
         raise SystemExit(f"publication: {error}")
     return 0

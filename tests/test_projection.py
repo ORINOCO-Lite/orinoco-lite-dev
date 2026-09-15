@@ -34,6 +34,7 @@ from orinoco_lite.projection import (
     render_projection,
     update_projection,
     validate_semantics,
+    validate_inputs,
 )
 from orinoco_lite.schema_conversion import build_format_converters
 from orinoco_lite.records import record_sources
@@ -907,6 +908,17 @@ class GenericProjectionContractTests(unittest.TestCase):
             assert semantic.call_count == 1
             update_projection(self.workspace, self.resources, no_cache=True)
             assert semantic.call_count == 2
+
+    def test_validate_does_not_generate_projection(self):
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
+            assert validate_inputs(self.workspace, self.resources) == self.semantic
+            assert not list(self.workspace.path("generated").iterdir())
+            update_projection(self.workspace, self.resources)
+            count = semantic.call_count
+            validate_inputs(self.workspace, self.resources)
+            assert semantic.call_count == count
+            validate_inputs(self.workspace, self.resources, no_cache=True)
+            assert semantic.call_count == count + 1
 
     def test_projection_cache_invalidates_changed_inputs_and_outputs(self):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:

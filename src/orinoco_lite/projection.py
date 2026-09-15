@@ -994,6 +994,34 @@ def render_projection(
     return {**semantic, "pages": len(list((output / "content").rglob("*.md")))}
 
 
+def _cached_projection_report(workspace, key):
+    destination = workspace.path("generated") / "projection"
+    if destination.is_dir():
+        try:
+            saved = json.loads((destination.parent / ".projection-cache.json").read_text(encoding="utf-8"))
+            if (saved["key"] == key
+                    and saved["output"] == tree_sha256(destination)
+                    and isinstance(saved["report"], dict)):
+                return saved["report"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    return None
+
+
+def validate_inputs(workspace, resources_root, *, no_cache=False):
+    """Check semantic inputs without generating a projection or website."""
+    presentation = _presentation_root(workspace, resources_root)
+    contract = load_contract(workspace, presentation)
+    if not no_cache:
+        report = _cached_projection_report(
+            workspace, _projection_cache_key(workspace, contract, resources_root),
+        )
+        if report is not None:
+            print("Reusing unchanged semantic validation", file=sys.stderr)
+            return report
+    return validate_semantics(workspace, resources_root, presentation)
+
+
 def update_projection(
     workspace: WorkspaceConfig, resources_root: Path, *, no_cache: bool = False,
 ) -> dict[str, Any]:
@@ -1002,16 +1030,11 @@ def update_projection(
     contract = load_contract(workspace, _presentation_root(workspace, resources_root))
     key = _projection_cache_key(workspace, contract, resources_root)
     cache = destination.parent / ".projection-cache.json"
-    if not no_cache and destination.is_dir():
-        try:
-            saved = json.loads(cache.read_text(encoding="utf-8"))
-            if (saved["key"] == key
-                    and saved["output"] == tree_sha256(destination)
-                    and isinstance(saved["report"], dict)):
-                print("Reusing unchanged projection (including semantic validation)", file=sys.stderr)
-                return saved["report"]
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
+    if not no_cache:
+        report = _cached_projection_report(workspace, key)
+        if report is not None:
+            print("Reusing unchanged projection (including semantic validation)", file=sys.stderr)
+            return report
     staging = Path(
         tempfile.mkdtemp(prefix=".projection-staging-", dir=destination.parent)
     )

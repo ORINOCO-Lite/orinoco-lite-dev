@@ -12,7 +12,7 @@ from orinoco_lite import cli
 from orinoco_lite.errors import ConfigurationError
 
 
-@pytest.mark.parametrize("command", [["build"], ["validate"], ["projection", "update"]])
+@pytest.mark.parametrize("command", [["build"], ["projection", "update"]])
 def test_no_cache_option_is_explicit_and_forwarded(command):
     args = cli._parser().parse_args([*command, "--no-cache"])
     with patch.object(cli, "invoke_driver", return_value=0) as invoke:
@@ -48,12 +48,12 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
                 build_timestamp="2026-09-08T12:34:56Z",
                 destination=None,
                 github_repository="ORINOCO-Lite/example-site",
-                skip_structural_validation=True,
             )
 
             with (
                 patch.object(cli, "_resolve", return_value=(workspace, resources)),
-                patch.object(cli, "invoke_driver", side_effect=(0, 0, 0)) as invoke,
+                patch.object(cli, "validate_workspace"),
+                patch.object(cli, "invoke_driver", side_effect=(0, 0)) as invoke,
             ):
                 result = cli._build(args)
 
@@ -62,7 +62,6 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
                 invoke.call_args_list,
                 [
                     call("projection-update", workspace, resources),
-                    call("validate", workspace, resources),
                     call(
                         "build",
                         workspace,
@@ -111,3 +110,36 @@ def test_installed_package_inside_engineering_environment_is_not_a_checkout(tmp_
     module = tmp_path / ".pixi/envs/default/lib/python3.12/site-packages/orinoco_lite/__init__.py"
     monkeypatch.setattr(orinoco_lite, "__file__", str(module))
     assert orinoco_lite.source_description() == "installed package"
+
+
+def test_validate_checks_inputs_without_generating_projection():
+    args = cli._parser().parse_args(["validate", "--no-cache"])
+    with (
+        patch.object(cli, "_workspace", return_value=SimpleNamespace(site_name="Test")),
+        patch.object(cli, "validate_workspace", return_value={"records": 1}),
+        patch.object(cli, "resolve_resources", return_value="resources"),
+        patch.object(cli, "invoke_driver", return_value=0) as invoke,
+    ):
+        assert cli._validate(args) == 0
+    assert invoke.call_count == 1
+    assert invoke.call_args.args[0] == "validate"
+    assert invoke.call_args.kwargs["extra_arguments"] == ("--no-cache",)
+
+
+@pytest.mark.parametrize("status", [0, 1])
+def test_build_bundle_is_optional_and_only_created_after_success(tmp_path, status):
+    workspace = SimpleNamespace(root=tmp_path, base_url="/", path=lambda name: tmp_path / name)
+    args = cli._parser().parse_args(["build", "--publication-bundle", "build/publication.bundle"])
+    with (
+        patch.object(cli, "_resolve", return_value=(workspace, "resources")),
+        patch.object(cli, "validate_workspace"),
+        patch.object(cli, "invoke_driver", side_effect=[0, status]),
+        patch("orinoco_lite.publication.require_clean_source") as clean,
+        patch("orinoco_lite.publication.prepare") as prepare,
+    ):
+        assert cli._build(args) == status
+    clean.assert_called_once_with(tmp_path)
+    if status == 0:
+        prepare.assert_called_once_with(tmp_path, "generated/projection", "build/site", "build/publication.bundle")
+    else:
+        prepare.assert_not_called()

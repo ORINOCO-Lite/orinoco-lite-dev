@@ -188,6 +188,10 @@ A longer publication history may be retained for diagnosis and recovery.
 Other generated operational data is temporary and is neither canonical metadata nor a recovery source.
 This retention does not require byte-identical rebuilds or additional manifests, attestations, ledgers, or validation machinery.
 
+A publication build emits the static site and a Git bundle of the projection and site using `build --publication-bundle`.
+Ordinary local builds need neither a clean commit nor publication records.
+After hosting deployment succeeds, `publication record` pushes the bundled generated commits; it neither rebuilds nor deploys the website.
+
 ## Metadata change flow
 
 Orinoco Lite supports two sources of metadata change:

@@ -37,10 +37,12 @@ def _parser() -> argparse.ArgumentParser:
         help="skip the release's semantic validation driver",
     )
     validate.add_argument("--json", action="store_true", help="print the report as JSON")
-    validate.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
+    validate.add_argument("--no-cache", action="store_true", help="repeat semantic checks instead of reusing their cached result")
 
-    build = commands.add_parser("build", help="build the deterministic static site")
+    build = commands.add_parser("build", help="validate inputs and build the static site")
     build.add_argument("--destination", type=Path)
+    build.add_argument("--publication-bundle", type=Path,
+                       help="also write a Git bundle of this build for recording after deployment (requires clean committed inputs)")
     build.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
     build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"))
     build.add_argument(
@@ -57,11 +59,6 @@ def _parser() -> argparse.ArgumentParser:
             "interfaces (defaults to GITHUB_REPOSITORY)"
         ),
     )
-    build.add_argument(
-        "--skip-structural-validation",
-        action="store_true",
-        help=argparse.SUPPRESS,
-    )
 
     serve = commands.add_parser("serve", help="serve an already built static site")
     serve.add_argument("--directory", type=Path)
@@ -75,9 +72,9 @@ def _parser() -> argparse.ArgumentParser:
     apply.add_argument("--write", action="store_true")
 
     projection = commands.add_parser(
-        "projection", help="refresh or verify generated projection"
+        "projection", help="generate the metadata projection without building a website"
     )
-    projection.add_argument("projection_command", choices=("update", "verify"))
+    projection.add_argument("projection_command", choices=("update",))
     projection.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
 
     run = commands.add_parser("run", help="run an advanced release driver")
@@ -101,7 +98,7 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
                         help="check the built site through localhost and 127.0.0.1")
     commands.add_parser("publication", parents=[publication.parser()], add_help=False,
-                        help="record generated projection and deployed website commits")
+                        help="record already-deployed output from a build's Git bundle")
     commands.add_parser("shacl-handoff", parents=[shacl_handoff._parser()], add_help=False,
                         help="inspect and materialize GitHub editor proposals")
     return parser
@@ -134,10 +131,8 @@ def _validate(args: argparse.Namespace) -> int:
     report = validate_workspace(workspace)
     if not args.structural_only:
         resources = resolve_resources()
-        status = _update_projection(args, workspace, resources)
-        if status:
-            return status
-        status = invoke_driver("validate", workspace, resources)
+        status = invoke_driver("validate", workspace, resources,
+                               extra_arguments=("--no-cache",) if args.no_cache else ())
         if status:
             return status
         report["package_version"] = __version__
@@ -163,15 +158,18 @@ def _build(args: argparse.Namespace) -> int:
         if args.github_repository is not None
         else None
     )
-    if not args.skip_structural_validation:
-        validate_workspace(workspace)
+    destination = _safe_build_destination(workspace, args.destination)
+    bundle = getattr(args, "publication_bundle", None)
+    if bundle is not None:
+        from .publication import require_clean_source
+        bundle = _safe_build_destination(workspace, bundle)
+        if bundle == destination or destination in bundle.parents:
+            raise ConfigurationError("Publication bundle must be outside the website destination")
+        require_clean_source(workspace.root)
+    validate_workspace(workspace)
     projection_status = _update_projection(args, workspace, resources)
     if projection_status:
         return projection_status
-    semantic_status = invoke_driver("validate", workspace, resources)
-    if semantic_status:
-        return semantic_status
-    destination = _safe_build_destination(workspace, args.destination)
     base_url = args.base_url or workspace.base_url
     build_timestamp = getattr(args, "build_timestamp", None)
     if build_timestamp is None and urlsplit(base_url).scheme in {"http", "https"}:
@@ -186,7 +184,7 @@ def _build(args: argparse.Namespace) -> int:
         if build_repository is not None
         else None
     )
-    return invoke_driver(
+    status = invoke_driver(
         "build",
         workspace,
         resources,
@@ -198,6 +196,12 @@ def _build(args: argparse.Namespace) -> int:
             else ()
         ),
     )
+    if status == 0 and bundle is not None:
+        from .publication import prepare
+        prepare(workspace.root, "generated/projection",
+                destination.relative_to(workspace.root).as_posix(),
+                bundle.relative_to(workspace.root).as_posix())
+    return status
 
 
 def _serve(args: argparse.Namespace) -> int:
@@ -241,11 +245,7 @@ def _editor(args: argparse.Namespace) -> int:
 def _projection(args: argparse.Namespace) -> int:
     workspace, resources = _resolve(args)
     validate_workspace(workspace)
-    if args.projection_command == "update":
-        return _update_projection(args, workspace, resources)
-    return invoke_driver(
-        f"projection-{args.projection_command}", workspace, resources
-    )
+    return _update_projection(args, workspace, resources)
 
 
 def _run(args: argparse.Namespace) -> int:

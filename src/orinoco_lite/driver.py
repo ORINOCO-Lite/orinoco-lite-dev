@@ -29,7 +29,7 @@ PASSTHROUGH_ENVIRONMENT = {
     "XDG_CONFIG_HOME",
 }
 COMMANDS = {
-    "validate": ("orinoco_lite.validate_resources", "--config", "{config}"),
+    "validate": ("orinoco_lite.validate_resources", "--config", "{config}", "--resources", "{resources}"),
     "projection-update": (
         "orinoco_lite.projection_cli",
         "--config",

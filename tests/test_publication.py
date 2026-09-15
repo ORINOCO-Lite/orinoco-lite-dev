@@ -7,6 +7,8 @@ import sys
 import tempfile
 import unittest
 
+from orinoco_lite.publication import prepare, PublicationError
+
 
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "Publication Test",
@@ -61,7 +63,7 @@ class PagesPublicationTests(unittest.TestCase):
     def test_bundle_records_exact_two_commit_publication_chain(self) -> None:
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:
             repository, source = self.make_repository(temporary)
-            run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository)
+            prepare(repository, "generated/projection", "build/pages", "build/pages-publication.bundle")
             bundle = repository / "build/pages-publication.bundle"
             run(["git", "bundle", "verify", bundle], repository)
             run(
@@ -107,8 +109,8 @@ class PagesPublicationTests(unittest.TestCase):
             remote = Path(temporary) / "remote.git"
             run(["git", "init", "--bare", remote], repository)
             run(["git", "remote", "add", "origin", remote], repository)
-            run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository)
-            run([sys.executable, "-m", "orinoco_lite.publication", "publish"], repository)
+            prepare(repository, "generated/projection", "build/pages", "build/pages-publication.bundle")
+            run([sys.executable, "-m", "orinoco_lite.publication", "record"], repository)
             pages = run(["git", "rev-parse", "refs/heads/gh-pages"], remote).stdout.strip()
             projection = run(["git", "rev-parse", "refs/heads/latest-hugo-projection"], remote).stdout.strip()
             self.assertEqual(projection, run(["git", "rev-parse", f"{pages}^"], remote).stdout.strip())
@@ -119,9 +121,8 @@ class PagesPublicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="orinoco-pages-test-") as temporary:
             repository, _ = self.make_repository(temporary)
             (repository / "README.md").write_text("changed\n")
-            result = run([sys.executable, "-m", "orinoco_lite.publication", "prepare"], repository, check=False)
-            self.assertNotEqual(0, result.returncode)
-            self.assertIn("Tracked worktree changes", result.stderr)
+            with self.assertRaisesRegex(PublicationError, "Tracked worktree changes"):
+                prepare(repository, "generated/projection", "build/pages", "build/pages-publication.bundle")
 
 
 if __name__ == "__main__":
