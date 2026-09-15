@@ -38,6 +38,7 @@ def test_snapshot_conversion_uses_committed_editorial_inputs(tmp_path):
         "content/contact.md": "Committed editorial content\n",
         "content/_index.md": "Generated home page\n",
         "content/persons/person/_index.md": "Generated record page\n",
+        "content/persons/_index.md": "---\ntitle: People\n---\nAuthored introduction\n",
     }
     for name, text in files.items():
         path = website / name
@@ -63,7 +64,8 @@ def test_snapshot_conversion_uses_committed_editorial_inputs(tmp_path):
     assert site["footer_navigation"] == [{"name": "Contact", "page_ref": "contact"}]
     assert (destination / "content/contact.md").read_text() == "Committed editorial content\n"
     assert not (destination / "content/_index.md").exists()
-    assert not (destination / "content/persons").exists()
+    assert (destination / "content/persons/_index.md").read_text() == files["content/persons/_index.md"]
+    assert not (destination / "content/persons/person").exists()
     assert not (destination / "manifest.json").exists()
     records = list((destination / "metadata/records").rglob("*.yaml"))
     assert len(records) == 1
