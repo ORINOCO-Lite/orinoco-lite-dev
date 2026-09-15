@@ -39,6 +39,7 @@ This supports the core generation claim for the capture, not unconditional visua
 | Header/institution logos, Windows tile image, four favicon contents, copyright, extra home heading and Hub label | **Presentation choice; not accepted as replica fidelity.** Neutral defaults avoid inheriting another site's identity. Configure an explicit identity/presentation fixture when needed. The extra heading/label are not required by static curation and need separate review. |
 | Editing routes/data, package/content/build footer and license notices | **Deliberate architecture; ignore for upstream-content parity.** Validate these features separately. This does not excuse missing native content or navigation. |
 | Graph edge IDs/order; graph fetch cache-query suffix | **Safe narrow heuristic.** Compare full node objects and counted endpoints; ignore IDs/order only while edges contain only `id`, `source`, `target`. Strip only the known graph fetch cache query, not arbitrary URLs. |
+| Graph node positions and label visibility between page loads | **Runtime layout variation.** Ignore force-layout geometry in paired screenshots only after graph data, filters and navigation agree. Do not mistake changing positions or label culling for changed metadata, or mask the entire graph without functional checks. |
 | Annotation envelopes; 21 records' full-URI versus declared CURIE PAV tags | **Representation-only for this capture.** Compare joined records using schema-declared namespace equivalence. Nine person frontmatters also differ in nested annotation representation; Michael Hanke's ISIL creator is not expanded in Lite. Current identifier links/icons are unaffected. **Later** if those fields become visible or consumed. |
 | Publication `fec91e0d-f22a-42c8-8170-a0dd87da53f7` loses `generated_by[0].at_time: "-"` | **Decision required; soon.** Existing conversion omits an invalid optional datetime sentinel. This is a source-value change, not formatting noise. Retain the capture and review explicit conversion policy or an upstream correction before general acceptance. |
 | Nine broken HTML-link references and 790 unresolved graph paths, shared by both | **Inherited upstream behavior; visible broken links soon, graph-scope policy later.** Examples: a scheme-less `hub.datalad.org/datalad/datalad-core` link, `/orcid:0000-0003-3456-2493`, and `/depictions/logo_abcd-j`. Graph links also target filtered-out people/publications because graph records and page selectors have different scopes. Matching upstream proves inheritance, not correctness; never suppress all broken links. |
@@ -103,10 +104,10 @@ The investigated 1.2.11 installation had MIME/doctype parsing caveats, so this r
 Keep scratch checkers and detailed output untracked; no bespoke framework or new Pixi task suite is required.
 
 Package pytest passed 325 tests; template pytest passed 22 source tests.
-The final Lite build produced 846 files and passed the site check for localhost and 127.0.0.1 (60 homepage references each); that check is not an all-route/asset test.
-Native search, project navigation, graph double-click, person and dataset views were browser-tested.
-The Mac locked before Lite browser review.
-Representative HTTP routes returned 200 on both, but that does not prove Lite interactions.
+The final Lite build produced 846 files and passed the site check for localhost and 127.0.0.1 (60 homepage references each); that check is not an all-route/asset test. An isolated headless Chromium 151 context rendered 16 representative pages (home and seven record classes on both sites) at 1273×768, with expected images and graphs, no console/page errors, and no external requests.
+Paired home/person screenshots confirmed the restored media and remaining presentation differences. Lite interaction checks passed: keyboard search for DataLad to its named project/instrument, Outputs menu to Datasets, appearance toggle/restore, graph Project filter off/on, and double-click on the rendered DataLad node to its project page.
+Native search, navigation and graph double-click were also exercised in Safari before the desktop locked; the isolated Chromium checks completed without unlocking it or using a user browser profile.
+These are bounded desktop-browser checks, not exhaustive responsive or cross-browser coverage.
 Authenticated curation, live Pool freshness, upstream publication and media acquisition were not tested.
 The local fixture has no configured GitHub repository, so review is disabled.
 No repositories were merged and no hosted workflow was changed.
