@@ -891,10 +891,42 @@ class GenericProjectionContractTests(unittest.TestCase):
                 side_effect=fail_install_and_rollback,
             ):
                 with self.assertRaisesRegex(DriverError, "original is preserved"):
-                    update_projection(self.workspace, self.resources)
+                    update_projection(self.workspace, self.resources, no_cache=True)
         backups = list((self.root / "generated").glob(".projection-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
+
+    def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self):
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
+            first = update_projection(self.workspace, self.resources)
+            editorial = self.workspace.path("editorial") / "about.md"
+            editorial.parent.mkdir(parents=True, exist_ok=True)
+            editorial.write_text("New editorial content")
+            (self.workspace.path("site") / "site.yaml").write_text("identity:\n  base_url: https://new.example/\n")
+            assert update_projection(self.workspace, self.resources) == first
+            assert semantic.call_count == 1
+            update_projection(self.workspace, self.resources, no_cache=True)
+            assert semantic.call_count == 2
+
+    def test_projection_cache_invalidates_changed_inputs_and_outputs(self):
+        with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
+            update_projection(self.workspace, self.resources)
+            contract = load_contract(self.workspace)
+            paths = [
+                next(self.workspace.path("records").rglob("*.yaml")),
+                contract.path,
+                contract.homepage.template,
+                self.resources / "schema/types/base.yaml",
+                self.workspace.path("generated") / "projection/records.jsonl",
+            ]
+            # Whitespace is enough to invalidate without changing fixture meaning.
+            for index, path in enumerate(paths, start=2):
+                path.write_text(path.read_text() + "\n")
+                update_projection(self.workspace, self.resources)
+                assert semantic.call_count == index
+            (self.workspace.path("generated") / ".projection-cache.json").write_text("broken")
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == len(paths) + 2
 
 
 def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypatch):

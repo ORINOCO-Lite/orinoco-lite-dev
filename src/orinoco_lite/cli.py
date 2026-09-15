@@ -37,9 +37,11 @@ def _parser() -> argparse.ArgumentParser:
         help="skip the release's semantic validation driver",
     )
     validate.add_argument("--json", action="store_true", help="print the report as JSON")
+    validate.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
 
     build = commands.add_parser("build", help="build the deterministic static site")
     build.add_argument("--destination", type=Path)
+    build.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
     build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"))
     build.add_argument(
         "--build-timestamp",
@@ -76,6 +78,7 @@ def _parser() -> argparse.ArgumentParser:
         "projection", help="refresh or verify generated projection"
     )
     projection.add_argument("projection_command", choices=("update", "verify"))
+    projection.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
 
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
@@ -131,7 +134,7 @@ def _validate(args: argparse.Namespace) -> int:
     report = validate_workspace(workspace)
     if not args.structural_only:
         resources = resolve_resources()
-        status = invoke_driver("projection-update", workspace, resources)
+        status = _update_projection(args, workspace, resources)
         if status:
             return status
         status = invoke_driver("validate", workspace, resources)
@@ -143,6 +146,11 @@ def _validate(args: argparse.Namespace) -> int:
     else:
         print(f"Validated {report['records']} records for {workspace.site_name}")
     return 0
+
+
+def _update_projection(args, workspace, resources) -> int:
+    options = {"extra_arguments": ("--no-cache",)} if getattr(args, "no_cache", False) else {}
+    return invoke_driver("projection-update", workspace, resources, **options)
 
 
 def _build(args: argparse.Namespace) -> int:
@@ -157,7 +165,7 @@ def _build(args: argparse.Namespace) -> int:
     )
     if not args.skip_structural_validation:
         validate_workspace(workspace)
-    projection_status = invoke_driver("projection-update", workspace, resources)
+    projection_status = _update_projection(args, workspace, resources)
     if projection_status:
         return projection_status
     semantic_status = invoke_driver("validate", workspace, resources)
@@ -233,6 +241,8 @@ def _editor(args: argparse.Namespace) -> int:
 def _projection(args: argparse.Namespace) -> int:
     workspace, resources = _resolve(args)
     validate_workspace(workspace)
+    if args.projection_command == "update":
+        return _update_projection(args, workspace, resources)
     return invoke_driver(
         f"projection-{args.projection_command}", workspace, resources
     )

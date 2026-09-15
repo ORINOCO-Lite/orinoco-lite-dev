@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
+import hashlib
+from importlib.metadata import distributions
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -28,6 +30,7 @@ from .annotations import (
 )
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
+from .integrity import canonical_json_bytes, tree_sha256
 from .presentation import resolve_presentation
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
@@ -818,58 +821,35 @@ def _matches_policy(
     return links(record, {record["pid"]})
 
 
-def _projection_inputs(
+def _projection_cache_key(
     workspace: WorkspaceConfig,
     contract: ProjectionContract,
-) -> list[Path]:
+    resources_root: Path,
+) -> str:
+    """Hash projection inputs, not editorial content or deployment settings."""
     roots = [
         workspace.path("records"),
+        annotation_root(workspace),
         contract.path,
         contract.homepage.template.parent,
         contract.graph_producer,
+        resources_root / "schema",
     ]
     roots.extend(policy.template.parent for policy in contract.pages.values())
-    annotations = annotation_root(workspace)
-    if annotations.exists():
-        roots.append(annotations)
-    workspace_root = workspace.root.resolve()
-    paths: list[Path] = []
-    for root in roots:
-        resolved_root = root.resolve()
-        if resolved_root != workspace_root and workspace_root not in resolved_root.parents:
-            continue
-        if root.is_file():
-            paths.append(root)
-        elif root.is_dir():
-            paths.extend(
-                path
-                for path in root.rglob("*")
-                if path.is_file()
-                and not any(
-                    part.startswith(".") for part in path.relative_to(root).parts
-                )
-                and "__pycache__" not in path.parts
-                and path.suffix not in {".pyc", ".pyo"}
-                and not path.is_symlink()
-            )
-    return sorted(set(paths))
-
-
-def _schema_closure_digest(resources_root: Path) -> str:
-    """Digest the localized semantic schema closure, not just its entrypoint."""
-
-    schema_root = resources_root / "schema"
-    paths = sorted(schema_root.rglob("*.yaml"))
-    if not paths:
-        raise DriverError("Package schema source closure is missing")
+    roots.extend(sorted(Path(__file__).parent.glob("*.py")))
     digest = hashlib.sha256()
-    for path in paths:
-        if path.is_symlink() or not path.is_file():
-            raise DriverError(f"Package schema source is not a regular file: {path}")
-        digest.update(path.relative_to(schema_root).as_posix().encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
+    digest.update(canonical_json_bytes({
+        "format": 1,
+        "python": list(sys.version_info[:3]),
+        "dependencies": sorted((d.metadata["Name"], d.version) for d in distributions()),
+    }))
+    for root in roots:
+        if root.is_file():
+            digest.update(b"file\0" + root.read_bytes() + b"\0")
+        elif root.is_dir():
+            digest.update(b"tree\0" + tree_sha256(root).encode() + b"\0")
+        else:
+            digest.update(b"missing\0")
     return digest.hexdigest()
 
 
@@ -1014,9 +994,24 @@ def render_projection(
     return {**semantic, "pages": len(list((output / "content").rglob("*.md")))}
 
 
-def update_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[str, Any]:
+def update_projection(
+    workspace: WorkspaceConfig, resources_root: Path, *, no_cache: bool = False,
+) -> dict[str, Any]:
     destination = workspace.path("generated") / "projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
+    contract = load_contract(workspace, _presentation_root(workspace, resources_root))
+    key = _projection_cache_key(workspace, contract, resources_root)
+    cache = destination.parent / ".projection-cache.json"
+    if not no_cache and destination.is_dir():
+        try:
+            saved = json.loads(cache.read_text(encoding="utf-8"))
+            if (saved["key"] == key
+                    and saved["output"] == tree_sha256(destination)
+                    and isinstance(saved["report"], dict)):
+                print("Reusing unchanged projection (including semantic validation)", file=sys.stderr)
+                return saved["report"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     staging = Path(
         tempfile.mkdtemp(prefix=".projection-staging-", dir=destination.parent)
     )
@@ -1064,4 +1059,11 @@ def update_projection(workspace: WorkspaceConfig, resources_root: Path) -> dict[
             shutil.rmtree(staging)
         if backup.exists() and not preserve_backup:
             shutil.rmtree(backup)
+    # This is disposable cache state, never a canonical input or publication record.
+    try:
+        cache.write_bytes(canonical_json_bytes({
+            "key": key, "output": tree_sha256(destination), "report": report,
+        }))
+    except OSError:
+        pass
     return report

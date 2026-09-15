@@ -6,8 +6,20 @@ import tempfile
 import unittest
 from unittest.mock import call, patch
 
+import pytest
+
 from orinoco_lite import cli
 from orinoco_lite.errors import ConfigurationError
+
+
+@pytest.mark.parametrize("command", [["build"], ["validate"], ["projection", "update"]])
+def test_no_cache_option_is_explicit_and_forwarded(command):
+    args = cli._parser().parse_args([*command, "--no-cache"])
+    with patch.object(cli, "invoke_driver", return_value=0) as invoke:
+        cli._update_projection(args, "workspace", "resources")
+    invoke.assert_called_once_with(
+        "projection-update", "workspace", "resources", extra_arguments=("--no-cache",),
+    )
 
 
 class TrustedBuildCoordinatesTests(unittest.TestCase):
