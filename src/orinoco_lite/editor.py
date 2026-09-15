@@ -211,14 +211,18 @@ def _converters(schema: Path):
         raise DriverError("Could not load the pinned editor schema") from error
 
 
-def _canonical_rdf(value: str, *, record_pid: str) -> str:
+def _scoped_rdf(value: str, *, record_pid: str) -> str:
+    """Keep every RDF triple while isolating blank nodes between records.
+
+    Editor RDF is transient presentation input. Its blank-node labels do not
+    identify metadata or bind review bundles, so graph canonicalization is not
+    needed and can be prohibitively expensive for large file-part graphs.
+    """
     try:
         from rdflib import BNode, Graph
-        from rdflib.compare import to_canonical_graph
 
         graph = Graph()
         graph.parse(data=value, format="turtle")
-        canonical = to_canonical_graph(graph)
         namespace = "r" + hashlib.sha256(record_pid.encode("utf-8")).hexdigest()[:24]
         relabeled = Graph()
         blank_nodes: dict[BNode, BNode] = {}
@@ -231,11 +235,11 @@ def _canonical_rdf(value: str, *, record_pid: str) -> str:
                 BNode(f"{namespace}_{term}"),
             )
 
-        for subject, predicate, object_ in canonical:
+        for subject, predicate, object_ in graph:
             relabeled.add((scoped(subject), predicate, scoped(object_)))
         serialized = relabeled.serialize(format="nt")
     except Exception as error:
-        raise DriverError("Could not canonicalize record RDF") from error
+        raise DriverError("Could not scope record RDF") from error
     return "\n".join(sorted(line for line in serialized.splitlines() if line.strip())) + "\n"
 
 
@@ -252,9 +256,9 @@ def _render_rdf_sources(
             rendered = converter.convert(record, class_name)
             if not isinstance(rendered, str):
                 raise TypeError("converter did not return Turtle")
-            canonical = _canonical_rdf(rendered, record_pid=source["pid"])
-            per_record[source["pid"]] = canonical
-            combined_lines.update(canonical.splitlines())
+            scoped = _scoped_rdf(rendered, record_pid=source["pid"])
+            per_record[source["pid"]] = scoped
+            combined_lines.update(scoped.splitlines())
         except Exception as error:
             raise DriverError(
                 f"Could not bind editor RDF for {source['pid']}: {error}"
@@ -498,7 +502,7 @@ def validate_bundle(
         try:
             # Parsing before schema conversion rejects malformed RDF without
             # permitting network retrieval or filesystem references.
-            _canonical_rdf(rdf_turtle, record_pid=pid)
+            _scoped_rdf(rdf_turtle, record_pid=pid)
             class_name = source["schema_type"].rsplit(":", 1)[-1]
             record = rdf_to_json.convert(rdf_turtle, class_name)
         except Exception as error:

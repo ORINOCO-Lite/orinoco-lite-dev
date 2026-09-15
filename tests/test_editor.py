@@ -271,6 +271,7 @@ class EditorBundleTests(unittest.TestCase):
 
     def test_combined_editor_rdf_scopes_blank_nodes_per_record(self) -> None:
         from rdflib import BNode, Graph
+        from rdflib.compare import isomorphic
 
         sources = [
             {
@@ -302,8 +303,16 @@ class EditorBundleTests(unittest.TestCase):
             BlankNodeConverter(),
         )
 
-        self.assertEqual(first_records, second_records)
-        self.assertEqual(first_union, second_union)
+        self.assertEqual(set(first_records), set(second_records))
+        for pid in first_records:
+            self.assertTrue(isomorphic(
+                Graph().parse(data=first_records[pid], format="nt"),
+                Graph().parse(data=second_records[pid], format="nt"),
+            ))
+        self.assertTrue(isomorphic(
+            Graph().parse(data=first_union, format="nt"),
+            Graph().parse(data=second_union, format="nt"),
+        ))
         graph = Graph()
         graph.parse(data=first_union, format="nt")
         self.assertEqual(
@@ -600,6 +609,30 @@ class EditorBundleTests(unittest.TestCase):
                 ConfigurationError, "configured annotation companion tree"
             ):
                 apply_bundle(self.workspace, self.resources, bundle, write=False)
+
+
+def test_editor_rdf_preserves_a_wide_file_parts_graph():
+    from rdflib import BNode, Graph, Literal, URIRef
+    from orinoco_lite.editor import _scoped_rdf
+
+    root = URIRef("https://example.invalid/file")
+    part = URIRef("https://example.invalid/part")
+    locator = URIRef("https://example.invalid/locator")
+    count = 2500
+    turtle = "\n".join(
+        f'<{root}> <{part}> [ <{locator}> "file-{index}" ] .'
+        for index in range(count)
+    )
+    graph = Graph().parse(
+        data=_scoped_rdf(turtle, record_pid="xyzrins:files/wide"), format="nt"
+    )
+    assert len(graph) == count * 2
+    parts = set(graph.objects(root, part))
+    assert len(parts) == count
+    assert all(isinstance(node, BNode) for node in parts)
+    assert {graph.value(node, locator) for node in parts} == {
+        Literal(f"file-{index}") for index in range(count)
+    }
 
 
 if __name__ == "__main__":

@@ -49,6 +49,11 @@ The system has three layers: development sources, reusable components, and each 
 | [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also publishes optional releases. | Downstreams do not receive its multi-repository engineering structure. |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the website presentation, page templates, graph production, and its exact Congo selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
+Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
+An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco presentation adaptations belong in the template.
+Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
+This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
+
 ### Reusable components
 
 An Orinoco Lite package commit contains code and bundled resources under one Git identity.

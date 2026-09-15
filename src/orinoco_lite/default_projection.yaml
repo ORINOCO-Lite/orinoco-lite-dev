@@ -63,12 +63,31 @@ pages:
     inline: [about, attributed_to::object, kind, rules]
 
 unrendered_classes:
+  # The selected upstream update-from-pool workflow renders only the classes
+  # above. These remain records for inlining, graph input, media and editing.
+  - dlthings:AnnotationTag
+  - dlthings:Property
+  - dlthings:Rule
+  - xyzri:XYZAccolade
+  - xyzri:XYZActivity
+  - xyzri:XYZCompetition
+  - xyzri:XYZCompetitionType
+  - xyzri:XYZDataType
+  - xyzri:XYZDepiction
+  - xyzri:XYZDepictionType
+  - xyzri:XYZDocument
+  - xyzri:XYZEntityRole
+  - xyzri:XYZFile
   - xyzri:XYZGrant
   - xyzri:XYZOrganization
   - xyzri:XYZAgentRole
   - xyzri:XYZBibliographicType
   - xyzri:XYZInstrumentType
   - xyzri:XYZPublicationVenue
+  - xyzri:XYZQuality
+  - xyzri:XYZStudy
+  - xyzri:XYZSubject
+  - xyzri:XYZSubjectType
 
 graph:
   producer: presentation:code/pool2graph.py

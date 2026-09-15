@@ -47,10 +47,16 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-Pixi 0.76 or newer is required:
+Use the Pixi version range declared in `pixi.toml`.
+In a fresh checkout, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
 
 ```console
 pixi install --locked
+git submodule update --init -- \
+  submodules/pool.psychoinformatics.de-ui submodules/things-schemas \
+  submodules/query-things submodules/www-from-model
+git -C submodules/pool.psychoinformatics.de-ui submodule update --init -- shacl-vue
+pixi run orinoco-lite dev prepare-resources
 pixi run pytest
 ```
 
@@ -90,7 +96,7 @@ Edit them there directly; they do not require APM or a setup hook.
 Do not add a package manager, manifest, lock, bootstrap task, or agent hook while every skill is owned by this repository.
 Introduce dependency management only when the project first consumes an independently maintained promoted skill; the chosen setup mechanism remains a downstream preference.
 
-Initialize engineering submodules only when cross-component work needs them:
+Initialize the remaining engineering submodules only when broader cross-component work needs them:
 
 ```console
 pixi run python tools/checkout_submodules.py
