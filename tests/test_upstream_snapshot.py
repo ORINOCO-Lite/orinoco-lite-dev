@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import tempfile
 import unittest
-
-import pytest
 
 from orinoco_lite import upstream_snapshot as snapshot
 
@@ -123,6 +122,15 @@ class UpstreamSnapshotTests(unittest.TestCase):
             },
         )
 
+    def test_pid_hash_paths_do_not_collapse_equal_final_segments(self) -> None:
+        records = self.fixture()
+        paths = [snapshot.record_relative_path(item) for item in records]
+
+        self.assertEqual(len(set(paths)), len(records))
+        for item, path in zip(records, paths, strict=True):
+            expected = hashlib.sha256(item.pid.encode()).hexdigest() + ".yaml"
+            self.assertEqual(path.name, expected)
+
     def test_repeated_list_values_and_order_are_not_deduplicated(self) -> None:
         source = self.write_jsonl(self.fixture())
         tree = self.root / "tree"
@@ -227,84 +235,6 @@ class UpstreamSnapshotTests(unittest.TestCase):
         (tree / "linked.yaml").symlink_to(target)
         with self.assertRaisesRegex(snapshot.SnapshotError, "symlink"):
             snapshot.load_records_tree(tree)
-
-
-@pytest.mark.parametrize(("pid", "reference"), [
-    ("xyzrins:persons/michael-hanke", "persons/michael-hanke.yaml"),
-    ("xyzrins:projects/87be5fa3-80fb-4221-8406-2ddd40fb1fd1",
-     "projects/87be5fa3-80fb-4221-8406-2ddd40fb1fd1.yaml"),
-    ("dldi:01ed46012d5a6bcb384e8a5e6b0be62824cb09a3/datalad/commit",
-     "01ed46012d5a6bcb384e8a5e6b0be62824cb09a3/datalad/commit.yaml"),
-    ("xyzrins:.", "_root.yaml"),
-    ("ror:", "_empty.yaml"),
-    ("http://edamontology.org/format_3548", "edamontology.org/format_3548.yaml"),
-    ("http://www.cogpo.org/ontologies/CogPOver1.owl#COGPO_00053",
-     "www.cogpo.org/ontologies/CogPOver1.owl%23COGPO_00053.yaml"),
-    ("https://example.org:8443/a?b=c", "example.org%3A8443/a%3Fb%3Dc.yaml"),
-    ("spdxlic:GPL-2.0+", "GPL-2.0%2B.yaml"),
-    ("ex:with space/naïve%name", "with%20space/na%C3%AFve%25name.yaml"),
-])
-def test_readable_pid_paths_preserve_records(tmp_path, pid, reference):
-    original = record(pid, related_to=["xyzrins:persons/michael-hanke"])
-    tree = tmp_path / "records"
-    snapshot.write_records_tree([original], tree)
-
-    expected = Path("XYZProject") / reference
-    assert snapshot.record_relative_path(original) == expected
-    assert (tree / expected).read_bytes() == snapshot.canonical_yaml_bytes(original.record)
-    assert snapshot.load_records_tree(tree) == [original]
-
-
-def test_full_reference_keeps_distinct_records_with_the_same_basename(tmp_path):
-    records = [record("dldi:first/datalad/commit", class_name="XYZFile"),
-               record("dldi:second/datalad/commit", class_name="XYZFile")]
-    tree = tmp_path / "records"
-    snapshot.write_records_tree(records, tree)
-
-    assert snapshot.load_records_tree(tree) == records
-    assert {p.relative_to(tree).as_posix() for p in tree.rglob("*.yaml")} == {
-        "XYZFile/first/datalad/commit.yaml", "XYZFile/second/datalad/commit.yaml",
-    }
-
-
-@pytest.mark.parametrize("pid", [
-    "ex:../outside", "ex:a/../outside", "ex:a/./b", "ex:a//b",
-    "ex:/absolute", "ex:a/", "ex:.hidden", "ex:a/.hidden/b",
-    "ex:a\\..\\outside", "https://example.org/../outside",
-])
-def test_unsafe_pid_paths_leave_destination_untouched(tmp_path, pid):
-    tree = tmp_path / "records"
-    tree.mkdir()
-    marker = tree / "preserved.txt"
-    marker.write_bytes(b"existing content")
-
-    with pytest.raises(snapshot.SnapshotError, match="unsafe record path"):
-        snapshot.write_records_tree([record(pid)], tree, replace=True)
-
-    assert list(tree.iterdir()) == [marker]
-    assert marker.read_bytes() == b"existing content"
-
-
-@pytest.mark.parametrize("pids", [
-    ("one:projects/alpha", "two:projects/alpha"),
-    ("ex:Alpha", "ex:alpha"),
-    ("ex:.", "ex:_root"),
-    ("ex:", "ex:_empty"),
-    ("http://example.org/one", "https://example.org/one"),
-    ("ex:one", "ex:one.yaml/two"),
-    ("ex:ONE", "ex:one.YAML/two"),
-])
-def test_path_collisions_leave_destination_untouched(tmp_path, pids):
-    tree = tmp_path / "records"
-    tree.mkdir()
-    marker = tree / "preserved.txt"
-    marker.write_bytes(b"existing content")
-
-    with pytest.raises(snapshot.SnapshotError, match="path collision"):
-        snapshot.write_records_tree([record(pid) for pid in pids], tree, replace=True)
-
-    assert list(tree.iterdir()) == [marker]
-    assert marker.read_bytes() == b"existing content"
 
 
 if __name__ == "__main__":

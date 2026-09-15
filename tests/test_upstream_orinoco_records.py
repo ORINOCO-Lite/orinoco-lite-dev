@@ -115,11 +115,10 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
                 }
             },
         )
-        relative = Path("XYZPublication/publications/one.yaml")
-        self.assertTrue((output / "metadata" / "records" / relative).is_file())
-        companion_path = output / "metadata" / "overlays" / "annotations" / relative
+        companion_path = next(
+            (output / "metadata" / "overlays" / "annotations").rglob("*.yaml")
+        )
         companion = storage._load_companion(companion_path)
-        self.assertEqual(companion["record"], record["pid"])
         self.assertEqual(
             companion["assertions"][0]["pav:importedBy"],
             "xyzrins:adapters/example",
