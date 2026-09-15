@@ -152,8 +152,14 @@ def verify_local_preview(site: Path) -> dict[str, object]:
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("site", type=Path)
+    result = argparse.ArgumentParser(
+        description=("Check an existing local website build for unsafe file links, embedded "
+                     "local addresses, and missing same-origin resources linked from its homepage. "
+                     "The check briefly serves the files locally; it does not rebuild or change them. "
+                     "Use a build made with --base-url /, not a deployed site's path prefix."),
+        epilog="Example: orinoco-lite verify-site build/site",
+    )
+    result.add_argument("site", type=Path, help="directory containing the built website's index.html")
     return result
 
 

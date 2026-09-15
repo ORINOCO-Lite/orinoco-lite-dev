@@ -25,26 +25,43 @@ from .validation import report_json, validate_workspace
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="orinoco-lite", description=__doc__, epilog="Use `orinoco-lite dev --help` for development-only commands.")
+    parser = argparse.ArgumentParser(
+        prog="orinoco-lite",
+        description="Maintain your site's metadata and build a static website with Orinoco Lite.",
+        epilog=("Run from your website repository. For a local preview, run 'orinoco-lite build' "
+                "followed by 'orinoco-lite serve'. Use COMMAND --help for options and "
+                "'orinoco-lite dev --help' when contributing package or template changes."),
+    )
     parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
     parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}\nsource: {source_description()}")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    validate = commands.add_parser("validate", help="validate site-owned inputs")
+    validate = commands.add_parser(
+        "validate", help="check your metadata and site configuration",
+        description=("Check your site's configuration, metadata records, and schema-defined "
+                     "relationships without generating pages or a website. Use this when "
+                     "reviewing input changes. The build command already includes these checks."),
+    )
     validate.add_argument(
         "--structural-only",
         action="store_true",
-        help="skip the release's semantic validation driver",
+        help="check file layout, configuration, and record structure only; skip schema and relationship checks",
     )
     validate.add_argument("--json", action="store_true", help="print the report as JSON")
-    validate.add_argument("--no-cache", action="store_true", help="repeat semantic checks instead of reusing their cached result")
+    validate.add_argument("--no-cache", action="store_true", help="repeat schema and relationship checks even when a previous build validated the same inputs")
 
-    build = commands.add_parser("build", help="validate inputs and build the static site")
-    build.add_argument("--destination", type=Path)
-    build.add_argument("--publication-bundle", type=Path,
-                       help="also write a Git bundle of this build for recording after deployment (requires clean committed inputs)")
-    build.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
-    build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"))
+    build = commands.add_parser(
+        "build", help="build your website from its metadata and content",
+        description=("Validate your inputs and generate a static website in build/site. "
+                     "Unchanged metadata-derived pages and graph data are reused automatically. "
+                     "Preview the result with 'orinoco-lite serve'. Building does not publish your site."),
+    )
+    build.add_argument("--destination", type=Path, help="output directory under build/ (default: build/site)")
+    build.add_argument("--publication-bundle", type=Path, metavar="PATH",
+                       help="also save this build as a Git bundle at PATH under build/ for deployment history; commit input changes first (normally set by the Pages workflow)")
+    build.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate metadata-derived pages and graph data; does not fetch new source data")
+    build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"),
+                       help="website URL, including any path prefix; use / for a local preview (default: ORINOCO_BASE_URL or your site configuration)")
     build.add_argument(
         "--build-timestamp",
         default=os.environ.get("ORINOCO_BUILD_TIMESTAMP"),
@@ -55,15 +72,18 @@ def _parser() -> argparse.ArgumentParser:
         default=os.environ.get("GITHUB_REPOSITORY"),
         metavar="OWNER/REPOSITORY",
         help=(
-            "trusted repository coordinate embedded in the static curation "
-            "interfaces (defaults to GITHUB_REPOSITORY)"
+            "GitHub repository for the website's online editing and review links "
+            "(default: GITHUB_REPOSITORY, usually supplied by GitHub Actions)"
         ),
     )
 
-    serve = commands.add_parser("serve", help="serve an already built static site")
-    serve.add_argument("--directory", type=Path)
-    serve.add_argument("--bind", default="127.0.0.1")
-    serve.add_argument("--port", type=int, default=8767)
+    serve = commands.add_parser(
+        "serve", help="preview a built website on your computer",
+        description="Serve an existing website build locally. Run build first; this command does not rebuild or watch for changes.",
+    )
+    serve.add_argument("--directory", type=Path, help="website directory to serve (default: build/site)")
+    serve.add_argument("--bind", default="127.0.0.1", help="address to listen on (default: 127.0.0.1, this computer only)")
+    serve.add_argument("--port", type=int, default=8767, help="local HTTP port (default: 8767)")
 
     editor = commands.add_parser("editor", help="static-editor review operations")
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
@@ -72,10 +92,13 @@ def _parser() -> argparse.ArgumentParser:
     apply.add_argument("--write", action="store_true")
 
     projection = commands.add_parser(
-        "projection", help="generate the metadata projection without building a website"
+        "projection", help="generate intermediate metadata pages and graph data",
+        description=("Generate the Hugo pages, normalized records, and graph data under "
+                     "generated/projection for inspection or further processing. This does "
+                     "not build HTML. For a website preview, use build, which performs this step automatically."),
     )
     projection.add_argument("projection_command", choices=("update",))
-    projection.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
+    projection.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate intermediate output rather than reuse cached results")
 
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
@@ -95,10 +118,14 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
     from . import local_preview, publication, shacl_handoff
 
-    commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
-                        help="check the built site through localhost and 127.0.0.1")
-    commands.add_parser("publication", parents=[publication.parser()], add_help=False,
-                        help="record already-deployed output from a build's Git bundle")
+    preview_parser = local_preview.parser()
+    publication_parser = publication.parser()
+    commands.add_parser("verify-site", parents=[preview_parser], add_help=False,
+                        description=preview_parser.description, epilog=preview_parser.epilog,
+                        help="check that an existing local build can be served")
+    commands.add_parser("publication", parents=[publication_parser], add_help=False,
+                        description=publication_parser.description, epilog=publication_parser.epilog,
+                        help="save a successful deployment in your repository's generated-output branches")
     commands.add_parser("shacl-handoff", parents=[shacl_handoff._parser()], add_help=False,
                         help="inspect and materialize GitHub editor proposals")
     return parser

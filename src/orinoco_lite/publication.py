@@ -243,10 +243,17 @@ def publish(root: Path, bundle_name: str) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("publication_command", choices=("record",))
-    parser.add_argument("--repository", type=Path, default=Path.cwd())
-    parser.add_argument("--bundle", default="build/pages-publication.bundle")
+    parser = argparse.ArgumentParser(
+        description=("Record a successful deployment using the Git bundle saved by build "
+                     "--publication-bundle. This pushes the generated projection and website "
+                     "to latest-hugo-projection and gh-pages on origin, leaving your source "
+                     "branch unchanged. It does not upload the website to a hosting service."),
+        epilog=("Normally run by the Pages workflow after deployment succeeds. "
+                "The repository must be checked out at the source commit used for the build."),
+    )
+    parser.add_argument("publication_command", choices=("record",), help="save the deployed build in Git")
+    parser.add_argument("--repository", type=Path, default=Path.cwd(), help="website repository (default: current directory)")
+    parser.add_argument("--bundle", default="build/pages-publication.bundle", help="build bundle, relative to the repository (default: build/pages-publication.bundle)")
     return parser
 
 
