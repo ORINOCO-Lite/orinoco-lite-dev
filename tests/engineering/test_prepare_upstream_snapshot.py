@@ -74,6 +74,24 @@ def test_cli_refresh_replaces_the_capture_and_derived_values(capture):
     assert manifest["source_server"] == {"version": "new"}
 
 
+def test_missing_manifest_requires_explicit_refresh_without_replacing_capture(capture):
+    assert preparation.main([]) == 0
+    raw_before = preparation.RAW_JSONL.read_bytes()
+    preparation.POOL_MANIFEST.unlink()
+    capture.reset_mock()
+
+    with pytest.raises(RuntimeError, match="no provenance manifest.*--refresh"):
+        preparation.main([])
+
+    capture.assert_not_called()
+    assert preparation.RAW_JSONL.read_bytes() == raw_before
+    assert not preparation.POOL_MANIFEST.exists()
+
+    assert preparation.main(["--refresh"]) == 0
+    capture.assert_called_once_with(preparation.source.DEFAULT_API)
+    assert preparation.POOL_MANIFEST.is_file()
+
+
 @pytest.mark.parametrize("cached_api", [API, None])
 def test_other_or_unknown_origin_is_rejected_without_relabeling(capture, cached_api):
     assert preparation.main(["--api", API]) == 0

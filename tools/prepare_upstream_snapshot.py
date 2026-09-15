@@ -33,7 +33,12 @@ def prepare_raw(
     *, refresh: bool = False, api: str = source.DEFAULT_API
 ) -> tuple[int, str, dict]:
     api = api.rstrip("/")
-    if RAW_JSONL.exists() and POOL_MANIFEST.exists() and not refresh:
+    if RAW_JSONL.exists() and not refresh:
+        if not POOL_MANIFEST.exists():
+            raise RuntimeError(
+                "Cached upstream snapshot has no provenance manifest; "
+                "use --refresh to capture the requested API"
+            )
         pool_manifest = json.loads(POOL_MANIFEST.read_text(encoding="utf-8"))
         cached_api = pool_manifest.get("source_api")
         if not isinstance(cached_api, str) or cached_api.rstrip("/") != api:
