@@ -12,7 +12,7 @@ Do not expect one percentage or exit code to decide whether Lite follows upstrea
 
 | Job | Recommended approach | Condition or limit |
 | --- | --- | --- |
-| Explain HTML changes across all pages | Evolving Web SiteDiff | Correct its demonstrated Unicode and lowercase-doctype defects before relying on its output |
+| Explain HTML changes | Evolving Web SiteDiff | Use the tested Unicode and doctype fixes in upstream PR #215 while review continues |
 | Review selected page states | BackstopJS | Stabilize graph randomness. Retain captures and interpret differences instead of requiring identical pictures |
 | Check search, menus, graph actions, and errors | Existing Playwright checks | Can replace BackstopJS screenshots when one browser-test dependency is preferable |
 | Find broken HTML targets | Lychee | Compare new failures separately from inherited failures. Check deployed routing separately |
@@ -20,8 +20,10 @@ Do not expect one percentage or exit code to decide whether Lite follows upstrea
 | Explain repeated changes in plain English | Agent review of those reports | Cite tool findings and distinguish deliberate changes from unresolved decisions |
 
 SiteDiff is the preferred HTML-reporting foundation, not an approved unmodified dependency.
-Its defects have small demonstrated corrections, but those corrections still need upstream tests and review.
-Until then, retain the unfiltered file comparison and treat SiteDiff's clean results as incomplete evidence.
+The follow-up [upstream PR #215](https://github.com/evolvingweb/sitediff/pull/215) contains corrections and regression tests for the demonstrated defects.
+It remains open for upstream review.
+The [deployment PR #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) owns the corrected fork selection and its integration.
+Retain the unfiltered file comparison because even corrected HTML comparison does not cover every deployed resource.
 Do not replace it with the summarized prototype solely because the prototype is easier to install.
 
 BackstopJS gives the clearest ready-made visual catalogue of the tools tested.
@@ -47,6 +49,8 @@ This evaluation uses two retained outputs from the same-capture work in [PR #152
 It does not rebuild the sites, fetch the live Pool, or certify today's production deployment.
 The evaluation branch starts from main after PR #153.
 That branch choice does not change the older software selections in the retained outputs.
+Later deployment changes can remove differences observed here.
+Use PR #152 for the current accepted deviations, not these historical tool measurements.
 
 | Input | Selected source |
 | --- | --- |
@@ -126,7 +130,7 @@ The encoding defect prevents recommending the unmodified release as the sole HTM
 An isolated experimental correction made doctype matching case-insensitive and removed two incorrect binary-source encoding arguments.
 The corrected copy detected the accented-name and outer-element attribute changes.
 No supported sanitization configuration repairs information already lost by those earlier processing steps.
-The correction belongs upstream, with regression tests, before ordinary adoption.
+The follow-up upstream PR supplies regression tests and a corrected candidate for adoption through the deployment work.
 This PR does not install a patched tool or create a maintained fork.
 Do not silently rewrite website output and call the comparison unmodified.
 The [sanitizer](https://github.com/evolvingweb/sitediff/blob/b32b7926841d6b21697afd6a0b813c4b3a4fbee3/lib/sitediff/sanitize.rb) and [HTTP reader](https://github.com/evolvingweb/sitediff/blob/b32b7926841d6b21697afd6a0b813c4b3a4fbee3/lib/sitediff/uriwrapper.rb) establish the processing order.
@@ -527,20 +531,8 @@ A small missing button can matter more than thousands of harmless shifted pixels
 Each finding should identify an example page, actual change, source, owner, and proposed action.
 An agent can group repeated findings, but the report must link them to tool evidence.
 Do not count every affected page as an independent defect.
-The following historical examples illustrate classification, not a second current deviation register.
 The ongoing deployment review owns current decisions and any later fixes to these inputs.
-
-| Finding in the retained pair | Source or uncertainty | Proposed action |
-| --- | --- | --- |
-| Pool editing links become Lite editing links | Deliberate package adaptation | Retain, with separate authenticated editing tests |
-| Footer shows package/build information | Deliberate package adaptation | Retain, then narrowly account for changing build coordinates |
-| Explore states that the site uses a retained capture | Site-specific authored content | Retain while the statement remains true. Expect the search entry to change too |
-| Institutional logos and copyright differ | Site identity and media rights | Maintainer decision. Do not silently add branding to the generic template |
-| Extra homepage heading or mobile menu item | Presentation adaptation, not inherently required | Fix soon or explicitly accept with a reason |
-| Explore's graph height changes | Template shortcode versus native layout | Maintainer decision. Do not label it random graph noise |
-| Three direct dataset downloads disappear | Retained upstream files, not regenerated records | Decide whether their direct URLs must remain available |
-| One invalid date value is omitted during conversion | Existing converter behavior | Resolve soon as a data/conversion decision, not a display normalization |
-| Graph edge IDs/order differ, but checked graph content matches | Generated representation | Ignore by the narrow checked rule above |
+Do not maintain a second list of accepted deviations or site-policy suggestions in this tool evaluation.
 
 Use **Deliberate**, **Ignore by rule**, **Fix soon**, **Later**, and **Decision needed** consistently.
 “Decision needed” does not mean approved.
@@ -677,9 +669,9 @@ The experimental correction changed three lines in `lib/sitediff/sanitize.rb`:
 
 The corrected fixture returned `false` for all three comparisons.
 The full-site comparison and unchanged controls also ran successfully with that correction.
-Add upstream regression tests and review invalid/non-UTF-8 input handling before selecting a corrected commit for routine use.
-An upstream report or a narrowly maintained fork is justified here.
-It does not require abandoning SiteDiff.
+The follow-up upstream PR adds regression tests for these cases, malformed UTF-8, and non-UTF-8 input.
+It also extends the correction to handle invalid bytes before parsing.
+This demonstrates a bounded contribution to the existing tool, not a reason to abandon SiteDiff.
 
 ## Evidence locations and remaining limits
 
@@ -698,5 +690,5 @@ The report records the measurements needed to review the tool choice without com
 All temporary trial servers stopped after the checks.
 
 This evaluation did not test current live deployments, fresh capture/media acquisition, authenticated curation, all browser engines, or every visual state. It did not adopt tools into Pixi, modify package/template code, publish captured media, or merge another repository.
-The next implementation step is a corrected SiteDiff selection and a small repeatable comparison procedure in the ongoing deployment PR.
+The ongoing deployment PR owns the corrected SiteDiff selection, repeatable comparison procedure, and refreshed website results.
 Keep tool repairs and their tests upstream where possible.
