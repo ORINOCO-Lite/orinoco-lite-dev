@@ -145,9 +145,10 @@ pixi exec --spec ruby=3.3.6 --spec libcurl --spec c-compiler --spec make -- bund
 pixi exec --spec ruby=3.3.6 --spec libcurl --spec c-compiler --spec make -- bundle exec sitediff diff -C "$REPORT" --paths-file "$REPORT/paths.txt" --cached=none --no-verbose --export
 ```
 
-Exit 2 means changed or missing pages, not a failed comparison.
+Exit 2 means SiteDiff found differences or page errors.
 SiteDiff labels one-sided pages as errors.
 Inspect their paths and classify them as added or removed pages.
+Resolve any other read or comparison errors before interpreting the results.
 Open the exported HTML report.
 Retain the JSON result and an unfiltered file diff beside it.
 
@@ -156,7 +157,53 @@ mkdir -p "$REPORT/viewer"
 tar -xzf "$REPORT/report.tgz" -C "$REPORT/viewer"
 ```
 
-Open `$REPORT/viewer/report/report.html` in a browser.
+Keep this unfiltered report as supporting detail.
+Do not use its changed-page count as the summary: a repeated footer change can mark every page as changed.
+
+### Show differences that need review
+
+Use the [SiteDiff profile](../../tools/site-diff/psychoinformatics.yaml) to account for the [known adaptations](upstream-accepted-differences.md).
+It applies the same narrow rules to both sites.
+It does not remove whole headers, footers, or page sections.
+Changed editor inputs, menu destinations, branding, page content, and structured metadata remain compared.
+
+Create `build/comparison-report/reviewed/sitediff.yaml` with the same `before` and `after` URLs and this addition:
+
+```yaml
+includes:
+  - ../../../tools/site-diff/psychoinformatics.yaml
+```
+
+SiteDiff resolves this include relative to the report directory.
+Set `REVIEW_REPORT` to the absolute path to `build/comparison-report/reviewed`.
+Check the two expected Lite-only editor pages before omitting them from the review path list:
+
+```console
+for page in edit/index.html edit/auth/oidc-callback.html; do
+  test -f "$LITE_SITE/$page" && test ! -e "$NATIVE_SITE/$page" || exit 1
+done
+rg -v '^/edit/(index\.html|auth/oidc-callback\.html)$' "$REPORT/paths.txt" > "$REVIEW_REPORT/paths.txt"
+```
+
+If either route check fails, investigate it instead of excluding the route.
+Keep every other added or removed path in the comparison.
+Set `REPORT` to `REVIEW_REPORT`, then repeat the SiteDiff JSON, export, and extraction commands above.
+Open this `viewer/report/report.html` as the default view.
+Report the two editor additions once in the summary, with a link to the unfiltered report.
+
+Run the rule tests from `tools/site-diff`:
+
+```console
+pixi exec --spec ruby=3.3.6 --spec libcurl --spec c-compiler --spec make -- bundle exec ../../.pixi/envs/default/bin/python -m pytest ../../tests/engineering/test_site_diff_rules.py
+```
+
+These tests use SiteDiff itself and require no captured site.
+They check both known adaptations and changes that must remain visible.
+Also compare each site with itself using the profile; both controls must show no differences or errors.
+Group any new repeated difference once, determine its cause, and decide its action before adding a rule.
+Do not extend the rules just to reach zero changed pages.
+
+### Check data, files, and behavior
 
 HTML comparison does not execute JavaScript or compare referenced file contents.
 Also compare graph data, search entries, images, scripts, styles, and downloads.
@@ -177,6 +224,8 @@ Sorting preserves duplicate relationships and all node fields.
 Open both builds at the same viewport.
 Check the home page, Explore, and one page from each generated record class.
 Exercise search, menus, graph filters, and graph navigation.
+Check Lite's original record links use `/edit/` with the correct PID.
+The comparison rules treat the Pool and Lite editor bases as equivalent.
 Use a fixed random seed for graph screenshots, or apply the graph rule in the accepted-differences document.
 
 ## Write the report
