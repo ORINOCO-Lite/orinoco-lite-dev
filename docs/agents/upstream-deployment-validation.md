@@ -3,7 +3,7 @@
 ## Result
 
 Both generation processes use the same 5,030-record capture.
-The comparison found no remaining differences in record meaning, page text, search entries, graph content, images, or downloads.
+The comparison found matching record meaning, main page text, search entries, graph content, images, and downloads.
 The remaining differences are the accepted Lite adaptations listed below.
 
 | Check | Native ORINOCO | Orinoco Lite | Result |
@@ -58,11 +58,6 @@ A native self-comparison reports 254 unchanged pages and no errors.
 ## New differences
 
 None requiring a new decision in this run.
-
-The input overlay supplies the upstream identity, authored text, and retained downloads.
-It also removes the extra Lite home heading.
-The converter preserves the captured `at_time: "-"` in records and RDF instead of dropping it.
-Equivalent annotation names and separate YAML companions do not change record meaning.
 
 ## Accepted differences
 
