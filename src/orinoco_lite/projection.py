@@ -218,13 +218,32 @@ def load_contract(
         if len(select) > 1 or not all(isinstance(item, dict) for item in select.values()):
             raise ConfigurationError(f"{label}.select must contain at most one operator")
         for operator, arguments in select.items():
-            required = {"pid", "field"}
-            permitted = required | ({"recursive"} if operator == "links_to" else set())
+            required = {"field"}
+            permitted = {"pid", "field"}
+            if operator == "links_to":
+                permitted |= {"recursive", "targets_linked_from"}
+            target_source = arguments.get("targets_linked_from")
             if (
                 set(arguments) - permitted
                 or not required <= set(arguments)
-                or not isinstance(arguments.get("pid"), str)
                 or not isinstance(arguments.get("field"), str)
+                or not arguments["field"]
+                or ("pid" in arguments) == ("targets_linked_from" in arguments)
+                or (
+                    "pid" in arguments
+                    and (not isinstance(arguments["pid"], str) or not arguments["pid"])
+                )
+                or (
+                    "targets_linked_from" in arguments
+                    and (
+                        not isinstance(target_source, dict)
+                        or set(target_source) != {"pid", "field", "schema_type"}
+                        or not all(
+                            isinstance(item, str) and item
+                            for item in target_source.values()
+                        )
+                    )
+                )
                 or (
                     "recursive" in arguments
                     and not isinstance(arguments["recursive"], bool)
@@ -773,6 +792,16 @@ def _render_record(
         rec[target_field] = _incoming(records, rec["pid"], source_field)
     for operation in policy.inline:
         _apply_inline(rec, operation, by_pid)
+    # query-things render-record exposes top-level annotation values directly
+    # to Jinja. Normalize only this presentation copy, not canonical metadata.
+    annotations = rec.get("annotations")
+    if isinstance(annotations, dict):
+        rec["annotations"] = {
+            tag: value["annotation_value"]
+            if isinstance(value, dict) and "annotation_value" in value
+            else value
+            for tag, value in annotations.items()
+        }
     environment = Environment(
         loader=FileSystemLoader(policy.template.parent),
         autoescape=False,
@@ -805,13 +834,26 @@ def _matches_policy(
             raise DriverError(f"Projection selector source is missing: {arguments['pid']}")
         return record["pid"] in set(_relationship_targets(source, arguments["field"]))
     arguments = policy.select["links_to"]
-    target = arguments["pid"]
+    if "targets_linked_from" in arguments:
+        # Upstream's localfolk.pids contains only Person records linked from
+        # the root project, not every PID mentioned by that project.
+        selection = arguments["targets_linked_from"]
+        source = by_pid.get(selection["pid"])
+        if source is None:
+            raise DriverError(f"Projection selector source is missing: {selection['pid']}")
+        targets = {
+            pid
+            for pid in _relationship_targets(source, selection["field"])
+            if pid in by_pid and by_pid[pid]["schema_type"] == selection["schema_type"]
+        }
+    else:
+        targets = {arguments["pid"]}
     field = arguments["field"]
     recursive = arguments.get("recursive", False)
 
     def links(candidate: Mapping[str, Any], visited: set[str]) -> bool:
         for linked_pid in _relationship_targets(candidate, field):
-            if linked_pid == target:
+            if linked_pid in targets:
                 return True
             if recursive and linked_pid not in visited and linked_pid in by_pid:
                 if links(by_pid[linked_pid], {*visited, linked_pid}):

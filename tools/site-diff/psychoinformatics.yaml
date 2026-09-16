@@ -1,0 +1,45 @@
+# Known adaptations only. Keep the raw report and check referenced files separately.
+# Apply the same rules to both sites; retain query values, content and branding.
+sanitization:
+  - selector: 'footer > div.text-xs > a[href^="https://pool.psychoinformatics.de/ui/?"]'
+    pattern: 'href="https://pool\.psychoinformatics\.de/ui/\?'
+    substitute: 'href="/edit/?'
+  - selector: 'footer > div.text-xs'
+    pattern: '</a>in the knowledge pool\.</div>'
+    substitute: '</a></div>'
+  - selector: 'footer > p.text-xs'
+    pattern: '\A<p class="text-xs text-neutral-500 dark:text-neutral-400">Orinoco Lite [0-9]+(?:\.[0-9]+)+(?:[a-z]+[0-9]*)?\s*\(<a class="hover:underline hover:decoration-primary-400 hover:text-primary-500" href="https://github\.com/ORINOCO-Lite/orinoco-lite-dev/commit/[0-9a-f]{40}">[-.A-Za-z0-9]+</a>\)</p>\z'
+    substitute: ''
+  - selector: 'footer > div.orinoco-record-editor-link'
+    pattern: 'class="orinoco-record-editor-link text-xs"'
+    substitute: 'class="text-xs"'
+  - selector: 'footer > div.text-xs > a[href^="/edit/?"]'
+    pattern: ' rel="noopener noreferrer"'
+    substitute: ''
+  - selector: '#menu-wrapper a[href="https://hub.psychoinformatics.de"][title="Collaboration hub"]'
+    pattern: '<span class="decoration-primary-500 group-hover:underline group-hover:decoration-2 group-hover:underline-offset-2">Collaboration hub</span>'
+    substitute: ''
+  - selector: 'header nav a[href=""][title="Outputs"]'
+    pattern: 'title="Outputs"'
+    substitute: 'title=""'
+  - selector: 'script[src^="/graph.js?v="]'
+    pattern: 'src="/graph\.js\?v=[0-9a-f]{64}"'
+    substitute: 'src="/graph.js"'
+  - path: '\A/explore/index\.html\z'
+    selector: '#sigma-container'
+    pattern: '<div id="sigma-container" style="height:55vh;min-height:320px" class="w-full m-0 p-0 bg-neutral-100 dark:bg-neutral-600">'
+    substitute: '<div id="sigma-container" class="w-full h-screen m-0 p-0 bg-neutral-100 dark:bg-neutral-600">'
+  - selector: 'footer > div.text-xs > a[href^="/edit/?"]'
+    pattern: 'Edit this record\s*</a>'
+    substitute: 'Edit this record</a>'
+  # Nokogiri can insert this redundant declaration when serializing scoped edits.
+  # Retain other charsets and declarations without an adjacent UTF-8 meta tag.
+  - pattern: '(<head>\n\s*)<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>\n\s*(?=<meta charset="utf-8"/>)'
+    substitute: '\1'
+report:
+  title: 'Native versus Lite: differences to review'
+  details: >-
+    Known changes are grouped here: Lite editing (plus two pages), package footer,
+    Collaboration hub label, Outputs tooltip, Explore height, and graph cache suffix.
+    The count below shows other HTML differences.
+    Referenced files and browser behavior are checked separately in the comparison summary.

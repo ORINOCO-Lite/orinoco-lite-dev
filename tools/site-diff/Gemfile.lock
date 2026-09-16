@@ -1,0 +1,76 @@
+GIT
+  remote: https://github.com/leej3/sitediff.git
+  revision: f99f81a8a000d2bb7e397efca096819c3d39def5
+  ref: f99f81a8a000d2bb7e397efca096819c3d39def5
+  specs:
+    sitediff (1.2.12)
+      addressable (>= 2.5.2, < 2.9.0)
+      diffy (~> 3.4.0)
+      minitar (~> 0.9)
+      nokogiri (>= 1.18)
+      pkg-config (~> 1.4)
+      rainbow (~> 3.1.1)
+      thor (~> 1.2.1)
+      typhoeus (>= 1.1.1)
+      webrick (>= 1.9)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    addressable (2.8.10)
+      public_suffix (>= 2.0.2, < 8.0)
+    diffy (3.4.4)
+    ethon (0.18.0)
+      ffi (>= 1.15.0)
+      logger
+    ffi (1.17.4-aarch64-linux-gnu)
+    ffi (1.17.4-aarch64-linux-musl)
+    ffi (1.17.4-arm-linux-gnu)
+    ffi (1.17.4-arm-linux-musl)
+    ffi (1.17.4-arm64-darwin)
+    ffi (1.17.4-x86_64-darwin)
+    ffi (1.17.4-x86_64-linux-gnu)
+    ffi (1.17.4-x86_64-linux-musl)
+    logger (1.7.0)
+    minitar (0.12.1)
+    nokogiri (1.19.4-aarch64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.19.4-aarch64-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.19.4-arm-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.19.4-arm-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.19.4-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.19.4-x86_64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.19.4-x86_64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.19.4-x86_64-linux-musl)
+      racc (~> 1.4)
+    pkg-config (1.6.5)
+    public_suffix (7.0.5)
+    racc (1.8.1)
+    rainbow (3.1.1)
+    thor (1.2.2)
+    typhoeus (1.6.0)
+      ethon (>= 0.18.0)
+    webrick (1.9.2)
+
+PLATFORMS
+  aarch64-linux-gnu
+  aarch64-linux-musl
+  arm-linux-gnu
+  arm-linux-musl
+  arm64-darwin
+  x86_64-darwin
+  x86_64-linux
+  x86_64-linux-gnu
+  x86_64-linux-musl
+
+DEPENDENCIES
+  sitediff!
+
+BUNDLED WITH
+   2.5.22

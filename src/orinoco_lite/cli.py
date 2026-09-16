@@ -105,6 +105,14 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("arguments", nargs=argparse.REMAINDER)
     dev = commands.add_parser("dev", help="development-only commands")
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
+    capture = dev_commands.add_parser(
+        "capture", help="fetch or reuse a checked public Pool capture",
+        description="Save raw Pool records as JSONL and their source information in PATH.manifest.json. Reuse a verified capture without fetching; use --refresh to replace it. This does not convert records or build a website.",
+    )
+    capture.add_argument("path", type=Path, help="destination JSONL file")
+    from .pool_capture import DEFAULT_API
+    capture.add_argument("--api", default=DEFAULT_API, help=f"Pool API (default: {DEFAULT_API}); another origin requires --refresh")
+    capture.add_argument("--refresh", action="store_true", help="fetch again and replace the capture after checking it")
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
     enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
@@ -333,6 +341,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from . import local_preview, publication, shacl_handoff
             return {"verify-site": local_preview, "publication": publication,
                     "shacl-handoff": shacl_handoff}[args.command].execute(args)
+        if args.command == "dev" and args.dev_command == "capture":
+            from .pool_capture import capture
+            capture(args.path, api=args.api, refresh=args.refresh)
+            return 0
         if args.command == "dev" and args.dev_command in {"enable", "disable", "setup"}:
             from . import development, instantiate
             if args.dev_command == "setup":

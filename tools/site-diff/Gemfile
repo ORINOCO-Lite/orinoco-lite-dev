@@ -1,0 +1,5 @@
+source 'https://rubygems.org'
+
+# Unicode and doctype preservation, with upstream regression tests.
+gem 'sitediff', git: 'https://github.com/leej3/sitediff.git',
+               ref: 'f99f81a8a000d2bb7e397efca096819c3d39def5'
