@@ -112,6 +112,99 @@ async function requireEmptyHandoffPath(
   }
 }
 
+async function prepareHandoff(
+  github: GitHubClient,
+  proposal: ShaclProposalRequest,
+  grant: ShaclGrant,
+  login: string,
+): Promise<{ bytes: Uint8Array; metadataPull: string | null }> {
+  const source = proposal.bundle.source_commit;
+  const submodule = await github.siteSubmodule(proposal.repository, source);
+  const bytes = serializeShaclReviewBundle(proposal.bundle);
+  if (submodule === null) return { bytes, metadataPull: null };
+  if (
+    proposal.bundle.records.some(
+      (record) =>
+        !record.source_path.startsWith("site-specific/metadata/records/"),
+    )
+  ) {
+    throw new HttpError(
+      422,
+      "invalid_site_submodule",
+      "A submodule proposal may edit only site-specific metadata records.",
+    );
+  }
+  let repository;
+  try {
+    await github.requireCurator(submodule.repository, login);
+    repository = await github.repository(submodule.repository);
+  } catch {
+    throw new HttpError(
+      403,
+      "metadata_access_required",
+      `Install the GitHub App on ${submodule.repository} and give the signed-in curator write access before retrying.`,
+    );
+  }
+  const base = await github.branchHead(
+    submodule.repository,
+    repository.defaultBranch,
+  );
+  if (base.sha !== submodule.sha) {
+    throw new HttpError(
+      409,
+      "stale_metadata_submodule",
+      `The deployed site-specific commit is not the current ${submodule.repository} default-branch head. Update the website gitlink and rebuild its editor before proposing.`,
+    );
+  }
+  await requireEmptyHandoffPath(github, submodule.repository, submodule.sha);
+  const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
+  // A nonce-derived ref is also the replay gate. Never delete it after an
+  // uncertain write: another repository may already refer to its proposal.
+  await github.createBranch(submodule.repository, branch, submodule.sha);
+  try {
+    const head = await github.commitFileAtHead(
+      submodule.repository,
+      branch,
+      submodule.sha,
+      SHACL_BUNDLE_PATH,
+      bytes,
+      COMMIT_HEADLINE,
+      commitBody(source),
+    );
+    const pull = await github.openDraftPullRequest(
+      submodule.repository,
+      branch,
+      repository.defaultBranch,
+      head.sha,
+      PULL_REQUEST_TITLE,
+      `Metadata proposal for https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle.`,
+    );
+    return {
+      metadataPull: pull.url,
+      bytes: new TextEncoder().encode(
+        JSON.stringify({
+          format: "orinoco-shacl-submodule-handoff",
+          version: 1,
+          bundle: proposal.bundle,
+          metadata: {
+            repository: submodule.repository,
+            source_commit: submodule.sha,
+            branch,
+            head_sha: head.sha,
+            pull_request: pull.number,
+          },
+        }) + "\n",
+      ),
+    };
+  } catch (error) {
+    throw new HttpError(
+      502,
+      "metadata_handoff_incomplete",
+      `Metadata proposal in ${submodule.repository} on refs/heads/${branch} may be incomplete (${failureDiagnostic(error)}). Inspect that branch and its draft pull request before starting another submission.`,
+    );
+  }
+}
+
 async function requireTrustedEditorDeployment(
   github: GitHubClient,
   repository: string,
@@ -216,7 +309,6 @@ export async function createShaclProposal(
   }
   const user = await github.currentUser();
   await github.requireCurator(proposal.repository, user.login);
-  const bytes = serializeShaclReviewBundle(proposal.bundle);
 
   if (proposal.target.kind === "pull_request") {
     const pull = parsePullRequest(
@@ -247,15 +339,30 @@ export async function createShaclProposal(
     );
     validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
     await requireEmptyHandoffPath(github, proposal.repository, pull.headSha);
-    const commit = await github.commitFileAtHead(
-      proposal.repository,
-      pull.branch,
-      pull.headSha,
-      SHACL_BUNDLE_PATH,
-      bytes,
-      COMMIT_HEADLINE,
-      commitBody(pull.headSha),
+    const { bytes, metadataPull } = await prepareHandoff(
+      github,
+      proposal,
+      grant,
+      user.login,
     );
+    let commit;
+    try {
+      commit = await github.commitFileAtHead(
+        proposal.repository,
+        pull.branch,
+        pull.headSha,
+        SHACL_BUNDLE_PATH,
+        bytes,
+        COMMIT_HEADLINE,
+        commitBody(pull.headSha),
+      );
+    } catch (error) {
+      throw new HttpError(
+        502,
+        "website_handoff_incomplete",
+        `Website handoff failed (${failureDiagnostic(error)}). Inspect ${pull.url}${metadataPull ? ` and ${metadataPull}` : ""} before retrying.`,
+      );
+    }
     return {
       commit_sha: commit.sha,
       commit_url: commit.url,
@@ -285,8 +392,24 @@ export async function createShaclProposal(
   );
   validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
   await requireEmptyHandoffPath(github, proposal.repository, base.sha);
+  const { bytes, metadataPull } = await prepareHandoff(
+    github,
+    proposal,
+    grant,
+    user.login,
+  );
   const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
-  await github.createBranch(proposal.repository, branch, base.sha);
+  try {
+    await github.createBranch(proposal.repository, branch, base.sha);
+  } catch (error) {
+    if (metadataPull !== null)
+      throw new HttpError(
+        502,
+        "website_handoff_incomplete",
+        `Metadata draft ${metadataPull} exists, but the website branch could not be created (${failureDiagnostic(error)}). Inspect both repositories before retrying.`,
+      );
+    throw error;
+  }
   try {
     const commit = await github.commitFileAtHead(
       proposal.repository,
@@ -303,7 +426,9 @@ export async function createShaclProposal(
       repository.defaultBranch,
       commit.sha,
       PULL_REQUEST_TITLE,
-      "",
+      metadataPull === null
+        ? ""
+        : `Companion metadata proposal: ${metadataPull}. Merge the metadata proposal before advancing the website gitlink.`,
     );
     return {
       commit_sha: commit.sha,
@@ -312,6 +437,12 @@ export async function createShaclProposal(
       pull_request_url: pull.url,
     };
   } catch (error) {
+    if (metadataPull !== null)
+      throw new HttpError(
+        502,
+        "website_handoff_incomplete",
+        `Metadata draft ${metadataPull} exists, but website proposal refs/heads/${branch} may be incomplete (${failureDiagnostic(error)}). Inspect both repositories before retrying; neither branch was deleted.`,
+      );
     try {
       await github.deleteBranch(proposal.repository, branch);
     } catch (cleanupError) {

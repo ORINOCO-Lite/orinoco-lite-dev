@@ -48,18 +48,34 @@ A standalone proposal MUST originate at the configured canonical editor origin.
 A Netlify deploy preview MAY update only its own open same-repository draft pull request.
 For that exception, the service MUST verify GitHub's successful Netlify deploy-preview status for the exact pull-request head, preview origin, and pull-request number.
 
-The service MUST NOT retarget a stale bundle, create a cross-repository pull request, convert metadata, or retain the bundle after processing.
+The service MUST NOT retarget a stale bundle, create a pull request with a head from another repository, convert metadata, or retain the bundle after processing.
+
+When `site-specific` is a Git submodule, the service MUST resolve its GitHub URL and exact gitlink from the deployed website commit.
+This bounded profile requires an absolute GitHub HTTPS or SSH URL and a gitlink at the metadata repository's current default-branch head.
+The App MUST be installed on both repositories and the curator MUST have write permission in both.
+The service first creates a metadata draft pull request containing the unchanged bundle, then hands off the website proposal with the metadata draft's exact coordinates.
+Each draft has its head and base in its own repository.
+The fixed temporary website handoff may wrap the unchanged bundle and metadata proposal coordinates; these are operational state removed by replacement.
 
 ## Trusted replacement
 
 A trusted workflow runs the downstream-selected package against an isolated checkout of the handoff parent.
 It verifies the bundle and allowed paths, applies the edits, validates all records and the joined graph, and replaces the temporary handoff with one ordinary metadata commit.
 
+For a submodule proposal, the trusted website workflow MUST verify both exact heads, the pinned metadata base, the identical bundles, and curator authority in both repositories.
+It checks out metadata as data and validates the complete website and metadata composition without write credentials.
+Only then may it replace the metadata handoff with a metadata-only commit and replace the website handoff with a commit changing only the gitlink to that metadata commit.
+The workflow requires a repository-scoped GitHub App installation token for metadata access, supplied by the downstream's trusted configuration.
+Both branch updates MUST use exact-head leases.
+The metadata update precedes the website update so the website never points at an unpublished commit.
+GitHub does not provide an atomic transaction across repositories: a partial failure MUST identify the retained draft and commit and require inspection before another submission.
+Automation MUST NOT merge either proposal.
+
 The verified curator is the author and automation is the committer.
 The temporary bundle is removed from branch history.
 Earlier source-adapter proposal and review commits remain unchanged.
 
-Failure leaves the draft pull request visibly blocked and does not modify canonical metadata.
+Failure leaves the draft pull request visibly blocked and does not modify either reviewed default branch.
 A stale or ambiguous input fails rather than being rebased, retargeted, or guessed.
 
 ## Boundaries

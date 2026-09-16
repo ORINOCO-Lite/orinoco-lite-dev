@@ -394,7 +394,9 @@ class MaterializedCommitTests(unittest.TestCase):
             self.repository.root,
             source_commit=self.repository.base,
         )
-        self.assertEqual(["site-specific/metadata/records/XYZProject/example.yaml"], report["paths"])
+        self.assertEqual(
+            ["site-specific/metadata/records/XYZProject/example.yaml"], report["paths"]
+        )
         commit = self.repository.commit("materialize exact editor result")
         verified = HANDOFF.verify_materialized_commit(
             self.repository.root,
@@ -403,11 +405,14 @@ class MaterializedCommitTests(unittest.TestCase):
         )
         self.assertEqual(commit, verified["commit"])
         self.assertEqual(
-            ["site-specific/metadata/records/XYZProject/example.yaml"], verified["paths"]
+            ["site-specific/metadata/records/XYZProject/example.yaml"],
+            verified["paths"],
         )
 
     def test_metadata_root_stages_without_an_annotation_tree(self) -> None:
-        annotation_root = self.repository.root / "site-specific/metadata/overlays/annotations"
+        annotation_root = (
+            self.repository.root / "site-specific/metadata/overlays/annotations"
+        )
         self.assertFalse(annotation_root.exists())
         self.repository.write(
             "site-specific/metadata/records/XYZProject/example.yaml",
@@ -425,7 +430,9 @@ class MaterializedCommitTests(unittest.TestCase):
         staged = self.repository.git(
             "diff", "--cached", "--name-only", "--", "site-specific/metadata"
         ).stdout.splitlines()
-        self.assertEqual(["site-specific/metadata/records/XYZProject/example.yaml"], staged)
+        self.assertEqual(
+            ["site-specific/metadata/records/XYZProject/example.yaml"], staged
+        )
         self.assertFalse(annotation_root.exists())
 
     def test_empty_or_nonmetadata_materialization_is_rejected(self) -> None:
@@ -444,3 +451,147 @@ class MaterializedCommitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SubmoduleHandoffTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.website = Repository(self.root)
+        self.website.git("rm", "-r", "site-specific")
+        metadata = self.root / "site-specific"
+        metadata.mkdir()
+        self.metadata = Repository(metadata)
+        self.metadata.git("mv", "site-specific/metadata", "metadata")
+        self.metadata.commit("move records to metadata root")
+        self.source = self.metadata.head
+        self.website.write(
+            ".gitmodules",
+            '[submodule "site-specific"]\n\tpath = site-specific\n\turl = https://github.com/example/metadata.git\n',
+        )
+        self.parent = self.website.commit("add metadata submodule")
+        self.bundle = self.website.bundle()
+        self.metadata.write(HANDOFF.HANDOFF_PATH, json.dumps(self.bundle))
+        self.metadata_head = self.metadata.commit("metadata handoff")
+        self.metadata.git("checkout", "--detach", self.source)
+        self.coordinates = {
+            "repository": "example/metadata",
+            "source_commit": self.source,
+            "head_sha": self.metadata_head,
+            "branch": "curation/shacl-vue-" + self.parent[:12] + "-" + "a" * 16,
+            "pull_request": 1,
+        }
+        self.website.write(
+            HANDOFF.HANDOFF_PATH,
+            json.dumps(
+                {
+                    "format": "orinoco-shacl-submodule-handoff",
+                    "version": 1,
+                    "bundle": self.bundle,
+                    "metadata": self.coordinates,
+                }
+            ),
+        )
+        self.head = self.website.commit("website handoff")
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_resolves_exact_parent_and_extracts_original_bundle(self):
+        report = HANDOFF.inspect_proposal(
+            self.root, base_sha=self.parent, head_sha=self.head
+        )
+        self.assertEqual(report["metadata"], self.coordinates)
+        output = self.root / "ignored.json"
+        HANDOFF.extract_bundle(self.root, head_sha=self.head, output=output)
+        self.assertEqual(json.loads(output.read_text()), self.bundle)
+
+    def test_rejects_forged_metadata_target(self):
+        self.coordinates["repository"] = "attacker/other"
+        self.website.write(
+            HANDOFF.HANDOFF_PATH,
+            json.dumps(
+                {
+                    "format": "orinoco-shacl-submodule-handoff",
+                    "version": 1,
+                    "bundle": self.bundle,
+                    "metadata": self.coordinates,
+                }
+            ),
+        )
+        self.website.git("add", HANDOFF.HANDOFF_PATH)
+        self.website.git("commit", "--amend", "--no-edit")
+        with self.assertRaisesRegex(HANDOFF.HandoffError, "gitlink"):
+            HANDOFF.inspect_proposal(
+                self.root, base_sha=self.parent, head_sha=self.website.head
+            )
+
+    def test_validates_only_metadata_and_one_gitlink_replacement(self):
+        self.website.git("checkout", "--detach", self.parent)
+        record = "metadata/records/XYZProject/example.yaml"
+        self.metadata.write(
+            record, "pid: https://example.test/projects/example\ntitle: After\n"
+        )
+        report = HANDOFF.inspect_materialized_changes(
+            self.root, source_commit=self.parent
+        )
+        self.assertEqual(report["paths"], ["site-specific/" + record])
+        self.metadata.commit("apply edit")
+        replacement = self.website.commit("advance gitlink")
+        report = HANDOFF.verify_materialized_commit(
+            self.root, source_commit=self.parent, commit=replacement
+        )
+        self.assertEqual(report["paths"], ["site-specific"])
+        self.assertEqual(
+            HANDOFF.inspect_proposal(
+                self.root, base_sha=self.parent, head_sha=replacement
+            )["phase"],
+            "canonical",
+        )
+
+    def test_rejects_non_metadata_changes_inside_submodule(self):
+        self.website.git("checkout", "--detach", self.parent)
+        self.metadata.write("README.md", "unapproved change")
+        with self.assertRaisesRegex(HANDOFF.HandoffError, "unapproved"):
+            HANDOFF.inspect_materialized_changes(self.root, source_commit=self.parent)
+
+    def test_remote_handoff_requires_same_curator_and_exact_heads(self):
+        user = {"login": "curator", "id": 42}
+        repo = {"full_name": "example/metadata", "default_branch": "main"}
+        pull = {
+            "state": "open",
+            "draft": True,
+            "number": 1,
+            "base": {"repo": repo, "ref": "main", "sha": self.source},
+            "head": {
+                "repo": repo,
+                "ref": self.coordinates["branch"],
+                "sha": self.metadata_head,
+            },
+        }
+        permission = {"permission": "write", "user": user}
+        commit = {"sha": self.metadata_head, "author": user}
+        kwargs = dict(
+            head_sha=self.head,
+            metadata_root=self.metadata.root,
+            pull=pull,
+            permission=permission,
+            commit=commit,
+            curator="curator",
+            curator_id="42",
+        )
+        self.assertEqual(
+            HANDOFF.verify_submodule_handoff(self.root, **kwargs), self.coordinates
+        )
+        for field, changed in (
+            ("head", {"sha": "f" * 40}),
+            ("base", {"sha": "f" * 40}),
+        ):
+            original = pull[field]
+            pull[field] = {**original, **changed}
+            with self.assertRaisesRegex(HANDOFF.HandoffError, "authority changed"):
+                HANDOFF.verify_submodule_handoff(self.root, **kwargs)
+            pull[field] = original
+        permission["permission"] = "read"
+        with self.assertRaisesRegex(HANDOFF.HandoffError, "authority changed"):
+            HANDOFF.verify_submodule_handoff(self.root, **kwargs)

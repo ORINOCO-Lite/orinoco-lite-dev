@@ -32,6 +32,26 @@ export interface BranchCoordinates {
   sha: string;
 }
 
+export interface SiteSubmodule {
+  repository: string;
+  sha: string;
+}
+
+export function githubSubmoduleRepository(coordinate: string): string {
+  const match =
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(
+      coordinate,
+    );
+  if (match === null) {
+    throw new HttpError(
+      422,
+      "invalid_site_submodule",
+      "site-specific must name a GitHub repository with an HTTPS or SSH URL.",
+    );
+  }
+  return parseRepository(match[1] ?? null);
+}
+
 export interface DraftPullRequestResult {
   number: number;
   url: string;
@@ -318,6 +338,68 @@ export class GitHubClient {
       );
     }
     return { name: branch, sha: commit.sha };
+  }
+
+  async siteSubmodule(
+    repository: string,
+    sha: string,
+  ): Promise<SiteSubmodule | null> {
+    parseRepository(repository);
+    if (!COMMIT_SHA.test(sha))
+      throw new HttpError(400, "invalid_request", "Invalid source commit.");
+    const tree = objectRecord(
+      await this.json(endpoint(repository, `/git/trees/${sha}`)),
+    );
+    if (!tree || !Array.isArray(tree.tree) || tree.truncated !== false) {
+      throw new HttpError(
+        502,
+        "github_error",
+        "GitHub did not return the complete source tree.",
+      );
+    }
+    const entry = tree.tree
+      .map(objectRecord)
+      .find((item) => item?.path === "site-specific");
+    if (!entry || (entry.mode === "040000" && entry.type === "tree"))
+      return null;
+    if (
+      entry.mode !== "160000" ||
+      entry.type !== "commit" ||
+      typeof entry.sha !== "string" ||
+      !COMMIT_SHA.test(entry.sha)
+    ) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "site-specific must be an ordinary directory or a Git submodule.",
+      );
+    }
+    const content = objectRecord(
+      await this.json(
+        endpoint(repository, `/contents/site-specific?ref=${sha}`),
+      ),
+    );
+    if (
+      !content ||
+      content.path !== "site-specific" ||
+      content.sha !== entry.sha ||
+      typeof content.submodule_git_url !== "string"
+    ) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "The deployed site-specific gitlink has no matching repository URL.",
+      );
+    }
+    const target = githubSubmoduleRepository(content.submodule_git_url);
+    if (target.toLowerCase() === repository.toLowerCase()) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "site-specific cannot refer to the website repository itself.",
+      );
+    }
+    return { repository: target, sha: entry.sha };
   }
 
   async pathExists(
@@ -774,7 +856,7 @@ export class GitHubClient {
         Object.prototype.toString.call(content) === "[object Uint8Array]"
       ) ||
       content.byteLength === 0 ||
-      content.byteLength > 10 * 1024 * 1024 ||
+      content.byteLength > 10 * 1024 * 1024 + 64 * 1024 ||
       !headline ||
       headline.length > 256 ||
       /[\r\n\0]/.test(headline) ||

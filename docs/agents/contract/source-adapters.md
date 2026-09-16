@@ -144,7 +144,8 @@ It does not change source-adapter candidate or decision semantics.
 ## Guardrails
 
 - Website builds may read `site-specific` from a submodule.
-  Source-adapter and GitHub editing writes remain confined to one repository.
+  Source-adapter writes remain confined to one repository.
+  Explicit GitHub editor submissions may coordinate the metadata draft and website gitlink under the bounded [SHACL editing profile](github-shacl-vue-edit.md).
 - Static validation, review, build, and publication require no metadata service.
 - Git commits and Git revert are the transaction and recovery mechanisms.
 - Do not add candidate ledgers, duplicated diffs, exhaustive manifests, attestation graphs, or another persistent store.

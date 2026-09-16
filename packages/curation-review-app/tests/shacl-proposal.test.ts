@@ -113,6 +113,8 @@ function commitResponse(branch: string): Response {
 }
 
 function commonResponse(url: string): Response | null {
+  if (url.includes("/git/trees/"))
+    return Response.json({ tree: [], truncated: false });
   if (url.endsWith("/user")) {
     return Response.json({ id: 1, login: "octocat" });
   }
@@ -591,5 +593,125 @@ describe("standalone SHACL proposal", () => {
       message: expect.stringContaining("Remove that branch before retrying"),
       status: 502,
     });
+  });
+});
+
+describe("site-specific submodule handoff", () => {
+  function client() {
+    const github = new GitHubClient("ghu_curator");
+    vi.spyOn(github, "currentUser").mockResolvedValue({
+      id: 1,
+      login: "octocat",
+    });
+    vi.spyOn(github, "requireCurator").mockResolvedValue();
+    vi.spyOn(github, "repository").mockImplementation(async (repository) => ({
+      fullName: repository,
+      defaultBranch: "main",
+    }));
+    vi.spyOn(github, "branchHead").mockImplementation(async (repository) => ({
+      name: "main",
+      sha: repository === "example/site" ? HEAD : BASE,
+    }));
+    vi.spyOn(github, "siteSubmodule").mockResolvedValue({
+      repository: "example/metadata",
+      sha: BASE,
+    });
+    vi.spyOn(github, "contents").mockImplementation(
+      async (_repository, requests) =>
+        new Map(
+          requests.map((item) => [
+            item.key,
+            item.path === "orinoco.yaml" ? ORINOCO_CONFIG : SITE_DATA,
+          ]),
+        ),
+    );
+    vi.spyOn(github, "pathExists").mockResolvedValue(false);
+    vi.spyOn(github, "createBranch").mockImplementation(
+      async (_repository, name, sha) => ({ name, sha }),
+    );
+    vi.spyOn(github, "commitFileAtHead").mockImplementation(
+      async (repository) => ({
+        sha: COMMIT,
+        url: `https://github.com/${repository}/commit/${COMMIT}`,
+      }),
+    );
+    vi.spyOn(github, "openDraftPullRequest").mockImplementation(
+      async (repository) => ({
+        number: 43,
+        url: `https://github.com/${repository}/pull/43`,
+      }),
+    );
+    return github;
+  }
+
+  it("hands off the unchanged bundle in metadata and binds the website to its exact draft head", async () => {
+    const github = client();
+    await createProposal(github, request({ kind: "standalone" }));
+    expect(github.siteSubmodule).toHaveBeenCalledWith("example/site", HEAD);
+    expect(github.requireCurator).toHaveBeenCalledWith(
+      "example/metadata",
+      "octocat",
+    );
+    const calls = vi.mocked(github.commitFileAtHead).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.slice(0, 4)).toEqual([
+      "example/metadata",
+      expect.any(String),
+      BASE,
+      SHACL_BUNDLE_PATH,
+    ]);
+    expect(JSON.parse(new TextDecoder().decode(calls[0]?.[4]))).toEqual(
+      bundle(),
+    );
+    expect(JSON.parse(new TextDecoder().decode(calls[1]?.[4]))).toMatchObject({
+      format: "orinoco-shacl-submodule-handoff",
+      version: 1,
+      bundle: bundle(),
+      metadata: {
+        repository: "example/metadata",
+        source_commit: BASE,
+        head_sha: COMMIT,
+        pull_request: 43,
+      },
+    });
+  });
+
+  it("rejects a stale metadata base without creating either branch", async () => {
+    const github = client();
+    vi.mocked(github.siteSubmodule).mockResolvedValue({
+      repository: "example/metadata",
+      sha: "e".repeat(40),
+    });
+    await expect(
+      createProposal(github, request({ kind: "standalone" })),
+    ).rejects.toMatchObject({ code: "stale_metadata_submodule" });
+    expect(github.createBranch).not.toHaveBeenCalled();
+  });
+
+  it("reports missing metadata access before any write", async () => {
+    const github = client();
+    vi.mocked(github.requireCurator).mockImplementation(async (repository) => {
+      if (repository === "example/metadata") throw new Error("forbidden");
+    });
+    await expect(
+      createProposal(github, request({ kind: "standalone" })),
+    ).rejects.toMatchObject({ code: "metadata_access_required" });
+    expect(github.createBranch).not.toHaveBeenCalled();
+  });
+
+  it("preserves evidence and reports the metadata branch after an uncertain write", async () => {
+    const github = client();
+    vi.mocked(github.openDraftPullRequest).mockRejectedValue(
+      new Error("connection lost"),
+    );
+    const remove = vi.spyOn(github, "deleteBranch");
+    await expect(
+      createProposal(github, request({ kind: "standalone" })),
+    ).rejects.toMatchObject({
+      code: "metadata_handoff_incomplete",
+      message: expect.stringContaining("example/metadata"),
+    });
+    expect(remove).not.toHaveBeenCalled();
+    expect(github.createBranch).toHaveBeenCalledTimes(1);
   });
 });
