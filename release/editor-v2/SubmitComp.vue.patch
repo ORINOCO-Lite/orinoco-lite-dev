@@ -1,19 +1,75 @@
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
-index 9621e55..b0787b0 100644
+index 9621e55..7939e6a 100644
 --- a/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
-@@ -15,6 +15,7 @@
-                             <v-checkbox
-                                 v-for="r in nodesToSubmit"
-                                 v-model="selectedNodesToSubmit"
+@@ -3,0 +4,31 @@
++        <v-card-actions
++            v-if="patchDownloadMode && !framedContext && !responseReceived"
++            class="submission-actions px-4 pb-2"
++        >
++            <v-btn :disabled="!nodesToSubmit.length" @click="downloadRecords()">
++                <v-icon>mdi-download</v-icon>
++                Download review bundle
++            </v-btn>
++            <input
++                ref="reviewBundleUpload"
++                accept="application/json,.json"
++                hidden
++                type="file"
++                @change="uploadReviewBundle"
++            />
++            <v-btn @click="reviewBundleUpload.click()">
++                <v-icon>mdi-upload</v-icon>
++                Upload review bundle
++            </v-btn>
++            <v-btn
++                v-if="proposalMode"
++                :disabled="proposing || !nodesToSubmit.length"
++                @click="proposeRecords()"
++            >
++                <v-icon>mdi-source-pull</v-icon>
++                Propose via GitHub
++            </v-btn>
++        </v-card-actions>
++        <v-card-actions class="position-absolute top-0 right-0 pa-2">
++            <v-btn prepend-icon="mdi-close-box" @click="props.openCloseFn()">Close</v-btn>
++        </v-card-actions>
+@@ -4,0 +36,32 @@
++            <v-alert
++                v-if="proposalMode && !framedContext && !responseReceived"
++                type="warning"
++                variant="tonal"
++                style="margin-bottom: 1em;"
++            >
++                <strong>GitHub App access is required</strong>
++                <p>
++                    Before proposing, make sure the Orinoco Lite GitHub App can
++                    access this repository. Download the review bundle first if
++                    you need to leave this page; you can upload it after returning.
++                </p>
++                <a
++                    :href="curationInstallUrl(config.review_bundle_proposal)"
++                    rel="noreferrer"
++                    target="_blank"
++                >Install or configure the GitHub App</a>
++                <br />
++                <a
++                    :href="curationSetupUrl(config.review_bundle_proposal)"
++                    rel="noreferrer"
++                    target="_blank"
++                >Read authorization and custom-app instructions</a>
++            </v-alert>
++            <v-alert
++                v-if="reviewBundleStatus"
++                :type="reviewBundleStatus.type"
++                variant="tonal"
++                style="margin-bottom: 1em;"
++            >
++                {{ reviewBundleStatus.message }}
++            </v-alert>
+@@ -17,0 +81 @@
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
-                                 :value="r.node_iri"
-                                 align="start"
-                                 class="align-start"
-@@ -55,12 +56,113 @@
-                             <em><h3>Nothing to submit</h3></em>
-                         </div>
-                     </span>
+@@ -57,0 +122,47 @@
 +                    <v-alert
 +                        v-if="proposalMode && framedContext"
 +                        type="warning"
@@ -61,12 +117,7 @@ index 9621e55..b0787b0 100644
 +                        <strong>GitHub repository:</strong>
 +                        {{ config.review_bundle_proposal.repository }}.
 +                    </p>
-                 </span>
-             </v-skeleton-loader>
-             <span v-if="responseReceived">
-                 <v-icon v-if="responseSuccess" style="color: green">mdi-check-circle</v-icon>
-                 <v-icon v-if="responseFailure" style="color: red">mdi-alert-circle</v-icon>
-                 {{ responseText }}
+@@ -63,0 +175,29 @@
 +                <v-alert
 +                    v-if="proposalAuthorizationFailure"
 +                    type="warning"
@@ -96,35 +147,18 @@ index 9621e55..b0787b0 100644
 +                    rel="noreferrer"
 +                    target="_blank"
 +                >Open draft pull request</a>
-                 <br />
-                 <br />
-                 <v-btn
-@@ -100,2 +100,2 @@
+@@ -98,4 +238,4 @@
+-        <v-card-actions class="position-absolute top-0 right-0 pa-2">
+-            <v-btn v-if="!responseReceived && nodesToSubmit.length" @click="downloadRecords()">
 -                <v-icon>mdi-download</v-icon>
 -                {{ patchDownloadMode ? 'Download review bundle' : 'Download RDF' }}
++        <v-card-actions v-if="!proposalMode || responseReceived">
++            <v-btn v-if="!proposalMode && !responseReceived && nodesToSubmit.length" @click="downloadRecords()">
 +                <v-icon>{{ patchDownloadMode && framedContext ? 'mdi-send' : 'mdi-download' }}</v-icon>
 +                {{ patchDownloadMode ? (framedContext ? 'Add to review' : 'Download review bundle') : 'Download RDF' }}
-@@ -103,6 +158,17 @@
-             <v-btn v-if="!patchDownloadMode && !responseReceived && nodesToSubmit.length" type="submit" @click="submit()">
-                 <v-icon>mdi-check-circle-outline</v-icon> Submit
-             </v-btn>
-+            <v-btn
-+                v-if="proposalMode && !framedContext && !responseReceived && nodesToSubmit.length"
-+                :disabled="
-+                    proposing
-+                "
-+                @click="proposeRecords()"
-+            >
-+                <v-icon>mdi-source-pull</v-icon>
-+                Propose via GitHub
-+            </v-btn>
-             <v-btn v-if="responseReceived" @click="clearSubmitErrors()">
-                 <v-icon>mdi-check-circle-outline</v-icon> OK
-             </v-btn>
-@@ -136,7 +202,15 @@
- <script setup>
- import { computed, ref, inject } from 'vue';
- import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJSON, dlTTL} from '@/modules/utils';
+@@ -109 +248,0 @@
+-            <v-btn prepend-icon="mdi-close-box" @click="props.openCloseFn()">Close</v-btn>
+@@ -139 +278,13 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
 +import {
 +    beginReviewBundleProposal,
@@ -135,25 +169,16 @@ index 9621e55..b0787b0 100644
 +    isFramedContext,
 +    isSharedGithubPagesOrigin,
 +    recordSubmissionLabel,
++    restoreReviewBundle,
 +    reviewProposalTarget,
 +    reviewBundleFilename,
 +} from '@/modules/review-bundle';
-
- import { useToken } from '@/composables/tokens';
- import { DataFactory, Store } from 'n3';
-@@ -162,6 +236,8 @@ const awaitingResponse = ref(false);
- const responseReceived = ref(false);
- const responseSuccess = ref(false);
- const responseFailure = ref(false);
+@@ -164,0 +316,4 @@ const responseFailure = ref(false);
 +const proposalResult = ref(null);
 +const proposing = ref(false);
-
- const showCompleteFailure = ref(false);
- const responseText = ref('');
-@@ -172,6 +248,38 @@ const copiedIndex = ref(null);
- const patchDownloadMode = computed(
-     () => config.value?.review_bundle_mode === 'patch-download'
- );
++const reviewBundleStatus = ref(null);
++const reviewBundleUpload = ref(null);
+@@ -174,0 +330,46 @@ const patchDownloadMode = computed(
 +const proposalMode = computed(
 +    () =>
 +        patchDownloadMode.value &&
@@ -200,13 +225,7 @@ index 9621e55..b0787b0 100644
 +        recordLabel,
 +    });
 +}
-
- function toggleFailureResponse() {
-     showCompleteFailure.value = !showCompleteFailure.value;
-@@ -189,7 +297,68 @@ function clearSubmitErrors() {
-     responseErrors.value = [];
-     responseReceived.value = false;
-     awaitingResponse.value = false;
+@@ -191,0 +393,73 @@ function clearSubmitErrors() {
 +    proposalResult.value = null;
 +    proposing.value = false;
 +
@@ -216,6 +235,15 @@ index 9621e55..b0787b0 100644
 +    const selected = nodesToSubmit.value.filter((node) =>
 +        selectedNodesToSubmit.value.includes(node.node_iri)
 +    );
++    return buildReviewBundle({
++        catalog: await loadRecordCatalog(),
++        graph: rdfDS.data.graph,
++        prefixes: allPrefixes,
++        selectedNodes: selected,
++    });
++}
++
++async function loadRecordCatalog() {
 +    const response = await fetch(config.value.review_bundle_catalog, {
 +        cache: 'no-cache',
 +        credentials: 'omit',
@@ -223,20 +251,55 @@ index 9621e55..b0787b0 100644
 +    if (!response.ok) {
 +        throw new Error(`record catalog request failed (${response.status})`);
 +    }
-+    return buildReviewBundle({
-+        catalog: await response.json(),
-+        graph: rdfDS.data.graph,
-+        prefixes: allPrefixes,
-+        selectedNodes: selected,
-+    });
++    return response.json();
 +}
-
++
++async function uploadReviewBundle(event) {
++    const file = event.target.files?.[0];
++    event.target.value = '';
++    if (!file) return;
++    reviewBundleStatus.value = null;
++    try {
++        if (file.size > 10 * 1024 * 1024) {
++            throw new Error('review bundle exceeds 10 MiB');
++        }
++        const restored = restoreReviewBundle({
++            bundle: JSON.parse(await file.text()),
++            catalog: await loadRecordCatalog(),
++            graph: rdfDS.data.graph,
++            prefixes: allPrefixes,
++        });
++        for (const record of restored) {
++            const existing = nodesToSubmit.value.findIndex(
++                (node) => node.node_iri === record.node_iri
++            );
++            if (existing < 0) nodesToSubmit.value.push(record);
++            else nodesToSubmit.value.splice(existing, 1, record);
++        }
++        selectedNodesToSubmit.value = [
++            ...new Set([
++                ...selectedNodesToSubmit.value,
++                ...restored.map((record) => record.node_iri),
++            ]),
++        ];
++        reviewBundleStatus.value = {
++            message: `Restored ${restored.length} edited record${restored.length === 1 ? '' : 's'} from the review bundle.`,
++            type: 'success',
++        };
++    } catch (error) {
++        reviewBundleStatus.value = {
++            message: `The review bundle could not be uploaded: ${error.message}`,
++            type: 'error',
++        };
++    }
++}
++
 +function reviewBundleFailure(error) {
 +    responseFailure.value = true;
 +    responseReceived.value = true;
 +    responseText.value = `The review bundle could not be created: ${error.message}`;
 +}
-+
+@@ -192,0 +467,49 @@ function clearSubmitErrors() {
 +async function proposeRecords() {
 +    if (framedContext) return;
 +    let handoff;
@@ -286,13 +349,7 @@ index 9621e55..b0787b0 100644
 +    } finally {
 +        proposing.value = false;
 +    }
- }
-
- async function submit() {
-@@ -239,24 +408,11 @@ async function downloadRecords() {
-     );
-     if (patchDownloadMode.value) {
-         try {
+@@ -242,13 +565 @@ async function downloadRecords() {
 -            const response = await fetch(config.value.review_bundle_catalog, {
 -                cache: 'no-cache',
 -                credentials: 'omit',
@@ -307,13 +364,10 @@ index 9621e55..b0787b0 100644
 -                selectedNodes: toSubmit,
 -            });
 +            const bundle = await buildSelectedReviewBundle();
-             dlJSON(bundle, reviewBundleFilename(bundle.records));
+@@ -255,0 +567 @@ async function downloadRecords() {
 +            dispatchReviewBundle(bundle);
-         } catch (error) {
+@@ -257,3 +569 @@ async function downloadRecords() {
 -            responseFailure.value = true;
 -            responseReceived.value = true;
 -            responseText.value = `The review bundle could not be created: ${error.message}`;
 +            reviewBundleFailure(error);
-         }
-         return;
-     }

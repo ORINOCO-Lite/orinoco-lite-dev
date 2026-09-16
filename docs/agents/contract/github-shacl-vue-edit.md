@@ -9,9 +9,10 @@ The downstream `/edit/` route is the only editor.
 Its build combines the downstream-selected editor shell and schema with records from the exact site source used for that deployment.
 Generated editor inputs are static output, not canonical metadata or durable curation state.
 
-The editor exposes both:
+The editor exposes:
 
 - **Download bundle**, which remains credential-free; and
+- **Upload bundle**, which restores an exact downloaded bundle after the curator returns to the same deployed editor; and
 - **Propose via GitHub**, which uses the configured curation service.
 
 Repository identity comes from the trusted build.
@@ -26,7 +27,7 @@ The channel binds the downstream origin, service origin, opener and popup window
 The unchanged bounded bundle crosses only that verified channel after the popup signals readiness.
 Tokens and session cookies remain at the service origin.
 
-If browser policy breaks the opener relationship, the curator may download the bundle, reselect it on the same downstream `/edit/` route, and start a new session.
+If browser policy or GitHub App setup interrupts the proposal, the curator may download the bundle, upload it on the same downstream `/edit/` route, and start a new session.
 A framed editor refuses direct GitHub submission while retaining bundle download.
 
 Shared `github.io` deployments display a clear origin-wide security warning and custom-domain guidance.
