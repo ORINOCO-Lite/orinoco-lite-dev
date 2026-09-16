@@ -33,6 +33,55 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
 
         self.assertEqual(args.github_repository, "ORINOCO-Lite/example-site")
 
+    def test_netlify_preview_binds_exact_pull_request(self) -> None:
+        commit = "a" * 40
+        with patch.dict(
+            "os.environ",
+            {
+                "COMMIT_REF": commit,
+                "CONTEXT": "deploy-preview",
+                "NETLIFY": "true",
+                "REPOSITORY_URL": (
+                    "https://github.com/ORINOCO-Lite/example-site.git"
+                ),
+                "REVIEW_ID": "42",
+            },
+            clear=True,
+        ):
+            environment = cli._netlify_preview_environment()
+
+        self.assertEqual(
+            environment,
+            {
+                "ORINOCO_CANDIDATE_CONTENT_COMMIT": commit,
+                "ORINOCO_CANDIDATE_PULL_REQUEST": "42",
+                "ORINOCO_GITHUB_REPOSITORY": "ORINOCO-Lite/example-site",
+                "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+            },
+        )
+
+    def test_non_preview_netlify_build_has_no_candidate_target(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"CONTEXT": "production", "NETLIFY": "true"},
+            clear=True,
+        ):
+            self.assertEqual(cli._netlify_preview_environment(), {})
+
+    def test_netlify_preview_rejects_incomplete_coordinates(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "COMMIT_REF": "main",
+                "CONTEXT": "deploy-preview",
+                "NETLIFY": "true",
+                "REPOSITORY_URL": "https://github.com/ORINOCO-Lite/example-site",
+                "REVIEW_ID": "42",
+            },
+            clear=True,
+        ), self.assertRaisesRegex(ConfigurationError, "full Git commit"):
+            cli._netlify_preview_environment()
+
     def test_build_forwards_only_the_trusted_repository_coordinate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

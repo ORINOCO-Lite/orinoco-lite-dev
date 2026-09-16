@@ -153,6 +153,41 @@ def _safe_build_destination(workspace, value: Path | None) -> Path:
     return resolved
 
 
+def _netlify_preview_environment() -> dict[str, str]:
+    """Bind a Netlify deploy preview to its exact GitHub pull request."""
+
+    if (
+        os.environ.get("NETLIFY") != "true"
+        or os.environ.get("CONTEXT") != "deploy-preview"
+    ):
+        return {}
+
+    repository_url = os.environ.get("REPOSITORY_URL", "")
+    prefix = "https://github.com/"
+    if not repository_url.startswith(prefix):
+        raise ConfigurationError(
+            "Netlify REPOSITORY_URL must identify a GitHub repository"
+        )
+    repository = repository_url.removeprefix(prefix).removesuffix(".git")
+    repository = github_repository(repository, "Netlify GitHub repository")
+
+    pull_request = os.environ.get("REVIEW_ID", "")
+    commit = os.environ.get("COMMIT_REF", "")
+    if not pull_request.isdigit() or int(pull_request) < 1:
+        raise ConfigurationError("Netlify REVIEW_ID must be a pull-request number")
+    if len(commit) != 40 or any(
+        character not in "0123456789abcdef" for character in commit
+    ):
+        raise ConfigurationError("Netlify COMMIT_REF must be a full Git commit")
+
+    return {
+        "ORINOCO_CANDIDATE_CONTENT_COMMIT": commit,
+        "ORINOCO_CANDIDATE_PULL_REQUEST": pull_request,
+        "ORINOCO_GITHUB_REPOSITORY": repository,
+        "ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE": "1",
+    }
+
+
 def _validate(args: argparse.Namespace) -> int:
     workspace = _workspace(args)
     report = validate_workspace(workspace)
@@ -177,12 +212,16 @@ def _update_projection(args, workspace, resources) -> int:
 
 def _build(args: argparse.Namespace) -> int:
     workspace, resources = _resolve(args)
+    preview_environment = _netlify_preview_environment()
+    repository_value = args.github_repository or preview_environment.get(
+        "ORINOCO_GITHUB_REPOSITORY"
+    )
     build_repository = (
         github_repository(
-            args.github_repository,
+            repository_value,
             "GitHub repository build coordinate",
         )
-        if args.github_repository is not None
+        if repository_value is not None
         else None
     )
     destination = _safe_build_destination(workspace, args.destination)
@@ -206,17 +245,15 @@ def _build(args: argparse.Namespace) -> int:
             .isoformat()
             .replace("+00:00", "Z")
         )
-    build_environment = (
-        {"ORINOCO_GITHUB_REPOSITORY": build_repository}
-        if build_repository is not None
-        else None
-    )
+    build_environment = dict(preview_environment)
+    if build_repository is not None:
+        build_environment["ORINOCO_GITHUB_REPOSITORY"] = build_repository
     status = invoke_driver(
         "build",
         workspace,
         resources,
         values={"base_url": base_url, "destination": str(destination)},
-        environment=build_environment,
+        environment=build_environment or None,
         extra_arguments=(
             ("--build-timestamp", build_timestamp)
             if build_timestamp is not None
