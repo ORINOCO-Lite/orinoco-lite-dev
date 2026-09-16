@@ -18,6 +18,10 @@ vi.mock('@/modules/utils', () => ({
         }
         return iri;
     },
+    toIRI: (value, prefixes) => {
+        const [prefix, suffix] = value.split(':', 2);
+        return prefixes[prefix] ? `${prefixes[prefix]}${suffix}` : value;
+    },
 }));
 
 const {
@@ -29,6 +33,7 @@ const {
     isFramedContext,
     isSharedGithubPagesOrigin,
     recordSubmissionLabel,
+    restoreReviewBundle,
     reviewProposalTarget,
     REVIEW_BUNDLE_EVENT,
     REVIEW_PROPOSAL_MESSAGE_FORMAT,
@@ -146,6 +151,82 @@ describe('Orinoco review bundles', () => {
 
         expect(dispatchReviewBundle(bundle)).toBe(true);
         expect(observed).toBe(bundle);
+    });
+
+    it('restores a downloaded bundle into the matching deployed editor', () => {
+        const graph = new Store([
+            quad(
+                IRI,
+                namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
+                literal('Original label'),
+            ),
+        ]);
+        const bundle = {
+            format: 'orinoco-shacl-review-bundle',
+            records: [
+                {
+                    pid: PID,
+                    rdf_turtle:
+                        `<${IRI}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ` +
+                        '<https://example.test/s/XYZPerson> ;\n' +
+                        '  <http://www.w3.org/2000/01/rdf-schema#label> "Restored label" .\n',
+                    schema_type: 'xyzri:XYZPerson',
+                    source_path: catalog.records[0].path,
+                    source_sha256: SOURCE_SHA256,
+                },
+            ],
+            source_commit: SOURCE_COMMIT,
+            version: 2,
+        };
+
+        expect(
+            restoreReviewBundle({
+                bundle,
+                catalog,
+                graph,
+                prefixes: {
+                    xyzri: 'https://example.test/s/',
+                    xyzrins: 'https://example.test/r/',
+                },
+            }),
+        ).toEqual([
+            {
+                node_iri: IRI,
+                nodeshape_iri: 'https://example.test/s/XYZPerson',
+            },
+        ]);
+        expect(graph.getQuads(IRI, null, null, null)).toHaveLength(2);
+        expect(
+            graph.getQuads(
+                IRI,
+                'http://www.w3.org/2000/01/rdf-schema#label',
+                null,
+                null,
+            )[0].object.value,
+        ).toBe('Restored label');
+    });
+
+    it('rejects a bundle from a different deployment before changing data', () => {
+        const original = quad(
+            IRI,
+            namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
+            literal('Original label'),
+        );
+        const graph = new Store([original]);
+        expect(() =>
+            restoreReviewBundle({
+                bundle: {
+                    format: 'orinoco-shacl-review-bundle',
+                    records: [],
+                    source_commit: 'c'.repeat(40),
+                    version: 2,
+                },
+                catalog,
+                graph,
+                prefixes: {},
+            }),
+        ).toThrow('does not match this deployed editor');
+        expect(graph.has(original)).toBe(true);
     });
 
     it('sends a confirmed proposal only to the exact transport popup', async () => {

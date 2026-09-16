@@ -171,17 +171,17 @@ def _apply_submission_accessibility_patch(
         raise DriverError("Editor submission accessibility patch is missing")
     if not patch_path.read_text(encoding="utf-8").startswith("diff --git "):
         raise DriverError("Editor submission patch has an invalid preamble")
-    _run(
-        ["git", "apply", "--recount", "--unidiff-zero", "--check", patch_path],
-        shacl,
-    )
-    _run(["git", "apply", "--recount", "--unidiff-zero", patch_path], shacl)
+    _run(["git", "apply", "--unidiff-zero", "--check", patch_path], shacl)
+    _run(["git", "apply", "--unidiff-zero", patch_path], shacl)
     source = component.read_text(encoding="utf-8")
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
         or source.count(REVIEW_BUNDLE_DISPATCH) != 2
         or source.count(REVIEW_BUNDLE_PROPOSAL) != 1
         or source.count("Propose via GitHub") != 1
+        or source.count("Upload review bundle") != 1
+        or "GitHub App access is required" not in source
+        or "restoreReviewBundle" not in source
         or "return recordSubmissionLabel({" not in source
         or "recordIri: record.node_iri" not in source
         or "prefixes: allPrefixes" not in source

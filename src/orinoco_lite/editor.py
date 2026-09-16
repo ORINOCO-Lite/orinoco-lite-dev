@@ -172,11 +172,14 @@ def _editor_config(
                 "packages/curation-review-app/README.md#fix-github-authorization"
             ),
         }
-        hostname = urlsplit(workspace.base_url).hostname or ""
-        if hostname.lower().endswith(".github.io"):
-            config["review_bundle_proposal"]["shared_github_pages_origin"] = True
         candidate_pull = os.environ.get("ORINOCO_CANDIDATE_PULL_REQUEST")
         candidate_commit = os.environ.get("ORINOCO_CANDIDATE_CONTENT_COMMIT")
+        hostname = urlsplit(workspace.base_url).hostname or ""
+        if (
+            hostname.lower().endswith(".github.io")
+            and candidate_pull is None
+        ):
+            config["review_bundle_proposal"]["shared_github_pages_origin"] = True
         if candidate_pull is not None:
             if (
                 os.environ.get("ORINOCO_UNSAFE_DEVELOPMENT_PACKAGE") != "1"

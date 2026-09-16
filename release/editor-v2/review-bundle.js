@@ -1,6 +1,6 @@
-import { Store } from 'n3';
+import { Parser, Store } from 'n3';
 
-import { getRecordQuads, quadsToTTL, toCURIE } from '@/modules/utils';
+import { getRecordQuads, quadsToTTL, toCURIE, toIRI } from '@/modules/utils';
 
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 2;
@@ -513,6 +513,115 @@ export function validateRecordCatalog(catalog) {
         byPid.set(pid, record);
     }
     return byPid;
+}
+
+function reviewBundleRecords(bundle, catalogByPid, sourceCommit) {
+    if (
+        !exactKeys(bundle, ['format', 'records', 'source_commit', 'version']) ||
+        bundle.format !== REVIEW_BUNDLE_FORMAT ||
+        bundle.version !== REVIEW_BUNDLE_VERSION ||
+        bundle.source_commit !== sourceCommit ||
+        !Array.isArray(bundle.records) ||
+        !bundle.records.length ||
+        bundle.records.length > 50
+    ) {
+        throw new Error('Review bundle does not match this deployed editor');
+    }
+    const pids = new Set();
+    const paths = new Set();
+    return bundle.records.map((record) => {
+        if (
+            !exactKeys(record, [
+                'pid',
+                'rdf_turtle',
+                'schema_type',
+                'source_path',
+                'source_sha256',
+            ]) ||
+            typeof record.pid !== 'string' ||
+            typeof record.rdf_turtle !== 'string' ||
+            !record.rdf_turtle.trim() ||
+            record.rdf_turtle.includes('\0') ||
+            typeof record.schema_type !== 'string' ||
+            typeof record.source_path !== 'string' ||
+            typeof record.source_sha256 !== 'string' ||
+            !/^[0-9a-f]{64}$/.test(record.source_sha256) ||
+            pids.has(record.pid) ||
+            paths.has(record.source_path)
+        ) {
+            throw new Error('Review bundle contains an invalid record');
+        }
+        const source = catalogByPid.get(record.pid);
+        if (
+            !source ||
+            source.schema_type !== record.schema_type ||
+            source.path !== record.source_path ||
+            source.sha256 !== record.source_sha256
+        ) {
+            throw new Error(
+                `Review bundle record does not match this deployment: ${record.pid}`,
+            );
+        }
+        pids.add(record.pid);
+        paths.add(record.source_path);
+        return record;
+    });
+}
+
+export function restoreReviewBundle({ bundle, catalog, graph, prefixes }) {
+    const catalogByPid = validateRecordCatalog(catalog);
+    const records = reviewBundleRecords(
+        bundle,
+        catalogByPid,
+        catalog.source_commit,
+    );
+    const restored = records.map((record) => {
+        const nodeIri = toIRI(record.pid, prefixes);
+        const nodeShapeIri = toIRI(record.schema_type, prefixes);
+        if (
+            typeof nodeIri !== 'string' ||
+            !nodeIri.includes(':') ||
+            typeof nodeShapeIri !== 'string' ||
+            !nodeShapeIri.includes(':')
+        ) {
+            throw new Error(
+                `Review bundle uses an unknown prefix: ${record.pid}`,
+            );
+        }
+        let quads;
+        try {
+            quads = new Parser().parse(record.rdf_turtle);
+        } catch {
+            throw new Error(`Review bundle RDF is invalid: ${record.pid}`);
+        }
+        const imported = new Store(quads);
+        const recordQuads = getRecordQuads(nodeIri, imported, true);
+        if (
+            !recordQuads.length ||
+            recordQuads.length !== imported.size ||
+            !recordQuads.some((quad) => quad.subject.value === nodeIri)
+        ) {
+            throw new Error(
+                `Review bundle RDF does not describe its record: ${record.pid}`,
+            );
+        }
+        return {
+            node_iri: nodeIri,
+            nodeshape_iri: nodeShapeIri,
+            quads: recordQuads,
+        };
+    });
+
+    for (const record of restored) {
+        for (const quad of getRecordQuads(record.node_iri, graph, true)) {
+            graph.removeQuad(quad);
+        }
+        for (const quad of record.quads) graph.addQuad(quad);
+    }
+    return restored.map(({ node_iri, nodeshape_iri }) => ({
+        node_iri,
+        nodeshape_iri,
+    }));
 }
 
 export async function buildReviewBundle({

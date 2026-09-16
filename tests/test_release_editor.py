@@ -210,6 +210,10 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             self.assertEqual(source.count(REVIEW_BUNDLE_DISPATCH), 2)
             self.assertEqual(source.count(REVIEW_BUNDLE_PROPOSAL), 1)
             self.assertEqual(source.count("Propose via GitHub"), 1)
+            self.assertEqual(source.count("Upload review bundle"), 1)
+            self.assertIn("GitHub App access is required", source)
+            self.assertIn("restoreReviewBundle", source)
+            self.assertIn('class="submission-actions px-4 pb-2"', source)
             self.assertIn("const framedContext = isFramedContext();", source)
             self.assertIn(
                 "GitHub proposal unavailable inside this editor",
@@ -225,9 +229,10 @@ class SubmissionAccessibilityOverlayTests(unittest.TestCase):
             self.assertIn(SUBMISSION_EMBEDDED_REVIEW_LABEL, source)
             self.assertIn(SUBMISSION_STANDALONE_DOWNLOAD_LABEL, source)
             self.assertIn(
-                'v-if="proposalMode && !framedContext && !responseReceived',
+                'v-if="patchDownloadMode && !framedContext && !responseReceived',
                 source,
             )
+            self.assertIn('v-if="proposalMode"', source)
             self.assertNotIn("framedContext ||", source)
             self.assertNotIn("Confirm GitHub proposal", source)
             self.assertNotIn("Confirm and create draft pull request", source)

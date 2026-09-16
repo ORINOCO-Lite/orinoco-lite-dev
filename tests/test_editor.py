@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 import subprocess
 import tempfile
@@ -247,6 +248,10 @@ class EditorBundleTests(unittest.TestCase):
 
     def test_editor_config_binds_candidate_preview_to_pull_request(self) -> None:
         commit = "a" * 40
+        workspace = replace(
+            self.workspace,
+            base_url="https://orinoco-lite.github.io/example-site/",
+        )
         with patch.dict(
             os.environ,
             {
@@ -257,7 +262,7 @@ class EditorBundleTests(unittest.TestCase):
             clear=False,
         ):
             config = _editor_config(
-                self.workspace,
+                workspace,
                 repository="ORINOCO-Lite/example-site",
             )
         self.assertEqual(
@@ -267,6 +272,25 @@ class EditorBundleTests(unittest.TestCase):
                 "kind": "pull_request",
                 "pull_request": 42,
             },
+        )
+        self.assertNotIn(
+            "shared_github_pages_origin",
+            config["review_bundle_proposal"],
+        )
+
+    def test_editor_config_marks_shared_github_pages_origin(self) -> None:
+        workspace = replace(
+            self.workspace,
+            base_url="https://orinoco-lite.github.io/example-site/",
+        )
+
+        config = _editor_config(
+            workspace,
+            repository="ORINOCO-Lite/example-site",
+        )
+
+        self.assertTrue(
+            config["review_bundle_proposal"]["shared_github_pages_origin"]
         )
 
     def test_combined_editor_rdf_scopes_blank_nodes_per_record(self) -> None:
