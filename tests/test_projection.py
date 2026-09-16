@@ -19,7 +19,7 @@ from orinoco_lite.annotations import annotation_companion, assertion_sha256
 from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import DEFAULT_PATHS, WorkspaceConfig, load_workspace
 from orinoco_lite.editor import _render_rdf_sources
-from orinoco_lite.errors import DriverError
+from orinoco_lite.errors import ConfigurationError, DriverError
 from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
     _all_links,
@@ -28,6 +28,7 @@ from orinoco_lite.projection import (
     _matches_policy,
     _native_fingerprint,
     _relationship_targets,
+    _render_record,
     _route_for_pid,
     load_contract,
     rendered_record_route,
@@ -620,6 +621,30 @@ class GenericProjectionContractTests(unittest.TestCase):
         resolve.assert_called_with(self.workspace.root, self.resources)
         self.assertEqual(load_contract(self.workspace, self.root).missing_graph_targets, "reject")
 
+    def test_selector_rejects_ambiguous_and_incomplete_target_sources(self) -> None:
+        path = self.root / "site-specific/projection.yaml"
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for arguments in (
+            {"field": "attributed_to"},
+            {"field": "attributed_to", "pid": "acme:.", "targets_linked_from": {}},
+            {"field": "attributed_to", "targets_linked_from": {"pid": "acme:."}},
+        ):
+            document["pages"]["acme:Person"]["select"] = {"links_to": arguments}
+            path.write_text(yaml.safe_dump(document), encoding="utf-8")
+            with self.subTest(arguments=arguments), self.assertRaises(ConfigurationError):
+                load_contract(self.workspace)
+
+    def test_unknown_schema_class_is_still_rejected_when_declared_unrendered(self) -> None:
+        path = self.root / "site-specific/projection.yaml"
+        path.write_text(path.read_text().replace(
+            "unrendered_classes: []", "unrendered_classes: ['acme:Unknown']"
+        ), encoding="utf-8")
+        with self.assertRaisesRegex(DriverError, "unknown CURIE schema type acme:Unknown"):
+            self._validate_records([
+                {"pid": "acme:.", "schema_type": "acme:Person"},
+                {"pid": "acme:unknown", "schema_type": "acme:Unknown"},
+            ])
+
     def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
         alias = self.root / "site-specific/metadata/records/Person/alias.yaml"
         alias.write_text(
@@ -983,6 +1008,271 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
     path.write_text(canonical_yaml(record), encoding="utf-8")
     with pytest.raises(DriverError, match="unknown CURIE schema type xyzri:Unknown"):
         update_projection(workspace, resources)
+
+
+def test_default_selection_matches_pinned_upstream_member_filter():
+    source = PACKAGE_ROOT / "submodules/query-things/query_things"
+    if not (source / "filter_links_pid.py").is_file():
+        pytest.skip("pinned query-things source fixture is unavailable")
+
+    def load(name, path):
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    linking = load("pinned_query_linking", source / "common/linking.py")
+    common = types.ModuleType("query_things.common")
+    common.Record = dict
+    common.record_has_link = linking.record_has_link
+    common.record_has_link_any = linking.record_has_link_any
+    with patch.dict(sys.modules, {"query_things.common": common}):
+        filtering = load("pinned_query_filter", source / "filter_links_pid.py")
+
+    root = {"pid": "xyzrins:.", "associated_with": [
+        {"object": "xyzrins:member"}, {"object": "xyzrins:organization"},
+        "xyzrins:missing-person",
+    ]}
+    people = [
+        {"pid": "xyzrins:member", "schema_type": "xyzri:XYZPerson"},
+        {"pid": "xyzrins:nonmember", "schema_type": "xyzri:XYZPerson"},
+        {"pid": "xyzrins:organization", "schema_type": "xyzri:XYZOrganization"},
+    ]
+    by_pid = {record["pid"]: record for record in [root, *people]}
+    before = deepcopy(by_pid)
+    # update-from-pool lists Person records, filters root associated_with, and
+    # passes those PIDs to filter-links-pid --link-from-file attributed_to.
+    linked = set(linking.iter_link_pids(root["associated_with"]))
+    localfolk = frozenset(
+        record["pid"] for record in people
+        if record["schema_type"] == "xyzri:XYZPerson" and record["pid"] in linked
+    )
+    workspace = load_workspace(PACKAGE_ROOT / "tests/fixtures/template-candidate")
+    contract = load_contract(workspace, PACKAGE_ROOT / "submodules/www-from-model")
+    for schema_type in ("xyzri:XYZPublication", "xyzri:XYZDataset"):
+        policy = contract.pages[schema_type]
+        for attribution in (
+            "xyzrins:member", [{"object": "xyzrins:member"}],
+            [{"object": "xyzrins:nonmember"}, {"object": "xyzrins:member"}],
+            [{"object": "xyzrins:nonmember"}], [{"object": "xyzrins:organization"}],
+            [{"object": "xyzrins:missing-person"}], [{"roles": ["marcrel:aut"]}], [],
+        ):
+            record = {"pid": "xyzrins:work", "schema_type": schema_type,
+                      "attributed_to": attribution}
+            assert _matches_policy(record, policy, by_pid) == filtering.record_links_pid(
+                record, file_links=[("attributed_to", localfolk)]
+            ), (schema_type, attribution)
+    assert by_pid == before
+    root["associated_with"] = []
+    assert not _matches_policy(
+        {"pid": "xyzrins:work", "attributed_to": "xyzrins:member"},
+        contract.pages["xyzri:XYZPublication"], by_pid,
+    )
+
+
+def test_source_datetime_marker_survives_validation_and_editor_import(tmp_path, monkeypatch):
+    from rdflib import Graph, URIRef
+    from orinoco_lite.editor import record_catalog, validate_bundle
+
+    root = tmp_path / "site"
+    shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
+    presentation = PACKAGE_ROOT / "submodules/www-from-model"
+    monkeypatch.setattr("orinoco_lite.presentation.resolve_presentation", lambda *_: presentation)
+    monkeypatch.setattr("orinoco_lite.editor._git_commit", lambda *_: "0" * 40)
+    monkeypatch.setattr("orinoco_lite.editor._git_status", lambda *_: set())
+    workspace = load_workspace(root)
+    resources = resolve_resources().root
+    record = {
+        "pid": "xyzrins:publications/source-marker",
+        "schema_type": "xyzri:XYZPublication",
+        "title": "Source marker",
+        "generated_by": [{
+            "schema_type": "dlthings:Generation",
+            "object": "obo:IAO_0000444",
+            "at_time": "-",
+        }],
+    }
+    path = workspace.path("records") / "XYZPublication/source-marker.yaml"
+    path.parent.mkdir(exist_ok=True)
+    original = canonical_yaml(record)
+    path.write_text(original, encoding="utf-8")
+
+    validate_semantics(workspace, resources, presentation)
+    to_rdf, to_json = build_format_converters(
+        resources / "schema/demo-research-information/unreleased.yaml"
+    )
+    rdf_sources, _ = _render_rdf_sources(record_sources(workspace), to_rdf)
+    rdf = rdf_sources[record["pid"]]
+    graph = Graph().parse(data=rdf, format="turtle")
+    predicate = URIRef("https://concepts.datalad.org/s/things/v2/at_time")
+    subject, value = next(graph.subject_objects(predicate))
+    assert str(value) == "-"
+    assert str(value.datatype) == "https://concepts.datalad.org/s/things/v2/w3ctr-datetime"
+    assert to_json.convert(rdf, "XYZPublication") == record
+    assert path.read_text(encoding="utf-8") == original
+
+    catalog = record_catalog(workspace, presentation)
+    source = next(item for item in catalog["records"] if item["pid"] == record["pid"])
+    entry = {
+        "pid": record["pid"], "schema_type": record["schema_type"],
+        "source_path": source["path"], "source_sha256": source["sha256"],
+        "rdf_turtle": rdf,
+    }
+    bundle = {"source_commit": catalog["source_commit"], "records": [entry]}
+    imported = validate_bundle(workspace, resources, bundle)
+    assert yaml.safe_load(imported[path]) == record
+    # An explicit removal stays removed; the reader never restores from a
+    # baseline or invents a replacement value.
+    graph.remove((subject, predicate, value))
+    entry["rdf_turtle"] = graph.serialize(format="turtle")
+    imported = validate_bundle(workspace, resources, bundle)
+    assert "at_time" not in yaml.safe_load(imported[path])["generated_by"][0]
+
+    # The exception is not a general acceptance of malformed date strings.
+    record["generated_by"][0]["at_time"] = "not-a-date"
+    path.write_text(canonical_yaml(record), encoding="utf-8")
+    with pytest.raises(DriverError, match="schema round trip changed native semantics"):
+        validate_semantics(workspace, resources, presentation)
+
+
+def test_member_selection_keeps_records_and_regenerates_pages_and_graph(tmp_path, monkeypatch):
+    """Page filtering must not curate metadata or leave stale generated pages."""
+    root = tmp_path / "site"
+    shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
+    presentation = PACKAGE_ROOT / "submodules/www-from-model"
+    # Keep this focused test offline while exercising the real pinned Jinja,
+    # schema conversion and graph producer through the public projection API.
+    monkeypatch.setattr(
+        "orinoco_lite.projection.resolve_presentation", lambda *_: presentation
+    )
+    records = root / "site-specific/metadata/records"
+
+    def store(record):
+        directory = records / record["schema_type"].split(":")[1]
+        directory.mkdir(exist_ok=True)
+        path = directory / (record["pid"].split("/")[-1] + ".yaml")
+        path.write_text(yaml.safe_dump(record), encoding="utf-8")
+        return path
+
+    home_path = records / "XYZProject/site-root.yaml"
+    home = yaml.safe_load(home_path.read_text(encoding="utf-8"))
+    home["associated_with"] = [{
+        "object": "xyzrins:persons/example-person",
+        "schema_type": "dlthings:Association",
+    }]
+    home_path.write_text(yaml.safe_dump(home), encoding="utf-8")
+    store({"pid": "xyzrins:persons/nonmember", "schema_type": "xyzri:XYZPerson",
+           "display_label": "Nonmember"})
+    store({"pid": "xyzrins:files/ancillary", "schema_type": "xyzri:XYZFile",
+           "display_label": "Ancillary file"})
+    for schema_type, section in (("XYZPublication", "publications"), ("XYZDataset", "datasets")):
+        for person in ("example-person", "nonmember"):
+            store({
+                "pid": f"xyzrins:{section}/{schema_type}-{person}",
+                "schema_type": f"xyzri:{schema_type}",
+                "title": f"{schema_type} by {person}",
+                "display_label": f"{schema_type} by {person}",
+                "attributed_to": [{"object": f"xyzrins:persons/{person}",
+                                   "schema_type": "dlthings:Attribution"}],
+            })
+
+    workspace = load_workspace(root)
+    resources = resolve_resources().root
+    projection = root / "generated/projection"
+
+    def rebuild():
+        update_projection(workspace, resources)
+        return json.loads((projection / "static/graph.json").read_text())
+
+    first = rebuild()
+    original_records = {path: path.read_bytes() for path in records.rglob("*.yaml")}
+    machine = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
+    assert len(machine) == len(original_records)
+    assert "xyzrins:files/ancillary" in {record["pid"] for record in machine}
+    assert not (projection / "content/files/ancillary/_index.md").exists()
+    nodes = {node["id"] for node in first["nodes"]}
+    for schema_type, section in (("XYZPublication", "publications"), ("XYZDataset", "datasets")):
+        for person in ("example-person", "nonmember"):
+            route = f"{section}/{schema_type}-{person}"
+            assert (projection / "content" / route / "_index.md").exists() == (person == "example-person")
+            assert f"xyzrins:{route}" in nodes
+
+    home["associated_with"] = []
+    home_path.write_text(yaml.safe_dump(home), encoding="utf-8")
+    project_path = records / "XYZProject/example-project.yaml"
+    project = yaml.safe_load(project_path.read_text(encoding="utf-8"))
+    project["title"] = project["display_label"] = "Changed project"
+    project["annotations"] = {
+        "xyzrins:annotation-tags/psyinf-ns-id": "projects/named-project"
+    }
+    project_path.write_text(yaml.safe_dump(project), encoding="utf-8")
+    changed = rebuild()
+    assert not list((projection / "content/publications").rglob("*.md"))
+    assert not list((projection / "content/datasets").rglob("*.md"))
+    assert len((projection / "records.jsonl").read_text().splitlines()) == len(machine)
+    for path, content in original_records.items():
+        if path not in {home_path, project_path}:
+            assert path.read_bytes() == content
+    page = projection / "content/projects/example-project/_index.md"
+    assert "Changed project" in page.read_text()
+    frontmatter = yaml.safe_load(page.read_text().split("---", 2)[1])
+    node = next(node for node in changed["nodes"] if node["id"] == project["pid"])
+    assert node["label"] == "Changed project"
+    assert frontmatter["url"] == "projects/named-project"
+    assert node["url"] == "/" + frontmatter["url"]
+    assert yaml.safe_load(project_path.read_text()) == project
+
+    project_path.unlink()
+    deleted = rebuild()
+    assert not page.exists()
+    assert project["pid"] not in {node["id"] for node in deleted["nodes"]}
+    assert all(project["pid"] not in {edge["source"], edge["target"]} for edge in deleted["edges"])
+
+
+@pytest.mark.parametrize("expanded", [False, True])
+def test_template_annotation_values_match_upstream_named_url(tmp_path, expanded):
+    source = PACKAGE_ROOT / "submodules/query-things/query_things"
+    if not (source / "render_record.py").is_file():
+        pytest.skip("pinned query-things source fixture is unavailable")
+
+    def load(name, path):
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    upstream_records = load("pinned_query_records", source / "common/records.py")
+    common = types.ModuleType("query_things.common")
+    common.homogenize_annotations = upstream_records.homogenize_annotations
+    common.parse_json_objects = None  # _proc_rec accepts an already parsed record.
+    with patch.dict(sys.modules, {"query_things.common": common}):
+        upstream = load("pinned_query_render_record", source / "render_record.py")
+    workspace = load_workspace(PACKAGE_ROOT / "tests/fixtures/template-candidate")
+    contract = load_contract(workspace, PACKAGE_ROOT / "submodules/www-from-model")
+    policy = contract.pages["xyzri:XYZInstrument"]
+    tag = "xyzrins:annotation-tags/psyinf-ns-id"
+    record = {
+        "pid": "xyzrins:instruments/uuid",
+        "schema_type": "xyzri:XYZInstrument",
+        "name": "Named instrument",
+        "annotations": {tag: (
+            {"annotation_tag": tag, "annotation_value": "instruments/named-tool"}
+            if expanded else "instruments/named-tool"
+        )},
+    }
+    original = deepcopy(record)
+    native_page = tmp_path / "native.md"
+    upstream._proc_rec(
+        deepcopy(record),
+        upstream.make_jinja_env(policy.template.parent).get_template(policy.template.name),
+        output_filename_template=(str(native_page),),
+    )
+    rendered = _render_record(record, policy, {record["pid"]: record}, [record])
+    native = yaml.safe_load(native_page.read_text().split("---", 2)[1])
+    lite = yaml.safe_load(rendered.split("---", 2)[1])
+    assert native["url"] == "instruments/named-tool"
+    assert lite == native
+    assert record == original
 
 
 if __name__ == "__main__":

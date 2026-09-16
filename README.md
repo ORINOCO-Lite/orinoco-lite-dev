@@ -15,6 +15,8 @@ The package reuses an exact upstream website revision, [`orinoco-lite-template`]
 | [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks |
 | `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
 | [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Human-gated reference downstream |
+| [`psychoinformatics-downstream`](https://github.com/ORINOCO-Lite/psychoinformatics-downstream) | Repeatable upstream comparison website, with recorded package, template, and input selections |
+| [`psychoinformatics-site-specific`](https://github.com/ORINOCO-Lite/psychoinformatics-site-specific) | Retained Pool capture, converted records, authored content, and media for that comparison |
 
 The package resolves and composes the upstream website, while the template owns only the Orinoco-specific adaptation and downstream scaffold.
 A downstream provides declarative `site-specific/` inputs and optional overrides, plus site-specific executable metadata adapters under `extensions/`.
@@ -101,6 +103,9 @@ Initialize the remaining engineering submodules only when broader cross-componen
 ```console
 pixi run python tools/checkout_submodules.py
 ```
+
+Use the [agent comparison procedure](docs/agents/upstream-comparison.md) to rebuild from the recorded Psychoinformatics inputs and compare both generation processes.
+The [current report](docs/agents/upstream-deployment-validation.md) identifies the tools, findings, and unresolved decisions.
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.

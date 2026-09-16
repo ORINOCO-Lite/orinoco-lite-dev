@@ -271,7 +271,15 @@ def _ensure_checkout(
 
 
 def _package_source(resources_root: Path) -> tuple[str, str]:
-    return SOURCE_REPOSITORY, source_commit(resources_root)
+    commit = source_commit(resources_root)
+    module = Path(__file__).resolve()
+    checkout = module.parents[2]
+    if module.parent == checkout / "src/orinoco_lite" and (checkout / ".git").exists():
+        _repository_head(checkout, label="Editable engineering checkout")
+        # Clone committed Git objects, not the editable checkout's files. The
+        # resource commit still selects the presentation and dependency pins.
+        return os.fspath(checkout), commit
+    return SOURCE_REPOSITORY, commit
 
 
 def resolve_presentation(workspace: Path, resources_root: Path | None = None) -> Path:

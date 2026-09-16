@@ -29,10 +29,16 @@ def test_snapshot_conversion_uses_committed_editorial_inputs(tmp_path):
         "config/_default/languages.en.toml": 'title = "Captured site"\n[params]\ndescription = "Captured description"\n',
         "config/_default/hugo.toml": 'baseURL = "https://example.invalid/"\n',
         "config/_default/params.toml": 'colorScheme = "fire"\ndefaultAppearance = "light"\n[header]\nlayout = "hybrid"\n',
-        "config/_default/menus.en.toml": '[[main]]\nname = "People"\npageRef = "persons"\n',
+        "config/_default/menus.en.toml": (
+            '[[main]]\nname = "People"\npageRef = "persons"\n'
+            '[[main]]\ntitle = "Collaboration hub"\nurl = "https://hub.example.test"\n'
+            '[main.params]\nicon = "hub"\ntarget = "_blank"\n'
+            '[[footer]]\nname = "Contact"\npageRef = "contact"\n'
+        ),
         "content/contact.md": "Committed editorial content\n",
         "content/_index.md": "Generated home page\n",
         "content/persons/person/_index.md": "Generated record page\n",
+        "content/persons/_index.md": "---\ntitle: People\n---\nAuthored introduction\n",
     }
     for name, text in files.items():
         path = website / name
@@ -51,9 +57,15 @@ def test_snapshot_conversion_uses_committed_editorial_inputs(tmp_path):
     instantiate.snapshot_site(engineering, snapshot, destination)
     site = yaml.safe_load((destination / "site.yaml").read_text())
     assert site["identity"]["title"] == "Captured site"
+    assert site["navigation"][1] == {
+        "name": "Collaboration hub", "url": "https://hub.example.test",
+        "icon": "hub", "target": "_blank",
+    }
+    assert site["footer_navigation"] == [{"name": "Contact", "page_ref": "contact"}]
     assert (destination / "content/contact.md").read_text() == "Committed editorial content\n"
     assert not (destination / "content/_index.md").exists()
-    assert not (destination / "content/persons").exists()
+    assert (destination / "content/persons/_index.md").read_text() == files["content/persons/_index.md"]
+    assert not (destination / "content/persons/person").exists()
     assert not (destination / "manifest.json").exists()
     records = list((destination / "metadata/records").rglob("*.yaml"))
     assert len(records) == 1

@@ -177,6 +177,38 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 3. Orinoco Lite combines that projection with the upstream website and template.
    It adds downstream content and applies configured overrides.
 
+## Validate the deployment layer
+
+Validate the thin adaptation by generating two deployments from the same captured Pool records, with the selected upstream presentation and its declared dependencies:
+
+- Native ORINOCO uses its own Pool, query, graph, Jinja, and Hugo operations.
+- Orinoco Lite converts the capture into downstream YAML records and annotation companions, then uses the selected template and ordinary package build to regenerate the graph, pages, and static site.
+
+Serving the committed `www-from-model` graph and record pages is a presentation preview, not evidence that either data flow works.
+Test local contributions in an ordinary downstream with an editable package connection, rather than a second renderer or a parallel deployment framework.
+Use pytest for conversion, projection, composition, and their important failure boundaries.
+Fresh capture and cache invalidation must be explicit command options, separate from software revision selection.
+
+Compare record meaning, page selection and URLs, graph relationships, visible content, assets, and browser behavior.
+The objective is an explained overview of deployment differences, not byte-identical output.
+Distinguish accepted static curation and presentation changes from unexpected Lite differences.
+Exclude defects that both outputs share.
+Neither passing unit tests nor a successful Lite build alone establishes native-versus-Lite parity.
+Each comparison must include a tool-generated report and an explanation of the differences.
+Record the tool, its options, the compared inputs, and the checks it cannot perform.
+Use existing tools rather than a separate comparison framework.
+
+The Psychoinformatics downstream records the package, template, and site-specific submodule used for repeat builds.
+Its site-specific repository retains the Pool capture, converted records, authored content, and media.
+Use those recorded inputs when testing a software repin before changing the capture.
+The [agent procedure](agents/upstream-comparison.md) describes the steps.
+The [current report](agents/upstream-deployment-validation.md) explains the measured differences.
+The [accepted differences](agents/upstream-accepted-differences.md) define narrow rules that do not require repeated human review.
+
+Upstream deploys its `main` branch to the draft site and its `published` branch to the production site.
+A comparison must name the chosen commit and distinguish a local rebuild from a live deployment.
+A branch head alone does not identify the commit from the last successful deployment.
+
 ## Generated publication records
 
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
