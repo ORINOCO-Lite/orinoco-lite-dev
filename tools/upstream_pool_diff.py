@@ -4,29 +4,26 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
 from pathlib import Path
 import sys
-import time
-from typing import Callable, Mapping, Sequence
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from typing import Mapping, Sequence
+
+from orinoco_lite.pool_capture import (
+    DEFAULT_API,
+    CaptureError as PoolDiffError,
+    fetch_live,
+    load_cache,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CACHE = ROOT / "build" / "upstream-stack" / "pool" / "public-thing.jsonl"
-DEFAULT_MANIFEST = DEFAULT_CACHE.with_name("manifest.json")
+DEFAULT_MANIFEST = DEFAULT_CACHE.with_name(DEFAULT_CACHE.name + ".manifest.json")
 DEFAULT_REPORT = DEFAULT_CACHE.with_name("live-diff.json")
-DEFAULT_API = "https://pool.psychoinformatics.de/api"
 MISSING = object()
-
-
-class PoolDiffError(RuntimeError):
-    """Report an invalid cache, live response, or comparison request."""
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -42,35 +39,6 @@ def semantic_digest(records: Mapping[str, Mapping[str, object]]) -> str:
     for pid in sorted(records):
         digest.update(canonical_record(records[pid]))
     return digest.hexdigest()
-
-
-def load_cache(path: Path) -> tuple[dict[str, dict[str, object]], str]:
-    if not path.is_file():
-        raise PoolDiffError(
-            f"Prepared cache is missing: {path}. Run "
-            "`pixi run python tools/prepare_upstream_snapshot.py --refresh` first."
-        )
-    records: dict[str, dict[str, object]] = {}
-    file_digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for line_number, line in enumerate(stream, start=1):
-            file_digest.update(line)
-            if not line.strip():
-                raise PoolDiffError(f"Cache {path}:{line_number} has a blank line")
-            try:
-                envelope = json.loads(line)
-                record = envelope["record"]
-                pid = record["pid"]
-            except (json.JSONDecodeError, KeyError, TypeError) as error:
-                raise PoolDiffError(f"Cache {path}:{line_number} is invalid") from error
-            if not isinstance(record, dict) or not isinstance(pid, str) or not pid:
-                raise PoolDiffError(f"Cache {path}:{line_number} has an invalid record")
-            if pid in records:
-                raise PoolDiffError(f"Cache {path}:{line_number} repeats PID {pid!r}")
-            records[pid] = record
-    if not records:
-        raise PoolDiffError(f"Cache {path} has no records")
-    return records, file_digest.hexdigest()
 
 
 def load_manifest(path: Path, cache: Path, count: int, digest: str) -> dict[str, object]:
@@ -98,104 +66,12 @@ def load_manifest(path: Path, cache: Path, count: int, digest: str) -> dict[str,
         relative = str(cache.resolve().relative_to(ROOT.resolve()))
     except ValueError:
         relative = str(cache.resolve())
-    if declared not in (relative, str(cache)):
+    if declared not in (cache.name, relative, str(cache)):
         raise PoolDiffError(
             "Prepared cache path does not match its manifest: "
             f"cache={relative!r}, manifest={declared!r}"
         )
     return manifest
-
-
-def request_json(url: str, *, timeout: int = 120) -> object:
-    request = Request(url, headers={"Accept": "application/json"})
-    for attempt in range(4):
-        try:
-            with urlopen(request, timeout=timeout) as response:
-                return json.load(response)
-        except (HTTPError, URLError, TimeoutError) as error:
-            if isinstance(error, HTTPError) and error.code == 413:
-                raise PoolDiffError(f"Could not fetch {url}: {error}") from error
-            if attempt == 3:
-                raise PoolDiffError(f"Could not fetch {url}: {error}") from error
-            time.sleep(2**attempt)
-    raise AssertionError("unreachable")
-
-
-def fetch_page(
-    api: str,
-    page: int,
-    size: int,
-    fetch: Callable[[str], object],
-) -> tuple[dict[str, object], int]:
-    while size >= 1:
-        query = urlencode({"format": "json", "size": size, "page": page})
-        url = f"{api}/public/records/p/Thing?{query}"
-        try:
-            result = fetch(url)
-        except PoolDiffError as error:
-            if "413" not in str(error) or size == 1:
-                raise
-            size //= 2
-            continue
-        if not isinstance(result, dict) or "items" not in result:
-            raise PoolDiffError(f"Unexpected live pool response from {url}")
-        return result, size
-    raise AssertionError("unreachable")
-
-
-def fetch_live(
-    api: str,
-    *,
-    fetch: Callable[[str], object] = request_json,
-    workers: int = 8,
-) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
-    api = api.rstrip("/")
-    server = fetch(f"{api}/server")
-    size = 100
-    while True:
-        first, size = fetch_page(api, 1, size, fetch)
-        try:
-            total = int(first["total"])
-            pages = int(first["pages"])
-        except (KeyError, TypeError, ValueError) as error:
-            raise PoolDiffError("Live pool pagination metadata is invalid") from error
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            remainder = list(
-                executor.map(
-                    lambda page: fetch_page(api, page, size, fetch),
-                    range(2, pages + 1),
-                )
-            )
-        effective_sizes = [effective_size for _, effective_size in remainder]
-        restart = any(effective_size != size for effective_size in effective_sizes)
-        if restart:
-            size = min(effective_sizes)
-            continue
-        payloads = [first, *(payload for payload, _ in remainder)]
-        for payload in payloads[1:]:
-            if int(payload.get("total", -1)) != total:
-                raise PoolDiffError("Live pool changed while the diff was fetched")
-        if not restart:
-            break
-    records: dict[str, dict[str, object]] = {}
-    for page, payload in enumerate(payloads, start=1):
-        items = payload.get("items")
-        if not isinstance(items, list):
-            raise PoolDiffError(f"Live pool page {page} has invalid items")
-        for record in items:
-            if not isinstance(record, dict):
-                raise PoolDiffError(f"Live pool page {page} has a non-object record")
-            pid = record.get("pid")
-            if not isinstance(pid, str) or not pid or pid in records:
-                raise PoolDiffError(
-                    f"Live pool page {page} has an invalid or duplicate PID {pid!r}"
-                )
-            records[pid] = record
-    if len(records) != total:
-        raise PoolDiffError(
-            f"Live pool snapshot is incomplete: expected {total}, fetched {len(records)}"
-        )
-    return records, server if isinstance(server, dict) else {}
 
 
 def pointer_segment(value: object) -> str:

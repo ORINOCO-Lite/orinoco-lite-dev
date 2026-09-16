@@ -142,7 +142,7 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
             report["stored_records_semantic_sha256"],
         )
 
-    def test_invalid_optional_datetime_sentinel_is_omitted_and_reported(self) -> None:
+    def test_source_datetime_marker_is_preserved_without_inventing_a_date(self) -> None:
         record = {
             "pid": "xyzrins:publications/sentinel",
             "schema_type": "xyzri:XYZPublication",
@@ -159,21 +159,9 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
 
         report = storage.project(source, output)
 
-        self.assertEqual(report["schema_compatibility_adjustment_count"], 1)
-        self.assertEqual(
-            report["schema_compatibility_adjustments"],
-            [
-                {
-                    "action": "omit-invalid-optional-datetime-sentinel",
-                    "path": "/generated_by/0/at_time",
-                    "pid": "xyzrins:publications/sentinel",
-                    "source_value": "-",
-                }
-            ],
-        )
         stored = snapshot.load_records_tree(output / "metadata" / "records")[0]
-        self.assertNotIn("at_time", stored.record["generated_by"][0])
-        self.assertNotEqual(
+        self.assertEqual(stored.record, record)
+        self.assertEqual(
             report["source_semantic_sha256"],
             report["normalized_source_semantic_sha256"],
         )

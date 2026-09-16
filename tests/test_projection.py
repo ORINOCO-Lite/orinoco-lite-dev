@@ -1070,6 +1070,71 @@ def test_default_selection_matches_pinned_upstream_member_filter():
     )
 
 
+def test_source_datetime_marker_survives_validation_and_editor_import(tmp_path, monkeypatch):
+    from rdflib import Graph, URIRef
+    from orinoco_lite.editor import record_catalog, validate_bundle
+
+    root = tmp_path / "site"
+    shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
+    presentation = PACKAGE_ROOT / "submodules/www-from-model"
+    monkeypatch.setattr("orinoco_lite.presentation.resolve_presentation", lambda *_: presentation)
+    monkeypatch.setattr("orinoco_lite.editor._git_commit", lambda *_: "0" * 40)
+    monkeypatch.setattr("orinoco_lite.editor._git_status", lambda *_: set())
+    workspace = load_workspace(root)
+    resources = resolve_resources().root
+    record = {
+        "pid": "xyzrins:publications/source-marker",
+        "schema_type": "xyzri:XYZPublication",
+        "title": "Source marker",
+        "generated_by": [{
+            "schema_type": "dlthings:Generation",
+            "object": "obo:IAO_0000444",
+            "at_time": "-",
+        }],
+    }
+    path = workspace.path("records") / "XYZPublication/source-marker.yaml"
+    path.parent.mkdir(exist_ok=True)
+    original = canonical_yaml(record)
+    path.write_text(original, encoding="utf-8")
+
+    validate_semantics(workspace, resources, presentation)
+    to_rdf, to_json = build_format_converters(
+        resources / "schema/demo-research-information/unreleased.yaml"
+    )
+    rdf_sources, _ = _render_rdf_sources(record_sources(workspace), to_rdf)
+    rdf = rdf_sources[record["pid"]]
+    graph = Graph().parse(data=rdf, format="turtle")
+    predicate = URIRef("https://concepts.datalad.org/s/things/v2/at_time")
+    subject, value = next(graph.subject_objects(predicate))
+    assert str(value) == "-"
+    assert str(value.datatype) == "https://concepts.datalad.org/s/things/v2/w3ctr-datetime"
+    assert to_json.convert(rdf, "XYZPublication") == record
+    assert path.read_text(encoding="utf-8") == original
+
+    catalog = record_catalog(workspace, presentation)
+    source = next(item for item in catalog["records"] if item["pid"] == record["pid"])
+    entry = {
+        "pid": record["pid"], "schema_type": record["schema_type"],
+        "source_path": source["path"], "source_sha256": source["sha256"],
+        "rdf_turtle": rdf,
+    }
+    bundle = {"source_commit": catalog["source_commit"], "records": [entry]}
+    imported = validate_bundle(workspace, resources, bundle)
+    assert yaml.safe_load(imported[path]) == record
+    # An explicit removal stays removed; the reader never restores from a
+    # baseline or invents a replacement value.
+    graph.remove((subject, predicate, value))
+    entry["rdf_turtle"] = graph.serialize(format="turtle")
+    imported = validate_bundle(workspace, resources, bundle)
+    assert "at_time" not in yaml.safe_load(imported[path])["generated_by"][0]
+
+    # The exception is not a general acceptance of malformed date strings.
+    record["generated_by"][0]["at_time"] = "not-a-date"
+    path.write_text(canonical_yaml(record), encoding="utf-8")
+    with pytest.raises(DriverError, match="schema round trip changed native semantics"):
+        validate_semantics(workspace, resources, presentation)
+
+
 def test_member_selection_keeps_records_and_regenerates_pages_and_graph(tmp_path, monkeypatch):
     """Page filtering must not curate metadata or leave stale generated pages."""
     root = tmp_path / "site"
