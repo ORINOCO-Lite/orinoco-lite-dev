@@ -134,6 +134,8 @@ async function prepareHandoff(
       "A submodule proposal may edit only site-specific metadata records.",
     );
   }
+  await github.requireInstallationAccess(proposal.repository);
+  await github.requireInstallationAccess(submodule.repository);
   let repository;
   try {
     await github.requireCurator(submodule.repository, login);

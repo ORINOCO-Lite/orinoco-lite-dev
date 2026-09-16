@@ -256,6 +256,74 @@ export class GitHubClient {
     }
   }
 
+  async requireInstallationAccess(repository: string): Promise<void> {
+    const [owner] = splitRepository(repository);
+    for (let page = 1; page <= 10; page += 1) {
+      const response = objectRecord(
+        await this.json(`/user/installations?per_page=100&page=${page}`),
+      );
+      if (!response || !Array.isArray(response.installations)) {
+        throw new HttpError(
+          502,
+          "github_error",
+          "GitHub returned invalid installation access.",
+        );
+      }
+      for (const raw of response.installations) {
+        const installation = objectRecord(raw);
+        const account = objectRecord(installation?.account);
+        const permissions = objectRecord(installation?.permissions);
+        if (
+          typeof account?.login !== "string" ||
+          account.login.toLowerCase() !== owner.toLowerCase() ||
+          !Number.isSafeInteger(installation?.id)
+        )
+          continue;
+        if (
+          installation?.suspended_at ||
+          permissions?.contents !== "write" ||
+          permissions?.pull_requests !== "write"
+        )
+          continue;
+        for (
+          let repositoryPage = 1;
+          repositoryPage <= 10;
+          repositoryPage += 1
+        ) {
+          const selected = objectRecord(
+            await this.json(
+              `/user/installations/${installation?.id}/repositories?per_page=100&page=${repositoryPage}`,
+            ),
+          );
+          if (!selected || !Array.isArray(selected.repositories)) {
+            throw new HttpError(
+              502,
+              "github_error",
+              "GitHub returned invalid installed repositories.",
+            );
+          }
+          if (
+            selected.repositories.some((item) => {
+              const value = objectRecord(item);
+              return (
+                typeof value?.full_name === "string" &&
+                value.full_name.toLowerCase() === repository.toLowerCase()
+              );
+            })
+          )
+            return;
+          if (selected.repositories.length < 100) break;
+        }
+      }
+      if (response.installations.length < 100) break;
+    }
+    throw new HttpError(
+      403,
+      "installation_access_required",
+      `Install the curation GitHub App on ${repository} with Contents and Pull requests write access before proposing.`,
+    );
+  }
+
   async pullRequest(repository: string, number: number): Promise<unknown> {
     return this.json(endpoint(repository, `/pulls/${number}`));
   }

@@ -98,3 +98,44 @@ describe("exact site-specific Git resolution", () => {
     ]);
   });
 });
+
+describe("installed-repository authority", () => {
+  it("does not infer installation access from public repository visibility", async () => {
+    const github = new GitHubClient("token");
+    vi.spyOn(github, "json")
+      .mockResolvedValueOnce({
+        installations: [
+          {
+            id: 1,
+            account: { login: "example" },
+            permissions: { contents: "write", pull_requests: "write" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        repositories: [{ full_name: "example/other" }],
+      });
+    await expect(
+      github.requireInstallationAccess("example/metadata"),
+    ).rejects.toThrow("Install the curation GitHub App");
+  });
+  it("requires repository membership and write installation permissions", async () => {
+    const github = new GitHubClient("token");
+    vi.spyOn(github, "json")
+      .mockResolvedValueOnce({
+        installations: [
+          {
+            id: 1,
+            account: { login: "example" },
+            permissions: { contents: "write", pull_requests: "write" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        repositories: [{ full_name: "example/metadata" }],
+      });
+    await expect(
+      github.requireInstallationAccess("example/metadata"),
+    ).resolves.toBeUndefined();
+  });
+});

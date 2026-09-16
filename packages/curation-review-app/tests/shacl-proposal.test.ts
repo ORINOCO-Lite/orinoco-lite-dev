@@ -604,6 +604,7 @@ describe("site-specific submodule handoff", () => {
       login: "octocat",
     });
     vi.spyOn(github, "requireCurator").mockResolvedValue();
+    vi.spyOn(github, "requireInstallationAccess").mockResolvedValue();
     vi.spyOn(github, "repository").mockImplementation(async (repository) => ({
       fullName: repository,
       defaultBranch: "main",
