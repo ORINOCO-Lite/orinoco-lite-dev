@@ -17,10 +17,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("action", choices=("update",))
+    parser.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
     args = parser.parse_args(argv)
     try:
         workspace = load_config_path(args.config)
-        report = update_projection(workspace, args.resources.resolve())
+        report = update_projection(workspace, args.resources.resolve(), no_cache=args.no_cache)
     except OrinocoError as error:
         parser.exit(1, f"orinoco-lite projection: {error}\n")
     print(json.dumps(report, sort_keys=True))

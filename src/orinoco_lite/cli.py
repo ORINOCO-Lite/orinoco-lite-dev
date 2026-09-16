@@ -25,22 +25,43 @@ from .validation import report_json, validate_workspace
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="orinoco-lite", description=__doc__, epilog="Use `orinoco-lite dev --help` for development-only commands.")
+    parser = argparse.ArgumentParser(
+        prog="orinoco-lite",
+        description="Maintain your site's metadata and build a static website with Orinoco Lite.",
+        epilog=("Run from your website repository. For a local preview, run 'orinoco-lite build' "
+                "followed by 'orinoco-lite serve'. Use COMMAND --help for options and "
+                "'orinoco-lite dev --help' when contributing package or template changes."),
+    )
     parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
     parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}\nsource: {source_description()}")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    validate = commands.add_parser("validate", help="validate site-owned inputs")
+    validate = commands.add_parser(
+        "validate", help="check your metadata and site configuration",
+        description=("Check your site's configuration, metadata records, and schema-defined "
+                     "relationships without generating pages or a website. Use this when "
+                     "reviewing input changes. The build command already includes these checks."),
+    )
     validate.add_argument(
         "--structural-only",
         action="store_true",
-        help="skip the release's semantic validation driver",
+        help="check file layout, configuration, and record structure only; skip schema and relationship checks",
     )
     validate.add_argument("--json", action="store_true", help="print the report as JSON")
+    validate.add_argument("--no-cache", action="store_true", help="repeat schema and relationship checks even when a previous build validated the same inputs")
 
-    build = commands.add_parser("build", help="build the deterministic static site")
-    build.add_argument("--destination", type=Path)
-    build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"))
+    build = commands.add_parser(
+        "build", help="build your website from its metadata and content",
+        description=("Validate your inputs and generate a static website in build/site. "
+                     "Unchanged metadata-derived pages and graph data are reused automatically. "
+                     "Preview the result with 'orinoco-lite serve'. Building does not publish your site."),
+    )
+    build.add_argument("--destination", type=Path, help="output directory under build/ (default: build/site)")
+    build.add_argument("--publication-bundle", type=Path, metavar="PATH",
+                       help="also save this build as a Git bundle at PATH under build/ for deployment history; commit input changes first (normally set by the Pages workflow)")
+    build.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate metadata-derived pages and graph data; does not fetch new source data")
+    build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"),
+                       help="website URL, including any path prefix; use / for a local preview (default: ORINOCO_BASE_URL or your site configuration)")
     build.add_argument(
         "--build-timestamp",
         default=os.environ.get("ORINOCO_BUILD_TIMESTAMP"),
@@ -51,20 +72,18 @@ def _parser() -> argparse.ArgumentParser:
         default=os.environ.get("GITHUB_REPOSITORY"),
         metavar="OWNER/REPOSITORY",
         help=(
-            "trusted repository coordinate embedded in the static curation "
-            "interfaces (defaults to GITHUB_REPOSITORY)"
+            "GitHub repository for the website's online editing and review links "
+            "(default: GITHUB_REPOSITORY, usually supplied by GitHub Actions)"
         ),
     )
-    build.add_argument(
-        "--skip-structural-validation",
-        action="store_true",
-        help=argparse.SUPPRESS,
-    )
 
-    serve = commands.add_parser("serve", help="serve an already built static site")
-    serve.add_argument("--directory", type=Path)
-    serve.add_argument("--bind", default="127.0.0.1")
-    serve.add_argument("--port", type=int, default=8767)
+    serve = commands.add_parser(
+        "serve", help="preview a built website on your computer",
+        description="Serve an existing website build locally. Run build first; this command does not rebuild or watch for changes.",
+    )
+    serve.add_argument("--directory", type=Path, help="website directory to serve (default: build/site)")
+    serve.add_argument("--bind", default="127.0.0.1", help="address to listen on (default: 127.0.0.1, this computer only)")
+    serve.add_argument("--port", type=int, default=8767, help="local HTTP port (default: 8767)")
 
     editor = commands.add_parser("editor", help="static-editor review operations")
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
@@ -73,9 +92,13 @@ def _parser() -> argparse.ArgumentParser:
     apply.add_argument("--write", action="store_true")
 
     projection = commands.add_parser(
-        "projection", help="refresh or verify generated projection"
+        "projection", help="generate intermediate metadata pages and graph data",
+        description=("Generate the Hugo pages, normalized records, and graph data under "
+                     "generated/projection for inspection or further processing. This does "
+                     "not build HTML. For a website preview, use build, which performs this step automatically."),
     )
-    projection.add_argument("projection_command", choices=("update", "verify"))
+    projection.add_argument("projection_command", choices=("update",))
+    projection.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate intermediate output rather than reuse cached results")
 
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
@@ -95,10 +118,14 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
     from . import local_preview, publication, shacl_handoff
 
-    commands.add_parser("verify-site", parents=[local_preview.parser()], add_help=False,
-                        help="check the built site through localhost and 127.0.0.1")
-    commands.add_parser("publication", parents=[publication.parser()], add_help=False,
-                        help="record generated projection and deployed website commits")
+    preview_parser = local_preview.parser()
+    publication_parser = publication.parser()
+    commands.add_parser("verify-site", parents=[preview_parser], add_help=False,
+                        description=preview_parser.description, epilog=preview_parser.epilog,
+                        help="check that an existing local build can be served")
+    commands.add_parser("publication", parents=[publication_parser], add_help=False,
+                        description=publication_parser.description, epilog=publication_parser.epilog,
+                        help="save a successful deployment in your repository's generated-output branches")
     commands.add_parser("shacl-handoff", parents=[shacl_handoff._parser()], add_help=False,
                         help="inspect and materialize GitHub editor proposals")
     return parser
@@ -131,10 +158,8 @@ def _validate(args: argparse.Namespace) -> int:
     report = validate_workspace(workspace)
     if not args.structural_only:
         resources = resolve_resources()
-        status = invoke_driver("projection-update", workspace, resources)
-        if status:
-            return status
-        status = invoke_driver("validate", workspace, resources)
+        status = invoke_driver("validate", workspace, resources,
+                               extra_arguments=("--no-cache",) if args.no_cache else ())
         if status:
             return status
         report["package_version"] = __version__
@@ -143,6 +168,11 @@ def _validate(args: argparse.Namespace) -> int:
     else:
         print(f"Validated {report['records']} records for {workspace.site_name}")
     return 0
+
+
+def _update_projection(args, workspace, resources) -> int:
+    options = {"extra_arguments": ("--no-cache",)} if getattr(args, "no_cache", False) else {}
+    return invoke_driver("projection-update", workspace, resources, **options)
 
 
 def _build(args: argparse.Namespace) -> int:
@@ -155,15 +185,18 @@ def _build(args: argparse.Namespace) -> int:
         if args.github_repository is not None
         else None
     )
-    if not args.skip_structural_validation:
-        validate_workspace(workspace)
-    projection_status = invoke_driver("projection-update", workspace, resources)
+    destination = _safe_build_destination(workspace, args.destination)
+    bundle = getattr(args, "publication_bundle", None)
+    if bundle is not None:
+        from .publication import require_clean_source
+        bundle = _safe_build_destination(workspace, bundle)
+        if bundle == destination or destination in bundle.parents:
+            raise ConfigurationError("Publication bundle must be outside the website destination")
+        require_clean_source(workspace.root)
+    validate_workspace(workspace)
+    projection_status = _update_projection(args, workspace, resources)
     if projection_status:
         return projection_status
-    semantic_status = invoke_driver("validate", workspace, resources)
-    if semantic_status:
-        return semantic_status
-    destination = _safe_build_destination(workspace, args.destination)
     base_url = args.base_url or workspace.base_url
     build_timestamp = getattr(args, "build_timestamp", None)
     if build_timestamp is None and urlsplit(base_url).scheme in {"http", "https"}:
@@ -178,7 +211,7 @@ def _build(args: argparse.Namespace) -> int:
         if build_repository is not None
         else None
     )
-    return invoke_driver(
+    status = invoke_driver(
         "build",
         workspace,
         resources,
@@ -190,6 +223,12 @@ def _build(args: argparse.Namespace) -> int:
             else ()
         ),
     )
+    if status == 0 and bundle is not None:
+        from .publication import prepare
+        prepare(workspace.root, "generated/projection",
+                destination.relative_to(workspace.root).as_posix(),
+                bundle.relative_to(workspace.root).as_posix())
+    return status
 
 
 def _serve(args: argparse.Namespace) -> int:
@@ -233,9 +272,7 @@ def _editor(args: argparse.Namespace) -> int:
 def _projection(args: argparse.Namespace) -> int:
     workspace, resources = _resolve(args)
     validate_workspace(workspace)
-    return invoke_driver(
-        f"projection-{args.projection_command}", workspace, resources
-    )
+    return _update_projection(args, workspace, resources)
 
 
 def _run(args: argparse.Namespace) -> int:
