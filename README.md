@@ -104,7 +104,7 @@ Initialize the remaining engineering submodules only when broader cross-componen
 pixi run python tools/checkout_submodules.py
 ```
 
-Use the [upstream comparison procedure](docs/upstream-comparison.md) to rebuild from the recorded Psychoinformatics inputs and compare both generation processes.
+Use the [agent comparison procedure](docs/agents/upstream-comparison.md) to rebuild from the recorded Psychoinformatics inputs and compare both generation processes.
 The [current report](docs/agents/upstream-deployment-validation.md) identifies the tools, findings, and unresolved decisions.
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.

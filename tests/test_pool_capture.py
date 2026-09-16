@@ -123,6 +123,27 @@ def test_failed_refresh_preserves_existing_capture(capture):
     assert set(destination.parent.iterdir()) == {destination, manifest_path}
 
 
+def test_failed_manifest_replacement_leaves_cache_fail_closed(capture, monkeypatch):
+    destination, manifest_path, fetch = capture
+    pool_capture.capture(destination)
+    fetch.return_value = ({PID: record(name="Changed")}, {})
+    replace = pool_capture.os.replace
+
+    def fail_manifest(source, target):
+        if target == manifest_path:
+            raise OSError("injected manifest replacement failure")
+        return replace(source, target)
+
+    monkeypatch.setattr(pool_capture.os, "replace", fail_manifest)
+    with pytest.raises(pool_capture.CaptureError, match="manifest replacement failure"):
+        pool_capture.capture(destination, refresh=True)
+
+    fetch.reset_mock()
+    with pytest.raises(pool_capture.CaptureError, match="digest does not match"):
+        pool_capture.capture(destination)
+    fetch.assert_not_called()
+
+
 def test_capture_restarts_all_pages_when_a_later_page_needs_smaller_requests():
     records = [record(f"example:{index}") for index in range(105)]
     requests = []

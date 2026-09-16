@@ -191,7 +191,8 @@ Fresh capture and cache invalidation must be explicit command options, separate 
 
 Compare record meaning, page selection and URLs, graph relationships, visible content, assets, and browser behavior.
 The objective is an explained overview of deployment differences, not byte-identical output.
-Distinguish deliberate static curation and GitHub adaptations from regressions, unexplained differences, source-data changes, and checks not performed.
+Distinguish accepted static curation and presentation changes from unexpected Lite differences.
+Exclude defects that both outputs share.
 Neither passing unit tests nor a successful Lite build alone establishes native-versus-Lite parity.
 Each comparison must include a tool-generated report and an explanation of the differences.
 Record the tool, its options, the compared inputs, and the checks it cannot perform.
@@ -200,7 +201,9 @@ Use existing tools rather than a separate comparison framework.
 The Psychoinformatics downstream records the package, template, and site-specific submodule used for repeat builds.
 Its site-specific repository retains the Pool capture, converted records, authored content, and media.
 Use those recorded inputs when testing a software repin before changing the capture.
-The [comparison procedure](upstream-comparison.md) describes the steps, and the [current report](agents/upstream-deployment-validation.md) records unresolved differences.
+The [agent procedure](agents/upstream-comparison.md) describes the steps.
+The [current report](agents/upstream-deployment-validation.md) explains the measured differences.
+The [accepted differences](agents/upstream-accepted-differences.md) define narrow rules that do not require repeated human review.
 
 Upstream deploys its `main` branch to the draft site and its `published` branch to the production site.
 A comparison must name the chosen commit and distinguish a local rebuild from a live deployment.
