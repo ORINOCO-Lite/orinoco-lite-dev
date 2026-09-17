@@ -62,7 +62,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 
 | PR | Scope | What the reviewer runs and inspects |
 | --- | --- | --- |
-| A — Cleanup | Remove the obsolete upstream preview builder, service scripts, and tests that only preserve them. Correct references to removed tasks. | Existing engineering checks and CLI help. Ordinary downstream setup and builds remain available. |
+| A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
 | B — Capture and recording | Extract #152's capture command. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, and field-level comparison. Carry the reviewed date-preservation fix from #152. | Convert the capture, export joined records, and inspect changed identifiers, fields, and values. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare the returned records with the original capture. Run a raw-capture control to locate service-side changes. |
@@ -179,10 +179,10 @@ Reuse the downstream tool lock and record both the input change and the parent s
 | Existing PR | Place in this work |
 | --- | --- |
 | [Design #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This charter and command plan, proposed directly against `main`. |
-| [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Implements A independently against `main`. Removes the obsolete tooling before the command work. |
+| [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Implements A independently against `main`. Extracts reusable operations and removes the old preview orchestration. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
 | [Package #154](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/154) | Tool research for H. Promote the chosen procedure, then retire the dated report. |
-| [Package #142](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/142) | Retire its separate builder. Recover useful checks through the staged CLI. |
+| [Package #142](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/142) | Reuse authored-content and resource preservation in E/G and record, content, and route checks in C/F/G/H. Retire its separate builder after those stages cover it. |
 | [Site inputs #1](https://github.com/ORINOCO-Lite/psychoinformatics-site-specific/pull/1) | Separate record preservation for C from authored content and resource placement for E/G. |
 | [Downstream #3](https://github.com/ORINOCO-Lite/psychoinformatics-downstream/pull/3) | Integration candidate. Advance package and site-input selections with the verified steps. |
 
@@ -195,7 +195,7 @@ Address them in the replacement PRs while preserving the original comments.
 | [Document lifetime and reproducibility](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025790917) | Keep design in the charter, instructions with commands, and dated results in PR evidence. |
 | [Difference-table readability](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025791408) | Report each new difference with its effect and next action. |
 | [Broken upstream link](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025791960) | Link to the selected file in the upstream repository. |
-| [Native procedure and obsolete scripts](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025792747) | Remove obsolete tooling in A and provide CLI operations in D–H. |
+| [Native procedure and obsolete scripts](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025792747) | Separate reusable operations from preview orchestration in A; provide CLI operations in D–H. |
 | [Terminology and charter scope](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025793492) | Define terms once in the charter and keep implementation details here. |
 
 Rewrite #152's stale summary when the replacements are ready.
@@ -215,9 +215,14 @@ No comments were present on #142 or #154 during the initial review.
   Its current implementation recreates the assembly before rendering.
 - Move user-facing operations out of recorded `python -m` calls in `instantiate.py` and `development.py`.
   Retain internal Python functions for code reuse.
-- Cleanup can remove the obsolete scripts without the new capture implementation.
-  The retained Pool-diff tool is self-contained.
-  Cleanup updates its error message to select an existing capture instead of referring to removed tasks.
+- Cleanup retains the tested checkout and worktree-preservation helpers.
+  It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
+  D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.
+  Consider the upstream `dtc` client there before adding more HTTP code.
+- Use #152's capture implementation for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
+  Keep #142 available until the useful behavior has been carried across.
+- The retained Pool-diff tool is self-contained.
+  Cleanup updates its missing-capture message to select an existing capture instead of referring to removed tasks.
 - Resolve the original capture's unknown acquisition time by retaining it as historical input and recording fresh capture facts accurately.
   Pagination completeness checks do not detect every concurrent source edit.
 - The legacy capture contains 5,030 records.
