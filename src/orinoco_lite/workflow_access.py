@@ -13,7 +13,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .config import load_workspace
+from .config import DEFAULT_CURATION_SERVICE, _curation_service_origin, _load_mapping
+from .errors import ConfigurationError
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -42,7 +43,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
-    origin = load_workspace(Path.cwd()).curation_service
+    # Metadata may be a private, not-yet-initialized submodule. Only the
+    # trusted website configuration is needed to obtain its checkout token.
+    raw = _load_mapping(Path.cwd() / "orinoco.yaml", "Workspace configuration")
+    site = raw.get("site", {})
+    if not isinstance(site, dict):
+        raise ConfigurationError("orinoco.yaml site must be a mapping")
+    service = site.get("curation_service")
+    origin = _curation_service_origin(
+        DEFAULT_CURATION_SERVICE if service is None else service,
+        "orinoco.yaml site.curation_service",
+    )
     endpoint = f"{origin}/api/shacl/workflow-access"
     identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
     parsed = urllib.parse.urlsplit(identity_url)
