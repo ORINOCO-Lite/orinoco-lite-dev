@@ -10,18 +10,13 @@ Detailed protocols, procedures, and temporary implementation plans belong in the
 
 ## Terminology
 
-- *annotation companion* — a file containing machine attribution for assertions in a matching metadata record.
-  Joining the two restores the complete record for validation and projection.
 - *canonical* — accepted source state that provides other representations.
   The term does not mean that the state is immutable.
-- *capture* — a retained copy of records retrieved from a service.
 - *contract* — behavior or a boundary that implementations must preserve.
   It excludes incidental implementation details.
 - *downstream* — a website repository that people create and maintain with Orinoco Lite.
-- *PID* — the persistent identifier of a metadata record.
 - *policy* — an explicit choice that a person or organization makes among supported behaviors.
   The current implementation does not imply this choice.
-- *Pool* — the upstream metadata service at `pool.psychoinformatics.de`, implemented with Dump Things Service.
 - *projection* — a consumer-specific view that selects, joins, or transforms canonical metadata.
   The projection does not change the metadata.
 - *upstream* — the original ORINOCO ecosystem and its artifacts, including the [psychoinformatics.de](https://www.psychoinformatics.de) website.
@@ -55,57 +50,14 @@ The system has three layers: development sources, reusable components, and each 
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the website presentation, page templates, graph production, and its exact Congo selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
 Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
-An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests to the package.
-Scaffold and Orinoco presentation adaptations belong in the template.
+An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco presentation adaptations belong in the template.
 Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
-This development loop uses representative site inputs and supports comparison with the upstream website at each generation step.
-
-### Command interface and provenance
-
-`orinoco-lite` is the public interface for routine operations.
-Development operations belong under `orinoco-lite dev`.
-Each upstream comparison step has a command with inspectable inputs and outputs.
-A few Pixi tasks may shorten common commands or make essential operations easier to discover.
-CI uses those tasks or the CLI.
-Direct script and Python module execution are development and debugging tools.
-
-The CLI uses DataLad to record commands that capture or change retained inputs by default.
-Comparisons produce uncommitted reports.
-The CLI owns this behavior and provides `--no-record` for development runs that do not require a DataLad commit.
-Required recording in automated metadata proposal and finalization workflows remains subject to the source-adapter contract.
-
-Recorded commands invoke the public CLI through the project's Pixi environment.
-Their executable names and file arguments contain no absolute local paths.
-They use paths relative to the dataset and record the inputs and outputs needed for another host to rerun the operation.
-External sources use retrievable repository or service URLs.
-For a site-specific submodule, the downstream and that submodule form the rerun unit.
-Use the downstream tool lock and record both the input change and the updated submodule pointer.
-DataLad commits only the operation's outputs and leaves unrelated changes alone.
-These records use ordinary Git without Git Annex.
-
-### Upstream comparison
-
-The development CLI exposes capture, record conversion, service round-trip, content generation, site composition, rendering, and comparisons as separate operations.
-Each operation consumes explicit inputs and writes outputs that a maintainer can inspect before continuing.
-Upstream and Lite comparisons at each step use the same reviewed inputs.
-A final comparison covers the complete generation process.
-
-Handle each difference at the first operation that introduces it.
-Keep an accepted correction there so later comparisons report only additional differences.
-A comparison may account for an accepted transformation only within its reviewed scope.
-Changes outside that scope require review.
-
-Keep the raw capture unchanged when correcting conversion or presentation behavior.
-Put a correction in the component that owns the faulty operation.
-Keep site-data corrections in the site's inputs and reusable fixes in the package or upstream dependency.
-Document a temporary fix with its reason, upstream follow-up, and removal condition alongside the fix and its regression test.
-Git and pull requests retain the decision history.
+This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
 
 ### Reusable components
 
 An Orinoco Lite package commit contains code and bundled resources under one Git identity.
-A downstream selects the official repository or a fork and may use an exact commit directly.
-Publishing a central release is optional.
+A downstream selects the official repository or a fork and may use an exact commit directly; publishing a central release is optional.
 
 | Part | Role | Boundary |
 | --- | --- | --- |
@@ -187,7 +139,7 @@ site-specific/                         # Downstream-owned declarative site data
   static/                              # Site files published verbatim
   metadata/                            # Canonical records and their annotation companions for validation and RDF view
     records/                           # Schema-compliant YAML describing organization entities
-    overlays/annotations/              # Machine attribution associated with assertions in records
+    overlays/annotations/              # Separate tree for messier record components that are part of the realized graph
   curation-records/                    # Current reviewed automated data import decisions
   sources/<adapter>/                   # Inputs, evidence, and mapping policy for metadata automation tools
   overrides/                           # Bounded replacements for framework surfaces

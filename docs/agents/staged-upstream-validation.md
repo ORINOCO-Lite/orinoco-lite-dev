@@ -1,16 +1,19 @@
 # Upstream diff detection
 
 Active plan for John and Yarik, updated 17 September 2026.
-The [design charter](../project-design.md) defines the interface, terminology, and provenance rules.
-This plan arranges the implementation into reviewable PRs.
+The [design charter](../project-design.md) sets the high-level constraints.
+This plan defines the validation commands and recording rules and arranges their implementation into reviewable PRs.
 
 ## Review path
 
-Review the design and cleanup independently against `main`, then review each command group in order.
+Review the charter principle and this implementation plan independently against `main`, then review each command group in order.
 Each PR supplies commands, example inputs, and inspectable outputs for its step.
 Use the same reviewed inputs for both sides of each comparison.
 After those comparisons pass, compare the complete upstream and Lite generation paths.
 
+`orinoco-lite` is the public interface for routine operations; development operations belong under `orinoco-lite dev`.
+Pixi tasks may shorten common commands, and CI uses those tasks or the CLI.
+Direct scripts and Python module execution are for development and debugging.
 The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations built from the same code.
@@ -55,8 +58,9 @@ Raw comparisons remain available beside the summary of new differences.
 ## Proposed PR stack
 
 The letters identify proposed PRs, not GitHub PR numbers.
-The design and cleanup are independent PRs based on `main`.
-After both merge, start the capture PR from `main`.
+Cleanup #160 is merged.
+The charter principle and this command plan remain separate PRs against `main`.
+After agreeing on the plan, start the capture PR from `main`.
 Later command PRs may stack on their predecessor until it merges.
 Then rebase their unique changes onto `main` and repeat the affected checks.
 
@@ -92,7 +96,8 @@ pixi run --locked orinoco-lite dev records roundtrip build/records/joined.jsonl 
 pixi run --locked orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
 ```
 
-The export joins records and their annotation companions without generating pages.
+Annotation companions keep machine attribution for record assertions separate for human readability.
+The export rejoins them with the records without generating pages.
 The round-trip command manages the temporary service and retains the returned dump for inspection.
 The diff shows raw field changes and identifies reviewed annotation-equivalent changes separately.
 It preserves list order, duplicate values, scalar types, and the distinction between null and missing values.
@@ -145,6 +150,8 @@ Later isolated comparisons consume the reviewed output.
 The final comparison reports a known difference once and links its explanation.
 A changed value or behavior outside the accepted scope appears as a new difference.
 
+Keep raw captures unchanged when correcting conversion or presentation behavior.
+Put site-data corrections in site inputs and reusable fixes in the package or upstream dependency.
 Keep each temporary fix beside the code that needs it, with a focused regression test.
 Document its reason, upstream follow-up, and removal condition in that change's PR.
 Use existing comparison rules for intentional representation differences.
@@ -159,16 +166,19 @@ Preserve that commit when merging C instead of squashing it with the new CLI ope
 The adaptation belongs at record conversion in C. #152 preserves the value in storage and adapts the RDF reader where it otherwise disappears.
 Investigate the upstream conversion behavior before choosing its permanent correction.
 Remove the adaptation when the selected upstream code handles this case and the record-preservation test still passes.
-The raw capture remains unchanged.
 
 ## DataLad recording
 
 Retained-input changes record by default, while comparisons leave reports uncommitted.
 The CLI owns recording and uses `--no-record` for the inner command to prevent nested recording.
+The same flag allows development runs without a DataLad commit.
 Pixi tasks and CI call that same interface.
+Required recording for automated metadata proposals and finalization follows the [source-adapter contract](contract/source-adapters.md).
 
 Record the public command, relative paths, declared inputs, and only the operation's outputs.
 Use the project's locked tools instead of absolute Python paths or a separately resolved `pixi exec` environment.
+External inputs use retrievable repository or service URLs.
+Use ordinary Git without requiring Git Annex.
 Check portability by cloning into a different directory and rerunning a recorded conversion from the retained capture.
 
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
@@ -178,8 +188,9 @@ Reuse the downstream tool lock and record both the input change and the parent s
 
 | Existing PR | Place in this work |
 | --- | --- |
-| [Design #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This charter and command plan, proposed directly against `main`. |
-| [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Implements A independently against `main`. Extracts reusable operations and removes the old preview orchestration. |
+| [Charter #162](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/162) | One sentence on upstream comparison under the existing reuse principle. |
+| [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This command plan and detailed agent guidance, proposed directly against `main`. |
+| [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Merged. Retains reusable operations and removes the old preview orchestration. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
 | [Package #154](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/154) | Tool research for H. Promote the chosen procedure, then retire the dated report. |
 | [Package #142](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/142) | Reuse authored-content and resource preservation in E/G and record, content, and route checks in C/F/G/H. Retire its separate builder after those stages cover it. |
@@ -196,7 +207,7 @@ Address them in the replacement PRs while preserving the original comments.
 | [Difference-table readability](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025791408) | Report each new difference with its effect and next action. |
 | [Broken upstream link](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025791960) | Link to the selected file in the upstream repository. |
 | [Native procedure and obsolete scripts](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025792747) | Separate reusable operations from preview orchestration in A; provide CLI operations in D–H. |
-| [Terminology and charter scope](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025793492) | Define terms once in the charter and keep implementation details here. |
+| [Terminology and charter scope](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152#discussion_r4025793492) | Keep high-level constraints in the charter and command and recording details here. |
 
 Rewrite #152's stale summary when the replacements are ready.
 No comments were present on #142 or #154 during the initial review.
