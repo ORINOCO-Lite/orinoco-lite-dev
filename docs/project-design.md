@@ -223,6 +223,7 @@ The normative contracts define the precise behavior:
 
 - **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website.
   Orinoco-specific changes remain small, explicit, and separately owned.
+  Reuse upstream terminology and operations where their meanings match to ease collaboration with upstream maintainers.
   Use staged comparisons with upstream to detect unintended differences and keep this adaptation thin and maintainable as upstream evolves.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
   Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
