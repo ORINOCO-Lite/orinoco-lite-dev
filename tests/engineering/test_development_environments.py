@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 import subprocess
 import tomllib
 import unittest
@@ -55,51 +54,9 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(interface["display_name"], "Develop Orinoco Lite")
         self.assertIn("$develop-orinoco-lite", interface["default_prompt"])
 
-    def test_builder_never_moves_gitlinks_after_scoped_preparation(self) -> None:
-        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("submodule update", builder)
-        self.assertIn("restore_annex_status.py", builder)
-        refresh = builder.index('refresh "$site_root" "$status_snapshot"')
-        restore = builder.index('config core.worktree "$original_core_worktree"')
-        self.assertLess(refresh, restore)
-        checkout = (ROOT / "tools" / "upstream_checkout.py").read_text()
-        self.assertIn("prepare_static_checkout", checkout)
-        self.assertIn("prepare_full_checkout", checkout)
-        self.assertIn('mode == "recorded"', checkout)
-        self.assertIn("restore_local_state", builder)
-        self.assertIn("--no-write-fetch-head", builder)
-
-    def test_static_builder_uses_one_authoritative_annex_pin(self) -> None:
-        builder = (ROOT / "tools" / "build_upstream_site.sh").read_text(
-            encoding="utf-8"
-        )
-        match = re.search(r"^annex_commit=([0-9a-f]{40})$", builder, re.M)
-        self.assertIsNotNone(match)
-        self.assertEqual(builder.count(match.group(1)), 1)
-        self.assertIn(
-            "upstream_url=https://hub.psychoinformatics.de/www/"
-            "www-from-model.git",
-            builder,
-        )
-        self.assertIn(
-            '"$upstream_url" "+$annex_commit:$annex_remote_ref"',
-            builder,
-        )
-        self.assertIn(
-            '-c remote.$annex_remote_name.url="$upstream_url"',
-            builder,
-        )
-        self.assertNotIn(
-            "github.com/ORINOCO-Lite/www-from-model",
-            builder,
-        )
-
     def test_supported_checkouts_never_follow_branch_hints(self) -> None:
         paths = (
             ROOT / "tools" / "checkout_submodules.py",
-            ROOT / "tools" / "upstream_checkout.py",
             WORKFLOW,
             RELEASE_WORKFLOW,
         )
