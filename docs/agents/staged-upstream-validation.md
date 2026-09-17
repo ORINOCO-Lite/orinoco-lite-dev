@@ -18,67 +18,70 @@ The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations built from the same code.
 
-Rectangles contain `dev` commands; blue hexagons mark inputs and final results.
-Arrow labels name the data passed between commands.
-Dashed arrows show review selecting one shared input for the next commands.
+The aim is to identify the first transformation that introduces a difference, so each step can be corrected or accepted in its own PR.
+The three views separate differences caused by record conversion or the temporary service, authored-input acquisition, and site generation.
+The first two establish the reviewed inputs used by the third, which can then isolate generation differences.
+
+Boxes show data states; blue boxes contain reports.
+Arrow labels show proposed `dev` commands; dashed arrows show a maintainer selecting reviewed data.
+Comparison reports inform that selection but are not inputs to generation.
 
 ### Check record preservation
 
+Compare the original capture with both the joined export and the records returned by a temporary service.
+
 ```mermaid
 flowchart TB
-  pool{{"Pool"}}:::boundary --> capture["dev capture"]
-  capture -->|captured records| convert["dev records convert"]
-  convert -->|stored metadata and annotations| export["dev records export"]
-  export -->|joined records| storedcheck["dev records diff"]
-  capture -->|original capture| storedcheck
-  export -->|joined records| roundtrip["dev records roundtrip"]
-  roundtrip -->|records returned by the temporary service| servicecheck["dev records diff"]
-  capture -->|original capture| servicecheck
-  storedcheck -.->|review and select| records{{"Reviewed records"}}:::boundary
-  servicecheck -.->|review and select| records
-  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
+  pool["Pool records"] -->|"<code>dev capture</code>"| raw["Captured records"]
+  raw -->|"<code>dev records convert</code>"| stored["Stored metadata and annotation companions"]
+  stored -->|"<code>dev records export</code><br/>(join annotation companions)"| joined["Joined records"]
+  joined -->|"<code>dev records roundtrip</code><br/>(upload and re-dump)"| returned["Returned service records"]
+  raw -->|"<code>dev records diff</code>"| storedreport["Stored-record differences"]:::report
+  joined -->|"<code>dev records diff</code>"| storedreport
+  raw -->|"<code>dev records diff</code>"| servicereport["Service round-trip differences"]:::report
+  returned -->|"<code>dev records diff</code>"| servicereport
+  classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
 ### Check authored inputs
 
+Compare acquired content, configuration, and files with the selected upstream source.
+
 ```mermaid
 flowchart LR
-  upstream{{"Selected www-from-model"}}:::boundary --> acquire["dev inputs acquire"]
-  acquire -->|authored content and files| compare["dev inputs diff"]
-  upstream -->|original inputs| compare
-  compare -.->|review and select| inputs{{"Reviewed authored inputs"}}:::boundary
-  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
+  upstream["Authored inputs in selected www-from-model"] -->|"<code>dev inputs acquire</code>"| acquired["Acquired site-specific inputs"]
+  upstream -->|"<code>dev inputs diff</code>"| report["Authored-input differences"]:::report
+  acquired -->|"<code>dev inputs diff</code>"| report
+  classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
 ### Compare each generation step
 
-Run each pair of upstream and Lite commands with the same inputs.
-After each content comparison, review the outputs and select one for both commands in the next step.
+Run upstream and Lite with the same reviewed inputs at each step.
+This diagram follows the command examples below by selecting the upstream output after each comparison.
+Both composition commands also consume the reviewed authored inputs from the preceding diagram.
 
 ```mermaid
 flowchart TB
-  records{{"Reviewed records"}}:::boundary --> genup["dev content generate<br/>upstream"]
-  records --> genlite["dev content generate<br/>lite"]
-  genup -->|upstream pages and graph| contentdiff["dev content diff"]
-  genlite -->|Lite pages and graph| contentdiff
+  records["Reviewed records"] -->|"<code>dev content generate upstream</code>"| uppages["Upstream pages and graph"]
+  records -->|"<code>dev content generate lite</code>"| litepages["Lite pages and graph"]
+  uppages -.->|review and select| pages["Reviewed pages and graph"]
+  uppages -->|"<code>dev content diff</code>"| pagediff["Page and graph differences"]:::report
+  litepages -->|"<code>dev content diff</code>"| pagediff
 
-  contentdiff -.->|same reviewed pages and graph| composeup["dev content compose<br/>upstream"]
-  contentdiff -.->|same reviewed pages and graph| composelite["dev content compose<br/>lite"]
-  inputs{{"Reviewed authored inputs"}}:::boundary --> composeup
-  inputs --> composelite
-  composeup -->|upstream Hugo inputs| assemblydiff["dev content diff"]
-  composelite -->|Lite Hugo inputs| assemblydiff
+  pages -->|"<code>dev content compose upstream</code>"| upassembly["Upstream Hugo inputs"]
+  pages -->|"<code>dev content compose lite</code>"| liteassembly["Lite Hugo inputs"]
+  upassembly -.->|review and select| assembly["Reviewed Hugo inputs"]
+  upassembly -->|"<code>dev content diff</code>"| assemblydiff["Hugo-input differences"]:::report
+  liteassembly -->|"<code>dev content diff</code>"| assemblydiff
 
-  assemblydiff -.->|same reviewed Hugo inputs| renderup["dev site render<br/>upstream"]
-  assemblydiff -.->|same reviewed Hugo inputs| renderlite["dev site render<br/>lite"]
-  renderup -->|rendered upstream site| checkup["dev site check"]
-  renderup -->|rendered upstream site| sitediff["dev site diff"]
-  renderlite -->|rendered Lite site| sitediff
-  renderlite -->|rendered Lite site| checklite["dev site check"]
-  checkup --> upstreamchecks{{"Upstream site check results"}}:::boundary
-  sitediff --> differences{{"Website differences"}}:::boundary
-  checklite --> litechecks{{"Lite site check results"}}:::boundary
-  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
+  assembly -->|"<code>dev site render upstream</code>"| upsite["Rendered upstream site"]
+  assembly -->|"<code>dev site render lite</code>"| litesite["Rendered Lite site"]
+  upsite -->|"<code>dev site check</code>"| upchecks["Upstream site check results"]:::report
+  upsite -->|"<code>dev site diff</code>"| sitediff["Website differences"]:::report
+  litesite -->|"<code>dev site diff</code>"| sitediff
+  litesite -->|"<code>dev site check</code>"| litechecks["Lite site check results"]:::report
+  classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
 Raw comparisons remain available beside the summary of new differences.
