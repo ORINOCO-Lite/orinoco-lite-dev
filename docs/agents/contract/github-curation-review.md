@@ -14,6 +14,9 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 6. The service revalidates repository, permission, pull request, proposal, artifact, and current head, then posts one authenticated GitHub comment.
 7. A trusted workflow reads that comment, updates the compact decision cache, finalizes the proposal, validates the complete graph, and records the result on the same branch.
 
+For a `site-specific` submodule, the workflow coordinates metadata and website draft pull requests under the [source-adapter contract](source-adapters.md).
+The App installation and curator-permission checks apply to both repositories.
+
 The final bot message SHOULD say: `Recorded human acceptance decisions in <commit>. Ready for merging.` It does not need an AI-draft disclaimer or a statement about actions it did not take.
 
 ## Downstream review page

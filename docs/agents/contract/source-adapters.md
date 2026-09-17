@@ -58,7 +58,7 @@ Untouched records are not reformatted.
 Formatting, unused source fields, and PAV alone MUST NOT reopen review.
 
 Programmatic metadata proposals and finalization changes use the project Pixi task and its DataLad recording path.
-DataLad records the run and resulting commit in the downstream Git repository.
+DataLad records the run and resulting commits in Git, including changes to a `site-specific` subdataset.
 The repository MUST be configured so those paths remain ordinary Git content; source-adapter execution MUST NOT require Git Annex or annex adapter outputs.
 Direct human edits are ordinary Git commits.
 
@@ -143,9 +143,9 @@ It does not change source-adapter candidate or decision semantics.
 
 ## Guardrails
 
-- Website builds may read `site-specific` from a submodule.
-  Source-adapter writes remain confined to one repository.
-  Explicit GitHub editor submissions may coordinate the metadata draft and website gitlink under the bounded [SHACL editing profile](github-shacl-vue-edit.md).
+- Source-adapter proposals and finalization MUST support `site-specific` as either a directory or a Git submodule.
+  With a submodule, metadata, annotation companions, and decisions remain in the metadata repository; the website records the corresponding gitlink.
+  Coordinated writes MUST check both repository heads and validate the combined website and metadata state.
 - Static validation, review, build, and publication require no metadata service.
 - Git commits and Git revert are the transaction and recovery mechanisms.
 - Do not add candidate ledgers, duplicated diffs, exhaustive manifests, attestation graphs, or another persistent store.
