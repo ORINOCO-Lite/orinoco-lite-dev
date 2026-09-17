@@ -57,6 +57,7 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
     def test_supported_checkouts_never_follow_branch_hints(self) -> None:
         paths = (
             ROOT / "tools" / "checkout_submodules.py",
+            ROOT / "tools" / "upstream_checkout.py",
             WORKFLOW,
             RELEASE_WORKFLOW,
         )
