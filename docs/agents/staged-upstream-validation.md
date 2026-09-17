@@ -17,7 +17,7 @@ Direct scripts and Python module execution are for development and debugging.
 The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Reuse upstream operation names where their meanings match, and name projection targets explicitly.
-`get-records` follows upstream `dtc get-records`; `hugo project`, `hugo assemble`, and `hugo build` name the three website stages.
+`records get` corresponds to upstream `dtc get-records`; `hugo project`, `hugo assemble`, and `hugo build` name the three website stages.
 
 Implement the validation pipeline in stages, each introduced in a separately reviewable PR.
 Each PR should expose the relevant `dev` commands and inspectable outputs so we can verify that stage before building on it.
@@ -47,7 +47,7 @@ block-beta
   space:3
   returned["Records (as JSONL)"] space service["Service round-trip differences"]
 
-  pool -- "<code>dev get-records</code>" --> raw
+  pool -- "<code>dev records get</code>" --> raw
   raw -- "<code>dev records convert</code>" --> stored
   stored -- "<code>dev records export</code>" --> exported
   exported -- "<code>dev records roundtrip</code><br/>(upload and dump)" --> returned
@@ -122,7 +122,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | PR | Scope | What the reviewer runs and inspects |
 | --- | --- | --- |
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
-| B — Capture and recording | Expose #152's capture operation as `dev get-records`. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
+| B — Capture and recording | Expose #152's capture operation as `dev records get`. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, and field-level comparison. Carry the reviewed date-preservation fix from #152. | Convert the capture, export joined records, and inspect changed identifiers, fields, and values. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
@@ -143,7 +143,7 @@ Dependency selection comes from the downstream and package, without repeating up
 ### Capture, conversion, and service round-trip
 
 ```console
-orinoco-lite dev get-records site-specific/sources/pool/records.jsonl
+orinoco-lite dev records get site-specific/sources/pool/records.jsonl
 orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
 orinoco-lite dev records export site-specific build/records/joined.jsonl
 orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
