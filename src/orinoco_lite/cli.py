@@ -116,9 +116,11 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
     setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
-    from . import local_preview, publication, shacl_handoff
+    from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
+    commands.add_parser("curation", parents=[curation_actions.parser()], add_help=False,
+                        help="run the trusted source-adapter GitHub workflow")
     publication_parser = publication.parser()
     commands.add_parser("verify-site", parents=[preview_parser], add_help=False,
                         description=preview_parser.description, epilog=preview_parser.epilog,
@@ -329,10 +331,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
-        if args.command in {"verify-site", "publication", "shacl-handoff"}:
-            from . import local_preview, publication, shacl_handoff
+        if args.command in {"verify-site", "publication", "shacl-handoff", "curation"}:
+            from . import local_preview, publication, shacl_handoff, curation_actions
             return {"verify-site": local_preview, "publication": publication,
-                    "shacl-handoff": shacl_handoff}[args.command].execute(args)
+                    "shacl-handoff": shacl_handoff, "curation": curation_actions}[args.command].execute(args)
         if args.command == "dev" and args.dev_command in {"enable", "disable", "setup"}:
             from . import development, instantiate
             if args.dev_command == "setup":

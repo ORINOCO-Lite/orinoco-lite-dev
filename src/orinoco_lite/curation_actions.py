@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from contextlib import contextmanager, ExitStack
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ import sys
 
 from . import curation
 from .finalization import _diff_paths, _site_gitlink
-from .workflow_access import request_json
+from .workflow_access import obtain, request_json, revoke
 
 SCRATCH = Path("build/curation")
 CONTEXT = SCRATCH / "context.json"
@@ -47,7 +48,7 @@ def prepare() -> None:
     repository = os.environ["GITHUB_REPOSITORY"]
     base = git(Path.cwd(), "rev-parse", "HEAD")
     context = {"repository": repository, "base": base, "head": base,
-               "comment_id": None, "number": 0, "adapter": os.environ.get("ADAPTER", ""),
+               "comment_id": None, "number": 0, "adapter": event.get("inputs", {}).get("adapter", ""),
                "branch": f"automation/curation/{os.environ['GITHUB_RUN_ID']}"}
     if os.environ["GITHUB_EVENT_NAME"] == "issue_comment":
         comment = api(f"/repos/{repository}/issues/comments/{event['comment']['id']}")
@@ -84,7 +85,6 @@ def prepare() -> None:
         raise RuntimeError("This coordinated workflow requires site-specific as a submodule")
     SCRATCH.mkdir(parents=True, exist_ok=True)
     CONTEXT.write_text(json.dumps(context))
-    output(head=context["head"], number=context["number"], comment_id=context["comment_id"] or "")
 
 
 def checkout(context: dict) -> None:
@@ -115,7 +115,8 @@ def record(context: dict) -> None:
     if not plan.candidates:
         if context["comment_id"]:
             raise RuntimeError("The regenerated proposal has no candidates")
-        output(has_changes="false")
+        context["has_changes"] = False
+        CONTEXT.write_text(json.dumps(context))
         print("No new source claims require review.")
         return
     if context["comment_id"]:
@@ -155,9 +156,8 @@ def record(context: dict) -> None:
     if git(root, "status", "--porcelain", "--untracked-files=all") or git(root / "site-specific", "status", "--porcelain", "--untracked-files=all"):
         raise RuntimeError("Adapter recording left uncommitted changes outside its declared outputs")
     context.update(result=git(root, "rev-parse", "HEAD"), metadata_result=git(root / "site-specific", "rev-parse", "HEAD"),
-                   source_coordinate=dict(plan.source_coordinate))
+                   source_coordinate=dict(plan.source_coordinate), has_changes=True)
     CONTEXT.write_text(json.dumps(context))
-    output(has_changes="true")
 
 
 def publish(context: dict) -> None:
@@ -208,7 +208,6 @@ def publish(context: dict) -> None:
     except Exception:
         print(f"Partial write: metadata {metadata}@{context['metadata_result']} was pushed. Inspect both drafts before retrying; no rollback or merge was attempted.", file=sys.stderr)
         raise
-    output(number=context["number"], proposal=context["result"])
 
 
 def bundle(context: dict) -> None:
@@ -230,15 +229,106 @@ def announce(context: dict) -> None:
     api(f"/repos/{context['repository']}/issues/{context['number']}/comments", {"body": body})
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("prepare", "checkout", "record", "publish", "bundle", "announce"))
-    args = parser.parse_args()
-    if args.operation == "prepare":
-        prepare()
+@contextmanager
+def environment(**values: str):
+    """Limit credentials to the transport that needs them; never save them on disk."""
+    previous = {key: os.environ.get(key) for key in values}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def access(context: dict, *, write: bool = False) -> dict:
+    return obtain({"repository": context["repository"], "head": context["head"],
+                   "comment_id": context["comment_id"], "write": write}, curation=True)
+
+
+def validate_run() -> None:
+    print("Resolve the trusted event and check out both repository heads.", flush=True)
+    prepare()
+    context = json.loads(CONTEXT.read_text())
+    credentials = access(context)
+    try:
+        with environment(METADATA_TOKEN=credentials["token"],
+                         METADATA_REPOSITORY=credentials["repository"],
+                         METADATA_HEAD=credentials["head"]):
+            checkout(context)
+    finally:
+        revoke(credentials["token"])
+    print("Validate and record the composed adapter result without installation credentials.", flush=True)
+    record(context)
+
+
+def publish_run() -> None:
+    context = json.loads(CONTEXT.read_text())
+    if not context["has_changes"]:
+        print("No new source claims require publication.")
+        return
+    print("Recheck authorization and publish both drafts at their exact heads.", flush=True)
+    credentials = access(context, write=True)
+    # Only a successful proposal publication needs a token in the final step,
+    # after GitHub's official action has uploaded the review artifact.
+    retain_website_token = False
+    try:
+        with environment(GH_TOKEN=credentials["website_token"], METADATA_TOKEN=credentials["token"],
+                         DEFAULT_BRANCH=json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())["repository"]["default_branch"]):
+            publish(context)
+            if context["comment_id"]:
+                announce(context)
+            else:
+                bundle(context)
+                output(review_artifact=f"orinoco-curation-review-{context['result']}",
+                       review_token=credentials["website_token"])
+                retain_website_token = True
+    finally:
+        # ExitStack attempts both revocations even if the first one fails.
+        with ExitStack() as cleanup:
+            if not retain_website_token:
+                cleanup.callback(revoke, credentials["website_token"])
+            cleanup.callback(revoke, credentials["token"])
+
+
+def complete_run(artifact_id: str) -> None:
+    token = os.environ.get("CURATION_REVIEW_TOKEN", "")
+    if not token:
+        return
+    try:
+        if artifact_id:
+            if not artifact_id.isdigit():
+                raise RuntimeError("Invalid review artifact identifier")
+            with environment(GH_TOKEN=token, ARTIFACT_ID=artifact_id):
+                announce(json.loads(CONTEXT.read_text()))
+        else:
+            print("Review presentation was not uploaded; inspect the published drafts before retrying.")
+    finally:
+        revoke(token)
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description="Run trusted source-adapter curation in GitHub Actions.")
+    commands = result.add_subparsers(dest="curation_command", required=True)
+    commands.add_parser("validate", help="prepare, validate, and record the event's metadata changes locally")
+    commands.add_parser("publish", help="authorize and publish the validated changes as paired drafts")
+    complete = commands.add_parser("complete", help="link the uploaded review and release its temporary access")
+    complete.add_argument("--artifact-id", default="", help="identifier returned by GitHub's artifact upload action")
+    return result
+
+
+def execute(args: argparse.Namespace) -> int:
+    if args.curation_command == "validate":
+        validate_run()
+    elif args.curation_command == "publish":
+        publish_run()
     else:
-        globals()[args.operation](json.loads(CONTEXT.read_text()))
+        complete_run(args.artifact_id)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    execute(parser().parse_args())
