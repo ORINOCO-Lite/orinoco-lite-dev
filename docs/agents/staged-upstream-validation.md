@@ -18,66 +18,67 @@ The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations built from the same code.
 
-### Prepare and review inputs
+Rectangles contain `dev` commands; blue hexagons mark inputs and final results.
+Arrow labels name the data passed between commands.
+Dashed arrows show review selecting one shared input for the next commands.
 
-First check record preservation and authored inputs.
-Rounded boxes identify reviewed inputs; dotted arrows show how comparisons inform a maintainer's selection.
+### Check record preservation
+
+```mermaid
+flowchart TB
+  pool{{"Pool"}}:::boundary --> capture["dev capture"]
+  capture -->|captured records| convert["dev records convert"]
+  convert -->|stored metadata and annotations| export["dev records export"]
+  export -->|joined records| storedcheck["dev records diff"]
+  capture -->|original capture| storedcheck
+  export -->|joined records| roundtrip["dev records roundtrip"]
+  roundtrip -->|records returned by the temporary service| servicecheck["dev records diff"]
+  capture -->|original capture| servicecheck
+  storedcheck -.->|review and select| records{{"Reviewed records"}}:::boundary
+  servicecheck -.->|review and select| records
+  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
+```
+
+### Check authored inputs
 
 ```mermaid
 flowchart LR
-  subgraph records["Record preservation"]
-    direction TB
-    pool["Pool"] -->|supplies| raw["Captured records"]
-    raw -->|convert to| stored["Site-specific metadata"]
-    stored -->|is exported as| joined["Joined records"]
-    joined -->|round-trip through a temporary service as| returned["Returned records"]
-    raw -->|provide the reference for| storedcheck["Stored-record comparison"]
-    joined -->|are checked by| storedcheck
-    raw -->|provide the reference for| servicecheck["Service comparison"]
-    returned -->|are checked by| servicecheck
-    storedcheck -.->|informs selection of| reviewed(["Reviewed records"])
-    servicecheck -.->|informs selection of| reviewed
-  end
-  subgraph authored["Authored inputs"]
-    direction TB
-    upstream["Selected www-from-model"] -->|supplies| files["Authored content and files"]
-    upstream -->|provides the reference for| inputcheck["Authored-input comparison"]
-    files -->|are checked by| inputcheck
-    inputcheck -.->|informs selection of| inputs(["Reviewed authored inputs"])
-  end
-  %% Keep the independent input reviews beside each other.
-  records ~~~ authored
+  upstream{{"Selected www-from-model"}}:::boundary --> acquire["dev inputs acquire"]
+  acquire -->|authored content and files| compare["dev inputs diff"]
+  upstream -->|original inputs| compare
+  compare -.->|review and select| inputs{{"Reviewed authored inputs"}}:::boundary
+  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
 ### Compare each generation step
 
-Then compare generation, composition, and rendering using the same reviewed inputs for upstream and Lite.
-Select one reviewed output for the next comparison.
+Run each pair of upstream and Lite commands with the same inputs.
+After each content comparison, review the outputs and select one for both commands in the next step.
 
 ```mermaid
 flowchart TB
-  records(["Reviewed records"])
-  records -->|feed| genup["dev content generate upstream"]
-  records -->|feed| genlite["dev content generate lite"]
-  genup -->|supplies pages and graph to| contentdiff["dev content diff"]
-  genlite -->|supplies pages and graph to| contentdiff
-  contentdiff -.->|informs selection of| projection(["Reviewed generated content"])
+  records{{"Reviewed records"}}:::boundary --> genup["dev content generate<br/>upstream"]
+  records --> genlite["dev content generate<br/>lite"]
+  genup -->|upstream pages and graph| contentdiff["dev content diff"]
+  genlite -->|Lite pages and graph| contentdiff
 
-  inputs(["Reviewed authored inputs"])
-  projection -->|supplies content to| shared["Shared composition inputs"]
-  inputs -->|supply authored files to| shared
-  shared -->|feed| composeup["dev content compose upstream"]
-  shared -->|feed| composelite["dev content compose lite"]
-  composeup -->|supplies Hugo inputs to| assemblydiff["dev content diff"]
-  composelite -->|supplies Hugo inputs to| assemblydiff
-  assemblydiff -.->|informs selection of| assembly(["Reviewed Hugo inputs"])
+  contentdiff -.->|same reviewed pages and graph| composeup["dev content compose<br/>upstream"]
+  contentdiff -.->|same reviewed pages and graph| composelite["dev content compose<br/>lite"]
+  inputs{{"Reviewed authored inputs"}}:::boundary --> composeup
+  inputs --> composelite
+  composeup -->|upstream Hugo inputs| assemblydiff["dev content diff"]
+  composelite -->|Lite Hugo inputs| assemblydiff
 
-  assembly -->|feed| renderup["dev site render upstream"]
-  assembly -->|feed| renderlite["dev site render lite"]
-  renderup -->|produces one of| sites["Rendered websites"]
-  renderlite -->|produces one of| sites
-  sites -->|are compared by| sitediff["dev site diff"]
-  sites -->|are checked by| check["dev site check"]
+  assemblydiff -.->|same reviewed Hugo inputs| renderup["dev site render<br/>upstream"]
+  assemblydiff -.->|same reviewed Hugo inputs| renderlite["dev site render<br/>lite"]
+  renderup -->|rendered upstream site| checkup["dev site check"]
+  renderup -->|rendered upstream site| sitediff["dev site diff"]
+  renderlite -->|rendered Lite site| sitediff
+  renderlite -->|rendered Lite site| checklite["dev site check"]
+  checkup --> upstreamchecks{{"Upstream site check results"}}:::boundary
+  sitediff --> differences{{"Website differences"}}:::boundary
+  checklite --> litechecks{{"Lite site check results"}}:::boundary
+  classDef boundary fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
 Raw comparisons remain available beside the summary of new differences.
