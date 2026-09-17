@@ -88,3 +88,118 @@ def test_comment_identity_ignores_extra_api_user_fields(tmp_path, monkeypatch, c
     else:
         curation_actions.prepare()
         assert json.loads(curation_actions.CONTEXT.read_text())["comment_id"] == 7
+
+
+@pytest.fixture
+def coordinated_run(tmp_path, monkeypatch):
+    import json
+    context = {"repository": "example/site", "head": "a" * 40, "comment_id": None,
+               "has_changes": True, "result": "b" * 40}
+    context_path = tmp_path / "context.json"
+    context_path.write_text(json.dumps(context))
+    monkeypatch.setattr(curation_actions, "CONTEXT", context_path)
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"repository": {"default_branch": "main"}}))
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setenv("GH_TOKEN", "builtin-read")
+    credentials = {"token": "metadata-secret", "website_token": "website-secret",
+                   "repository": "example/metadata", "head": "c" * 40}
+    monkeypatch.setattr(curation_actions, "access", Mock(return_value=credentials))
+    monkeypatch.setattr(curation_actions, "revoke", Mock())
+    return context, tmp_path
+
+
+def test_validation_releases_read_access_before_running_adapter(coordinated_run, monkeypatch):
+    import os
+    monkeypatch.setattr(curation_actions, "prepare", Mock())
+    def checkout(context):
+        assert os.environ["METADATA_TOKEN"] == "metadata-secret"
+    def record(context):
+        assert "METADATA_TOKEN" not in os.environ
+        curation_actions.revoke.assert_called_once_with("metadata-secret")
+        raise RuntimeError("invalid graph")
+    monkeypatch.setattr(curation_actions, "checkout", checkout)
+    monkeypatch.setattr(curation_actions, "record", record)
+    with pytest.raises(RuntimeError, match="invalid graph"):
+        curation_actions.validate_run()
+    assert curation_actions.access.call_args.kwargs == {}
+
+
+def test_failed_checkout_releases_read_access(coordinated_run, monkeypatch):
+    import os
+    monkeypatch.setattr(curation_actions, "prepare", Mock())
+    monkeypatch.setattr(curation_actions, "checkout", Mock(side_effect=RuntimeError("checkout failed")))
+    with pytest.raises(RuntimeError, match="checkout failed"):
+        curation_actions.validate_run()
+    curation_actions.revoke.assert_called_once_with("metadata-secret")
+    assert "METADATA_TOKEN" not in os.environ
+
+
+def test_failed_publication_attempts_both_revocations(coordinated_run, monkeypatch):
+    import os
+    monkeypatch.setattr(curation_actions, "publish", Mock(side_effect=RuntimeError("push failed")))
+    curation_actions.revoke.side_effect = [RuntimeError("revocation failed"), None]
+    with pytest.raises(RuntimeError, match="revocation failed"):
+        curation_actions.publish_run()
+    assert [call.args[0] for call in curation_actions.revoke.call_args_list] == ["metadata-secret", "website-secret"]
+    assert os.environ["GH_TOKEN"] == "builtin-read"
+    assert "METADATA_TOKEN" not in os.environ
+
+
+def test_proposal_retains_only_review_access_until_artifact_completion(coordinated_run, monkeypatch):
+    import os
+    _, root = coordinated_run
+    monkeypatch.setattr(curation_actions, "publish", Mock())
+    monkeypatch.setattr(curation_actions, "bundle", Mock())
+    curation_actions.publish_run()
+    curation_actions.revoke.assert_called_once_with("metadata-secret")
+    assert "metadata-secret" not in (root / "output").read_text()
+    assert "review_token=website-secret" in (root / "output").read_text()
+    assert "secret" not in (root / "context.json").read_text()
+    assert os.environ["GH_TOKEN"] == "builtin-read"
+    monkeypatch.setenv("CURATION_REVIEW_TOKEN", "website-secret")
+    def announce(context):
+        assert os.environ["ARTIFACT_ID"] == "123"
+        assert os.environ["GH_TOKEN"] == "website-secret"
+    monkeypatch.setattr(curation_actions, "announce", announce)
+    curation_actions.complete_run("123")
+    assert curation_actions.revoke.call_args.args == ("website-secret",)
+    assert os.environ["GH_TOKEN"] == "builtin-read"
+
+
+@pytest.mark.parametrize("artifact", ["", "123"])
+def test_completion_revokes_access_after_missing_upload_or_failed_comment(monkeypatch, coordinated_run, artifact):
+    monkeypatch.setenv("CURATION_REVIEW_TOKEN", "website-secret")
+    monkeypatch.setattr(curation_actions, "announce", Mock(side_effect=RuntimeError("comment failed")))
+    if artifact:
+        with pytest.raises(RuntimeError, match="comment failed"):
+            curation_actions.complete_run(artifact)
+    else:
+        curation_actions.complete_run(artifact)
+        curation_actions.announce.assert_not_called()
+    curation_actions.revoke.assert_called_once_with("website-secret")
+
+
+def test_no_candidates_requests_no_write_access(coordinated_run):
+    import json
+    context, _ = coordinated_run
+    context["has_changes"] = False
+    curation_actions.CONTEXT.write_text(json.dumps(context))
+    curation_actions.publish_run()
+    curation_actions.access.assert_not_called()
+
+
+def test_finalization_completes_without_exporting_credentials(coordinated_run, monkeypatch):
+    import json
+    context, root = coordinated_run
+    context["comment_id"] = 7
+    curation_actions.CONTEXT.write_text(json.dumps(context))
+    monkeypatch.setattr(curation_actions, "publish", Mock())
+    monkeypatch.setattr(curation_actions, "announce", Mock())
+    monkeypatch.setattr(curation_actions, "bundle", Mock())
+    curation_actions.publish_run()
+    curation_actions.announce.assert_called_once()
+    curation_actions.bundle.assert_not_called()
+    assert not (root / "output").exists()
+    assert {call.args[0] for call in curation_actions.revoke.call_args_list} == {"metadata-secret", "website-secret"}
