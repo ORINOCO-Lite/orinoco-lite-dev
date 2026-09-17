@@ -89,6 +89,12 @@ def main() -> None:
     print(f"::add-mask::{token}")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         output.write(f"token={token}\n")
+        if args.curation and args.write:
+            website_token = result.get("website_token")
+            if not isinstance(website_token, str) or not website_token or any(c in website_token for c in "\r\n\0"):
+                raise RuntimeError("The service did not return bounded website access")
+            print(f"::add-mask::{website_token}")
+            output.write(f"website_token={website_token}\n")
         if args.curation:
             for key in ("repository", "head"):
                 value = result.get(key)

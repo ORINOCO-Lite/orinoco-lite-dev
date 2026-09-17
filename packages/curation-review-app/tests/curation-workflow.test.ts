@@ -182,6 +182,7 @@ describe("source-adapter workflow access", () => {
       { ...request, write: true },
       auth,
     );
+    expect(auth.token).toHaveBeenCalledWith("owner/site", true, false, true);
     expect(auth.token).toHaveBeenCalledWith(
       "owner/metadata",
       true,

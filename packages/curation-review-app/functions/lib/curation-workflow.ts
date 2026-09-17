@@ -200,16 +200,24 @@ export async function curationWorkflowAccess(
           "Composed validation and DataLad recording must succeed before write access.",
         );
       }
-      return {
-        ...(await auth.token(
-          pinned.repository,
-          true,
-          false,
-          request.comment_id === null,
-        )),
-        repository: pinned.repository,
-        head: current.sha,
-      };
+      const writableMetadata = await auth.token(
+        pinned.repository,
+        true,
+        false,
+        request.comment_id === null,
+      );
+      try {
+        const writableWebsite = await auth.token(repository, true, false, true);
+        return {
+          ...writableMetadata,
+          website_token: writableWebsite.token,
+          repository: pinned.repository,
+          head: current.sha,
+        };
+      } catch (error) {
+        await auth.revoke(writableMetadata.token);
+        throw error;
+      }
     }
     const result = metadataToken;
     metadataToken = undefined;
