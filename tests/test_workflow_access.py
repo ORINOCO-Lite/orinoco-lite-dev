@@ -46,8 +46,9 @@ def test_credentials_cannot_follow_redirects():
 def test_transport_failure_does_not_print_credentials_or_untrusted_body():
     with patch("urllib.request.OpenerDirector.open", side_effect=urllib.error.HTTPError(
         "https://review.example", 403, "untrusted response", {}, None
-    )):
+    )) as opened:
         with pytest.raises(RuntimeError, match="HTTP 403") as caught:
             workflow_access.request_json("https://review.example", "secret")
+    assert opened.call_args.args[0].get_header("User-agent") == "orinoco-lite-workflow-access"
     assert "secret" not in str(caught.value)
     assert "untrusted response" not in str(caught.value)

@@ -25,7 +25,11 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def request_json(url: str, token: str, body: dict | None = None) -> dict:
     request = urllib.request.Request(
         url,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "orinoco-lite-workflow-access",
+        },
         data=None if body is None else json.dumps(body).encode(),
     )
     try:
