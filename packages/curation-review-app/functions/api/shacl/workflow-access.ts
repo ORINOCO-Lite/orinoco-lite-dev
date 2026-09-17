@@ -1,5 +1,6 @@
 import type { EventContext } from "../../lib/pages";
 import {
+  HttpError,
   jsonResponse,
   readJsonBody,
   requireMethod,
@@ -18,11 +19,17 @@ export async function onRequest(context: EventContext): Promise<Response> {
     context.request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "",
     context.env.PUBLIC_ORIGIN,
   );
-  return jsonResponse(
-    await workflowAccess(
-      context.env,
-      identity,
-      object(await readJsonBody(context.request, 4096)),
-    ),
-  );
+  try {
+    return jsonResponse(
+      await workflowAccess(
+        context.env,
+        identity,
+        object(await readJsonBody(context.request, 4096)),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof HttpError)
+      console.warn("Workflow access error:", error.code);
+    throw error;
+  }
 }

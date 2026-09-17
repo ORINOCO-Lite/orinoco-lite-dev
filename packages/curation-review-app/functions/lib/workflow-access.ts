@@ -159,10 +159,39 @@ export async function verifyAuthorization(
 // Tokens never leave this service except for the one repository explicitly
 // authorized for this trusted job. The App private key is operator-only.
 export class AppAuthentication {
+  readonly fetcher: typeof fetch;
   constructor(
     readonly env: Env,
-    readonly fetcher: typeof fetch = fetch,
-  ) {}
+    fetcher: typeof fetch = fetch,
+  ) {
+    this.fetcher = async (input, init) => {
+      const response = await fetcher(input, init);
+      if (!response.ok) {
+        const path = new URL(
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+        ).pathname;
+        const operation = path.includes("/collaborators/")
+          ? "curator-permission"
+          : path.endsWith("/access_tokens")
+            ? "issue-installation-token"
+            : path.endsWith("/installation")
+              ? "resolve-installation"
+              : path === "/graphql"
+                ? "read-repository-content"
+                : "verify-repository-state";
+        console.warn(
+          "Workflow GitHub request rejected:",
+          operation,
+          response.status,
+        );
+      }
+      return response;
+    };
+  }
   async token(
     repository: string,
     write = false,
