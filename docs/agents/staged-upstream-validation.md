@@ -16,6 +16,8 @@ Pixi tasks may shorten common commands, and CI uses those tasks or the CLI.
 Direct scripts and Python module execution are for development and debugging.
 The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
+Reuse upstream operation names where their meanings match, and name projection targets explicitly.
+`get-records` follows upstream `dtc get-records`; `hugo project`, `hugo assemble`, and `hugo build` name the three website stages.
 
 Implement the validation pipeline in stages, each introduced in a separately reviewable PR.
 Each PR should expose the relevant `dev` commands and inspectable outputs so we can verify that stage before building on it.
@@ -45,7 +47,7 @@ block-beta
   space:3
   returned["Records (as JSONL)"] space service["Service round-trip differences"]
 
-  pool -- "<code>dev capture</code>" --> raw
+  pool -- "<code>dev get-records</code>" --> raw
   raw -- "<code>dev records convert</code>" --> stored
   stored -- "<code>dev records export</code>" --> exported
   exported -- "<code>dev records roundtrip</code><br/>(upload and dump)" --> returned
@@ -71,15 +73,15 @@ Lite assembles the files Hugo will render from these sources and the generated c
 
 The template layers over the upstream presentation, then site-specific settings and overrides apply.
 Generated content supplies record pages; site-specific authored content is applied afterward.
-Inspect changes in their own repositories and compare their combined effect in the Hugo input tree before rendering.
+Inspect changes in their own repositories and compare their combined effect in the Hugo input tree before building the website.
 
-For the psychoinformatics replica, `dev inputs acquire` imports selected site settings, authored pages, and site-owned files into `site-specific/`.
+For the psychoinformatics replica, `dev inputs import` imports selected site settings, authored pages, and site-owned files into `site-specific/`.
 `dev inputs diff` checks that import against its sources.
 This import is separate from resolving the pinned presentation and dependencies, which remain in their repositories.
 
-### Compare each generation step
+### Compare each Hugo step
 
-Generate pages and graph data, assemble the Hugo inputs, then render the website.
+Project records into Hugo pages and graph data, assemble the Hugo inputs, then build the website.
 Each diff compares the upstream and Lite output at that point.
 
 ```mermaid
@@ -95,9 +97,9 @@ block-beta
   space:3
   space:2 checks["Site check results"]
 
-  records -- "<code>dev content generate</code>" --> content
-  content -- "<code>dev content compose</code>" --> assembly
-  assembly -- "<code>dev site render</code>" --> site
+  records -- "<code>dev hugo project</code>" --> content
+  content -- "<code>dev hugo assemble</code>" --> assembly
+  assembly -- "<code>dev hugo build</code>" --> site
   content -- "<code>dev content diff</code>" --> contentdiff
   assembly -- "<code>dev content diff</code>" --> assemblydiff
   site -- "<code>dev site diff</code>" --> sitediff
@@ -120,13 +122,13 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | PR | Scope | What the reviewer runs and inspects |
 | --- | --- | --- |
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
-| B — Capture and recording | Extract #152's capture command. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
+| B — Capture and recording | Expose #152's capture operation as `dev get-records`. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, and field-level comparison. Carry the reviewed date-preservation fix from #152. | Convert the capture, export joined records, and inspect changed identifiers, fields, and values. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
-| F — Content generation | Expose upstream and Lite page generation from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before Hugo. |
-| G — Hugo input assembly | Separate assembly of Hugo inputs from rendering in the existing builder. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
-| H — Rendering and comparison | Render the Hugo input tree. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new rendering differences, then run the complete generation comparison. |
+| F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
+| G — Hugo input assembly | Separate assembly of Hugo inputs from building the website. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
+| H — Hugo build and comparison | Build the website from the supplied Hugo input tree. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new website differences, then run the complete generation comparison. |
 
 Review each stage's implementation and comparison outputs before merging its PR.
 Keep the existing #152 discussion available while extracting its changes.
@@ -141,7 +143,7 @@ Dependency selection comes from the downstream and package, without repeating up
 ### Capture, conversion, and service round-trip
 
 ```console
-orinoco-lite dev capture site-specific/sources/pool/records.jsonl
+orinoco-lite dev get-records site-specific/sources/pool/records.jsonl
 orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
 orinoco-lite dev records export site-specific build/records/joined.jsonl
 orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
@@ -157,43 +159,44 @@ The final diff checks the complete round-trip against the original capture.
 The diff shows raw field changes and identifies reviewed annotation-equivalent changes separately.
 It preserves list order, duplicate values, scalar types, and the distinction between null and missing values.
 
-### Site-data import and generated content
+### Site-data import and Hugo projection
 
 ```console
-orinoco-lite dev inputs acquire site-specific
+orinoco-lite dev inputs import site-specific
 orinoco-lite dev inputs diff site-specific
-orinoco-lite dev content generate upstream build/upstream/projection --records build/records/joined.jsonl
-orinoco-lite dev content generate lite build/lite/projection --records build/records/joined.jsonl
+orinoco-lite dev hugo project upstream build/upstream/projection --records build/records/joined.jsonl
+orinoco-lite dev hugo project lite build/lite/projection --records build/records/joined.jsonl
 orinoco-lite dev content diff build/upstream/projection build/lite/projection
 ```
 
 The import reads selected site data from `www-from-model` and any referenced file sources, preserving required page-resource placement.
 Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `site.yaml`.
-Generation produces pages and graph data from the same joined records on both sides.
+Hugo projection produces pages and graph data from the same joined records on both sides.
 The content diff reports page and graph differences separately.
 
-### Hugo inputs and rendering
+### Hugo assembly and build
 
 These examples assemble both sets of Hugo inputs from the upstream generated content.
 
 ```console
-orinoco-lite dev content compose upstream build/upstream/projection build/upstream/assembly --inputs site-specific
-orinoco-lite dev content compose lite build/upstream/projection build/lite/assembly --inputs site-specific
+orinoco-lite dev hugo assemble upstream build/upstream/projection build/upstream/assembly --inputs site-specific
+orinoco-lite dev hugo assemble lite build/upstream/projection build/lite/assembly --inputs site-specific
 orinoco-lite dev content diff build/upstream/assembly build/lite/assembly
 ```
 
-Then use the upstream Hugo input tree for the rendering comparison.
+Then use the upstream Hugo input tree for the build comparison.
 
 ```console
-orinoco-lite dev site render upstream build/upstream/assembly build/upstream/site --base-url /
-orinoco-lite dev site render lite build/upstream/assembly build/lite/site --base-url /
+orinoco-lite dev hugo build upstream build/upstream/assembly build/upstream/site --base-url /
+orinoco-lite dev hugo build lite build/upstream/assembly build/lite/site --base-url /
 orinoco-lite dev site diff build/upstream/site build/lite/site
 orinoco-lite dev site check build/upstream/site
 orinoco-lite dev site check build/lite/site
 ```
 
-Rendering consumes the supplied Hugo input tree without rebuilding it.
-For the final comparison, generate upstream content from the raw retained capture and Lite content from the converted records.
+`dev hugo build` consumes the supplied Hugo input tree without reassembling it.
+The ordinary `orinoco-lite build` runs projection, assembly, and the website build together.
+For the final comparison, project upstream content from the raw retained capture and Lite content from the converted records.
 Give each path its own generated content and Hugo input tree, then compare the rendered sites.
 This final run checks how the reviewed steps work together.
 
@@ -270,20 +273,21 @@ No comments were present on #142 or #154 during the initial review.
 
 - `upstream_snapshot` and record split/join code already exist on `main`.
   The new record export must include annotation companions.
+  It writes JSONL from Lite's stored records; upstream `dtc export` and `dtc import` instead transfer service collections to and from their filesystem format.
 - Conversion must update only the records and annotation companions it owns.
   Preserve the capture, authored inputs, and repository state in an existing `site-specific` directory.
   The current converter replaces its output directory, so C must separate that write boundary before reusing it.
-- Reuse the selected upstream query/Jinja commands for upstream page generation.
-  Expose Lite generation through the existing projection code, with an explicit record input.
-- Extract shared Hugo input assembly and rendering functions from `site.py`.
+- Implement `dev hugo project upstream` with the selected `query-things` operations, including `render-record`, and the upstream graph producer.
+  Expose Lite Hugo projection through the existing projection code, with an explicit record input.
+- Extract shared Hugo input assembly and build functions from `site.py`.
   Ordinary `build` should call them too.
-  Its current implementation recreates the assembly before rendering.
+  Its current implementation recreates the assembly before invoking Hugo.
 - Move user-facing operations out of recorded `python -m` calls in `instantiate.py` and `development.py`.
   Retain internal Python functions for code reuse.
 - Cleanup retains the tested checkout and worktree-preservation helpers.
   It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
   D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.
-  Consider the upstream `dtc` client there before adding more HTTP code.
+  Prefer the pinned `dtc get-records` and `dtc post-records` operations for capture and service round-trips before adding more HTTP code.
 - Use #152's capture implementation for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
   Keep #142 available until the useful behavior has been carried across.
 - The retained Pool-diff tool is self-contained.
