@@ -49,3 +49,42 @@ def test_partial_write_reports_metadata_commit_without_rollback(publication, cap
     assert "Partial write" in diagnostic
     assert "metadata-token" not in diagnostic
     assert "website-token" not in diagnostic
+
+
+@pytest.mark.parametrize("changed", [None, "body", "author"])
+def test_comment_identity_ignores_extra_api_user_fields(tmp_path, monkeypatch, changed):
+    import json
+    from copy import deepcopy
+
+    submission = {"repository": "example/site", "pull_request": 8,
+                  "head_sha": "a" * 40, "proposal_sha": "b" * 40,
+                  "adapter": "fixture"}
+    comment = {"id": 7, "body": "/curation submit\n```json\n" + json.dumps(submission) + "\n```",
+               "user": {"id": 1, "login": "curator", "type": "User"},
+               "created_at": "now", "updated_at": "now", "html_url": "https://github.com/comment/7"}
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"comment": comment, "issue": {"number": 8}}))
+    current = deepcopy(comment)
+    current["user"]["user_view_type"] = "public"
+    if changed == "body":
+        current["body"] += "changed"
+    if changed == "author":
+        current["user"]["id"] = 2
+    pull = {"state": "open", "draft": True,
+            "head": {"sha": "a" * 40, "ref": "review", "repo": {"full_name": "example/site"}},
+            "base": {"sha": "c" * 40}}
+    monkeypatch.setattr(curation_actions, "api", Mock(side_effect=[current, pull]))
+    monkeypatch.setattr(curation_actions, "git", Mock(return_value="c" * 40))
+    monkeypatch.setattr(curation_actions, "_site_gitlink", Mock(return_value="d" * 40))
+    monkeypatch.setattr(curation_actions, "SCRATCH", tmp_path / "scratch")
+    monkeypatch.setattr(curation_actions, "CONTEXT", tmp_path / "scratch/context.json")
+    for key, value in {"GITHUB_EVENT_PATH": str(event), "GITHUB_EVENT_NAME": "issue_comment",
+                       "GITHUB_REPOSITORY": "example/site", "GITHUB_RUN_ID": "1",
+                       "GITHUB_OUTPUT": str(tmp_path / "output")}.items():
+        monkeypatch.setenv(key, value)
+    if changed:
+        with pytest.raises(RuntimeError, match="comment.*changed"):
+            curation_actions.prepare()
+    else:
+        curation_actions.prepare()
+        assert json.loads(curation_actions.CONTEXT.read_text())["comment_id"] == 7

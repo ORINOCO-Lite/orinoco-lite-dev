@@ -53,9 +53,12 @@ def prepare() -> None:
         comment = api(f"/repos/{repository}/issues/comments/{event['comment']['id']}")
         if comment != event["comment"]:
             # Compare durable review facts; API responses may add unrelated fields.
-            for key in ("body", "id", "user", "created_at", "updated_at", "html_url"):
+            for key in ("body", "id", "created_at", "updated_at", "html_url"):
                 if comment.get(key) != event["comment"].get(key):
                     raise RuntimeError("The authenticated comment changed")
+        if any(comment["user"].get(key) != event["comment"]["user"].get(key)
+               for key in ("id", "login", "type")):
+            raise RuntimeError("The authenticated comment author changed")
         if comment["created_at"] != comment["updated_at"]:
             raise RuntimeError("Edited decision comments require a new submission")
         matches = re.findall(r"```json\n([\s\S]*?)\n```", comment["body"])
@@ -151,7 +154,8 @@ def record(context: dict) -> None:
         raise RuntimeError("DataLad changed more than the website gitlink; initialize the datasets before proposing")
     if git(root, "status", "--porcelain", "--untracked-files=all") or git(root / "site-specific", "status", "--porcelain", "--untracked-files=all"):
         raise RuntimeError("Adapter recording left uncommitted changes outside its declared outputs")
-    context.update(result=git(root, "rev-parse", "HEAD"), metadata_result=git(root / "site-specific", "rev-parse", "HEAD"))
+    context.update(result=git(root, "rev-parse", "HEAD"), metadata_result=git(root / "site-specific", "rev-parse", "HEAD"),
+                   source_coordinate=dict(plan.source_coordinate))
     CONTEXT.write_text(json.dumps(context))
     output(has_changes="true")
 
@@ -160,6 +164,14 @@ def publish(context: dict) -> None:
     website = context["repository"]
     metadata = context["metadata_repository"]
     branch = context["branch"]
+    source_details = ""
+    if not context["comment_id"]:
+        from .config import load_workspace
+        from html import escape
+        review_url = load_workspace(SCRATCH / "base").base_url.rstrip("/") + "/review/"
+        coordinate = escape(json.dumps(context["source_coordinate"], ensure_ascii=False, indent=2))
+        source_details = (f"\n\n[Downstream review]({review_url})\n\n<details>\n"
+                          f"<summary>Source coordinate</summary>\n\n<pre>{coordinate}</pre>\n\n</details>")
     root = SCRATCH / "review"
     if context["comment_id"]:
         current = api(f"/repos/{website}/pulls/{context['number']}")
@@ -180,7 +192,7 @@ def publish(context: dict) -> None:
             meta_pull = api(f"/repos/{metadata}/pulls", {
                 "title": f"chore(curation): propose {context['adapter']} metadata", "head": branch,
                 "base": api(f"/repos/{metadata}", metadata=True)["default_branch"], "draft": True,
-                "body": NOTICE + f"Source-adapter proposal coordinated by {website}. Explicit decisions are submitted on the website review page.",
+                "body": NOTICE + f"Source-adapter proposal coordinated by {website}. Explicit decisions are submitted on the website review page." + source_details,
             }, metadata=True)
             context["metadata_number"] = meta_pull["number"]
         git(root, "push", f"--force-with-lease=refs/heads/{branch}:{context['head'] if context['comment_id'] else ''}",
@@ -189,7 +201,7 @@ def publish(context: dict) -> None:
             pull = api(f"/repos/{website}/pulls", {
                 "title": f"chore(curation): propose {context['adapter']} metadata", "head": branch,
                 "base": os.environ["DEFAULT_BRANCH"], "draft": True,
-                "body": NOTICE + f"Review the source-adapter proposal with metadata draft https://github.com/{metadata}/pull/{context['metadata_number']}. The review link follows when its presentation artifact is ready.",
+                "body": NOTICE + f"Review the source-adapter proposal with metadata draft https://github.com/{metadata}/pull/{context['metadata_number']}. The exact proposal review link follows when its presentation artifact is ready." + source_details,
             })
             context["number"] = pull["number"]
         CONTEXT.write_text(json.dumps(context))

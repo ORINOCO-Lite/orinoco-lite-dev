@@ -786,7 +786,7 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
     );
     openPullRequests.searchParams.set(
       "q",
-      "is:pr is:open label:curation-review",
+      "is:pr is:open curation in:title",
     );
     return (
       <main className="landing" id="main-content">
