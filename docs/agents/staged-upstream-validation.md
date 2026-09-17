@@ -20,68 +20,66 @@ Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations buil
 
 Implement the validation pipeline in stages, each introduced in a separately reviewable PR.
 Each PR should expose the relevant `dev` commands and inspectable outputs so we can verify that stage before building on it.
-The three views separate differences caused by record conversion or the temporary service, authored-input acquisition, and site generation.
-The first two establish the reviewed inputs used by the third, which can then isolate generation differences.
+The diagrams show record preservation and site generation; the table between them identifies the source layers used in composition.
+Inspect each stage's output and correct or account for differences before continuing.
 
-Boxes show data states; blue boxes contain reports.
-Arrow labels show proposed `dev` commands; dashed arrows show a maintainer selecting reviewed data.
-Comparison reports inform that selection but are not inputs to generation.
+Boxes name data and its form; blue boxes contain comparison or check reports.
+Every arrow names a proposed `dev` command, abbreviated from `orinoco-lite dev`.
 
 ### Check record preservation
 
-Compare the original capture with both the joined export and the records returned by a temporary service.
+Follow the records from the Pool API through JSONL, YAML, and back to JSONL.
+Compare the original capture with both the export and the temporary service's dump.
 
 ```mermaid
 flowchart TB
-  pool["Pool records"] -->|"<code>dev capture</code>"| raw["Captured records"]
-  raw -->|"<code>dev records convert</code>"| stored["Stored metadata and annotation companions"]
-  stored -->|"<code>dev records export</code><br/>(join annotation companions)"| joined["Joined records"]
-  joined -->|"<code>dev records roundtrip</code><br/>(upload and re-dump)"| returned["Returned service records"]
-  raw -->|"<code>dev records diff</code>"| storedreport["Stored-record differences"]:::report
+  pool["Records (as API JSON)"] -->|"<code>dev capture</code>"| raw["Records (as JSONL)"]
+  raw -->|"<code>dev records convert</code>"| stored["Records (as YAML)"]
+  stored -->|"<code>dev records export</code>"| joined["Records (as JSONL)"]
+  joined -->|"<code>dev records roundtrip</code><br/>(upload and dump)"| returned["Records (as JSONL)"]
+  raw -->|"<code>dev records diff</code>"| storedreport["Conversion differences"]:::report
   joined -->|"<code>dev records diff</code>"| storedreport
   raw -->|"<code>dev records diff</code>"| servicereport["Service round-trip differences"]:::report
   returned -->|"<code>dev records diff</code>"| servicereport
   classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
-### Check authored inputs
+### Sources used in composition
 
-Compare acquired content, configuration, and files with the selected upstream source.
+The build uses the pinned `www-from-model` repository and its pinned dependencies.
+Any retained Orinoco Lite commits are already part of that selected Git history.
+Lite composition combines those sources with the template, site-specific files, and generated content:
 
-```mermaid
-flowchart LR
-  upstream["Authored inputs in selected www-from-model"] -->|"<code>dev inputs acquire</code>"| acquired["Acquired site-specific inputs"]
-  upstream -->|"<code>dev inputs diff</code>"| report["Authored-input differences"]:::report
-  acquired -->|"<code>dev inputs diff</code>"| report
-  classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
-```
+| Source | Contribution |
+| --- | --- |
+| Pinned `www-from-model` and its dependencies | Base presentation, page templates, and graph generation. Git diffs show the retained commits over upstream. |
+| Template | Presentation adaptation and a bounded overlay of required upstream assets. |
+| `site-specific/` | Site settings, authored content, files, and overrides for configuration and presentation. |
+
+The template layers over the upstream presentation, then site-specific settings and overrides apply.
+Generated content supplies record pages; site-specific authored content is applied afterward.
+Inspect changes in their own repositories and compare their combined effect in the Hugo input tree before rendering.
+
+For the psychoinformatics replica, `dev inputs acquire` imports selected site settings, authored pages, and site-owned files into `site-specific/`.
+`dev inputs diff` checks that import against its sources.
+This import is separate from resolving the pinned presentation and dependencies, which remain in their repositories.
 
 ### Compare each generation step
 
-Run upstream and Lite with the same reviewed inputs at each step.
-This diagram follows the command examples below by selecting the upstream output after each comparison.
-Both composition commands also consume the reviewed authored inputs from the preceding diagram.
+Each box labeled "Upstream and Lite" represents the two outputs of a command pair.
+Run each command marked `SIDE` twice, using `upstream` and `lite` with the same input files.
+For the next comparison, give both commands the upstream output, as the examples below do.
+Lite composition also consumes the source layers described above.
 
 ```mermaid
 flowchart TB
-  records["Reviewed records"] -->|"<code>dev content generate upstream</code>"| uppages["Upstream pages and graph"]
-  records -->|"<code>dev content generate lite</code>"| litepages["Lite pages and graph"]
-  uppages -.->|review and select| pages["Reviewed pages and graph"]
-  uppages -->|"<code>dev content diff</code>"| pagediff["Page and graph differences"]:::report
-  litepages -->|"<code>dev content diff</code>"| pagediff
-
-  pages -->|"<code>dev content compose upstream</code>"| upassembly["Upstream Hugo inputs"]
-  pages -->|"<code>dev content compose lite</code>"| liteassembly["Lite Hugo inputs"]
-  upassembly -.->|review and select| assembly["Reviewed Hugo inputs"]
-  upassembly -->|"<code>dev content diff</code>"| assemblydiff["Hugo-input differences"]:::report
-  liteassembly -->|"<code>dev content diff</code>"| assemblydiff
-
-  assembly -->|"<code>dev site render upstream</code>"| upsite["Rendered upstream site"]
-  assembly -->|"<code>dev site render lite</code>"| litesite["Rendered Lite site"]
-  upsite -->|"<code>dev site check</code>"| upchecks["Upstream site check results"]:::report
-  upsite -->|"<code>dev site diff</code>"| sitediff["Website differences"]:::report
-  litesite -->|"<code>dev site diff</code>"| sitediff
-  litesite -->|"<code>dev site check</code>"| litechecks["Lite site check results"]:::report
+  records["Records (as JSONL)"] -->|"<code>dev content generate SIDE</code>"| content["Upstream and Lite content<br/>(as Markdown and JSON)"]
+  content -->|"<code>dev content diff</code>"| contentdiff["Page and graph differences"]:::report
+  content -->|"<code>dev content compose SIDE</code><br/>(same upstream content)"| assembly["Upstream and Lite Hugo inputs<br/>(as file trees)"]
+  assembly -->|"<code>dev content diff</code>"| assemblydiff["Hugo-input differences"]:::report
+  assembly -->|"<code>dev site render SIDE</code><br/>(same upstream Hugo inputs)"| site["Upstream and Lite websites<br/>(as HTML and assets)"]
+  site -->|"<code>dev site diff</code>"| sitediff["Website differences"]:::report
+  site -->|"<code>dev site check</code><br/>(each website)"| checks["Site check results"]:::report
   classDef report fill:#eef2ff,stroke:#6366f1,color:#312e81
 ```
 
@@ -102,7 +100,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | B — Capture and recording | Extract #152's capture command. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, and field-level comparison. Carry the reviewed date-preservation fix from #152. | Convert the capture, export joined records, and inspect changed identifiers, fields, and values. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare the returned records with the original capture. Run a raw-capture control to locate service-side changes. |
-| E — Authored inputs | Separate acquisition of authored content, configuration, images, and downloads from record conversion. | Inspect copied bytes, transformed configuration, and file placement against the selected upstream inputs. |
+| E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
 | F — Content generation | Expose upstream and Lite page generation from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before Hugo. |
 | G — Composition | Separate composition from rendering in the existing builder. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same reviewed projection. |
 | H — Rendering and comparison | Render an inspected assembly. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new rendering differences, then run the complete generation comparison. |
@@ -134,7 +132,7 @@ The round-trip command manages the temporary service and retains the returned du
 The diff shows raw field changes and identifies reviewed annotation-equivalent changes separately.
 It preserves list order, duplicate values, scalar types, and the distinction between null and missing values.
 
-### Authored inputs and generated content
+### Site-data import and generated content
 
 ```console
 orinoco-lite dev inputs acquire site-specific
@@ -144,8 +142,8 @@ orinoco-lite dev content generate lite build/lite/projection --records build/rec
 orinoco-lite dev content diff build/upstream/projection build/lite/projection
 ```
 
-Input acquisition uses the selected `www-from-model` and preserves required page-resource placement.
-Its diff compares those source files with their destinations in `site-specific`.
+The import reads selected site data from `www-from-model` and any referenced file sources, preserving required page-resource placement.
+Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `site.yaml`.
 Generation produces pages and graph data from the same joined records on both sides.
 The content diff reports page and graph differences separately.
 
