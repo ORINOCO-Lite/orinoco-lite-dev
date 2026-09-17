@@ -178,6 +178,8 @@ Reuse the downstream tool lock and record both the input change and the parent s
 
 | Existing PR | Place in this work |
 | --- | --- |
+| [Design #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This charter and command plan, proposed directly against `main`. |
+| [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Implements A independently against `main`. Removes the obsolete tooling before the command work. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
 | [Package #154](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/154) | Tool research for H. Promote the chosen procedure, then retire the dated report. |
 | [Package #142](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/142) | Retire its separate builder. Recover useful checks through the staged CLI. |
@@ -214,7 +216,8 @@ No comments were present on #142 or #154 during the initial review.
 - Move user-facing operations out of recorded `python -m` calls in `instantiate.py` and `development.py`.
   Retain internal Python functions for code reuse.
 - Cleanup can remove the obsolete scripts without the new capture implementation.
-  The retained Pool-diff tool is self-contained, but its error message still points to removed tasks.
+  The retained Pool-diff tool is self-contained.
+  Cleanup updates its error message to select an existing capture instead of referring to removed tasks.
 - Resolve the original capture's unknown acquisition time by retaining it as historical input and recording fresh capture facts accurately.
   Pagination completeness checks do not detect every concurrent source edit.
 - The legacy capture contains 5,030 records.
