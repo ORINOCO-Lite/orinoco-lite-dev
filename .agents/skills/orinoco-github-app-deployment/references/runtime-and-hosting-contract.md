@@ -38,7 +38,7 @@ The immutable editor shell and schema belong in each downstream's static site bu
 
 Generate `SESSION_SEAL_KEY` with a cryptographically secure random source.
 Avoid commands that print it into captured logs; send it directly to the provider's secret input.
-Configure the signing key once per service, not per downstream, using the [service setup instructions](../../../../packages/curation-review-app/README.md#coordinated-submodule-materialization).
+For signing-key setup, follow [GitHub App configuration](github-app-configuration.md#signing-key-setup).
 No persistent installation token, webhook secret, database credential, or storage binding is required.
 
 The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.

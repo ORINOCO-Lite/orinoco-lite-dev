@@ -112,8 +112,6 @@ After deletion, a rollback that still expects it cannot authenticate.
 ### App signing key
 
 Generate an overlapping key in the same App, replace the protected backend secret, deploy, and verify a coordinated proposal before revoking the superseded key in GitHub.
-Rotate centrally; downstream installations need no replacement credentials.
-Remove temporary downloaded key copies after secure installation.
 
 ### Session seal key
 
