@@ -20,6 +20,8 @@ const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const MAX_AGE = 3600;
 
 function deny(message: string): never {
+  // Callers supply fixed diagnostic text, never tokens or proposal contents.
+  console.warn("Workflow access denied:", message);
   throw new HttpError(403, "workflow_access_denied", message);
 }
 export function object(value: unknown): Record<string, any> {
