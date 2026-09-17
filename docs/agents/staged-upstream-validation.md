@@ -6,7 +6,7 @@ This plan defines the validation commands and recording rules and arranges their
 
 ## Review path
 
-Review the charter principle and this implementation plan independently against `main`, then review each command group in order.
+Review charter changes and this implementation plan independently against `main`, then review each command group in order.
 Each PR supplies commands, example inputs, and inspectable outputs for its step.
 Use the same reviewed inputs for both sides of each comparison.
 After those comparisons pass, compare the complete upstream and Lite generation paths.
@@ -16,7 +16,7 @@ Pixi tasks may shorten common commands, and CI uses those tasks or the CLI.
 Direct scripts and Python module execution are for development and debugging.
 The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
-Reuse upstream operation names where their meanings match, and name projection targets explicitly.
+Name projection targets explicitly.
 `records get` corresponds to upstream `dtc get-records`; `hugo project`, `hugo assemble`, and `hugo build` name the three website stages.
 
 Implement the validation pipeline in stages, each introduced in a separately reviewable PR.
@@ -113,8 +113,8 @@ Raw comparisons remain available beside the summary of new differences.
 ## Proposed PR stack
 
 The letters identify proposed PRs, not GitHub PR numbers.
-Cleanup #160 is merged.
-The charter principle and this command plan remain separate PRs against `main`.
+Cleanup #160 and the upstream comparison charter principle in #162 are merged.
+The terminology charter principle in #167 and this command plan remain separate PRs against `main`.
 After agreeing on the plan, start the capture PR from `main`.
 Later command PRs may stack on their predecessor until it merges.
 Then rebase their unique changes onto `main` and repeat the affected checks.
@@ -245,7 +245,8 @@ Reuse the downstream tool lock and record both the input change and the parent s
 
 | Existing PR | Place in this work |
 | --- | --- |
-| [Charter #162](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/162) | One sentence on upstream comparison under the existing reuse principle. |
+| [Terminology charter #167](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/167) | One sentence on upstream terminology and operation reuse under the existing reuse principle. |
+| [Comparison charter #162](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/162) | Merged. One sentence on upstream comparison under the existing reuse principle. |
 | [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This command plan and detailed agent guidance, proposed directly against `main`. |
 | [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Merged. Retains reusable operations and removes the old preview orchestration. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
