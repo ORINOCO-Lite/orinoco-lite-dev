@@ -1,3 +1,4 @@
+import { authorizeWorkflow } from "../../lib/workflow-access";
 import { equalTokens } from "../../lib/encoding";
 import { GitHubClient } from "../../lib/github";
 import {
@@ -66,6 +67,20 @@ export async function onRequest(context: EventContext): Promise<Response> {
     proposal,
     grant,
     configuredOrigin(context.env),
+    (input) =>
+      authorizeWorkflow(
+        new GitHubClient(session.access_token),
+        context.env,
+        input,
+      ),
+    () => {
+      if (!context.env.GITHUB_APP_PRIVATE_KEY)
+        throw new HttpError(
+          503,
+          "automation_unavailable",
+          "The service operator must configure the existing curation App signing key. No additional downstream App or secret is required.",
+        );
+    },
   );
   return jsonResponse(result, {
     headers: {

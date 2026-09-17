@@ -99,3 +99,9 @@ Ask for only values that cannot be discovered safely:
 When the operator also asks to configure a downstream custom domain, ask only for the intended domain and discover its repository, Pages state, current DNS, verified-domain state, and `site.base_url` before requesting another value.
 
 Discover the application commit, current settings, repository identities, and provider capabilities read-only before asking the operator to repeat them.
+
+
+For coordinated `site-specific` submodule materialization, the existing App also signs installation-token requests.
+The operator configures `GITHUB_APP_PRIVATE_KEY` only in protected backend secret storage, following the [authentication contract](../../../../docs/agents/contract/curation-service-authentication-options.md#app-credentials-and-automated-completion).
+Downstreams install this same App on both repositories; they do not create an automation App or store its private key in Actions.
+Keep interactive operations on user access tokens and automated grants bound to the authenticated proposal and exact trusted workflow.

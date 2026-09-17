@@ -80,7 +80,7 @@ Its manifest sends the exact root and `/api/*` to Functions.
 The root Function returns an empty, hardened, non-cacheable `404` so a superseded Pages asset cannot reappear from static hosting or cache, while every other non-API presentation path remains outside the Functions deployment.
 Pages Functions are under `functions/`; `npm run pages:functions:build` verifies their Worker bundle without publishing it.
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
-Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
+Cloudflare stores the client secret, session-sealing key, and optional App signing key separately as encrypted Pages secrets.
 
 The central `https://orinoco-curation-review.pages.dev/` deployment is the default authentication and GitHub-transport option, but `PUBLIC_ORIGIN` is configurable.
 It is not a source-adapter review destination.
@@ -143,3 +143,35 @@ Pull-request Markdown is not parsed to locate or validate either artifact.
 
 Provisioning the Pages project, registering the GitHub App, setting secrets, and deploying are separately reviewed external operations.
 This package does not perform them.
+
+## Coordinated submodule materialization
+
+Install the same curation App on the website and metadata repositories.
+The curator needs write access in both; downstreams need no second App or App private key.
+The service operator configures `GITHUB_APP_PRIVATE_KEY` for the existing App as an encrypted backend secret (RSA PKCS#8 PEM).
+For Cloudflare, convert GitHub's downloaded PKCS#1 key in a pipe without printing or tracking it:
+
+```sh
+openssl pkcs8 -topk8 -nocrypt -in /secure/path/app-private-key.pem |
+  npx wrangler pages secret put GITHUB_APP_PRIVATE_KEY --project-name orinoco-curation-review
+```
+
+Restrict operator access, protect the downloaded key, and revoke superseded GitHub keys after verifying a replacement.
+A sign-only vault is preferable where supported; this implementation uses the hosting provider's encrypted secret binding and imports the signing key as non-extractable Web Crypto key material.
+It does not copy the key to Actions or a browser.
+
+An authenticated submission signs a one-hour authorization into the temporary website handoff.
+This contains no access token or private key and disappears with that handoff.
+`POST /api/shacl/workflow-access` requires a GitHub-signed OIDC identity addressed to that exact endpoint.
+It checks the immutable repositories and curator, exact trusted workflow revision, active run, both current draft heads, source gitlink, and unchanged bundles.
+Only the original `pull_request_target` run can obtain write access, after GitHub reports successful materialization and validation steps in that job.
+The canonical follow-up may obtain read access only, using the original handoff coordinate and matching composed replacement commits.
+Expired authorization requires a fresh authenticated proposal; retries cannot retarget an existing grant.
+
+The service issues a repository-limited installation token for trusted automation, never to the browser.
+Read access and write access are separate, and the workflow revokes both tokens on completion.
+GitHub tokens cannot restrict paths or branches; the exact authorized workflow enforces metadata-only changes and Git leases.
+The token's residual exposure is the metadata repository for its remaining lifetime (at most GitHub's one-hour expiry if cleanup cannot run).
+The backend's private key has broader App-wide impact and requires operator protection and rotation.
+This is an explicit automation delegation, not a fallback around failed user authentication.
+See the [authentication contract](../../docs/agents/contract/curation-service-authentication-options.md#app-credentials-and-automated-completion).

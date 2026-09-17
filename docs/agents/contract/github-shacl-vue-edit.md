@@ -65,7 +65,7 @@ It verifies the bundle and allowed paths, applies the edits, validates all recor
 For a submodule proposal, the trusted website workflow MUST verify both exact heads, the pinned metadata base, the identical bundles, and curator authority in both repositories.
 It checks out metadata as data and validates the complete website and metadata composition without write credentials.
 Only then may it replace the metadata handoff with a metadata-only commit and replace the website handoff with a commit changing only the gitlink to that metadata commit.
-The workflow requires a repository-scoped GitHub App installation token for metadata access, supplied by the downstream's trusted configuration.
+The existing curation App supplies bounded automated access under the [authentication contract](curation-service-authentication-options.md#app-credentials-and-automated-completion); downstreams MUST NOT configure a second App or copy its private key into Actions.
 Both branch updates MUST use exact-head leases.
 The metadata update precedes the website update so the website never points at an unpublished commit.
 GitHub does not provide an atomic transaction across repositories: a partial failure MUST identify the retained draft and commit and require inspection before another submission.
@@ -83,10 +83,10 @@ A stale or ambiguous input fails rather than being rebased, retargeted, or guess
 The backend MUST NOT:
 
 - host `/edit/`, another editor, a landing page, upload page, or confirmation UI;
-- store bundles, metadata, decisions, provenance, or credentials;
+- retain bundles, metadata, decisions, provenance, or curator credentials beyond short-lived processing; operator secrets follow the authentication contract;
 - add source-adapter dispositions or decision-cache semantics to SHACL Vue;
 - weaken OAuth state, PKCE, origin, nonce, exact-head, or path checks; or
-- use contents permission for any operation outside the bounded handoff.
+- use contents permission for any operation outside the bounded handoff and its verified materialization.
 
 The source-adapter review artifact remains separate.
 This profile adds no editor input Actions artifact and no persistent service.

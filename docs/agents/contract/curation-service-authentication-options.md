@@ -53,3 +53,32 @@ It protects credentials from untrusted repository code and external source data,
 
 GitHub and Git remain authoritative.
 Failures are retried before a write, inspected after an uncertain write, or repaired through an ordinary pull request or revert.
+
+## App credentials and automated completion
+
+The supported downstream setup MUST require only the curation App installation on each participating repository.
+A downstream MUST NOT need another App, a personal access token, or the curation App's private key.
+Installation alone MUST NOT authorize an arbitrary user, workflow, or repository to exercise the App's access to another repository.
+
+The service MUST follow [GitHub's App security guidance](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/best-practices-for-creating-a-github-app) and [private-key guidance](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps).
+The operator MUST keep signing keys in protected backend secret storage, restrict access, and support rotation and revocation.
+A non-exportable, sign-only key vault SHOULD be used where supported.
+Keys MUST NOT enter source, browser assets, downstream secrets, workflow artifacts, or logs.
+Operator secrets are configuration, not retained curator sessions.
+
+Interactive operations MUST use expiring user access tokens so GitHub enforces both user and App permissions, including organization access controls.
+An installation token MUST NOT substitute for failed user authorization.
+Automated materialization MAY act as the App only within the explicit, authenticated proposal previously authorized by the curator in both repositories.
+The service MUST bind that authorization to the immutable repository and curator identities, submitted bundle, exact source and handoff commits, permitted operation, trusted workflow code, and a short expiry.
+It MUST recheck current installations, curator permissions, and both draft heads before granting automated write access.
+An expired, replayed after completion, revoked, stale, or ambiguous authorization MUST fail closed.
+
+A workflow caller MUST authenticate with GitHub-signed Actions OIDC claims with verified signature, issuer, audience, expiry, immutable repository identity, event, workflow revision, and run identity.
+A repository name, workflow name, browser input, or successful check alone is insufficient authority.
+The approved workflow MUST execute trusted source code and treat proposal content as data; untrusted code MUST NOT receive credentials or an OIDC capability that can obtain them.
+Any installation token MUST be limited to the required repository and permissions, exposed only to trusted transport steps, and revoked when finished.
+GitHub installation tokens are not path- or branch-scoped: allowed paths, validation, and exact-head leases MUST also be enforced by the trusted implementation.
+The App MUST NOT acquire ruleset bypass, modify repository protections, or merge proposals to complete this operation.
+
+Tests MUST cover unauthorized repositories and workflows, forged or expired grants, revoked access, changed heads, replay, disallowed paths, and partial cross-repository failure, as well as successful completion.
+A passing functional test is not evidence that these authorization boundaries hold.

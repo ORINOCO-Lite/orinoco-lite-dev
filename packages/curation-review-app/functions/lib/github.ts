@@ -236,7 +236,11 @@ export class GitHubClient {
     };
   }
 
-  async requireCurator(repository: string, login: string): Promise<void> {
+  async requireCurator(
+    repository: string,
+    login: string,
+    expectedId?: number,
+  ): Promise<void> {
     const value = await this.json(
       endpoint(
         repository,
@@ -247,7 +251,12 @@ export class GitHubClient {
       value !== null && typeof value === "object" && !Array.isArray(value)
         ? (value as Record<string, unknown>).permission
         : null;
-    if (permission !== "write" && permission !== "admin") {
+    const authority = objectRecord(objectRecord(value)?.user);
+    if (
+      (permission !== "write" && permission !== "admin") ||
+      (expectedId !== undefined &&
+        (authority?.id !== expectedId || authority?.login !== login))
+    ) {
       throw new HttpError(
         403,
         "curator_permission_required",

@@ -1,3 +1,4 @@
+import type { AuthorizationInput } from "./workflow-access";
 import type {
   ShaclGrant,
   ShaclProposalRequest,
@@ -117,11 +118,19 @@ async function prepareHandoff(
   proposal: ShaclProposalRequest,
   grant: ShaclGrant,
   login: string,
+  authorization: {
+    branch: string;
+    trustedSha: string;
+    curator: { id: number; login: string };
+    sign?: (input: AuthorizationInput) => Promise<string>;
+    requireAutomation?: () => void;
+  },
 ): Promise<{ bytes: Uint8Array; metadataPull: string | null }> {
   const source = proposal.bundle.source_commit;
   const submodule = await github.siteSubmodule(proposal.repository, source);
   const bytes = serializeShaclReviewBundle(proposal.bundle);
   if (submodule === null) return { bytes, metadataPull: null };
+  authorization.requireAutomation?.();
   if (
     proposal.bundle.records.some(
       (record) =>
@@ -181,22 +190,29 @@ async function prepareHandoff(
       PULL_REQUEST_TITLE,
       `Metadata proposal for https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle.`,
     );
+    const handoff: Record<string, unknown> = {
+      format: "orinoco-shacl-submodule-handoff",
+      version: 1,
+      bundle: proposal.bundle,
+      metadata: {
+        repository: submodule.repository,
+        source_commit: submodule.sha,
+        branch,
+        head_sha: head.sha,
+        pull_request: pull.number,
+      },
+    };
+    if (authorization.sign)
+      handoff.authorization = await authorization.sign({
+        repository: proposal.repository,
+        branch: authorization.branch,
+        trustedSha: authorization.trustedSha,
+        curator: authorization.curator,
+        handoff,
+      });
     return {
       metadataPull: pull.url,
-      bytes: new TextEncoder().encode(
-        JSON.stringify({
-          format: "orinoco-shacl-submodule-handoff",
-          version: 1,
-          bundle: proposal.bundle,
-          metadata: {
-            repository: submodule.repository,
-            source_commit: submodule.sha,
-            branch,
-            head_sha: head.sha,
-            pull_request: pull.number,
-          },
-        }) + "\n",
-      ),
+      bytes: new TextEncoder().encode(JSON.stringify(handoff) + "\n"),
     };
   } catch (error) {
     throw new HttpError(
@@ -289,6 +305,8 @@ export async function createShaclProposal(
   proposal: ShaclProposalRequest,
   grant: ShaclGrant,
   serviceOrigin: string,
+  sign?: (input: AuthorizationInput) => Promise<string>,
+  requireAutomation?: () => void,
 ): Promise<ShaclProposalResult> {
   const pullRequest =
     proposal.target.kind === "pull_request"
@@ -346,6 +364,13 @@ export async function createShaclProposal(
       proposal,
       grant,
       user.login,
+      {
+        branch: pull.branch,
+        trustedSha: pull.baseSha,
+        curator: user,
+        sign,
+        requireAutomation,
+      },
     );
     let commit;
     try {
@@ -399,6 +424,13 @@ export async function createShaclProposal(
     proposal,
     grant,
     user.login,
+    {
+      branch: `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
+      trustedSha: base.sha,
+      curator: user,
+      sign,
+      requireAutomation,
+    },
   );
   const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   try {

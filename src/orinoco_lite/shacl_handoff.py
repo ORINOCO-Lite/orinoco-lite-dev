@@ -251,7 +251,10 @@ def _read_bundle_blob(root: Path, head_sha: str) -> tuple[dict[str, object], byt
         and value.get("format") == "orinoco-shacl-submodule-handoff"
     ):
         if (
-            set(value) != {"format", "version", "bundle", "metadata"}
+            set(value) not in (
+                {"format", "version", "bundle", "metadata"},
+                {"format", "version", "bundle", "metadata", "authorization"},
+            )
             or value["version"] != 1
         ):
             raise HandoffError("Invalid coordinated handoff envelope")

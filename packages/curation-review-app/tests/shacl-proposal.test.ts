@@ -677,6 +677,24 @@ describe("site-specific submodule handoff", () => {
     });
   });
 
+  it("stops before either write when service automation is not configured", async () => {
+    const github = client();
+    const proposal = request({ kind: "standalone" });
+    await expect(
+      createShaclProposal(
+        github,
+        proposal,
+        trustedGrant(proposal.target),
+        SERVICE_ORIGIN,
+        undefined,
+        () => {
+          throw new Error("automation unavailable");
+        },
+      ),
+    ).rejects.toThrow("automation unavailable");
+    expect(github.createBranch).not.toHaveBeenCalled();
+  });
+
   it("rejects a stale metadata base without creating either branch", async () => {
     const github = client();
     vi.mocked(github.siteSubmodule).mockResolvedValue({
