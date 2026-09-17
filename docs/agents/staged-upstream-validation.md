@@ -18,7 +18,8 @@ The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations built from the same code.
 
-The aim is to identify the first transformation that introduces a difference, so each step can be corrected or accepted in its own PR.
+Implement the validation pipeline in stages, each introduced in a separately reviewable PR.
+Each PR should expose the relevant `dev` commands and inspectable outputs so we can verify that stage before building on it.
 The three views separate differences caused by record conversion or the temporary service, authored-input acquisition, and site generation.
 The first two establish the reviewed inputs used by the third, which can then isolate generation differences.
 
@@ -106,25 +107,25 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | G — Composition | Separate composition from rendering in the existing builder. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same reviewed projection. |
 | H — Rendering and comparison | Render an inspected assembly. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new rendering differences, then run the complete generation comparison. |
 
-A difference must be corrected or explicitly accepted before its PR merges.
+Review each stage's implementation and comparison outputs before merging its PR.
 Keep the existing #152 discussion available while extracting its changes.
 Its commit history mixes these steps, so extract net file changes and individual patches.
 
 ## Command review examples
 
-Run these proposed commands from the downstream directory through its locked Pixi environment.
+Run these proposed commands from the downstream directory after activating its [Pixi environment](../../README.md#command-environment).
 The path names show how one command supplies the next command's input.
 Dependency selection comes from the downstream and package, without repeating upstream pins in command arguments.
 
 ### Capture, conversion, and service round-trip
 
 ```console
-pixi run --locked orinoco-lite dev capture site-specific/sources/pool/records.jsonl
-pixi run --locked orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
-pixi run --locked orinoco-lite dev records export site-specific build/records/joined.jsonl
-pixi run --locked orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
-pixi run --locked orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
-pixi run --locked orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
+orinoco-lite dev capture site-specific/sources/pool/records.jsonl
+orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
+orinoco-lite dev records export site-specific build/records/joined.jsonl
+orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
+orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
+orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
 ```
 
 Annotation companions keep machine attribution for record assertions separate for human readability.
@@ -136,11 +137,11 @@ It preserves list order, duplicate values, scalar types, and the distinction bet
 ### Authored inputs and generated content
 
 ```console
-pixi run --locked orinoco-lite dev inputs acquire site-specific
-pixi run --locked orinoco-lite dev inputs diff site-specific
-pixi run --locked orinoco-lite dev content generate upstream build/upstream/projection --records build/records/joined.jsonl
-pixi run --locked orinoco-lite dev content generate lite build/lite/projection --records build/records/joined.jsonl
-pixi run --locked orinoco-lite dev content diff build/upstream/projection build/lite/projection
+orinoco-lite dev inputs acquire site-specific
+orinoco-lite dev inputs diff site-specific
+orinoco-lite dev content generate upstream build/upstream/projection --records build/records/joined.jsonl
+orinoco-lite dev content generate lite build/lite/projection --records build/records/joined.jsonl
+orinoco-lite dev content diff build/upstream/projection build/lite/projection
 ```
 
 Input acquisition uses the selected `www-from-model` and preserves required page-resource placement.
@@ -154,19 +155,19 @@ After reviewing the generation comparison, select one output as the shared input
 These examples use the upstream output.
 
 ```console
-pixi run --locked orinoco-lite dev content compose upstream build/upstream/projection build/upstream/assembly --inputs site-specific
-pixi run --locked orinoco-lite dev content compose lite build/upstream/projection build/lite/assembly --inputs site-specific
-pixi run --locked orinoco-lite dev content diff build/upstream/assembly build/lite/assembly
+orinoco-lite dev content compose upstream build/upstream/projection build/upstream/assembly --inputs site-specific
+orinoco-lite dev content compose lite build/upstream/projection build/lite/assembly --inputs site-specific
+orinoco-lite dev content diff build/upstream/assembly build/lite/assembly
 ```
 
 Then select the reviewed assembly for the rendering comparison.
 
 ```console
-pixi run --locked orinoco-lite dev site render upstream build/upstream/assembly build/upstream/site --base-url /
-pixi run --locked orinoco-lite dev site render lite build/upstream/assembly build/lite/site --base-url /
-pixi run --locked orinoco-lite dev site diff build/upstream/site build/lite/site
-pixi run --locked orinoco-lite dev site check build/upstream/site
-pixi run --locked orinoco-lite dev site check build/lite/site
+orinoco-lite dev site render upstream build/upstream/assembly build/upstream/site --base-url /
+orinoco-lite dev site render lite build/upstream/assembly build/lite/site --base-url /
+orinoco-lite dev site diff build/upstream/site build/lite/site
+orinoco-lite dev site check build/upstream/site
+orinoco-lite dev site check build/lite/site
 ```
 
 Rendering consumes the supplied assembly without recomposing it.
