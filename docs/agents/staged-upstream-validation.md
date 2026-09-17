@@ -18,41 +18,68 @@ The command names below are proposed interfaces.
 Existing functions provide much of the implementation.
 Keep `dev setup`, `dev enable`, and `dev disable` as convenience operations built from the same code.
 
+### Prepare and review inputs
+
+First check record preservation and authored inputs.
+Rounded boxes identify reviewed inputs; dotted arrows show how comparisons inform a maintainer's selection.
+
 ```mermaid
-flowchart TB
-  pool["Pool"] --> capture["dev capture"]
-  capture --> raw["Captured records"]
-  raw --> convert["dev records convert"]
-  convert --> stored["site-specific metadata"]
-  stored --> export["dev records export"]
-  export --> joined["Joined records"]
-  raw --> recorddiff["dev records diff"]
-  joined --> recorddiff
-  joined --> roundtrip["dev records roundtrip<br/>temporary service → returned records"]
-  roundtrip --> returndiff["dev records diff"]
-  raw --> returndiff
-
-  upstream["Selected www-from-model"] --> acquire["dev inputs acquire"]
-  acquire --> inputs["Authored content and files"]
-  upstream --> inputdiff["dev inputs diff"]
-  inputs --> inputdiff
-
-  recorddiff --> reviewed["Reviewed records"]
-  returndiff --> reviewed
-  reviewed --> generate["dev content generate upstream / lite"]
-  generate --> contentdiff["dev content diff<br/>pages and graph"]
-  contentdiff --> projection["Reviewed generated content"]
-  inputdiff --> compose["dev content compose upstream / lite"]
-  projection --> compose
-  compose --> composeddiff["dev content diff<br/>complete Hugo inputs"]
-  composeddiff --> assembly["Reviewed Hugo inputs"]
-  assembly --> render["dev site render upstream / lite"]
-  render --> sitediff["dev site diff"]
-  render --> checks["dev site check"]
+flowchart LR
+  subgraph records["Record preservation"]
+    direction TB
+    pool["Pool"] -->|supplies| raw["Captured records"]
+    raw -->|convert to| stored["Site-specific metadata"]
+    stored -->|is exported as| joined["Joined records"]
+    joined -->|round-trip through a temporary service as| returned["Returned records"]
+    raw -->|provide the reference for| storedcheck["Stored-record comparison"]
+    joined -->|are checked by| storedcheck
+    raw -->|provide the reference for| servicecheck["Service comparison"]
+    returned -->|are checked by| servicecheck
+    storedcheck -.->|informs selection of| reviewed(["Reviewed records"])
+    servicecheck -.->|informs selection of| reviewed
+  end
+  subgraph authored["Authored inputs"]
+    direction TB
+    upstream["Selected www-from-model"] -->|supplies| files["Authored content and files"]
+    upstream -->|provides the reference for| inputcheck["Authored-input comparison"]
+    files -->|are checked by| inputcheck
+    inputcheck -.->|informs selection of| inputs(["Reviewed authored inputs"])
+  end
+  %% Keep the independent input reviews beside each other.
+  records ~~~ authored
 ```
 
-Each `upstream / lite` node represents two commands with the same input.
-A maintainer reviews the comparison before selecting the input for the next node.
+### Compare each generation step
+
+Then compare generation, composition, and rendering using the same reviewed inputs for upstream and Lite.
+Select one reviewed output for the next comparison.
+
+```mermaid
+flowchart TB
+  records(["Reviewed records"])
+  records -->|feed| genup["dev content generate upstream"]
+  records -->|feed| genlite["dev content generate lite"]
+  genup -->|supplies pages and graph to| contentdiff["dev content diff"]
+  genlite -->|supplies pages and graph to| contentdiff
+  contentdiff -.->|informs selection of| projection(["Reviewed generated content"])
+
+  inputs(["Reviewed authored inputs"])
+  projection -->|supplies content to| shared["Shared composition inputs"]
+  inputs -->|supply authored files to| shared
+  shared -->|feed| composeup["dev content compose upstream"]
+  shared -->|feed| composelite["dev content compose lite"]
+  composeup -->|supplies Hugo inputs to| assemblydiff["dev content diff"]
+  composelite -->|supplies Hugo inputs to| assemblydiff
+  assemblydiff -.->|informs selection of| assembly(["Reviewed Hugo inputs"])
+
+  assembly -->|feed| renderup["dev site render upstream"]
+  assembly -->|feed| renderlite["dev site render lite"]
+  renderup -->|produces one of| sites["Rendered websites"]
+  renderlite -->|produces one of| sites
+  sites -->|are compared by| sitediff["dev site diff"]
+  sites -->|are checked by| check["dev site check"]
+```
+
 Raw comparisons remain available beside the summary of new differences.
 
 ## Proposed PR stack
