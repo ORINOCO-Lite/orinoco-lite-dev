@@ -2,6 +2,7 @@ import { parseDocument } from "yaml";
 import type {
   CandidateOperation,
   JsonObject,
+  MetadataReview,
   ReviewGrant,
   ReviewProposal,
 } from "../../shared/contracts";
@@ -140,7 +141,10 @@ interface ProposalCommitCoordinates {
   sourceCoordinate: JsonObject;
 }
 
-function proposalCommit(value: unknown): ProposalCommitCoordinates {
+function proposalCommit(
+  value: unknown,
+  websiteBase?: string,
+): ProposalCommitCoordinates {
   const item = object(value, "proposal commit");
   const proposalSha = commit(item.sha, "proposal SHA");
   if (!Array.isArray(item.parents) || item.parents.length !== 1) {
@@ -165,7 +169,7 @@ function proposalCommit(value: unknown): ProposalCommitCoordinates {
     invalid("The proposal commit subject does not match its adapter.");
   }
   trailer(lines, "Curation-Adapter-Agent");
-  if (trailer(lines, "Curation-Metadata-Base") !== baseSha) {
+  if (trailer(lines, "Curation-Metadata-Base") !== (websiteBase ?? baseSha)) {
     invalid("The proposal metadata base does not match its sole parent.");
   }
   return {
@@ -607,6 +611,7 @@ export async function loadReviewProposal(
   repository: string,
   pullRequest: number,
   artifactId: number,
+  curatorLogin?: string,
 ): Promise<ReviewProposal> {
   const pull = pullCoordinates(
     await github.pullRequest(repository, pullRequest),
@@ -639,21 +644,127 @@ export async function loadReviewProposal(
     review.metadataRoots,
   );
   verifyBundleCoordinates(bundle, pull, pullRequest, proposal, artifact.runId);
-  const files = proposalFiles(
-    await github.commit(repository, proposal.proposalSha),
-    proposal.proposalSha,
-    review.metadataRoots,
-  );
+  let metadata: MetadataReview | undefined;
+  let contentRepository = repository;
+  let baseSha = proposal.baseSha;
+  let proposalSha = proposal.proposalSha;
+  let headSha = pull.headSha;
+  let commitData = await github.commit(repository, proposal.proposalSha);
+  if (
+    Array.isArray(commitData.files) &&
+    commitData.files.some(
+      (value) => object(value, "proposal file").filename === "site-specific",
+    )
+  ) {
+    if (commitData.files.length !== 1)
+      invalid(
+        "Website adapter proposals must change only the site-specific gitlink.",
+      );
+    const base = await github.siteSubmodule(repository, proposal.baseSha);
+    const proposed = await github.siteSubmodule(
+      repository,
+      proposal.proposalSha,
+    );
+    const head = await github.siteSubmodule(repository, pull.headSha);
+    if (
+      !base ||
+      !proposed ||
+      !head ||
+      base.repository.toLowerCase() !== proposed.repository.toLowerCase() ||
+      base.repository.toLowerCase() !== head.repository.toLowerCase()
+    ) {
+      invalid("The metadata repository changed during review.");
+    }
+    if (!curatorLogin)
+      invalid("Submodule review requires an authenticated curator.");
+    await github.requireInstallationAccess(repository);
+    await github.requireInstallationAccess(base.repository);
+    await github.requireCurator(base.repository, curatorLogin);
+    const associated = await github.json(
+      `/repos/${base.repository}/commits/${proposed.sha}/pulls?per_page=100`,
+    );
+    if (!Array.isArray(associated) || associated.length >= 100)
+      invalid("Metadata proposal pull request is ambiguous.");
+    const open = associated
+      .map((value) => object(value, "metadata pull request"))
+      .filter((value) => value.state === "open");
+    if (open.length !== 1)
+      invalid("Metadata proposal requires one open draft pull request.");
+    const selected = open[0]!;
+    if (!Number.isSafeInteger(selected.number) || Number(selected.number) < 1)
+      invalid("Metadata pull request number is invalid.");
+    const metadataPull = object(
+      await github.pullRequest(base.repository, Number(selected.number)),
+      "metadata pull request",
+    );
+    const metadataHead = object(metadataPull.head, "metadata head");
+    const metadataBase = object(metadataPull.base, "metadata base");
+    if (
+      metadataPull.state !== "open" ||
+      metadataPull.draft !== true ||
+      object(metadataHead.repo, "metadata head repository").full_name !==
+        base.repository ||
+      object(metadataBase.repo, "metadata base repository").full_name !==
+        base.repository ||
+      metadataHead.sha !== head.sha
+    ) {
+      invalid("The metadata draft head no longer matches the website gitlink.");
+    }
+    const metadataProposal = proposalCommit(
+      await github.firstPullRequestCommit(
+        base.repository,
+        Number(selected.number),
+      ),
+      proposal.baseSha,
+    );
+    if (
+      metadataProposal.baseSha !== base.sha ||
+      metadataProposal.proposalSha !== proposed.sha ||
+      metadataProposal.adapter !== proposal.adapter ||
+      canonicalJson(metadataProposal.sourceCoordinate) !==
+        canonicalJson(proposal.sourceCoordinate)
+    ) {
+      invalid("The metadata proposal does not match the website proposal.");
+    }
+    metadata = {
+      repository: base.repository,
+      pull_request: Number(selected.number),
+      proposal_sha: proposed.sha,
+      head_sha: head.sha,
+    };
+    contentRepository = base.repository;
+    baseSha = base.sha;
+    proposalSha = proposed.sha;
+    headSha = head.sha;
+    const metadataCommit = await github.commit(contentRepository, proposalSha);
+    if (!Array.isArray(metadataCommit.files))
+      invalid("Metadata proposal has no complete diff.");
+    commitData = {
+      ...metadataCommit,
+      files: metadataCommit.files.map((value) => {
+        const file = object(value, "metadata proposal file");
+        return {
+          ...file,
+          filename: `site-specific/${text(file.filename, "metadata filename")}`,
+        };
+      }),
+    };
+  }
+  const files = proposalFiles(commitData, proposalSha, review.metadataRoots);
   const presentation = bundleCandidates(bundle, files, review.metadataRoots);
-
   const recordPaths = [...files.records.keys()].sort();
   const contents = await github.contents(
-    repository,
-    recordPaths.flatMap((path, index) => [
-      { key: `before:${index}`, path, ref: proposal.baseSha },
-      { key: `proposed:${index}`, path, ref: proposal.proposalSha },
-      { key: `after:${index}`, path, ref: pull.headSha },
-    ]),
+    contentRepository,
+    recordPaths.flatMap((recordPath, index) => {
+      const path = metadata
+        ? recordPath.slice("site-specific/".length)
+        : recordPath;
+      return [
+        { key: `before:${index}`, path, ref: baseSha },
+        { key: `proposed:${index}`, path, ref: proposalSha },
+        { key: `after:${index}`, path, ref: headSha },
+      ];
+    }),
     remainingContentBytes,
   );
   const candidates = recordPaths.map((path, index) => {
@@ -692,6 +803,7 @@ export async function loadReviewProposal(
   });
 
   return {
+    ...(metadata ? { metadata } : {}),
     adapter: proposal.adapter,
     candidates,
     head_sha: pull.headSha,

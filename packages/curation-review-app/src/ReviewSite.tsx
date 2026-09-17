@@ -262,6 +262,7 @@ function proposal(
       "review_service_origin",
       "review_site_url",
       "source_coordinate",
+      ...("metadata" in value ? ["metadata"] : []),
     ])
   ) {
     return null;
@@ -288,6 +289,28 @@ function proposal(
     Array.isArray(review.source_coordinate)
   ) {
     return null;
+  }
+  if (review.metadata !== undefined) {
+    const metadata = review.metadata as Record<string, unknown> | null;
+    if (
+      metadata === null ||
+      typeof metadata !== "object" ||
+      Array.isArray(metadata) ||
+      !exactKeys(metadata, [
+        "repository",
+        "pull_request",
+        "proposal_sha",
+        "head_sha",
+      ]) ||
+      !validRepository(metadata.repository) ||
+      !Number.isSafeInteger(metadata.pull_request) ||
+      Number(metadata.pull_request) < 1 ||
+      typeof metadata.proposal_sha !== "string" ||
+      !/^[0-9a-f]{40}$/.test(metadata.proposal_sha) ||
+      typeof metadata.head_sha !== "string" ||
+      !/^[0-9a-f]{40}$/.test(metadata.head_sha)
+    )
+      return null;
   }
   const paths = review.candidates.map((item) => item.record_path);
   if (new Set(paths).size !== paths.length) return null;

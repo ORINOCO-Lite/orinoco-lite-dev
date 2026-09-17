@@ -284,6 +284,7 @@ export function Review({
     }
     submissionStarted.current = true;
     const submission: CurationSubmission = {
+      ...(proposal.metadata ? { metadata: proposal.metadata } : {}),
       adapter: proposal.adapter,
       decisions: proposal.candidates.map((candidate) => ({
         disposition: decisions[candidate.record_path] as Disposition,
@@ -492,6 +493,23 @@ export function Review({
                 <dd>
                   <code>{proposal.proposal_sha}</code>
                 </dd>
+                {proposal.metadata && (
+                  <>
+                    <dt>Metadata pull request</dt>
+                    <dd>
+                      <a
+                        href={`https://github.com/${proposal.metadata.repository}/pull/${proposal.metadata.pull_request}`}
+                      >
+                        {proposal.metadata.repository} #
+                        {proposal.metadata.pull_request}
+                      </a>
+                    </dd>
+                    <dt>Metadata head</dt>
+                    <dd>
+                      <code>{proposal.metadata.head_sha}</code>
+                    </dd>
+                  </>
+                )}
                 <dt>Current head</dt>
                 <dd>
                   <code>{proposal.head_sha}</code>

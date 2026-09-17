@@ -8,8 +8,8 @@ remain responsible for validation, attribution, and an exact-head commit.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -749,6 +749,25 @@ def _copy_finalized_paths(
                 ) from error
 
 
+def _site_gitlink(repository: Path, revision: str) -> str | None:
+    entry = _git(
+        repository,
+        ("ls-tree", "-z", revision, "--", "site-specific"),
+        operation="resolve the site-specific gitlink",
+    ).stdout
+    if not entry:
+        return None
+    header, path = entry.rstrip(b"\0").split(b"\t", 1)
+    mode, kind, sha = header.decode("ascii").split()
+    if path != b"site-specific":
+        raise ConfigurationError("Git returned an unexpected site-specific path")
+    if mode == "040000" and kind == "tree":
+        return None
+    if mode != "160000" or kind != "commit":
+        raise ConfigurationError("site-specific must be a directory or Git submodule")
+    return sha
+
+
 def finalize_candidate_plan(
     worktree: Path,
     *,
@@ -756,6 +775,81 @@ def finalize_candidate_plan(
     proposal_commit: str,
     submitted_head: str,
     dispositions: Mapping[str, Disposition | str],
+) -> FinalizationResult:
+    """Finalize metadata in a directory or the exact site-specific submodule.
+
+    Website coordinates identify the three metadata commits through their
+    gitlinks. The caller records the resulting metadata and website commits
+    with DataLad after validating the composed workspace.
+    """
+    if not isinstance(plan, CandidatePlan):
+        raise ConfigurationError("Finalization requires a regenerated CandidatePlan")
+    repository = Path(worktree).resolve()
+    submitted = _exact_commit(repository, submitted_head, "Submitted head")
+    _require_clean_submitted_head(repository, submitted)
+    metadata_head = _site_gitlink(repository, submitted)
+    if metadata_head is None:
+        return _finalize_candidate_plan(
+            repository, plan=plan, proposal_commit=proposal_commit,
+            submitted_head=submitted, dispositions=dispositions,
+        )
+    base = _exact_commit(repository, plan.metadata_base, "Candidate metadata base")
+    proposal = _exact_commit(repository, proposal_commit, "Proposal commit")
+    parents = _git(
+        repository, ("rev-list", "--parents", "-n", "1", proposal),
+        operation="inspect website proposal ancestry",
+    ).stdout.decode("ascii").split()
+    if parents != [proposal, base] or _git(
+        repository, ("merge-base", "--is-ancestor", proposal, submitted),
+        check=False, operation="verify website proposal ancestry",
+    ).returncode:
+        raise ConfigurationError("Website proposal must descend from its exact base and precede the submitted head")
+    if _diff_paths(repository, base, proposal) != ("site-specific",):
+        raise ConfigurationError("Website proposal must change only the site-specific gitlink")
+    metadata_base = _site_gitlink(repository, base)
+    metadata_proposal = _site_gitlink(repository, proposal)
+    if metadata_base is None or metadata_proposal is None:
+        raise ConfigurationError("Proposal must retain the site-specific submodule layout")
+    # Changes to the repository URL must never redirect finalization.
+    if _tree_blob(repository, base, ".gitmodules") != _tree_blob(repository, submitted, ".gitmodules"):
+        raise ConfigurationError("The site-specific repository configuration changed during review")
+    metadata = repository / "site-specific"
+    if metadata.is_symlink() or not metadata.is_dir():
+        raise ConfigurationError("The site-specific submodule must be checked out")
+    top = _git(
+        metadata, ("rev-parse", "--show-toplevel"),
+        operation="inspect the metadata checkout",
+    ).stdout.decode().strip()
+    if Path(top).resolve() != metadata:
+        raise ConfigurationError("The site-specific submodule must be an independent Git checkout")
+    candidates = []
+    for candidate in plan.candidates:
+        try:
+            records = PurePosixPath(candidate.record_root).relative_to("site-specific")
+            annotations = PurePosixPath(candidate.annotation_root).relative_to("site-specific")
+        except ValueError as error:
+            raise ConfigurationError("Submodule candidates must remain below site-specific") from error
+        candidates.append(replace(candidate, record_root=str(records), annotation_root=str(annotations)))
+    metadata_plan = replace(plan, metadata_base=metadata_base, candidates=candidates)
+    result = _finalize_candidate_plan(
+        metadata, plan=metadata_plan, proposal_commit=metadata_proposal,
+        submitted_head=metadata_head, dispositions=dispositions,
+        before_write=lambda: _require_clean_submitted_head(repository, submitted),
+    )
+    return FinalizationResult(
+        changed_paths=tuple(f"site-specific/{path}" for path in result.changed_paths),
+        metadata_changed=result.metadata_changed,
+    )
+
+
+def _finalize_candidate_plan(
+    worktree: Path,
+    *,
+    plan: CandidatePlan,
+    proposal_commit: str,
+    submitted_head: str,
+    dispositions: Mapping[str, Disposition | str],
+    before_write: Callable[[], None] | None = None,
 ) -> FinalizationResult:
     """Apply complete decisions to one exact proposal and submitted head.
 
@@ -823,6 +917,8 @@ def finalize_candidate_plan(
 
         # Recheck immediately before the only mutation of the caller's worktree.
         _require_clean_submitted_head(repository, submitted)
+        if before_write is not None:
+            before_write()
         _copy_finalized_paths(rehearsal, repository, changed_paths)
 
     return FinalizationResult(

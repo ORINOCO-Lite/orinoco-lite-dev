@@ -65,9 +65,35 @@ export async function onRequest(context: EventContext): Promise<Response> {
     submitted.repository,
     submitted.pull_request,
     artifactId,
+    session.login,
   );
   requireReviewTransport(proposal, grant, serviceOrigin);
   const verified = verifySubmission(submitted, proposal);
+  if (proposal.metadata) {
+    for (const target of [proposal, proposal.metadata]) {
+      await github.requireCurator(target.repository, session.login);
+      await github.requireInstallationAccess(target.repository);
+      const current = (await github.pullRequest(
+        target.repository,
+        target.pull_request,
+      )) as {
+        state?: string;
+        draft?: boolean;
+        head?: { sha?: string };
+      };
+      if (
+        current.state !== "open" ||
+        current.draft !== true ||
+        current.head?.sha !== target.head_sha
+      ) {
+        throw new HttpError(
+          409,
+          "stale_submission",
+          "A coordinated draft head changed before submission.",
+        );
+      }
+    }
+  }
   const commentUrl = await github.postComment(
     proposal.repository,
     proposal.pull_request,

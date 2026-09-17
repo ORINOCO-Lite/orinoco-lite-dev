@@ -84,12 +84,13 @@ export async function verifyWorkflowIdentity(
   token: string,
   origin: string,
   verificationKeys: JWTVerifyGetKey = keys,
+  endpoint = "/api/shacl/workflow-access",
 ): Promise<JWTPayload> {
   try {
     return (
       await jwtVerify(token, verificationKeys, {
         issuer: ISSUER,
-        audience: `${origin}/api/shacl/workflow-access`,
+        audience: `${origin}${endpoint}`,
         algorithms: ["RS256"],
         maxTokenAge: "10m",
         requiredClaims: [
@@ -167,6 +168,7 @@ export class AppAuthentication {
     repository: string,
     write = false,
     actions = false,
+    pullRequestsWrite = false,
   ): Promise<{ token: string; expires_at: string }> {
     if (!REPO.test(repository)) deny("Invalid repository.");
     if (!this.env.GITHUB_APP_PRIVATE_KEY)
@@ -198,7 +200,7 @@ export class AppAuthentication {
           repositories: [repository.split("/")[1]],
           permissions: {
             contents: write ? "write" : "read",
-            pull_requests: "read",
+            pull_requests: pullRequestsWrite ? "write" : "read",
             ...(actions ? { actions: "read" } : {}),
           },
         }),

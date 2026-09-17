@@ -29,6 +29,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
     target.repository,
     target.pullRequest,
     target.artifactId,
+    session.login,
   );
   requireReviewTransport(proposal, grant, configuredOrigin(context.env));
   return jsonResponse(proposal);
