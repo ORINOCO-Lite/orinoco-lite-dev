@@ -943,5 +943,79 @@ class FinalizationTests(unittest.TestCase):
         self.assertEqual(external_file.read_bytes(), b"outside\n")
 
 
+class SubmoduleFinalizationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        self.website = GitRepository(root / "website")
+        self.metadata = GitRepository(self.website.path / "site-specific")
+        self.metadata.commit("metadata base")
+        self.website.write_bytes(
+            ".gitmodules",
+            b'[submodule "site-specific"]\npath = site-specific\nurl = https://github.com/example/metadata.git\n',
+        )
+        base = self.website.commit("website base")
+        self.items = tuple(
+            candidate(name, f"xyzrins:{name}", baseline=None,
+                      proposed=record(f"xyzrins:{name}", name))
+            for name in ("accept", "reject", "defer")
+        )
+        self.plan = CandidatePlan(
+            adapter="example", adapter_version="1", adapter_agent_pid=AGENT,
+            source_namespace=NAMESPACE, source_coordinate={"revision": "fixture"},
+            metadata_base=base, candidates=self.items,
+        )
+        for change in self.plan.file_changes():
+            self.website.write_bytes(change.path, change.proposed)
+        self.metadata.commit("metadata proposal")
+        self.proposal = self.website.commit("website proposal")
+
+    def finalize(self):
+        return finalize_candidate_plan(
+            self.website.path, plan=self.plan, proposal_commit=self.proposal,
+            submitted_head=self.website.head,
+            dispositions={item.pid: item.source_record_id for item in self.items},
+        )
+
+    def test_three_decisions_preserve_human_edit_in_metadata_repository(self):
+        accepted = self.items[0]
+        self.website.write(
+            accepted.record_repository_path,
+            record(accepted.pid, "human correction"),
+        )
+        self.metadata.commit("human correction")
+        self.website.commit("record human correction gitlink")
+        result = self.finalize()
+        self.assertEqual(result.changed_paths, tuple(sorted(
+            item.record_repository_path for item in self.items[1:]
+        )))
+        self.assertIn(b"human correction", (
+            self.website.path / accepted.record_repository_path
+        ).read_bytes())
+        for item in self.items[1:]:
+            self.assertFalse((self.website.path / item.record_repository_path).exists())
+        self.assertEqual(self.website.git("diff", "--name-only").stdout, b"site-specific\n")
+
+    def test_unrecorded_metadata_head_stops_before_writes(self):
+        self.metadata.commit("concurrent metadata edit")
+        before = self.metadata.status()
+        with self.assertRaises(ConfigurationError):
+            self.finalize()
+        self.assertEqual(self.metadata.status(), before)
+        for item in self.items:
+            self.assertTrue((self.website.path / item.record_repository_path).exists())
+
+    def test_changed_repository_url_stops_before_writes(self):
+        self.website.write_bytes(
+            ".gitmodules",
+            b'[submodule "site-specific"]\npath = site-specific\nurl = https://github.com/example/other.git\n',
+        )
+        self.website.commit("change metadata repository")
+        with self.assertRaisesRegex(ConfigurationError, "configuration changed"):
+            self.finalize()
+        self.assertEqual(self.metadata.status(), b"")
+
+
 if __name__ == "__main__":
     unittest.main()

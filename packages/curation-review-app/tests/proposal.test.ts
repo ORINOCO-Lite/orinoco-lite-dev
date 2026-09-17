@@ -748,3 +748,120 @@ describe("artifact-backed GitHub proposal loading", () => {
     },
   );
 });
+
+describe("submodule adapter review", () => {
+  const metadataBase = "a".repeat(40);
+  const metadataProposal = "b".repeat(40);
+  const metadataHead = "c".repeat(40);
+  function submoduleClient(
+    options: { stale?: boolean; lostAccess?: boolean } = {},
+  ) {
+    const github = client();
+    const originalContents = github.contents.bind(github);
+    github.siteSubmodule = async (_repo, revision) => ({
+      repository: "Example/Metadata",
+      sha:
+        revision === BASE_SHA
+          ? metadataBase
+          : revision === PROPOSAL_SHA
+            ? metadataProposal
+            : metadataHead,
+    });
+    github.requireInstallationAccess = async () => {
+      if (options.lostAccess) throw new Error("installation access lost");
+    };
+    github.requireCurator = async () => {};
+    github.json = async () => [{ number: 7, state: "open" }];
+    const websitePull = github.pullRequest.bind(github);
+    github.pullRequest = async (repo, number) =>
+      repo === "Example/Metadata"
+        ? {
+            number,
+            state: "open",
+            draft: true,
+            head: {
+              sha: options.stale ? "d".repeat(40) : metadataHead,
+              repo: { full_name: repo },
+            },
+            base: { repo: { full_name: repo } },
+          }
+        : websitePull(repo, number);
+    const websiteFirst = github.firstPullRequestCommit.bind(github);
+    github.firstPullRequestCommit = async (repo, number) =>
+      repo === "Example/Metadata"
+        ? {
+            sha: metadataProposal,
+            parents: [{ sha: metadataBase }],
+            commit: { message: proposalCommitMessage() },
+          }
+        : websiteFirst(repo, number);
+    github.commit = async (repo, sha) => ({
+      sha,
+      files:
+        repo === "Example/Metadata"
+          ? defaultFiles.map((file) => ({
+              ...file,
+              filename: file.filename.slice("site-specific/".length),
+            }))
+          : [{ filename: "site-specific", status: "modified" }],
+    });
+    github.contents = async (repo, requests, limit) =>
+      originalContents(
+        repo,
+        requests.map((request) =>
+          repo === "Example/Metadata"
+            ? {
+                ...request,
+                path: `site-specific/${request.path}`,
+                ref:
+                  request.ref === metadataBase
+                    ? BASE_SHA
+                    : request.ref === metadataProposal
+                      ? PROPOSAL_SHA
+                      : HEAD_SHA,
+              }
+            : request,
+        ),
+        limit,
+      );
+    return github;
+  }
+  it("loads metadata from the three gitlinks and binds its draft head", async () => {
+    const result = await loadReviewProposal(
+      submoduleClient(),
+      "Example/Site",
+      42,
+      ARTIFACT_ID,
+      "curator",
+    );
+    expect(result.metadata).toEqual({
+      repository: "Example/Metadata",
+      pull_request: 7,
+      proposal_sha: metadataProposal,
+      head_sha: metadataHead,
+    });
+    expect(result.candidates[0]?.after).toContain("Current first");
+  });
+  it("rejects a metadata head that moved without the website gitlink", async () => {
+    await expect(
+      loadReviewProposal(
+        submoduleClient({ stale: true }),
+        "Example/Site",
+        42,
+        ARTIFACT_ID,
+        "curator",
+      ),
+    ).rejects.toThrow("no longer matches");
+  });
+  it("rejects lost installation access before loading metadata", async () => {
+    await expect(
+      loadReviewProposal(
+        submoduleClient({ lostAccess: true }),
+        "Example/Site",
+        42,
+        ARTIFACT_ID,
+        "curator",
+      ),
+    ).rejects.toThrow("installation access lost");
+  });
+});

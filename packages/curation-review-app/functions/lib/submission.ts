@@ -121,6 +121,22 @@ function decision(value: unknown): SubmissionDecision {
   };
 }
 
+function parseMetadata(value: unknown) {
+  requireExactKeys(
+    value,
+    ["repository", "pull_request", "proposal_sha", "head_sha"],
+    "metadata",
+  );
+  return {
+    repository: parseRepository(
+      typeof value.repository === "string" ? value.repository : null,
+    ),
+    pull_request: pullRequest(value.pull_request),
+    proposal_sha: sha(value.proposal_sha, "metadata proposal_sha"),
+    head_sha: sha(value.head_sha, "metadata head_sha"),
+  };
+}
+
 export function parseSubmission(value: unknown): CurationSubmission {
   requireExactKeys(
     value,
@@ -133,6 +149,9 @@ export function parseSubmission(value: unknown): CurationSubmission {
       "pull_request",
       "repository",
       "source_coordinate",
+      ...(value !== null && typeof value === "object" && "metadata" in value
+        ? ["metadata"]
+        : []),
     ],
     "submission",
   );
@@ -151,6 +170,9 @@ export function parseSubmission(value: unknown): CurationSubmission {
     );
   }
   return {
+    ...(value.metadata === undefined
+      ? {}
+      : { metadata: parseMetadata(value.metadata) }),
     adapter: line(value.adapter, "adapter"),
     decisions: value.decisions.map(decision),
     format: "orinoco-lite-curation-submission-v1",
@@ -186,6 +208,8 @@ export function verifySubmission(
     submitted.pull_request !== proposal.pull_request ||
     submitted.proposal_sha !== proposal.proposal_sha ||
     submitted.head_sha !== proposal.head_sha ||
+    canonical((submitted.metadata ?? null) as unknown as JsonValue) !==
+      canonical((proposal.metadata ?? null) as unknown as JsonValue) ||
     submitted.adapter !== proposal.adapter ||
     canonical(submitted.source_coordinate) !==
       canonical(proposal.source_coordinate) ||
@@ -223,6 +247,7 @@ export function verifySubmission(
     return { ...item };
   });
   return {
+    ...(proposal.metadata ? { metadata: proposal.metadata } : {}),
     adapter: proposal.adapter,
     decisions,
     format: "orinoco-lite-curation-submission-v1",

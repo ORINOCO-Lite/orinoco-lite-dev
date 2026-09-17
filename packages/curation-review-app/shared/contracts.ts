@@ -60,7 +60,15 @@ export interface ReviewCandidate {
   source_record_id: string;
 }
 
+export interface MetadataReview {
+  repository: string;
+  pull_request: number;
+  proposal_sha: string;
+  head_sha: string;
+}
+
 export interface ReviewProposal {
+  metadata?: MetadataReview;
   adapter: string;
   candidates: ReviewCandidate[];
   head_sha: string;
@@ -81,6 +89,7 @@ export interface SubmissionDecision {
 }
 
 export interface CurationSubmission {
+  metadata?: MetadataReview;
   adapter: string;
   decisions: SubmissionDecision[];
   format: "orinoco-lite-curation-submission-v1";

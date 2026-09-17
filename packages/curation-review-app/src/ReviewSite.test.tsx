@@ -195,7 +195,7 @@ describe("deployed source-review route", () => {
     });
     expect(link).toHaveAttribute(
       "href",
-      "https://github.com/example/site/pulls?q=is%3Apr+is%3Aopen+label%3Acuration-review",
+      "https://github.com/example/site/pulls?q=is%3Apr+is%3Aopen+curation+in%3Atitle",
     );
   });
 

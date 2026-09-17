@@ -46,6 +46,7 @@ def request_json(url: str, token: str, body: dict | None = None) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--curation", action="store_true")
     args = parser.parse_args()
     # Metadata may be a private, not-yet-initialized submodule. Only the
     # trusted website configuration is needed to obtain its checkout token.
@@ -58,7 +59,7 @@ def main() -> None:
         DEFAULT_CURATION_SERVICE if service is None else service,
         "orinoco.yaml site.curation_service",
     )
-    endpoint = f"{origin}/api/shacl/workflow-access"
+    endpoint = f"{origin}/api/{"curation" if args.curation else "shacl"}/workflow-access"
     identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
     parsed = urllib.parse.urlsplit(identity_url)
     if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".actions.githubusercontent.com"):
@@ -76,7 +77,10 @@ def main() -> None:
         "head": os.environ["PROPOSAL_HEAD"],
         "write": args.write,
     }
-    if os.environ.get("PROPOSAL_HANDOFF"):
+    if args.curation:
+        body.pop("pull_request")
+        body["comment_id"] = int(os.environ["CURATION_COMMENT_ID"]) if os.environ.get("CURATION_COMMENT_ID") else None
+    if os.environ.get("PROPOSAL_HANDOFF") and not args.curation:
         body["handoff"] = os.environ["PROPOSAL_HANDOFF"]
     result = request_json(endpoint, identity, body)
     token = result.get("token")
@@ -85,6 +89,18 @@ def main() -> None:
     print(f"::add-mask::{token}")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         output.write(f"token={token}\n")
+        if args.curation and args.write:
+            website_token = result.get("website_token")
+            if not isinstance(website_token, str) or not website_token or any(c in website_token for c in "\r\n\0"):
+                raise RuntimeError("The service did not return bounded website access")
+            print(f"::add-mask::{website_token}")
+            output.write(f"website_token={website_token}\n")
+        if args.curation:
+            for key in ("repository", "head"):
+                value = result.get(key)
+                if not isinstance(value, str) or any(c in value for c in "\r\n\0"):
+                    raise RuntimeError("Invalid metadata checkout coordinate")
+                output.write(f"{key}={value}\n")
 
 
 if __name__ == "__main__":

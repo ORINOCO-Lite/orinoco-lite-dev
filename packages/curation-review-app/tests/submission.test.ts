@@ -80,3 +80,32 @@ describe("authenticated submission envelope", () => {
     expect(() => submissionComment(payload)).toThrow("GitHub's text limit");
   });
 });
+
+describe("coordinated metadata submissions", () => {
+  const metadata = {
+    repository: "example/metadata",
+    pull_request: 7,
+    proposal_sha: "a".repeat(40),
+    head_sha: "b".repeat(40),
+  };
+  it("retains the verified metadata coordinates", () => {
+    const value = parseSubmission({ ...submission(), metadata });
+    expect(
+      verifySubmission(value, { ...proposal(), metadata }).metadata,
+    ).toEqual(metadata);
+  });
+  it("rejects an omitted or stale metadata head", () => {
+    expect(() =>
+      verifySubmission(submission(), { ...proposal(), metadata }),
+    ).toThrow("no longer matches");
+    expect(() =>
+      verifySubmission(
+        {
+          ...submission(),
+          metadata: { ...metadata, head_sha: "c".repeat(40) },
+        },
+        { ...proposal(), metadata },
+      ),
+    ).toThrow("no longer matches");
+  });
+});
