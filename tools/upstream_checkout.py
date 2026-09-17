@@ -3,14 +3,11 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 import subprocess
-import sys
-from typing import Literal, Sequence
+from typing import Literal
 
 
-ROOT = Path(__file__).resolve().parents[1]
 CheckoutMode = Literal["recorded", "worktree"]
 
 
@@ -102,58 +99,3 @@ def prepare_gitlink(
     source = "recorded" if mode == "recorded" else "current worktree"
     print(f"Using {source} {display} at {actual} ({state})")
     return checkout
-
-
-def prepare_static_checkout(mode: CheckoutMode) -> None:
-    website = prepare_gitlink(
-        ROOT,
-        Path("submodules/www-from-model"),
-        display=Path("submodules/www-from-model"),
-        mode=mode,
-    )
-    prepare_gitlink(
-        website,
-        Path("themes/congo"),
-        display=Path("submodules/www-from-model/themes/congo"),
-        mode=mode,
-    )
-
-
-def prepare_full_checkout(mode: CheckoutMode) -> None:
-    prepare_static_checkout(mode)
-    pool = prepare_gitlink(
-        ROOT,
-        Path("submodules/pool.psychoinformatics.de-ui"),
-        display=Path("submodules/pool.psychoinformatics.de-ui"),
-        mode=mode,
-    )
-    prepare_gitlink(
-        pool,
-        Path("shacl-vue"),
-        display=Path("submodules/pool.psychoinformatics.de-ui/shacl-vue"),
-        mode=mode,
-    )
-    for relative in (
-        Path("submodules/things-schemas"),
-        Path("submodules/dump-things-service"),
-    ):
-        prepare_gitlink(ROOT, relative, display=relative, mode=mode)
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("scope", choices=("static", "full"))
-    parser.add_argument("mode", choices=("recorded", "worktree"))
-    args = parser.parse_args(argv)
-    try:
-        if args.scope == "static":
-            prepare_static_checkout(args.mode)
-        else:
-            prepare_full_checkout(args.mode)
-    except UpstreamCheckoutError as error:
-        parser.exit(1, f"upstream-checkout: {error}\n")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
