@@ -53,7 +53,7 @@ Disable callback-URL wildcard matching and webhooks, configure the exact callbac
 - Pull requests: write
 
 `Pull requests: write` supports authenticated decision comments and creation of an explicit standalone draft proposal.
-Contents write includes the read access needed by both profiles and is used for writes only to create the exact, fixed-path SHACL Vue handoff branch and commit requested by the curator.
+Contents write includes the read access needed by both profiles and supports the exact, fixed-path SHACL Vue handoff requested by the curator and verified, proposal-bound workflow materialization.
 Commit-status read access verifies an exact successful Netlify deploy preview before that preview may update its own draft pull request.
 The source-adapter decision path never writes repository contents through the service.
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
@@ -62,12 +62,13 @@ If the editor reports a GitHub 401, 403, or 404, confirm that the App is install
 
 Configure these Pages runtime values:
 
-| Name                   | Kind     | Purpose                               |
-| ---------------------- | -------- | ------------------------------------- |
-| `PUBLIC_ORIGIN`        | variable | Exact HTTPS deployment origin         |
-| `GITHUB_CLIENT_ID`     | variable | GitHub App client ID                  |
-| `GITHUB_CLIENT_SECRET` | secret   | OAuth code exchange                   |
-| `SESSION_SEAL_KEY`     | secret   | Base64url-encoded 32-byte AES-GCM key |
+| Name                     | Kind     | Purpose                                                            |
+| ------------------------ | -------- | ------------------------------------------------------------------ |
+| `PUBLIC_ORIGIN`          | variable | Exact HTTPS deployment origin                                      |
+| `GITHUB_CLIENT_ID`       | variable | GitHub App client ID                                               |
+| `GITHUB_CLIENT_SECRET`   | secret   | OAuth code exchange                                                |
+| `SESSION_SEAL_KEY`       | secret   | Base64url-encoded 32-byte AES-GCM key                              |
+| `GITHUB_APP_PRIVATE_KEY` | secret   | RSA PKCS#8 PEM; required for coordinated submodule materialization |
 
 Do not configure KV, D1, R2, Durable Objects, queues, or analytics-backed curation storage.
 OAuth state and the short-lived GitHub access token exist only in encrypted, host-only browser cookies.
@@ -148,13 +149,33 @@ This package does not perform them.
 
 Install the same curation App on the website and metadata repositories.
 The curator needs write access in both; downstreams need no second App or App private key.
-The service operator configures `GITHUB_APP_PRIVATE_KEY` for the existing App as an encrypted backend secret (RSA PKCS#8 PEM).
-For Cloudflare, convert GitHub's downloaded PKCS#1 key in a pipe without printing or tracking it:
+The service operator configures `GITHUB_APP_PRIVATE_KEY` once per hosted service, not per downstream installation.
+It is an ongoing runtime signing credential, distinct from the OAuth client secret; the same App serves all its authorized installations.
+A deployment that supports only ordinary-directory handoffs and source-adapter review does not need this key.
+
+For an independent service, register your own GitHub App with the settings above, configure its client ID, client secret, session-sealing key, and exact service origin, and install that App on the selected repositories.
+Set the downstream's `site.curation_service` to your service's HTTPS origin.
+Do not obtain or share the central service's private key.
+
+Reuse an existing signing key held securely by the service operator when available.
+Otherwise, use **Generate a private key** in that App's GitHub settings and protect the downloaded PEM file.
+A displayed fingerprint is not the private key, and a client secret cannot replace it.
+Validate the file before uploading it:
+
+```sh
+openssl rsa -in /secure/path/app-private-key.pem -check -noout
+```
+
+For Cloudflare, after successful validation, convert GitHub's downloaded key to PKCS#8 and pass it directly to encrypted secret storage without printing it.
+Replace `YOUR_PAGES_PROJECT` with your own service project:
 
 ```sh
 openssl pkcs8 -topk8 -nocrypt -in /secure/path/app-private-key.pem |
-  npx wrangler pages secret put GITHUB_APP_PRIVATE_KEY --project-name orinoco-curation-review
+  npx wrangler pages secret put GITHUB_APP_PRIVATE_KEY --project-name YOUR_PAGES_PROJECT
 ```
+
+Deploy the service after configuring its secrets, verify authenticated operation, and remove temporary local key copies or retain them only in an approved secret store.
+Never commit the key or supply it to downstream repositories.
 
 Restrict operator access, protect the downloaded key, and revoke superseded GitHub keys after verifying a replacement.
 A sign-only vault is preferable where supported; this implementation uses the hosting provider's encrypted secret binding and imports the signing key as non-extractable Web Crypto key material.

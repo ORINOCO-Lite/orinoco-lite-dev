@@ -34,10 +34,12 @@ The immutable editor shell and schema belong in each downstream's static site bu
 | `GITHUB_CLIENT_ID` | Public | Client ID of the configured GitHub App. |
 | `GITHUB_CLIENT_SECRET` | Secret | GitHub OAuth code exchange secret. |
 | `SESSION_SEAL_KEY` | Secret | Base64url encoding of exactly 32 random bytes. |
+| `GITHUB_APP_PRIVATE_KEY` | Secret | Existing App signing key in RSA PKCS#8 PEM; required for coordinated submodule materialization. |
 
 Generate `SESSION_SEAL_KEY` with a cryptographically secure random source.
 Avoid commands that print it into captured logs; send it directly to the provider's secret input.
-No App private key, webhook secret, installation token, database credential, or storage binding is required.
+Configure the signing key once per service, not per downstream, using the [service setup instructions](../../../../packages/curation-review-app/README.md#coordinated-submodule-materialization).
+No persistent installation token, webhook secret, database credential, or storage binding is required.
 
 The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.
 Repository identity is not a separate curation setting.
