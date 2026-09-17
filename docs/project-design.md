@@ -228,6 +228,7 @@ The normative contracts define the precise behavior:
   Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
   Only signed-in GitHub operations use the curation service.
+- **Preserve GitHub’s security model.** The curation App follows GitHub’s current security guidance, uses least privilege, protects operator credentials, and never trades user authorization or repository protections for a simpler setup.
 - **Keep people and Git in control.** Automation only reads external sources.
   It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
 - **Record each fact once.** Source revisions belong in dependency declarations, ordinary tool locks, package metadata, and Gitlinks.

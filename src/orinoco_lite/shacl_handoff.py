@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -21,6 +22,36 @@ RECORD_ROOT = PurePosixPath("site-specific/metadata/records")
 ANNOTATION_ROOT = PurePosixPath("site-specific/metadata/overlays/annotations")
 SHA40 = re.compile(r"[0-9a-f]{40}")
 SOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def site_submodule(root: Path, commit: str) -> dict[str, str] | None:
+    """Resolve the bounded gitlink from Git, never from worktree config."""
+    entry = _tree_entry(root, commit, "site-specific")
+    if entry is None or entry[:2] == ("040000", "tree"):
+        return None
+    if entry[:2] != ("160000", "commit"):
+        raise HandoffError("site-specific must be a directory or Git submodule")
+    parser = configparser.RawConfigParser(strict=True)
+    try:
+        parser.read_string(_tree_blob(root, commit, ".gitmodules").decode("utf-8"))
+        matches = [
+            section
+            for section in parser.sections()
+            if parser.get(section, "path", fallback=None) == "site-specific"
+        ]
+        if len(matches) != 1 or not re.fullmatch(r'submodule "[^"\r\n]+"', matches[0]):
+            raise ValueError("ambiguous submodule")
+        url = parser.get(matches[0], "url")
+    except (ValueError, UnicodeDecodeError, configparser.Error) as error:
+        raise HandoffError("site-specific needs one exact .gitmodules URL") from error
+    match = re.fullmatch(
+        r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)"
+        r"([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?",
+        url,
+    )
+    if match is None or ".." in match[1]:
+        raise HandoffError("site-specific requires an absolute GitHub HTTPS or SSH URL")
+    return {"repository": match[1], "source_commit": entry[2]}
 
 
 class HandoffError(RuntimeError):
@@ -106,7 +137,9 @@ def _diff_entries(
     return tuple(entries)
 
 
-def _metadata_path(value: str) -> str | None:
+def _metadata_path(value: str, *, in_submodule: bool = False) -> str | None:
+    if in_submodule:
+        return value if _metadata_path("site-specific/" + value) is not None else None
     path = PurePosixPath(value)
     if (
         any(character in value for character in "\\\r\n\0")
@@ -207,12 +240,28 @@ def _proposal_commit_count(root: Path, merge_base: str, head_sha: str) -> int:
 
 def _read_bundle_blob(root: Path, head_sha: str) -> tuple[dict[str, object], bytes]:
     payload = _tree_blob(root, head_sha, HANDOFF_PATH)
-    if len(payload) > MAX_BUNDLE_BYTES:
+    if len(payload) > MAX_BUNDLE_BYTES + 64 * 1024:
         raise HandoffError("SHACL Vue bundle exceeds 10 MiB")
     try:
         value = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise HandoffError("SHACL Vue bundle is not valid UTF-8 JSON") from error
+    if (
+        isinstance(value, dict)
+        and value.get("format") == "orinoco-shacl-submodule-handoff"
+    ):
+        if (
+            set(value) not in (
+                {"format", "version", "bundle", "metadata"},
+                {"format", "version", "bundle", "metadata", "authorization"},
+            )
+            or value["version"] != 1
+        ):
+            raise HandoffError("Invalid coordinated handoff envelope")
+        value = value["bundle"]
+        payload = (json.dumps(value, ensure_ascii=False) + "\n").encode("utf-8")
+    if len(payload) > MAX_BUNDLE_BYTES:
+        raise HandoffError("SHACL Vue bundle exceeds 10 MiB")
     if (
         not isinstance(value, dict)
         or value.get("format") != BUNDLE_FORMAT
@@ -223,6 +272,40 @@ def _read_bundle_blob(root: Path, head_sha: str) -> tuple[dict[str, object], byt
     ):
         raise HandoffError("SHACL Vue bundle does not satisfy bounded version 2")
     return value, payload
+
+
+def submodule_handoff(root: Path, head_sha: str) -> dict[str, object] | None:
+    """Validate operational coordinates against the exact website parent."""
+    raw = json.loads(_tree_blob(root, head_sha, HANDOFF_PATH))
+    parents = _parents(root, head_sha)
+    if len(parents) != 1:
+        raise HandoffError("Handoff must have exactly one parent")
+    source = site_submodule(root, parents[0])
+    if source is None:
+        if raw.get("format") == "orinoco-shacl-submodule-handoff":
+            raise HandoffError("Coordinated handoff has no site-specific gitlink")
+        return None
+    metadata = raw.get("metadata")
+    if (
+        raw.get("format") != "orinoco-shacl-submodule-handoff"
+        or not isinstance(metadata, dict)
+        or set(metadata)
+        != {"repository", "source_commit", "head_sha", "branch", "pull_request"}
+        or metadata.get("repository") != source["repository"]
+        or metadata.get("source_commit") != source["source_commit"]
+        or SHA40.fullmatch(str(metadata.get("head_sha", ""))) is None
+        or re.fullmatch(
+            r"curation/shacl-vue-" + parents[0][:12] + r"-[0-9a-f]{16}",
+            str(metadata.get("branch", "")),
+        )
+        is None
+        or type(metadata.get("pull_request")) is not int
+        or metadata["pull_request"] < 1
+    ):
+        raise HandoffError(
+            "Metadata proposal does not match the deployed site-specific gitlink"
+        )
+    return metadata
 
 
 def inspect_proposal(
@@ -251,8 +334,7 @@ def inspect_proposal(
         fixed = _tree_entry(root, head_sha, HANDOFF_PATH)
         net = _diff_entries(root, base_sha, head_sha)
         if fixed is not None or any(
-            _metadata_path(path) is not None
-            or _decision_cache_path(path) is not None
+            _metadata_path(path) is not None or _decision_cache_path(path) is not None
             for _status, path in net
         ):
             raise HandoffError(
@@ -266,6 +348,22 @@ def inspect_proposal(
             "phase": "irrelevant",
         }
     changed = {path for _status_name, path in head_entries}
+    if changed == {"site-specific"}:
+        before = site_submodule(root, parent_sha)
+        after = site_submodule(root, head_sha)
+        if (
+            before is not None
+            and after is not None
+            and before["repository"] == after["repository"]
+        ):
+            return {
+                "base_sha": base_sha,
+                "head_sha": head_sha,
+                "parent_sha": parent_sha,
+                "paths": ["site-specific"],
+                "phase": "canonical",
+                "metadata": after,
+            }
     metadata = sorted(path for path in changed if _metadata_path(path) is not None)
     curation_state = sorted(
         path for path in changed if _decision_cache_path(path) is not None
@@ -318,6 +416,9 @@ def inspect_proposal(
             )
         report["source_commit"] = bundle["source_commit"]
         report["record_count"] = len(bundle["records"])
+        metadata_handoff = submodule_handoff(root, head_sha)
+        if metadata_handoff is not None:
+            report["metadata"] = metadata_handoff
     return report
 
 
@@ -340,10 +441,64 @@ def extract_bundle(root: Path, *, head_sha: str, output: Path) -> dict[str, obje
     }
 
 
+def verify_submodule_handoff(
+    root: Path,
+    *,
+    head_sha: str,
+    metadata_root: Path,
+    pull: dict[str, object],
+    permission: dict[str, object],
+    commit: dict[str, object],
+    curator: str,
+    curator_id: str,
+) -> dict[str, object]:
+    """Check both Git histories and fresh GitHub authority before replacement."""
+    metadata = submodule_handoff(root, head_sha)
+    if metadata is None:
+        raise HandoffError("Website handoff has no metadata proposal")
+    base, head = pull.get("base", {}), pull.get("head", {})
+    author = commit.get("author", {})
+    user = permission.get("user", {})
+    if (
+        pull.get("state") != "open"
+        or pull.get("draft") is not True
+        or pull.get("number") != metadata["pull_request"]
+        or base.get("repo", {}).get("full_name") != metadata["repository"]
+        or base.get("ref") != base.get("repo", {}).get("default_branch")
+        or base.get("sha") != metadata["source_commit"]
+        or head.get("repo", {}).get("full_name") != metadata["repository"]
+        or head.get("ref") != metadata["branch"]
+        or head.get("sha") != metadata["head_sha"]
+        or commit.get("sha") != metadata["head_sha"]
+        or author.get("login") != curator
+        or str(author.get("id")) != curator_id
+        or permission.get("permission") not in {"write", "admin"}
+        or user.get("login") != curator
+        or str(user.get("id")) != curator_id
+    ):
+        raise HandoffError(
+            "Metadata draft head, pinned base, or curator authority changed; inspect both pull requests before retrying"
+        )
+    metadata_head = str(metadata["head_sha"])
+    metadata_source = str(metadata["source_commit"])
+    if _parents(metadata_root, metadata_head) != (metadata_source,):
+        raise HandoffError("Metadata handoff must have the exact gitlink parent")
+    if _diff_entries(metadata_root, metadata_source, metadata_head) != (
+        ("A", HANDOFF_PATH),
+    ):
+        raise HandoffError("Metadata handoff must add only the fixed bundle")
+    bundle, _ = _read_bundle_blob(root, head_sha)
+    other, _ = _read_bundle_blob(metadata_root, metadata_head)
+    if bundle != other:
+        raise HandoffError("Website and metadata handoff bundles differ")
+    return metadata
+
+
 def inspect_materialized_changes(
     root: Path,
     *,
     source_commit: str,
+    in_submodule: bool = False,
 ) -> dict[str, object]:
     """Require one nonempty canonical metadata-only worktree change."""
 
@@ -351,6 +506,21 @@ def inspect_materialized_changes(
     source_commit = _exact_sha(source_commit, "Source commit")
     if _head(root) != source_commit:
         raise HandoffError("Materialization checkout is not the exact source commit")
+    submodule = None if in_submodule else site_submodule(root, source_commit)
+    if submodule is not None:
+        entries = [entry for entry in _status(root).split(b"\0") if entry]
+        if any(entry[3:] != b"site-specific" for entry in entries):
+            raise HandoffError("Materialization changed a path outside site-specific")
+        report = inspect_materialized_changes(
+            root / "site-specific",
+            source_commit=submodule["source_commit"],
+            in_submodule=True,
+        )
+        return {
+            "paths": ["site-specific/" + path for path in report["paths"]],
+            "source_commit": source_commit,
+            "metadata": submodule,
+        }
     raw = _status(root).split(b"\0")
     paths: list[str] = []
     for entry in raw:
@@ -365,7 +535,7 @@ def inspect_materialized_changes(
             path = entry[3:].decode("utf-8")
         except UnicodeDecodeError as error:
             raise HandoffError("Materialized path is not UTF-8") from error
-        if _metadata_path(path) is None:
+        if _metadata_path(path, in_submodule=in_submodule) is None:
             raise HandoffError(f"Materialization changed an unapproved path: {path}")
         filesystem_path = root.joinpath(*PurePosixPath(path).parts)
         if "D" not in status and (
@@ -383,6 +553,7 @@ def verify_materialized_commit(
     *,
     source_commit: str,
     commit: str,
+    in_submodule: bool = False,
 ) -> dict[str, object]:
     """Prove the replacement is one clean metadata commit on the source."""
 
@@ -396,9 +567,35 @@ def verify_materialized_commit(
     entries = _diff_entries(root, source_commit, commit)
     if not entries:
         raise HandoffError("Materialized commit has no metadata change")
+    submodule = None if in_submodule else site_submodule(root, source_commit)
+    if submodule is not None:
+        updated = site_submodule(root, commit)
+        if (
+            entries != (("M", "site-specific"),)
+            or updated is None
+            or updated["repository"] != submodule["repository"]
+        ):
+            raise HandoffError(
+                "Website replacement must change only the site-specific gitlink"
+            )
+        verify_materialized_commit(
+            root / "site-specific",
+            source_commit=submodule["source_commit"],
+            commit=updated["source_commit"],
+            in_submodule=True,
+        )
+        return {
+            "commit": commit,
+            "source_commit": source_commit,
+            "paths": ["site-specific"],
+            "metadata": updated,
+        }
     paths: list[str] = []
     for status, path in entries:
-        if status not in {"A", "M", "D"} or _metadata_path(path) is None:
+        if (
+            status not in {"A", "M", "D"}
+            or _metadata_path(path, in_submodule=in_submodule) is None
+        ):
             raise HandoffError(
                 f"Materialized commit changes an unapproved path: {path}"
             )
@@ -434,6 +631,14 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--root", type=Path, required=True)
     verify.add_argument("--source-commit", required=True)
     verify.add_argument("--commit", required=True)
+    submodule = commands.add_parser("verify-submodule")
+    submodule.add_argument("--root", type=Path, required=True)
+    submodule.add_argument("--head-sha", required=True)
+    submodule.add_argument("--metadata-root", type=Path, required=True)
+    for name in ("pull", "permission", "commit"):
+        submodule.add_argument(f"--{name}-json", type=Path, required=True)
+    submodule.add_argument("--curator", required=True)
+    submodule.add_argument("--curator-id", required=True)
     return parser
 
 
@@ -465,6 +670,17 @@ def execute(args: argparse.Namespace) -> int:
                 args.root,
                 source_commit=args.source_commit,
                 commit=args.commit,
+            )
+        elif args.handoff_command == "verify-submodule":
+            value = verify_submodule_handoff(
+                args.root,
+                head_sha=args.head_sha,
+                metadata_root=args.metadata_root,
+                pull=json.loads(args.pull_json.read_text()),
+                permission=json.loads(args.permission_json.read_text()),
+                commit=json.loads(args.commit_json.read_text()),
+                curator=args.curator,
+                curator_id=args.curator_id,
             )
         else:
             raise AssertionError(f"unhandled command: {args.handoff_command}")

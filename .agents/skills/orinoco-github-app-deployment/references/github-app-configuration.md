@@ -40,13 +40,21 @@ The service requests no OAuth scopes and rejects a nonempty returned scope.
 The GitHub App does not need account-email permission: the authenticated login and stable account identifier plus the exact GitHub authorization decision are sufficient.
 It uses state and PKCE S256, rejects callbacks that did not begin at its own start route, rejects non-bearer or non-expiring tokens, discards refresh tokens, and independently checks that the signed-in curator has `write` or `admin` collaborator permission.
 
-`Contents: write` supplies repository reads for both product profiles and is used for writes only by the explicitly requested fixed-path SHACL Vue handoff.
+`Contents: write` supplies repository reads for both product profiles and supports the explicitly requested fixed-path SHACL Vue handoff and verified, proposal-bound workflow materialization.
 `Commit statuses: read` lets the service verify that GitHub recorded the exact successful Netlify deploy preview before allowing that preview to update its own draft pull request.
 The source-adapter review path posts authenticated pull-request comments but does not write repository contents.
 
+## Signing-key setup
+
+For coordinated submodule materialization, configure `GITHUB_APP_PRIVATE_KEY` for the service's App.
+Reuse an available operator-held key or generate one in that App's settings.
+Validate the PEM, convert it to RSA PKCS#8, and upload it directly to the hosting provider's encrypted secret store.
+Deploy and verify a coordinated proposal using the [verification procedure](verification-rotation-and-rollback.md).
+For credential boundaries, follow the [authentication contract](../../../../docs/agents/contract/curation-service-authentication-options.md#app-credentials-and-automated-completion).
+
 ## Ownership, installation, and deployment are separate
 
-A GitHub App's owner controls its settings and client secrets.
+A GitHub App's owner controls its settings, client secrets, and signing keys.
 Transferring the App does not by itself:
 
 - move or reconfigure the hosting project;
@@ -83,8 +91,8 @@ That warning does not gate SHACL submission; the separate source-adapter `/revie
 Do not publish a SHACL editor-input Actions artifact for this path.
 The central service does not acquire either static interface's files, assemble an editor, or render source-adapter candidates.
 
-Do not put the client ID or either secret in a downstream repository.
-A public client ID belongs at the service deployment, and both secrets belong only in the host's encrypted secret store.
+Do not put service credentials in a downstream repository.
+The public client ID belongs at the service deployment, and all service secrets belong only in protected backend secret storage.
 
 ## Minimal operator inputs
 

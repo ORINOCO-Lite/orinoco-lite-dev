@@ -53,3 +53,20 @@ It protects credentials from untrusted repository code and external source data,
 
 GitHub and Git remain authoritative.
 Failures are retried before a write, inspected after an uncertain write, or repaired through an ordinary pull request or revert.
+
+## App credentials and automated completion
+
+Downstreams MUST need only the same curation App installed on each participating repository, with no additional App, personal access token, or private key.
+Installation alone MUST NOT authorize cross-repository access.
+The operator MUST protect signing keys in backend secret storage with restricted access, rotation, and revocation; keys MUST NOT enter source, browsers, downstream secrets, artifacts, or logs.
+
+Interactive operations MUST use expiring user access tokens; installation tokens MUST NOT substitute for failed user authorization.
+Automated materialization MUST remain bound to the curator-authorized proposal: immutable repository and curator identities, bundle, source and handoff commits, permitted operation, trusted workflow revision, and a short expiry.
+Before granting write access, the service MUST recheck installations, curator permissions, both draft heads, and successful validation.
+Expired, revoked, stale, or ambiguous authorizations and replayed writes MUST fail closed.
+
+Workflow callers MUST authenticate through GitHub-signed Actions OIDC with verified signature, issuer, audience, expiry, repository, event, workflow revision, and run identity.
+Proposal content MUST remain data; untrusted code MUST NOT receive credentials or an OIDC capability that can obtain them.
+Installation tokens MUST be limited to required repositories and permissions, exposed only to trusted transport steps, and revoked when finished.
+Because tokens are not path- or branch-scoped, the trusted workflow MUST enforce allowed paths and exact-head leases.
+The App MUST NOT acquire bypass permissions, modify repository protections, or merge proposals to complete materialization.

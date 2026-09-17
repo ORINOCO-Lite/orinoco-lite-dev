@@ -135,6 +135,7 @@ function client(options: ClientOptions = {}): GitHubClient {
   const siteConfig =
     "siteConfig" in options ? options.siteConfig : ORINOCO_CONFIG;
   return {
+    siteSubmodule: async () => null,
     artifactArchive: async () => archive,
     artifactMetadata: async () => ({
       expired: false,

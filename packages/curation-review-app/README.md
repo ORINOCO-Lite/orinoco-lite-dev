@@ -53,7 +53,7 @@ Disable callback-URL wildcard matching and webhooks, configure the exact callbac
 - Pull requests: write
 
 `Pull requests: write` supports authenticated decision comments and creation of an explicit standalone draft proposal.
-Contents write includes the read access needed by both profiles and is used for writes only to create the exact, fixed-path SHACL Vue handoff branch and commit requested by the curator.
+Contents write includes the read access needed by both profiles and supports the exact, fixed-path SHACL Vue handoff requested by the curator and verified, proposal-bound workflow materialization.
 Commit-status read access verifies an exact successful Netlify deploy preview before that preview may update its own draft pull request.
 The source-adapter decision path never writes repository contents through the service.
 The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
@@ -62,12 +62,13 @@ If the editor reports a GitHub 401, 403, or 404, confirm that the App is install
 
 Configure these Pages runtime values:
 
-| Name                   | Kind     | Purpose                               |
-| ---------------------- | -------- | ------------------------------------- |
-| `PUBLIC_ORIGIN`        | variable | Exact HTTPS deployment origin         |
-| `GITHUB_CLIENT_ID`     | variable | GitHub App client ID                  |
-| `GITHUB_CLIENT_SECRET` | secret   | OAuth code exchange                   |
-| `SESSION_SEAL_KEY`     | secret   | Base64url-encoded 32-byte AES-GCM key |
+| Name                     | Kind     | Purpose                                                            |
+| ------------------------ | -------- | ------------------------------------------------------------------ |
+| `PUBLIC_ORIGIN`          | variable | Exact HTTPS deployment origin                                      |
+| `GITHUB_CLIENT_ID`       | variable | GitHub App client ID                                               |
+| `GITHUB_CLIENT_SECRET`   | secret   | OAuth code exchange                                                |
+| `SESSION_SEAL_KEY`       | secret   | Base64url-encoded 32-byte AES-GCM key                              |
+| `GITHUB_APP_PRIVATE_KEY` | secret   | RSA PKCS#8 PEM; required for coordinated submodule materialization |
 
 Do not configure KV, D1, R2, Durable Objects, queues, or analytics-backed curation storage.
 OAuth state and the short-lived GitHub access token exist only in encrypted, host-only browser cookies.
@@ -80,7 +81,7 @@ Its manifest sends the exact root and `/api/*` to Functions.
 The root Function returns an empty, hardened, non-cacheable `404` so a superseded Pages asset cannot reappear from static hosting or cache, while every other non-API presentation path remains outside the Functions deployment.
 Pages Functions are under `functions/`; `npm run pages:functions:build` verifies their Worker bundle without publishing it.
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
-Cloudflare stores the client secret and session-sealing key separately as encrypted Pages secrets.
+Cloudflare stores the client secret, session-sealing key, and optional App signing key separately as encrypted Pages secrets.
 
 The central `https://orinoco-curation-review.pages.dev/` deployment is the default authentication and GitHub-transport option, but `PUBLIC_ORIGIN` is configurable.
 It is not a source-adapter review destination.
@@ -143,3 +144,13 @@ Pull-request Markdown is not parsed to locate or validate either artifact.
 
 Provisioning the Pages project, registering the GitHub App, setting secrets, and deploying are separately reviewed external operations.
 This package does not perform them.
+
+## Coordinated submodule materialization
+
+Install the same curation App on the website and metadata repositories; the curator needs write access in both.
+The service operator configures `GITHUB_APP_PRIVATE_KEY` once per service, not per downstream.
+It is a runtime signing credential distinct from the OAuth client secret; downstreams need no additional App or secret.
+
+An independently hosted service uses its own App and credentials with the settings above.
+Set `site.curation_service` in its downstreams to that service's HTTPS origin.
+See the [deployment skill](../../.agents/skills/orinoco-github-app-deployment/SKILL.md) for setup and rotation, and the [authentication contract](../../docs/agents/contract/curation-service-authentication-options.md#app-credentials-and-automated-completion) for security constraints.

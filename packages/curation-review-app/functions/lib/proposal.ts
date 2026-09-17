@@ -528,11 +528,21 @@ export async function loadSiteCoordinates(
   }
   const configBytes = new TextEncoder().encode(configText ?? "").byteLength;
   const sitePath = `${siteRoot}/site.yaml`;
-  const siteContents = await github.contents(
+  let siteContents = await github.contents(
     repository,
     [{ key: "site-data", path: sitePath, ref: baseSha }],
     MAX_REVIEW_BYTES - configBytes,
   );
+  if (siteRoot === "site-specific" && siteContents.get("site-data") === null) {
+    const submodule = await github.siteSubmodule(repository, baseSha);
+    if (submodule !== null) {
+      siteContents = await github.contents(
+        submodule.repository,
+        [{ key: "site-data", path: "site.yaml", ref: submodule.sha }],
+        MAX_REVIEW_BYTES - configBytes,
+      );
+    }
+  }
   const siteText = siteContents.get("site-data") ?? null;
   const siteData = configurationMapping(siteText, sitePath);
   if (siteData.version !== 1) {

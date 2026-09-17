@@ -32,6 +32,26 @@ export interface BranchCoordinates {
   sha: string;
 }
 
+export interface SiteSubmodule {
+  repository: string;
+  sha: string;
+}
+
+export function githubSubmoduleRepository(coordinate: string): string {
+  const match =
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(
+      coordinate,
+    );
+  if (match === null) {
+    throw new HttpError(
+      422,
+      "invalid_site_submodule",
+      "site-specific must name a GitHub repository with an HTTPS or SSH URL.",
+    );
+  }
+  return parseRepository(match[1] ?? null);
+}
+
 export interface DraftPullRequestResult {
   number: number;
   url: string;
@@ -216,7 +236,11 @@ export class GitHubClient {
     };
   }
 
-  async requireCurator(repository: string, login: string): Promise<void> {
+  async requireCurator(
+    repository: string,
+    login: string,
+    expectedId?: number,
+  ): Promise<void> {
     const value = await this.json(
       endpoint(
         repository,
@@ -227,13 +251,86 @@ export class GitHubClient {
       value !== null && typeof value === "object" && !Array.isArray(value)
         ? (value as Record<string, unknown>).permission
         : null;
-    if (permission !== "write" && permission !== "admin") {
+    const authority = objectRecord(objectRecord(value)?.user);
+    if (
+      (permission !== "write" && permission !== "admin") ||
+      (expectedId !== undefined &&
+        (authority?.id !== expectedId || authority?.login !== login))
+    ) {
       throw new HttpError(
         403,
         "curator_permission_required",
         "Repository write or admin permission is required.",
       );
     }
+  }
+
+  async requireInstallationAccess(repository: string): Promise<void> {
+    const [owner] = splitRepository(repository);
+    for (let page = 1; page <= 10; page += 1) {
+      const response = objectRecord(
+        await this.json(`/user/installations?per_page=100&page=${page}`),
+      );
+      if (!response || !Array.isArray(response.installations)) {
+        throw new HttpError(
+          502,
+          "github_error",
+          "GitHub returned invalid installation access.",
+        );
+      }
+      for (const raw of response.installations) {
+        const installation = objectRecord(raw);
+        const account = objectRecord(installation?.account);
+        const permissions = objectRecord(installation?.permissions);
+        if (
+          typeof account?.login !== "string" ||
+          account.login.toLowerCase() !== owner.toLowerCase() ||
+          !Number.isSafeInteger(installation?.id)
+        )
+          continue;
+        if (
+          installation?.suspended_at ||
+          permissions?.contents !== "write" ||
+          permissions?.pull_requests !== "write"
+        )
+          continue;
+        for (
+          let repositoryPage = 1;
+          repositoryPage <= 10;
+          repositoryPage += 1
+        ) {
+          const selected = objectRecord(
+            await this.json(
+              `/user/installations/${installation?.id}/repositories?per_page=100&page=${repositoryPage}`,
+            ),
+          );
+          if (!selected || !Array.isArray(selected.repositories)) {
+            throw new HttpError(
+              502,
+              "github_error",
+              "GitHub returned invalid installed repositories.",
+            );
+          }
+          if (
+            selected.repositories.some((item) => {
+              const value = objectRecord(item);
+              return (
+                typeof value?.full_name === "string" &&
+                value.full_name.toLowerCase() === repository.toLowerCase()
+              );
+            })
+          )
+            return;
+          if (selected.repositories.length < 100) break;
+        }
+      }
+      if (response.installations.length < 100) break;
+    }
+    throw new HttpError(
+      403,
+      "installation_access_required",
+      `Install the curation GitHub App on ${repository} with Contents and Pull requests write access before proposing.`,
+    );
   }
 
   async pullRequest(repository: string, number: number): Promise<unknown> {
@@ -318,6 +415,68 @@ export class GitHubClient {
       );
     }
     return { name: branch, sha: commit.sha };
+  }
+
+  async siteSubmodule(
+    repository: string,
+    sha: string,
+  ): Promise<SiteSubmodule | null> {
+    parseRepository(repository);
+    if (!COMMIT_SHA.test(sha))
+      throw new HttpError(400, "invalid_request", "Invalid source commit.");
+    const tree = objectRecord(
+      await this.json(endpoint(repository, `/git/trees/${sha}`)),
+    );
+    if (!tree || !Array.isArray(tree.tree) || tree.truncated !== false) {
+      throw new HttpError(
+        502,
+        "github_error",
+        "GitHub did not return the complete source tree.",
+      );
+    }
+    const entry = tree.tree
+      .map(objectRecord)
+      .find((item) => item?.path === "site-specific");
+    if (!entry || (entry.mode === "040000" && entry.type === "tree"))
+      return null;
+    if (
+      entry.mode !== "160000" ||
+      entry.type !== "commit" ||
+      typeof entry.sha !== "string" ||
+      !COMMIT_SHA.test(entry.sha)
+    ) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "site-specific must be an ordinary directory or a Git submodule.",
+      );
+    }
+    const content = objectRecord(
+      await this.json(
+        endpoint(repository, `/contents/site-specific?ref=${sha}`),
+      ),
+    );
+    if (
+      !content ||
+      content.path !== "site-specific" ||
+      content.sha !== entry.sha ||
+      typeof content.submodule_git_url !== "string"
+    ) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "The deployed site-specific gitlink has no matching repository URL.",
+      );
+    }
+    const target = githubSubmoduleRepository(content.submodule_git_url);
+    if (target.toLowerCase() === repository.toLowerCase()) {
+      throw new HttpError(
+        422,
+        "invalid_site_submodule",
+        "site-specific cannot refer to the website repository itself.",
+      );
+    }
+    return { repository: target, sha: entry.sha };
   }
 
   async pathExists(
@@ -774,7 +933,7 @@ export class GitHubClient {
         Object.prototype.toString.call(content) === "[object Uint8Array]"
       ) ||
       content.byteLength === 0 ||
-      content.byteLength > 10 * 1024 * 1024 ||
+      content.byteLength > 10 * 1024 * 1024 + 64 * 1024 ||
       !headline ||
       headline.length > 256 ||
       /[\r\n\0]/.test(headline) ||

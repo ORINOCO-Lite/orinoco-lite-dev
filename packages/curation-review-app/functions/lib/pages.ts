@@ -2,6 +2,7 @@ export interface Env {
   ASSETS?: {
     fetch(input: Request | string | URL, init?: RequestInit): Promise<Response>;
   };
+  GITHUB_APP_PRIVATE_KEY?: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   PUBLIC_ORIGIN: string;
