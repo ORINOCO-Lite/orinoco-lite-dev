@@ -784,10 +784,7 @@ function ReviewSite({ config }: { config: ReviewConfig }): React.JSX.Element {
       `/${config.repository}/pulls`,
       "https://github.com",
     );
-    openPullRequests.searchParams.set(
-      "q",
-      "is:pr is:open curation in:title",
-    );
+    openPullRequests.searchParams.set("q", "is:pr is:open curation in:title");
     return (
       <main className="landing" id="main-content">
         <p className="eyebrow">Source metadata review</p>
