@@ -10,20 +10,21 @@ It brings comparisons from each stage into one review, locates where differences
 
 Record preservation is checked before differences reach pages.
 Storage, RDF conversion, and service upload each have their own comparison, so a conversion loss has a place in the diagnosis.
+Arrow labels abbreviate proposed commands under `orinoco-lite dev`; the build specification supplies their arguments.
 
 ```mermaid
-flowchart LR
-  capture[Captured records] --> storage[Stored records and annotations]
-  storage --> joined[Joined records]
-  joined --> service[Service upload and dump]
-  capture -. compare .-> storageReport[Storage differences]
-  joined -. compare .-> storageReport
-  joined -. compare .-> serviceReport[Service differences]
-  service -. compare .-> serviceReport
-  joined --> rdf[RDF conversion]
-  rdf --> returned[Returned records]
-  joined -. compare .-> rdfReport[RDF preservation differences]
-  returned -. compare .-> rdfReport
+flowchart TD
+  pool[Pool API records] -->|records get| capture[Captured records]
+  capture -->|records convert| storage[Stored records and annotations]
+  storage -->|records export| joined[Joined records]
+  joined -->|records roundtrip| service[Records returned by service]
+  capture -. records diff .-> storageReport[Storage differences]
+  joined -.-> storageReport
+  joined -. records diff .-> serviceReport[Service differences]
+  service -.-> serviceReport
+  joined -->|records rdf-roundtrip| returned[Returned records and intermediate RDF]
+  joined -. records diff .-> rdfReport[RDF preservation differences]
+  returned -.-> rdfReport
 ```
 
 RDF preservation is a separate diagnostic check, not an extra website-generation step.
@@ -31,13 +32,14 @@ The website comparisons follow projection, assembly, and rendering:
 
 ```mermaid
 flowchart LR
-  records[Records] --> projection[Pages and graph data]
-  projection --> assembly[Hugo input tree]
+  records[Records] -->|hugo project| projection[Pages and graph data]
+  projection -->|hugo assemble| assembly[Hugo input tree]
   sources[Upstream presentation, template, and site inputs] --> assembly
-  assembly --> website[Website]
-  projection -.-> p[Projection differences]
-  assembly -.-> a[Assembly differences]
-  website -.-> w[Website differences and checks]
+  assembly -->|hugo build| website[Website]
+  projection -. content diff .-> p[Projection differences]
+  assembly -. content diff .-> a[Assembly differences]
+  website -. site diff .-> w[Website differences]
+  website -. site check .-> checks[Site check results]
 ```
 
 At each stage, upstream and Lite receive the same input to reveal differences introduced by that operation.
