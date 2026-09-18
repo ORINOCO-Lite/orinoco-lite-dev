@@ -55,17 +55,18 @@ Expose `dev review serve DIRECTORY` to serve that directory and the application 
 Bundling must not silently run missing stages, fetch dependencies, or declare integration success.
 The directory contains `review.json`, a snapshot of the supplied decisions, and relative artifact paths; it is untracked generated output.
 No absolute machine paths, credentials, or live-service access are required to open it.
-Existing Git selections and locks remain authoritative; report coordinates describe the execution that produced the evidence, not another dependency lock.
+Git selections and locks remain authoritative.
+Reports record the revisions and inputs used to produce their evidence.
 
 Operations write only their declared outputs.
 Comparisons accept `--report DIRECTORY` and produce a machine-readable report alongside a readable summary.
-Expose `dev review compare REPORT... --decisions FILE --output DIRECTORY` before the application phase to validate report compatibility and produce readable and machine-readable decision-matching results.
+Expose `dev review summarize REPORT... --decisions FILE --output DIRECTORY` before the application phase to validate report compatibility and produce readable and machine-readable decision-matching results.
 Omit `--decisions` for an initial review; all findings then have no prior decision.
 Maintainers can edit the scoped decision file directly and inspect its Git diff, then rerun this command to validate and apply the decisions to the reports.
 This command neither runs transformations nor changes the reports or decision file.
 Exit codes are 0 for a completed comparison without raw differences, 1 for completed comparisons with raw differences, and 2 for execution or validation failure.
 A retained decision does not change raw comparison results or exit codes.
-A bundle may contain failed and skipped stages, but must display its incomplete coverage prominently.
+A bundle may contain failed and skipped stages, but must display failed, skipped, and unevaluated stages prominently.
 
 ### Stage boundaries
 
@@ -120,7 +121,7 @@ Each stage status is `complete`, `failed`, or `skipped`.
 Record partial artifacts and diagnostics after failures; they cannot support a clean result or a retired finding.
 An omitted stage means not evaluated, not unchanged.
 Each report states the evaluated subject, field, class, route, or file scope as applicable, including exclusions and selection policy, derived from the actual command and comparator.
-Stage completion alone does not establish coverage of a previous decision.
+Stage completion alone does not establish that a previous decision's comparison scope was evaluated.
 Use `not-evaluated` unless the matcher can establish that the decision's scope was evaluated successfully.
 Each artifact reference contains its relative path, media type, and digest; reject path traversal and missing or mismatched artifacts.
 This inventory exists only to open and verify the review evidence.
@@ -144,13 +145,13 @@ The producer may propose links; humans or agents may supply inspectable replay e
 
 ### Saved decisions and subsequent runs
 
-The user-facing operation requiring durable state is reopening a repin review without deciding unchanged findings again.
+The user-facing operation requiring durable state is reopening the review of a dependency update without deciding unchanged findings again.
 Use one explicitly selected Git-tracked JSON decision file for that review scope, owned by the repository where the engineering review is maintained.
 It contains current decisions, not generated runs, copied dependency locks, or an inventory of patches.
 Git supplies history.
 Do not use source-adapter `curation-records` for these engineering decisions.
 
-Each decision contains an ID, disposition (`intended`, `tolerated`, or `undecided`), rationale, owning operation, subject/location selector, expected change, schema/comparator compatibility, relevant input conditions, evidence links, and a reconsideration/removal condition. `undecided` records a deferred issue without accepting its behavior. The initial matcher supports exact subject/location, change kind, and typed before/after values within a stage and compatible schema/comparator versions.
+Each decision contains an ID, disposition (`intended`, `tolerated`, or `undecided`), rationale, operation responsible for the difference, subject/location selector, expected change, schema/comparator compatibility, relevant input conditions, evidence links, and a reconsideration/removal condition. `undecided` records a deferred issue without accepting its behavior. The initial matcher supports exact subject/location, change kind, and typed before/after values within a stage and compatible schema/comparator versions.
 Input conditions explicitly name the relevant input values or scope.
 Whole-run IDs and dependency SHAs do not by themselves prevent reuse after a repin; changed behavior or unmet conditions do.
 When a dependency-specific condition is required, save and evaluate it explicitly.
@@ -161,28 +162,29 @@ When applicability cannot be established, present the previous decision as conte
 Multiple conflicting matches, changed values, ambiguous identity, and incompatible versions require review rather than choosing a match arbitrarily.
 A decision is never a blanket acceptance of all future changes in a field or file.
 
-Matching produces `new`, `changed`, or `covered` for current findings, plus `not-observed` for previously covered findings whose scope was completely evaluated.
-Use `not-evaluated` when coverage is absent or failed.
-Covered tolerated and undecided findings stay visible as outstanding work without a new decision prompt.
+Matching produces `new`, `changed`, or `matched` (a saved decision applies) for current findings, plus `not-observed` for findings previously matched to a saved decision whose scope was completely evaluated.
+Use `not-evaluated` when the relevant comparison scope was not evaluated successfully.
+Matched tolerated and undecided findings stay visible as outstanding work without a new decision prompt.
 Not-observed findings are candidates for retirement, not automatic proof that a retained patch is unnecessary.
 Require a run without the adaptation before recommending its removal.
 
 Verified effects may group under their originating finding; possible links cannot remove items from the review queue.
-Causal grouping does not confer decision coverage.
-A new or materially changed consequence remains actionable even when its cause is covered and its propagation is verified.
+Grouping an effect with its cause does not establish that the effect matches a saved decision.
+A new or materially changed consequence remains actionable even when its cause matches a saved decision and its propagation is verified.
 Only effects within the reviewed decision scope may collapse out of the new-or-changed queue.
 Apply these rules to CLI summaries and subsequent web views alike.
-Retain access to all raw differences, including covered findings and collapsed effects.
-Independent residual effects still require review, even when they affect the same page as a covered change.
+Retain access to all raw differences, including matched findings and collapsed effects.
+Additional differences not explained by the earlier change still require review, even when they affect the same page as a change that matches a saved decision.
 
-In the later application phase, the application exports a decision patch containing the original decision-file digest and explicit additions, updates, or removals.
-`dev review apply PATCH --decisions FILE` validates the schema and base digest, previews the changes, and writes only that file; stale edits must be reopened against the current file.
+In the later application phase, the application exports decision changes as a JSON document containing the original decision-file digest and explicit additions, updates, or removals.
+This document describes edits to the decision file; it is not a Git patch.
+`dev review apply CHANGES --decisions FILE` validates the schema and base digest, previews the changes, and writes only that file; stale edits must be reopened against the current file.
 The operation does not commit, modify metadata, change retained patches, or post to GitHub.
 Reviewers inspect and commit the resulting Git diff through their normal workflow.
 
 ### Later web review interface
 
-The initial page shows execution context, stage coverage, and a queue of new or changed findings.
+The initial page shows execution context, comparison scope and stage status, and a queue of new or changed findings.
 Show unchanged outstanding findings and retirement candidates in separate accessible views.
 Selecting a finding shows the before/after values, boundary, rationale, existing decision, and evidence needed to reproduce or question the attribution. Stage navigation provides record/assertion, RDF, file/content, and rendered-site views within one application.
 A reviewer can return from a downstream effect to its originating finding and from that finding to every linked effect.
@@ -201,7 +203,7 @@ Offer downloaded artifacts when safe inline inspection is unavailable.
 Test observable review behavior across multiple schema-valid cases, not just the date-marker reproducer:
 
 - A storage loss is identified before projection; its reviewed, verified page effects group under it while an independent page change remains new.
-- A covered originating finding acquires a new verified consequence; the consequence still requires review.
+- An originating finding that matches a saved decision acquires a new verified consequence; the consequence still requires review.
 - An RDF-only loss appears at the conversion boundary even when JSONL/YAML preservation passes.
 - A second run carries unchanged decisions forward; changed values, changed scope, and ambiguous matches reopen review.
 - A tolerated or deferred issue remains visible without asking for the same judgment again.
@@ -214,7 +216,7 @@ Test observable review behavior across multiple schema-valid cases, not just the
 
 Use unit tests for comparator and matcher semantics and CLI integration tests for write boundaries and report interchange.
 Exercise at least two successive review runs after B–H, and review their readable outputs before starting application work.
-The later application adds browser tests for equivalent review interactions, portable bundles, invalid artifact paths, unsupported versions, stale decision patches, and isolation of inspected HTML.
+The later application adds browser tests for equivalent review interactions, portable bundles, invalid artifact paths, unsupported versions, stale decision changes, and isolation of inspected HTML.
 Do not make web-interface completion a prerequisite for accepting a command stage.
 
 ## Command review examples
@@ -251,11 +253,11 @@ For example, inspect storage and RDF evidence before proceeding to projection:
 orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl --report build/reports/storage
 orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
 orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
-orinoco-lite dev review compare build/reports/storage build/reports/rdf --output build/review
+orinoco-lite dev review summarize build/reports/storage build/reports/rdf --output build/review
 ```
 
 Read the generated summaries and inspect their referenced records and RDF.
-Once scoped decisions have been recorded, rerun `dev review compare` with `--decisions FILE` to inspect which findings remain new, changed, covered, or outside evaluated scope.
+Once scoped decisions have been recorded, rerun `dev review summarize` with `--decisions FILE` to inspect which findings remain new, changed, matched to a saved decision, or outside the evaluated comparison scope.
 A diff exit code of 1 means differences were found and should be inspected; it is not an execution failure.
 
 ### Site-data import and Hugo projection
@@ -305,7 +307,7 @@ Identify the operation that introduces a difference, then fix or account for it 
 Later isolated comparisons use identical reviewed input on both sides so earlier differences do not contaminate that operation's comparison.
 For each finding, report the first observed boundary, affected assertion or artifact, before/after effect, evidence, existing decision if any, and next action.
 Distinguish intended behavior, a tolerated unresolved defect, and an undecided finding; acknowledging a report does not approve its behavior.
-Link an existing human decision with its input conditions, expected behavior, owning operation, and reconsideration or removal condition.
+Link an existing human decision with its input conditions, expected behavior, operation responsible for the difference, and reconsideration or removal condition.
 Reuse it only while those conditions and behavior still match.
 
 The final comparison may group verified downstream consequences under one originating finding, with raw differences still inspectable.
@@ -319,8 +321,8 @@ Put site-data corrections in site inputs and reusable fixes in the package or up
 Keep each temporary fix beside the code that needs it, with a focused regression test.
 Document its reason, upstream follow-up, and removal condition in that change's PR.
 Use existing comparison rules for intentional representation differences.
-Add a focused expectation or bounded semantic approval fixture only when needed to recognize a recurring reviewed difference.
-Such fixtures are optional, not prerequisites for every stage, and must not automatically approve changed output.
+Add a focused test expectation or a reviewed expected comparison result for specified inputs only when needed to recognize a recurring reviewed difference.
+Such expected results are optional, not prerequisites for every stage, and must not automatically approve changed output.
 The application stores scoped review decisions under “Saved decisions and subsequent runs”; executable comparison rules and regression tests remain with their owning code.
 Do not duplicate source-adapter curation decisions or maintain another patch inventory.
 

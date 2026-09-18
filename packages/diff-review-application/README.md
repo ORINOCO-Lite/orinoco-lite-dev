@@ -4,7 +4,7 @@ Planned web interface for understanding what changes as Orinoco metadata becomes
 Build it only after all staged CLI comparisons, complete-path checks, and decision reuse have been implemented and reviewed.
 Until then, maintainers assess each stage through readable reports, intermediate data, and reproducible commands.
 The interface reuses those established reports and matching operations.
-It brings comparisons from each stage into one review, locates where differences first appear, and carries reviewed decisions into the next repin.
+It brings comparisons from each stage into one review, locates where differences first appear, and carries reviewed decisions into the next dependency update.
 
 ## Follow the metadata
 
@@ -59,7 +59,7 @@ flowchart TD
   new --> evidence[Inspect boundary, values, and linked effects]
   evidence --> decision[Fix, report, accept, or defer]
   decision --> saved[Save the decision and its scope]
-  saved --> next[Next repin review]
+  saved --> next[Next dependency update review]
   next --> review
 ```
 
@@ -72,7 +72,7 @@ Unchanged decisions carry forward; changed behavior returns for review.
 Tolerated defects and deferred questions stay visible without demanding the same decision each time.
 Failed or skipped checks remain visibly incomplete.
 
-## Use it when repinning
+## Review a dependency update
 
 Run the affected stage comparisons and both complete generation paths, open the review, and resolve the new findings.
 Inspect differences that have disappeared and test whether the corresponding adaptation can now be removed.
