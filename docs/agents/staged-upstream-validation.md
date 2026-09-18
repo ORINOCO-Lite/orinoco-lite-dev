@@ -2,7 +2,7 @@
 
 Active build specification for maintainers implementing the comparison commands and diff review application.
 Updated 18 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
-The [application README](../../packages/diff-review-application/README.md) describes the system for reviewers.
+The [application README](../../packages/diff-review-application/README.md) describes the later web interface for reviewers.
 The [design charter](../project-design.md) supplies project constraints; this document specifies the planned interfaces, behavior, and delivery sequence.
 The commands and application described here are implementation targets.
 The [exploration](provenance-comparison-exploration.md) records the research behind the [investigation procedure](../../.agents/skills/compare-orinoco-provenance/SKILL.md).
@@ -27,9 +27,15 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | G — Hugo input assembly | Separate assembly of Hugo inputs from building the website. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
 | H — Hugo build and comparison | Build the website from the supplied Hugo input tree. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new website differences, then run the complete generation comparison. |
 
-Deliver the application in three increments: the bundle reader and record viewer with C; saved decisions and subsequent-run matching with D; projection, assembly, and website viewers with F–H.
-Each command stage supplies its report adapter in the same PR as the producer.
-The first record viewer must exercise the same bundle contract used by later viewers.
+Complete and review B–H through the CLI before starting the web application.
+Each stage delivers its operations, retained intermediate outputs, machine-readable comparison report, and readable summary together.
+The summary identifies inputs, operations, comparison scope, detected differences, and failures, with paths to inspect the evidence and commands to reproduce it.
+Reviewers must be able to follow the data flow and assess each stage without a browser application.
+
+Introduce CLI decision matching with D and extend it with subsequent stage reports.
+After H, validate complete-path comparison, scoped decision reuse across two runs, and report compatibility through the CLI.
+Only after maintainers have reviewed that behavior should a separate application PR add portable bundling, serving, viewers, and decision editing over the established reports.
+The application must reuse the CLI comparison and matching behavior.
 
 Review each stage's implementation and comparison outputs before merging its PR.
 Keep the existing #152 discussion available while extracting its changes.
@@ -44,7 +50,7 @@ The Python package owns operations, comparisons, report generation, and decision
 The application reads their outputs and edits review decisions; it does not implement a second comparator or run transformations in the browser.
 Use `orinoco-lite` for routine operations and `orinoco-lite dev` for diagnostic operations; Pixi and CI call the same interfaces.
 
-Expose `dev review bundle REPORT... --output DIRECTORY --decisions FILE` to collect explicit stage reports and their referenced artifacts into a portable review directory.
+In the later application phase, expose `dev review bundle REPORT... --output DIRECTORY --decisions FILE` to collect explicit stage reports and their referenced artifacts into a portable review directory.
 Expose `dev review serve DIRECTORY` to serve that directory and the application locally on loopback.
 Bundling must not silently run missing stages, fetch dependencies, or declare integration success.
 The directory contains `review.json`, a snapshot of the supplied decisions, and relative artifact paths; it is untracked generated output.
@@ -53,6 +59,10 @@ Existing Git selections and locks remain authoritative; report coordinates descr
 
 Operations write only their declared outputs.
 Comparisons accept `--report DIRECTORY` and produce a machine-readable report alongside a readable summary.
+Expose `dev review compare REPORT... --decisions FILE --output DIRECTORY` before the application phase to validate report compatibility and produce readable and machine-readable decision-matching results.
+Omit `--decisions` for an initial review; all findings then have no prior decision.
+Maintainers can edit the scoped decision file directly and inspect its Git diff, then rerun this command to validate and apply the decisions to the reports.
+This command neither runs transformations nor changes the reports or decision file.
 Exit codes are 0 for a completed comparison without raw differences, 1 for completed comparisons with raw differences, and 2 for execution or validation failure.
 A retained decision does not change raw comparison results or exit codes.
 A bundle may contain failed and skipped stages, but must display its incomplete coverage prominently.
@@ -79,10 +89,15 @@ The upstream side must call the selected upstream operations, not the Lite rende
 Label a selected revision containing retained Lite patches accordingly.
 
 Record comparators preserve scalar types, missing versus null, list order, and duplicates.
+Before implementing the record matcher in C, inspect representative assertion collections in the selected schema and retained records.
+Document in the comparator's rules and focused tests which collections have stable identity, which allow unambiguous structural matching, and which remain unmatched.
 Use schema-defined entity and assertion identities where available.
+The existing annotation path plus assertion digest can identify unchanged assertions; it is not a stable identity for an assertion whose value changed.
 Ambiguous identities produce unmatched items for review, not guessed matches based on array position or a whole-record hash.
 Keep raw changes available when reporting a reviewed representation equivalence.
 RDF comparison must account for blank-node renaming without treating blank-node labels as persistent identities; canonical RDF equality does not establish record-round-trip preservation.
+Reuse existing snapshot and Pool-diff comparison helpers after checking their type, ordering, and multiplicity behavior against these rules.
+For RDF graphs, use the existing RDFLib dependency's `isomorphic` and `graph_diff` operations where applicable; canonical blank-node labels are not cross-run assertion identities.
 File comparison reports added, removed, and changed paths; structured viewers expose front matter and graph fields separately from text and byte differences.
 Rendering adapters may incorporate SiteDiff after the existing tool evaluation; the application contract must also accommodate route, HTML, asset, and screenshot evidence without that dependency.
 
@@ -90,20 +105,29 @@ Rendering adapters may incorporate SiteDiff after the existing tool evaluation; 
 
 Version the JSON contract with `schema_version: 1` and validate it on both production and import.
 Reject unsupported versions with an actionable message rather than partially interpreting them.
+Stage reports expose their execution context, scope, findings, and artifacts before the application exists.
+CLI aggregation validates the same evidence that the later bundle imports.
 A bundle contains these fields:
 
 | Field | Content |
 | --- | --- |
 | `run_id` | Unique identifier for this execution, never a decision-matching key |
 | `context` | Selected repository revisions, schema and comparator versions, input artifact digests, and dirty-worktree indication where applicable |
-| `stages` | Stage identifier, comparison mode (`isolated` or `complete-path`), left/right operations and inputs, status, diagnostics, findings, and artifact references |
+| `stages` | Stage identifier, comparison mode (`isolated` or `complete-path`), left/right operations and inputs, comparison scope, status, diagnostics, findings, and artifact references |
 | `decisions` | Snapshot of current decisions and digest of the source file used to create it |
 
 Each stage status is `complete`, `failed`, or `skipped`.
 Record partial artifacts and diagnostics after failures; they cannot support a clean result or a retired finding.
 An omitted stage means not evaluated, not unchanged.
+Each report states the evaluated subject, field, class, route, or file scope as applicable, including exclusions and selection policy, derived from the actual command and comparator.
+Stage completion alone does not establish coverage of a previous decision.
+Use `not-evaluated` unless the matcher can establish that the decision's scope was evaluated successfully.
 Each artifact reference contains its relative path, media type, and digest; reject path traversal and missing or mismatched artifacts.
-This inventory exists only to open and verify the review bundle.
+This inventory exists only to open and verify the review evidence.
+When aggregating reports, validate input/output artifact digests and relevant operation selections along every claimed data-flow link.
+An isolated replay may deliberately use a shared input; record the actual link rather than infer it from directory names or stage order.
+Preserve each report's execution context when reports come from different runs.
+Mixed or incompatible reports may be inspected together, but must be marked as such and cannot establish integration agreement or verified cross-stage attribution without compatible linking evidence.
 
 A finding has a run-local `id`, stage, stable subject identity when available, structured location, change kind, typed before/after values or artifact references, comparator rule/version, and evidence references.
 Store the first observed boundary separately from any claimed cause.
@@ -143,21 +167,26 @@ Covered tolerated and undecided findings stay visible as outstanding work withou
 Not-observed findings are candidates for retirement, not automatic proof that a retained patch is unnecessary.
 Require a run without the adaptation before recommending its removal.
 
-The application exports a decision patch containing the original decision-file digest and explicit additions, updates, or removals.
+Verified effects may group under their originating finding; possible links cannot remove items from the review queue.
+Causal grouping does not confer decision coverage.
+A new or materially changed consequence remains actionable even when its cause is covered and its propagation is verified.
+Only effects within the reviewed decision scope may collapse out of the new-or-changed queue.
+Apply these rules to CLI summaries and subsequent web views alike.
+Retain access to all raw differences, including covered findings and collapsed effects.
+Independent residual effects still require review, even when they affect the same page as a covered change.
+
+In the later application phase, the application exports a decision patch containing the original decision-file digest and explicit additions, updates, or removals.
 `dev review apply PATCH --decisions FILE` validates the schema and base digest, previews the changes, and writes only that file; stale edits must be reopened against the current file.
 The operation does not commit, modify metadata, change retained patches, or post to GitHub.
 Reviewers inspect and commit the resulting Git diff through their normal workflow.
 
-### Review interface
+### Later web review interface
 
 The initial page shows execution context, stage coverage, and a queue of new or changed findings.
 Show unchanged outstanding findings and retirement candidates in separate accessible views.
 Selecting a finding shows the before/after values, boundary, rationale, existing decision, and evidence needed to reproduce or question the attribution. Stage navigation provides record/assertion, RDF, file/content, and rendered-site views within one application.
 A reviewer can return from a downstream effect to its originating finding and from that finding to every linked effect.
 
-Verified effects may collapse under their originating finding; possible links cannot remove items from the review queue.
-Retain access to all raw differences, including covered findings and collapsed effects.
-Independent residual effects still require review, even when they affect the same page as a covered change.
 A reviewer can record intent, tolerate an issue, defer a judgment, or revise/retire a decision with a reason.
 Fixing code and reporting upstream remain normal repository operations linked from the finding.
 
@@ -171,18 +200,22 @@ Offer downloaded artifacts when safe inline inspection is unavailable.
 
 Test observable review behavior across multiple schema-valid cases, not just the date-marker reproducer:
 
-- A storage loss is identified before projection; its verified page effects collapse while an independent page change remains new.
+- A storage loss is identified before projection; its reviewed, verified page effects group under it while an independent page change remains new.
+- A covered originating finding acquires a new verified consequence; the consequence still requires review.
 - An RDF-only loss appears at the conversion boundary even when JSONL/YAML preservation passes.
 - A second run carries unchanged decisions forward; changed values, changed scope, and ambiguous matches reopen review.
 - A tolerated or deferred issue remains visible without asking for the same judgment again.
-- A failed or omitted stage cannot retire a finding or appear clean.
+- A failed, omitted, or successfully completed but out-of-scope comparison cannot retire a finding or appear clean for that scope.
+- Reports with valid artifacts but incompatible stage inputs or operation selections cannot establish integration agreement.
 - Multi-cause effects and cancellation remain inspectable when isolated and complete-path results disagree.
 - A removed adaptation is assessed against the unpatched selection before its decision is retired.
-- A portable bundle opens without the original workspace; invalid artifact paths, unsupported versions, and stale decision patches fail clearly.
-- Raw evidence remains accessible after grouping, and generated HTML cannot mutate application state.
+- Stable, structurally matchable, and ambiguous assertions exercise their respective matching rules across more than one record shape.
+- Raw evidence remains accessible after grouping in CLI summaries.
 
-Use unit tests for comparator and matcher semantics, CLI integration tests for write boundaries and report interchange, and browser tests for these review interactions.
-Exercise at least two successive review runs as the integration acceptance case.
+Use unit tests for comparator and matcher semantics and CLI integration tests for write boundaries and report interchange.
+Exercise at least two successive review runs after B–H, and review their readable outputs before starting application work.
+The later application adds browser tests for equivalent review interactions, portable bundles, invalid artifact paths, unsupported versions, stale decision patches, and isolation of inspected HTML.
+Do not make web-interface completion a prerequisite for accepting a command stage.
 
 ## Command review examples
 
@@ -212,6 +245,18 @@ The record-conversion stage also exposes `dev records rdf-roundtrip INPUT OUTPUT
 It reuses the selected schema conversion operations and reports conversion failures at this boundary.
 This diagnostic operation is separate from the service round-trip and projection graph generation.
 Use `dev records diff` to compare those returned records with the joined export; do not treat the service dump as a substitute for this check.
+For example, inspect storage and RDF evidence before proceeding to projection:
+
+```console
+orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl --report build/reports/storage
+orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
+orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
+orinoco-lite dev review compare build/reports/storage build/reports/rdf --output build/review
+```
+
+Read the generated summaries and inspect their referenced records and RDF.
+Once scoped decisions have been recorded, rerun `dev review compare` with `--decisions FILE` to inspect which findings remain new, changed, covered, or outside evaluated scope.
+A diff exit code of 1 means differences were found and should be inspected; it is not an execution failure.
 
 ### Site-data import and Hugo projection
 

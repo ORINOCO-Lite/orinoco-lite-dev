@@ -1,6 +1,9 @@
 # Diff review application
 
-A maintainer workspace for understanding what changes as Orinoco metadata becomes a website.
+Planned web interface for understanding what changes as Orinoco metadata becomes a website.
+Build it only after all staged CLI comparisons, complete-path checks, and decision reuse have been implemented and reviewed.
+Until then, maintainers assess each stage through readable reports, intermediate data, and reproducible commands.
+The interface reuses those established reports and matching operations.
 It brings comparisons from each stage into one review, locates where differences first appear, and carries reviewed decisions into the next repin.
 
 ## Follow the metadata
@@ -60,7 +63,7 @@ flowchart TD
   next --> review
 ```
 
-Verified downstream effects are grouped with the finding that explains them.
+Verified downstream effects are grouped with the finding that explains them; a new consequence still requires review even when its originating finding has a saved decision.
 The raw differences remain available, and unexplained effects stay in the review queue.
 Record fields, RDF evidence, generated content, assembled files, and rendered pages each have an appropriate view in the same workspace.
 
