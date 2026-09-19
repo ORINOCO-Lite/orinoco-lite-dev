@@ -20,7 +20,13 @@ ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
 class DevelopmentEnvironmentTests(unittest.TestCase):
     def test_root_environment_contains_the_engineering_toolchain(self) -> None:
-        manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
+        # CI temporarily replaces the editable dependency with the built wheel.
+        # This contract concerns the committed engineering declaration; the
+        # workflow separately verifies the package actually imported from disk.
+        serialized = subprocess.check_output(
+            ["git", "show", "HEAD:pixi.toml"], cwd=ROOT, text=True,
+        )
+        manifest = tomllib.loads(serialized)
         workspace = manifest["workspace"]
         self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
         self.assertEqual(manifest["dependencies"]["python"], ">=3.12,<3.13")
@@ -32,7 +38,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         self.assertNotIn("feature", manifest)
         self.assertNotIn("environments", manifest)
-        serialized = MANIFEST.read_text(encoding="utf-8")
         for forbidden in (
             'path = "submodules/dump-things-service"',
         ):
