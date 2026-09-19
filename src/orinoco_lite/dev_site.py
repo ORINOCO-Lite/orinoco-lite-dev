@@ -115,13 +115,20 @@ def _report(args, left, right, findings, scope, *, comparator, evidence=None):
 
 def execute(args):
     """Return 0 for agreement/success, 1 for findings, and 2 for failure."""
-    from .stage_reports import write_operation
+    from .stage_reports import operation_receipt, write_operation
+    from .upstream_snapshot import SnapshotError
+    output = None
+    new_output = False
     try:
         args.root = (args.root or Path.cwd()).resolve()
         group = args.dev_command
+        if group == "hugo" and args.hugo_command == "project":
+            from .record_stages import _check_record_input
+            _check_record_input(_path(args, args.records))
         if group in {"content", "site"}:
             if group == "site" and args.site_command == "check":
                 root = _path(args, args.site)
+                operation_receipt(root)
                 findings, checked = check_site(root)
                 evidence = None
                 if args.browser:
@@ -143,6 +150,8 @@ def execute(args):
                     "selection": "HTML local href/src/poster targets and fragments", **checked,
                 }, comparator="local-html-targets/1", evidence=evidence)
             left, right = _path(args, args.left), _path(args, args.right)
+            operation_receipt(left)
+            operation_receipt(right)
             findings, names = compare_trees(left, right, rendered=group == "site")
             return _report(args, left, right, findings, {
                 "complete": True, "all_subjects": True, "subjects": names,
@@ -199,9 +208,11 @@ def execute(args):
         output = _path(args, args.output)
         if output.exists():
             raise DriverError(f"Declared output already exists; choose a fresh path: {output}")
+        new_output = True
         if args.hugo_command == "build":
             resources = _path(args, args.resources) if args.resources else resolve_resources().root
             source = _path(args, args.assembly)
+            operation_receipt(source)
             result = build_hugo(workspace, resources, source, output, args.base_url,
                                 flavor=args.flavor)
             inputs = {"assembly": source}
@@ -238,6 +249,8 @@ def execute(args):
                 inputs = {"records": source}
             else:
                 projection, site_inputs = _path(args, args.projection), _path(args, args.inputs)
+                operation_receipt(projection)
+                operation_receipt(site_inputs)
                 data = _load_site_data(site_inputs / "site.yaml")
                 workspace = replace(workspace, site_data=data, site_name=data["identity"]["title"],
                                     base_url=data["identity"]["base_url"])
@@ -248,6 +261,17 @@ def execute(args):
                         inputs=inputs, context=context, command=getattr(args, "invocation", []))
         print(json.dumps(result, indent=2))
         return 0
-    except (OrinocoError, OSError, ValueError, KeyError) as error:
-        print(f"orinoco-lite dev: {error}")
-        return 2
+    except BaseException as error:
+        # Retain failed boundary artifacts for inspection, but never let a later
+        # comparison mistake an interrupted output for a complete supplied tree.
+        if new_output and output is not None and output.exists():
+            try:
+                write_operation(output, operation=f"hugo-{args.hugo_command}-{args.flavor}",
+                                inputs={}, command=getattr(args, "invocation", []),
+                                context={"status": "failed", "diagnostic": f"{type(error).__name__}: {error}"})
+            except (OrinocoError, OSError, ValueError) as receipt_error:
+                print(f"Could not describe failed output {output}: {receipt_error}")
+        if isinstance(error, (OrinocoError, OSError, ValueError, KeyError, SnapshotError)):
+            print(f"orinoco-lite dev: {error}")
+            return 2
+        raise

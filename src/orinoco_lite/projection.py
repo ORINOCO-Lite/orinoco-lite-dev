@@ -917,6 +917,9 @@ def render_projection(
     output: Path,
     *, records_input: Path | None = None, presentation_root: Path | None = None,
 ) -> dict[str, Any]:
+    if records_input is not None:
+        from .record_stages import _check_record_input
+        _check_record_input(records_input)
     presentation_root = presentation_root or _presentation_root(workspace, resources_root)
     contract = load_contract(workspace, presentation_root)
     if records_input is None:

@@ -68,6 +68,8 @@ def resolve_tools(workspace: Path, presentation: Path) -> Path:
 
 def run_upstream(records: Path, presentation: Path, output: Path, tools: Path,
                  *, python_command: list[str] | None = None) -> dict:
+    from .record_stages import _check_record_input
+    _check_record_input(records)
     query = tools / "query-things"
     client = tools / "dump-things-pyclient"
     if not (query / "query_things").is_dir() or not (client / "dump_things_pyclient").is_dir():
@@ -94,6 +96,8 @@ def run_upstream(records: Path, presentation: Path, output: Path, tools: Path,
 
 def project(records_path: Path, presentation: Path, output: Path) -> dict:
     """Run query-things commands from the selected upstream workflow."""
+    from .record_stages import _check_record_input
+    _check_record_input(records_path)
     try:
         from click.testing import CliRunner
         from query_things.cli import main
