@@ -38,45 +38,6 @@ PAV_ALIASES = {
 }
 
 
-def _pointer_token(value: str) -> str:
-    return value.replace("~", "~0").replace("/", "~1")
-
-
-def normalize_schema_compatibility(
-    value: Mapping[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Omit the one observed invalid optional datetime sentinel, with evidence."""
-
-    normalized = deepcopy(dict(value))
-    pid = normalized.get("pid")
-    if not isinstance(pid, str) or not pid:
-        raise StorageProjectionError("schema compatibility input has no PID")
-    adjustments: list[dict[str, str]] = []
-
-    def inspect(item: Any, path: str) -> None:
-        if isinstance(item, dict):
-            for key, child in tuple(item.items()):
-                child_path = f"{path}/{_pointer_token(str(key))}"
-                if key == "at_time" and child == "-":
-                    adjustments.append(
-                        {
-                            "action": "omit-invalid-optional-datetime-sentinel",
-                            "path": child_path,
-                            "pid": pid,
-                            "source_value": "-",
-                        }
-                    )
-                    del item[key]
-                    continue
-                inspect(child, child_path)
-        elif isinstance(item, list):
-            for index, child in enumerate(item):
-                inspect(child, f"{path}/{index}")
-
-    inspect(normalized, "")
-    return normalized, adjustments
-
-
 def normalize_machine_pav(
     value: Mapping[str, Any],
 ) -> tuple[dict[str, Any], int, int]:
@@ -203,7 +164,6 @@ def verify_projection(
     assertion_count = 0
     normalized_aliases = 0
     normalized_expanded = 0
-    schema_adjustments: list[dict[str, str]] = []
     for pid in sorted(expected_by_pid):
         expected_item = expected_by_pid[pid]
         normalized_record, alias_count, expanded_count = normalize_machine_pav(
@@ -211,10 +171,6 @@ def verify_projection(
         )
         normalized_aliases += alias_count
         normalized_expanded += expanded_count
-        normalized_record, adjustments = normalize_schema_compatibility(
-            normalized_record
-        )
-        schema_adjustments.extend(adjustments)
         normalized_expected.append(
             upstream_snapshot.RecordEnvelope(
                 expected_item.class_name,
@@ -255,8 +211,6 @@ def verify_projection(
         "machine_pav_uri_aliases_normalized": normalized_aliases,
         "machine_pav_expanded_values_normalized": normalized_expanded,
         "record_count": len(stored),
-        "schema_compatibility_adjustments": schema_adjustments,
-        "schema_compatibility_adjustment_count": len(schema_adjustments),
         "source_semantic_sha256": upstream_snapshot.semantic_digest(expected),
         "normalized_source_semantic_sha256": upstream_snapshot.semantic_digest(
             normalized_expected
@@ -281,8 +235,7 @@ def project(
     companions: dict[str, Mapping[str, object]] = {}
     for envelope in expected:
         try:
-            compatible, _ = normalize_schema_compatibility(envelope.record)
-            stored, companion = split_enrichment_view(compatible)
+            stored, companion = split_enrichment_view(envelope.record)
             stored = annotation_semantic_view(stored)
         except Exception as error:
             raise StorageProjectionError(
@@ -295,7 +248,6 @@ def project(
             companions[envelope.pid] = companion
         reconstructed = join_annotations(stored, companion)
         normalized, _, _ = normalize_machine_pav(envelope.record)
-        normalized, _ = normalize_schema_compatibility(normalized)
         normalized = annotation_semantic_view(normalized)
         if upstream_snapshot.canonical_json(reconstructed) != upstream_snapshot.canonical_json(
             normalized

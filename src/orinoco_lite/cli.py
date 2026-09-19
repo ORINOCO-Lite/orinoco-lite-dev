@@ -116,10 +116,11 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
     setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
-    from . import pool_capture
+    from . import pool_capture, record_stages
     records = dev_commands.add_parser("records", help="capture, transform, and compare retained records")
     record_commands = records.add_subparsers(dest="records_command", required=True)
     pool_capture.register_capture(record_commands)
+    record_stages.register(record_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -336,8 +337,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "dev" and args.dev_command == "records":
-            from . import pool_capture
-            return pool_capture.execute(args)
+            from . import pool_capture, record_stages
+            if args.records_command == "get":
+                return pool_capture.execute(args)
+            if args.records_command == "convert" and not args.no_record:
+                from . import recording
+                root = (args.root or Path.cwd()).resolve()
+                source = recording.relative_path(root, args.source)
+                inputs = recording.relative_path(root, args.site_inputs)
+                recording.record(root, ["dev", "records", "convert", source, inputs, "--no-record"],
+                                 inputs=[source], outputs=[inputs + "/metadata/records", inputs + "/metadata/overlays/annotations"],
+                                 message="feat: convert retained Pool records and annotations")
+                return 0
+            return record_stages.execute(args)
         if args.command in {"verify-site", "publication", "shacl-handoff", "curation"}:
             from . import local_preview, publication, shacl_handoff, curation_actions
             return {"verify-site": local_preview, "publication": publication,
