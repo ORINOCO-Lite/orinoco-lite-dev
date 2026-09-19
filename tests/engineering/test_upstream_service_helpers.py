@@ -8,7 +8,7 @@ from urllib.request import urlopen
 import pytest
 
 from orinoco_lite import upstream_snapshot
-from tools.upstream_service_helpers import (
+from orinoco_lite.upstream_service import (
     local_service,
     put_record,
     seed_manifest,
