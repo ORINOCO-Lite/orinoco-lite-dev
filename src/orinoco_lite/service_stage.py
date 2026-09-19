@@ -36,9 +36,12 @@ def selected_schema() -> Path:
 
 def roundtrip(source: Path, output: Path, *, scratch: Path | None = None,
               schema: Path | None = None) -> dict:
+    from .record_stages import _check_record_input
+
     source, output = source.resolve(), output.absolute()
     if source == output.resolve() or output.exists():
         raise ConfigurationError(f"Returned-record output must be new and distinct from input: {output}")
+    _check_record_input(source)
     expected = upstream_snapshot.load_jsonl(source)
     schema = schema or selected_schema()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -80,7 +83,7 @@ def roundtrip(source: Path, output: Path, *, scratch: Path | None = None,
         os.replace(partial, output)
         diagnostics.update(status="complete", returned_records=len(returned))
         write_operation(output, operation="records.roundtrip", inputs={"records": source},
-                        context={"schema_digest": artifact_digest(schema), "service": "dump-things-service",
+                        context={"schema_sha256": artifact_digest(schema), "service": "dump-things-service",
                                  "transport": "retained HTTP upload/read-back helpers"})
     except Exception as error:
         diagnostics.update(error=str(error), returned_records=len(returned))
