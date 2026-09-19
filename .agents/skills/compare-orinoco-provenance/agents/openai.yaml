@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compare Orinoco Provenance"
+  short_description: "Trace semantic differences and reviewed downstream effects"
+  default_prompt: "Use $compare-orinoco-provenance to locate where these outputs diverge, verify propagated effects, and identify which differences need a new decision."

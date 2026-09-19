@@ -22,15 +22,31 @@ A downstream provides declarative `site-specific/` inputs and optional overrides
 The static website owns `/edit/` for SHACL Vue editing and `/review/` for source-adapter decisions.
 The central curation service, or an optional replacement, provides only GitHub authentication and verified transport.
 
-## Downstream interface
+## Command environment
 
-Site maintainers use the tasks supplied by their template version:
+Use the Pixi version range declared in the repository's `pixi.toml`.
+Before running the commands below, enter that repository's environment:
 
 ```console
-pixi install --frozen
-pixi run orinoco-lite validate
-pixi run build
-pixi run serve
+export PIXI_LOCKED=true
+pixi shell
+```
+
+`PIXI_LOCKED` prevents lock-file updates and checks that the manifest matches the lock before synchronizing the environment.
+To leave an already installed environment and its lock unchanged, use `pixi shell --as-is` instead.
+See the [Pixi shell options](https://pixi.prefix.dev/latest/reference/cli/pixi/shell/).
+Run installed commands directly inside the shell; use `exit` before switching repositories and activating another environment.
+For noninteractive execution, use `pixi run <command>`.
+Commands that intentionally change dependencies use `PIXI_LOCKED=false` to allow the required lock update, as shown below.
+
+## Downstream interface
+
+Site maintainers run these commands in their downstream's environment:
+
+```console
+orinoco-lite validate
+orinoco-lite build --base-url /
+orinoco-lite serve
 ```
 
 The downstream selects its Orinoco Lite package and template versions and chooses when to update either one.
@@ -47,23 +63,21 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-Use the Pixi version range declared in `pixi.toml`.
-In a fresh checkout, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
+In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
 
 ```console
-pixi install --locked
 git submodule update --init -- \
   submodules/pool.psychoinformatics.de-ui submodules/things-schemas \
   submodules/query-things submodules/www-from-model
 git -C submodules/pool.psychoinformatics.de-ui submodule update --init -- shacl-vue
-pixi run orinoco-lite dev prepare-resources
-pixi run pytest
+orinoco-lite dev prepare-resources
+pytest
 ```
 
 Create an inspectable downstream with the local template and cached upstream pool snapshot:
 
 ```console
-pixi run orinoco-lite dev setup
+PIXI_LOCKED=false orinoco-lite dev setup
 ```
 
 The default destination is `../orinoco-lite-test-downstream`.
@@ -74,21 +88,21 @@ Setup records its changes in DataLad, prepares editable package resources, and s
 In any downstream, enable or undo editable package development:
 
 ```console
-pixi run orinoco-lite dev enable
-pixi run orinoco-lite dev disable
+PIXI_LOCKED=false orinoco-lite dev enable
+PIXI_LOCKED=false orinoco-lite dev disable
 ```
 
 `enable` uses `../orinoco-lite-dev` by default; an optional path selects another checkout.
 If missing, it clones the repository and checks out the running package’s source commit.
 It records a relative development link and editable dependency, then prepares resources using the engineering environment.
 Python edits take effect immediately.
-After changing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` from the engineering checkout.
+After changing bundled resource sources, run `orinoco-lite dev prepare-resources` from the engineering checkout.
 `disable` restores the prior package selection from Git history while preserving site edits and unrelated dependency changes.
 Upgrading to a newer release is a separate operation.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
 Pixi's downstream tasks only supply convenient arguments.
-Use `pixi run pytest`, a test path, or pytest's selection flags to exercise code changes.
+Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
 The original upstream application retains its own native development commands.
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.
@@ -99,7 +113,7 @@ Introduce dependency management only when the project first consumes an independ
 Initialize the remaining engineering submodules only when broader cross-component work needs them:
 
 ```console
-pixi run python tools/checkout_submodules.py
+python tools/checkout_submodules.py
 ```
 
 Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
