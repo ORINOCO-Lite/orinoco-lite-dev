@@ -401,21 +401,18 @@ def execute(args: argparse.Namespace) -> int:
             print(f"Converted {result['record_count']} records and {result['annotation_companions']} annotation companions into {args.site_inputs}")
         elif action == "export":
             joined = export_records(args.site_inputs, args.output)
-            inputs = {"records": args.site_inputs / "metadata/records"}
-            companions = args.site_inputs / "metadata/overlays/annotations"
-            if companions.is_dir():
-                inputs["annotations"] = companions
-            write_operation(args.output, operation="records export", inputs=inputs, command=sys.argv)
+            inputs = {"metadata": args.site_inputs / "metadata"}
+            write_operation(args.output, operation="records export", inputs=inputs, command=getattr(args, "invocation", []))
             print(f"Exported {len(joined)} joined records to {args.output}")
         elif action == "rdf-roundtrip":
             result = rdf_roundtrip(args.source, args.output, compare_rdf=args.compare_rdf)
             write_operation(args.output, operation="records rdf-roundtrip", inputs={"records": args.source},
-                            command=sys.argv, context={"schema_sha256": result["schema_sha256"], "status": result["status"]})
+                            command=getattr(args, "invocation", []), context={"schema_sha256": result["schema_sha256"], "status": result["status"]})
             returned_path = args.output / (
                 "returned.jsonl" if result["status"] == "complete" else "returned.partial.jsonl"
             )
             write_operation(returned_path, operation="records rdf-roundtrip",
-                            inputs={"records": args.source}, command=sys.argv,
+                            inputs={"records": args.source}, command=getattr(args, "invocation", []),
                             context={"schema_sha256": result["schema_sha256"], "status": result["status"]})
             print(f"RDF conversion {result['status']}: {len(result['records'])} returned records; evidence in {args.output}")
             for diagnostic in result["diagnostics"]:
@@ -460,7 +457,7 @@ def execute(args: argparse.Namespace) -> int:
                                     "subjects": sorted({item.pid for item in [*left, *right]}),
                                     "all_locations": True, "selection": "all records",
                                     "exclusions": []},
-                             command=sys.argv, evidence=evidence)
+                             command=getattr(args, "invocation", []), evidence=evidence)
                 print(f"Report: {args.report}")
             return 1 if findings else 0
         else:
