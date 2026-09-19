@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - main
+      - codex/stage-*
   push:
     branches:
       - main
@@ -64,5 +65,21 @@ jobs:
           pixi run build-package
           wheels=(build/package/*.whl)
           pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi run python - <<'PY'
+          from importlib.metadata import distribution
+          import json
+          from pathlib import Path
+          import sysconfig
+
+          import orinoco_lite
+
+          installed = Path(orinoco_lite.__file__).resolve()
+          site_packages = Path(sysconfig.get_path("purelib")).resolve()
+          assert installed.is_relative_to(site_packages), installed
+          source = json.loads(distribution("orinoco-lite").read_text("direct_url.json"))
+          assert "archive_info" in source and source["url"].endswith(".whl"), source
+          assert not source.get("dir_info", {}).get("editable", False), source
+          print(f"Testing installed wheel: {installed}")
+          PY
           pixi run orinoco-lite --help
           pixi run pytest --ignore=tests/engineering
