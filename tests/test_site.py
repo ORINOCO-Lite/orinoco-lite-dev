@@ -474,6 +474,8 @@ class HugoCompatibilityTests(unittest.TestCase):
             adapter.parent.mkdir(parents=True)
             adapter.write_text("# test adapter\n", encoding="utf-8")
 
+            (root / "generated/projection/content").mkdir(parents=True)
+
             for name, base_url, expected_edit_url in (
                 ("local", "/", "/edit/"),
                 (

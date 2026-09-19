@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -43,12 +42,19 @@ def check_workspace(root: Path) -> None:
 
 def record(root: Path, action: str, *arguments: str | Path) -> None:
     """Record only the package connection; leave unrelated site edits alone."""
-    command = ["pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
+    checkout = Path(arguments[0]).resolve() if action == "enable" else (root / LINK).resolve()
+    source = Path(os.path.relpath(checkout, root))
+    command = ["pixi", "run", "--locked", "python", "-c",
+               "from datalad.cli.main import main; main()", "run",
                "--explicit", "-m", f"chore: {action} editable Orinoco Lite"]
     for path in FILES:
         command.extend(("--output", path))
-    run(*command, "--", sys.executable, "-m", "orinoco_lite.development",
-        action, *arguments, "--apply", cwd=root)
+    # Bootstrap through the selected source: the currently installed release may
+    # predate this command. The saved command remains public and relocatable.
+    run(*command, "--", "pixi", "run", "--manifest-path", source / "pixi.toml",
+        "--locked", "orinoco-lite", "--root", ".", "dev", action,
+        *((str(source),) if action == "enable" else ()), "--no-record",
+        *(("--skip-prepare",) if action == "enable" else ()), cwd=root)
 
 
 def previous_selection(root: Path) -> object:
@@ -105,7 +111,8 @@ def apply(root: Path, action: str, checkout: Path | None) -> None:
         raise
 
 
-def enable(root: Path, path: Path | None = None) -> None:
+def enable(root: Path, path: Path | None = None, *, no_record: bool = False,
+           prepare: bool = True) -> None:
     root = root.resolve()
     check_workspace(root)
     print("Enabling editable Orinoco Lite...", flush=True)
@@ -127,7 +134,12 @@ def enable(root: Path, path: Path | None = None) -> None:
         if selection != EDITABLE:
             raise ConfigurationError("The development link and package selection disagree.")
     else:
-        record(root, "enable", checkout)
+        if no_record:
+            apply(root, "enable", checkout)
+        else:
+            record(root, "enable", checkout)
+    if not prepare:
+        return
     # Compilation tools belong to the source checkout, not the site environment.
     for submodule, required in (
         ("submodules/pool.psychoinformatics.de-ui", "shacl-vue/package-lock.json"),
@@ -139,24 +151,13 @@ def enable(root: Path, path: Path | None = None) -> None:
         "orinoco-lite", "dev", "prepare-resources", cwd=checkout)
 
 
-def disable(root: Path) -> None:
+def disable(root: Path, *, no_record: bool = False) -> None:
     root = root.resolve()
     check_workspace(root)
     if not (root / LINK).is_symlink():
         raise ConfigurationError("This downstream has no editable development connection.")
     print("Restoring the previous package selection...", flush=True)
-    record(root, "disable")
-
-
-def main() -> None:
-    # Invoked by DataLad to record the actual mutation, not resource compilation.
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enable", "disable"))
-    parser.add_argument("path", type=Path, nargs="?")
-    parser.add_argument("--apply", action="store_true", required=True)
-    args = parser.parse_args()
-    apply(Path.cwd(), args.action, args.path)
-
-
-if __name__ == "__main__":
-    main()
+    if no_record:
+        apply(root, "disable", None)
+    else:
+        record(root, "disable")

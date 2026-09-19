@@ -100,3 +100,58 @@ def test_dirty_connection_files_are_not_overwritten(downstream):
     manifest.write_text(manifest.read_text() + "# pending edit\n")
     with pytest.raises(ConfigurationError, match="Commit or discard"):
         dev.check_workspace(downstream)
+
+
+def test_recorded_development_command_bootstraps_the_selected_source(downstream, monkeypatch):
+    checkout = downstream.parent / "candidate"
+    calls = []
+    monkeypatch.setattr(dev, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    dev.record(downstream, "enable", checkout)
+    command, options = calls[0]
+    recorded = command[command.index("--") + 1:]
+    assert recorded == (
+        "pixi", "run", "--manifest-path", Path("../candidate/pixi.toml"),
+        "--locked", "orinoco-lite", "--root", ".", "dev", "enable", "../candidate", "--no-record", "--skip-prepare",
+    )
+    assert options == {"cwd": downstream}
+    assert command.count("--output") == len(dev.FILES)
+
+
+def test_no_record_enable_applies_connection_and_prepares_resources_once(downstream, monkeypatch):
+    checkout = downstream.parent / "candidate"
+    (checkout / "src/orinoco_lite").mkdir(parents=True)
+    (checkout / "pyproject.toml").touch()
+    calls = []
+    monkeypatch.setattr(dev, "apply", lambda *args: calls.append(("apply", *args)))
+    monkeypatch.setattr(dev, "record", lambda *args: pytest.fail("nested recording"))
+    monkeypatch.setattr(dev, "run", lambda *args, **kwargs: calls.append(args))
+    dev.enable(downstream, checkout, no_record=True)
+    assert calls[0] == ("apply", downstream, "enable", checkout)
+    assert sum(call[-3:] == ("orinoco-lite", "dev", "prepare-resources") for call in calls) == 1
+
+
+def test_recorded_connection_survives_resource_preparation_failure(downstream, monkeypatch):
+    checkout = downstream.parent / "candidate"
+    (checkout / "src/orinoco_lite").mkdir(parents=True)
+    (checkout / "pyproject.toml").touch()
+
+    def record(root, action, source):
+        dev.enable(root, source, no_record=True, prepare=False)
+        commit(root, "chore: enable editable Orinoco Lite")
+
+    original_run = dev.run
+
+    def fail_resources(*args, **kwargs):
+        if args[-3:] == ("orinoco-lite", "dev", "prepare-resources"):
+            raise subprocess.CalledProcessError(1, "prepare-resources")
+        if args[:2] == ("pixi", "install"):
+            original_run(*args, **kwargs)
+
+    monkeypatch.setattr(dev, "record", record)
+    monkeypatch.setattr(dev, "run", fail_resources)
+    with pytest.raises(subprocess.CalledProcessError):
+        dev.enable(downstream, checkout)
+    # A failed compilation leaves the completed connection recorded, allowing
+    # enable to retry without asking the user to discard the connection files.
+    dev.check_workspace(downstream)
+    assert (downstream / dev.LINK).resolve() == checkout

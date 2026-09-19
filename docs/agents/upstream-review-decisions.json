@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "decisions": [
+    {
+      "id": "903a53a9-6264-46cd-88b3-3690951d7349",
+      "stage": "storage",
+      "subject": "*",
+      "location": [],
+      "disposition": "intended",
+      "rationale": "Machine annotation companions use the tested compact representation; this rule applies only when the joined record has identical annotation semantics, including list order and multiplicity.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "records export"
+      },
+      "expected": {
+        "representation_equivalence": "annotation-representation-v1"
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "records-v1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "rule": "annotation-representation-v1",
+          "selection": "all records",
+          "exclusions": []
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "f4940026-8ea4-4162-b3d6-67e95d72a20c",
+          "finding": "storage:1"
+        },
+        {
+          "url": "https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171"
+        }
+      ],
+      "reconsider_when": "The comparator rule or schema changes, or a difference changes semantic values or attribution.",
+      "author": "Codex (delegated engineering review)",
+      "rule": "annotation-representation-v1"
+    }
+  ]
+}
