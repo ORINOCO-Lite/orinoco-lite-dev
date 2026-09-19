@@ -207,9 +207,24 @@ def _safe_output(path: Path) -> None:
             raise snapshot.SnapshotError(f"output must not pass through a symlink: {ancestor}")
 
 
+def _check_record_input(path: Path) -> None:
+    from .stage_reports import operation_receipt, read_json
+
+    operation_receipt(path)
+    # Interruptions can leave evidence before the CLI writes its receipt.
+    if path.name == "returned.partial.jsonl":
+        raise snapshot.SnapshotError(f"Incomplete RDF return cannot be a complete record input: {path}")
+    conversion = path.with_name("conversion.json")
+    if path.name == "returned.jsonl" and conversion.is_file():
+        result = read_json(conversion)
+        if not isinstance(result, dict) or result.get("status") != "complete":
+            raise snapshot.SnapshotError(f"RDF conversion did not complete: {conversion}")
+
+
 def convert(source: Path, site_inputs: Path) -> dict[str, Any]:
     """Replace records and companions, preserving authored inputs and captures."""
 
+    _check_record_input(source)
     targets = [site_inputs / "metadata/records",
                site_inputs / "metadata/overlays/annotations"]
     for target in targets:
@@ -300,6 +315,7 @@ def rdf_roundtrip(
     node labels are serialization details, not assertion identities.
     """
 
+    _check_record_input(source)
     envelopes = snapshot.load_jsonl(source)
     schema = schema or resolve_resources().root / SCHEMA_RELATIVE
     _safe_output(output)
@@ -376,16 +392,12 @@ def register(subparsers: Any) -> None:
 
 
 def execute(args: argparse.Namespace) -> int:
-    from .stage_reports import operation_receipt, write_operation, write_report
+    from .stage_reports import write_operation, write_report
 
     action = args.records_action
     try:
         if action == "convert":
             result = convert(args.source, args.site_inputs)
-            write_operation(args.site_inputs / "metadata/records", operation="records convert",
-                            inputs={"capture": args.source}, command=sys.argv)
-            write_operation(args.site_inputs / "metadata/overlays/annotations", operation="records convert",
-                            inputs={"capture": args.source}, command=sys.argv)
             print(f"Converted {result['record_count']} records and {result['annotation_companions']} annotation companions into {args.site_inputs}")
         elif action == "export":
             joined = export_records(args.site_inputs, args.output)
@@ -412,8 +424,8 @@ def execute(args: argparse.Namespace) -> int:
         elif action == "diff":
             # A failed or stale producer cannot support a completed boundary
             # comparison, including when the caller does not request a report.
-            operation_receipt(args.left)
-            operation_receipt(args.right)
+            _check_record_input(args.left)
+            _check_record_input(args.right)
             left, right = snapshot.load_jsonl(args.left), snapshot.load_jsonl(args.right)
             findings = compare_records(left, right)
             print(f"{args.stage}: {len(left)} left records, {len(right)} right records, {len(findings)} raw findings")

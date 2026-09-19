@@ -346,8 +346,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source = recording.relative_path(root, args.source)
                 inputs = recording.relative_path(root, args.site_inputs)
                 recording.record(root, ["dev", "records", "convert", source, inputs, "--no-record"],
-                                 inputs=[source], outputs=[inputs + "/metadata/records", inputs + "/metadata/overlays/annotations",
-                                                          inputs + "/metadata/records.operation.json", inputs + "/metadata/overlays/annotations.operation.json"],
+                                 inputs=[source], outputs=[inputs + "/metadata/records", inputs + "/metadata/overlays/annotations"],
                                  message="feat: convert retained Pool records and annotations")
                 return 0
             return record_stages.execute(args)

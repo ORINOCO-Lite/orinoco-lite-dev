@@ -159,6 +159,21 @@ def test_failed_conversion_preserves_existing_metadata(tmp_path):
     assert existing.read_bytes() == original
 
 
+def test_public_export_accepts_reviewed_edits_to_converted_records(tmp_path, capsys):
+    from orinoco_lite import cli
+
+    source = capture(tmp_path, envelope(title="Original title"))
+    inputs, output = tmp_path / "inputs", tmp_path / "joined.jsonl"
+    assert cli.main(["dev", "records", "convert", str(source), str(inputs), "--no-record"]) == 0
+    record = next((inputs / "metadata/records").rglob("*.yaml"))
+    record.write_text(record.read_text().replace("Original title", "Reviewed title"))
+
+    assert cli.main(["dev", "records", "export", str(inputs), str(output)]) == 0
+    assert snapshot.load_jsonl(output)[0].record["title"] == "Reviewed title"
+    assert snapshot.load_jsonl(source)[0].record["title"] == "Original title"
+    capsys.readouterr()
+
+
 def test_convert_rejects_capture_inside_replaced_metadata(tmp_path):
     records = tmp_path / "metadata/records"
     records.mkdir(parents=True)
@@ -227,6 +242,58 @@ def test_interrupted_rdf_conversion_never_records_complete(tmp_path, monkeypatch
         stages.rdf_roundtrip(source, output, schema=schema)
     assert json.loads((output / "conversion.json").read_text())["status"] == "failed"
     assert not (output / "returned.jsonl").exists()
+
+
+def test_interrupted_partial_records_cannot_be_compared_or_reused(tmp_path, monkeypatch, capsys):
+    from orinoco_lite import cli
+
+    first = envelope()
+    second = envelope(pid="xyzrins:publications/second")
+    source = capture(tmp_path, first, second)
+    schema = tmp_path / "schema.yaml"
+    schema.write_text("schema input")
+
+    class Writer:
+        def convert(self, record, _class):
+            if record["pid"] == second.pid:
+                raise KeyboardInterrupt()
+            return '<https://example.org/a> <https://example.org/p> "value" .'
+
+    class Reader:
+        def convert(self, _rdf, _class):
+            return first.record
+
+    monkeypatch.setattr(stages, "build_format_converters", lambda _: (Writer(), Reader()))
+    output = tmp_path / "rdf"
+    with pytest.raises(KeyboardInterrupt):
+        stages.rdf_roundtrip(source, output, schema=schema)
+    partial = output / "returned.partial.jsonl"
+    assert snapshot.load_jsonl(partial) == [first]
+    report = tmp_path / "report"
+    assert cli.main(["dev", "records", "diff", str(partial), str(partial), "--report", str(report)]) == 2
+    assert not report.exists()
+    converted = tmp_path / "converted"
+    assert cli.main(["dev", "records", "convert", str(partial), str(converted), "--no-record"]) == 2
+    assert not converted.exists()
+    retry = tmp_path / "retry"
+    assert cli.main(["dev", "records", "rdf-roundtrip", str(partial), str(retry)]) == 2
+    assert not retry.exists()
+    assert "Incomplete RDF return" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("status", ["failed", "stale"])
+def test_rdf_rejects_failed_or_stale_input_before_writing_output(tmp_path, monkeypatch, status):
+    from orinoco_lite.stage_reports import write_operation
+
+    source = capture(tmp_path, envelope(title="Initial"))
+    write_operation(source, operation="test", inputs={}, context={"status": "failed" if status == "failed" else "complete"})
+    if status == "stale":
+        snapshot.write_jsonl(source, [envelope(title="Changed")])
+    monkeypatch.setattr(stages, "build_format_converters", lambda _: pytest.fail("Invalid input reached conversion"))
+    output = tmp_path / "rdf"
+    args = argparse.Namespace(records_action="rdf-roundtrip", source=source, output=output, compare_rdf=False)
+    assert stages.execute(args) == 2
+    assert not output.exists()
 
 
 def test_diff_cli_exit_codes_and_report_raw_findings(tmp_path, capsys):
