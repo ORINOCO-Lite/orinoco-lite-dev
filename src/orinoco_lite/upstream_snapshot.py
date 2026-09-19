@@ -102,6 +102,15 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON number {value}")
 
 
+def _unique_json_mapping(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        result[key] = value
+    return result
+
+
 def _strict_json_value(value: Any, *, location: str) -> Any:
     """Validate that a value is exact JSON data and return it unchanged."""
 
@@ -202,7 +211,11 @@ def load_jsonl(path: Path) -> list[RecordEnvelope]:
             if not line.strip():
                 raise SnapshotError(f"{location}: blank JSONL line")
             try:
-                item = json.loads(line, parse_constant=_reject_json_constant)
+                item = json.loads(
+                    line,
+                    parse_constant=_reject_json_constant,
+                    object_pairs_hook=_unique_json_mapping,
+                )
             except (json.JSONDecodeError, ValueError) as error:
                 raise SnapshotError(f"{location}: invalid JSON: {error}") from error
             if not isinstance(item, dict):
