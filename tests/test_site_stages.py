@@ -64,6 +64,29 @@ def test_missing_import_resource_leaves_existing_inputs_untouched(tmp_path):
     assert list(output.iterdir()) == [output / "site.yaml"]
 
 
+def test_input_comparison_accepts_system_temporary_directory_symlink(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    upstream = source(tmp_path)
+    output = tmp_path / "site-specific"
+    import_site_inputs(upstream, output)
+    real_temporary = tmp_path / "real-temporary"
+    real_temporary.mkdir()
+    temporary_alias = tmp_path / "temporary-alias"
+    temporary_alias.symlink_to(real_temporary, target_is_directory=True)
+
+    @contextmanager
+    def temporary_directory(**kwargs):
+        yield str(temporary_alias)
+
+    monkeypatch.setattr(dev_site.tempfile, "TemporaryDirectory", temporary_directory)
+    monkeypatch.setattr(dev_site, "_selection", lambda args: (tmp_path / "resources", upstream))
+    args = argparse.Namespace(root=tmp_path, dev_command="inputs", inputs_command="diff",
+                              inputs=Path("site-specific"), report=None, mode="isolated",
+                              stage="site-input-import")
+    assert dev_site.execute(args) == 0
+
+
 def test_content_diff_keeps_typed_order_duplicates_null_and_raw_changes(tmp_path):
     left, right = tmp_path / "left", tmp_path / "right"
     write(left / "static/graph.json", '{"nodes":[true,1,1],"optional":null}')

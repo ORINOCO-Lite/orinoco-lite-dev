@@ -195,7 +195,7 @@ def execute(args):
                 print(json.dumps(result, indent=2))
                 return 0
             with tempfile.TemporaryDirectory(prefix="orinoco-site-inputs-") as temporary:
-                expected = Path(temporary) / "expected"
+                expected = Path(temporary).resolve() / "expected"
                 import_site_inputs(presentation, expected)
                 subjects = [path.as_posix() for path in selected_site_files(presentation)] + ["site.yaml"]
                 findings, names = compare_trees(expected, destination, subjects=subjects)

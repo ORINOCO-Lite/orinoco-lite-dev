@@ -22,6 +22,9 @@ class PackageResourceTests(unittest.TestCase):
             "schema/demo-research-information/unreleased.yaml",
             "editor-shell/index.html",
             "review-shell/index.html",
+            "diff-review-app/index.html",
+            "diff-review-app/app.js",
+            "diff-review-app/app.css",
             "drivers/adapt_pages.py",
         ):
             with self.subTest(resource=name):

@@ -345,7 +345,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "dev" and args.dev_command in {"records", "review"}:
             root = (args.root or Path.cwd()).resolve()
-            for name in ("source", "output", "site_inputs", "left", "right", "report", "scratch", "decisions", "changes"):
+            for name in ("source", "output", "site_inputs", "left", "right", "report", "scratch", "decisions", "changes", "directory"):
                 value = getattr(args, name, None)
                 if isinstance(value, Path) and not value.is_absolute():
                     setattr(args, name, root / value)
