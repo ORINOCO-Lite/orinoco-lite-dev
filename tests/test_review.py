@@ -218,6 +218,8 @@ class StaticReviewBindingTests(unittest.TestCase):
             (shell / "index.html").write_text("review\n", encoding="utf-8")
             destination = root / "build/site"
 
+            (root / "generated/projection/content").mkdir(parents=True)
+
             def run(command, *, cwd):
                 del cwd
                 normalized = [str(item) for item in command]

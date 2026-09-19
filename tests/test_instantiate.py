@@ -5,7 +5,7 @@ import subprocess
 import pytest
 import yaml
 
-from orinoco_lite import instantiate
+from orinoco_lite import instantiate, site_inputs
 from orinoco_lite.errors import ConfigurationError
 
 
@@ -74,4 +74,61 @@ def test_force_does_not_remove_output_when_snapshot_is_missing(tmp_path, monkeyp
     monkeypatch.setattr(instantiate, "__file__", str(engineering / "src/orinoco_lite/instantiate.py"))
     with pytest.raises(ConfigurationError, match="Cached pool snapshot is missing"):
         instantiate.setup(output, force=True)
+    assert (output / "keep.txt").read_text() == "keep"
+
+
+def test_setup_retains_original_capture_before_public_conversion(tmp_path, monkeypatch):
+    engineering = tmp_path / "engineering"
+    (engineering / "release").mkdir(parents=True)
+    (engineering / "release/package-resources.yaml").touch()
+    (engineering / "submodules/www-from-model/.git").mkdir(parents=True)
+    template = tmp_path / "template"
+    template.mkdir()
+    source = tmp_path / "original.jsonl"
+    raw = b'{"class_name":"Thing","record":{"pid":"example:one","schema_type":"dlthings:Thing"}}\n'
+    source.write_bytes(raw)
+    manifest = source.with_name(source.name + ".manifest.json")
+    facts = b'{"captured_at":"2026-09-18T12:00:00+00:00"}\n'
+    manifest.write_bytes(facts)
+    destination = tmp_path / "downstream"
+    calls = []
+
+    def run(*args, **kwargs):
+        calls.append(args)
+        if "create" in args:
+            destination.mkdir()
+
+    monkeypatch.setattr(instantiate, "__file__", str(engineering / "src/orinoco_lite/instantiate.py"))
+    monkeypatch.setattr(instantiate, "run", run)
+    monkeypatch.setattr(instantiate, "git", lambda *args: "a" * 40)
+    monkeypatch.setattr(site_inputs, "selected_site_files", lambda source: {})
+    monkeypatch.setattr(instantiate, "enable", lambda *args: calls.append(("enable", *args)))
+    instantiate.setup(destination, template=template, snapshot=source)
+    retained = destination / "site-specific/sources/pool/original.jsonl"
+    assert retained.read_bytes() == raw
+    assert retained.with_name(retained.name + ".manifest.json").read_bytes() == facts
+    convert = next(i for i, call in enumerate(calls) if "convert" in call)
+    enabled = next(i for i, call in enumerate(calls) if call[0] == "enable")
+    assert enabled < convert
+    assert calls[convert][-2:] == (Path("site-specific/sources/pool/original.jsonl"), "site-specific")
+    assert calls[-1][-6:] == ("dev", "inputs", "import", "site-specific",
+                            "--presentation", ".orinoco-lite/dev/submodules/www-from-model")
+
+
+def test_setup_rejects_unselected_maintainer_source_before_replacing_output(tmp_path, monkeypatch):
+    engineering = tmp_path / "engineering"
+    (engineering / "release").mkdir(parents=True)
+    (engineering / "release/package-resources.yaml").touch()
+    (engineering / "submodules/www-from-model/.git").mkdir(parents=True)
+    template = tmp_path / "template"
+    template.mkdir()
+    snapshot = tmp_path / "capture.jsonl"
+    snapshot.write_text("retained source")
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "keep.txt").write_text("keep")
+    monkeypatch.setattr(instantiate, "__file__", str(engineering / "src/orinoco_lite/instantiate.py"))
+    monkeypatch.setattr(instantiate, "git", lambda root, *args: "a" * 40 if root == engineering else "b" * 40)
+    with pytest.raises(ConfigurationError, match="does not match.*Gitlink"):
+        instantiate.setup(output, template=template, snapshot=snapshot, force=True)
     assert (output / "keep.txt").read_text() == "keep"

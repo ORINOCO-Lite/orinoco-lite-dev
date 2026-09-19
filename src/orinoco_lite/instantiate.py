@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tomllib
 
 import yaml
@@ -100,28 +100,54 @@ def setup(destination: Path | None = None, *, template: Path | None = None,
             raise ConfigurationError("The downstream destination must not contain a setup input.")
     if site_specific is None and not (engineering / "submodules/www-from-model/.git").exists():
         run("git", "submodule", "update", "--init", "--", "submodules/www-from-model", cwd=engineering)
+    if site_specific is None:
+        from .site_inputs import selected_site_files
+        website = engineering / "submodules/www-from-model"
+        selected = git(engineering, "rev-parse", "HEAD:submodules/www-from-model")
+        if git(website, "rev-parse", "HEAD") != selected:
+            raise ConfigurationError("The maintainer presentation checkout does not match the selected engineering Gitlink.")
+        # Asset hydration is a maintainer preparation step. Read the required
+        # bytes now, before replacing a destination, without running Git Annex.
+        selected_site_files(website)
     # Check inputs before honoring a destructive recreation request.
     if destination.is_symlink() or destination.is_file():
         destination.unlink()
     elif destination.exists():
         shutil.rmtree(destination)
-    run("pixi", "exec", "--spec", "datalad", "--", "datalad", "create", "--no-annex", destination, cwd=engineering)
-    run("pixi", "exec", "--spec", "datalad", "--spec", "copier", "--", "datalad", "run",
-        "-m", "chore: instantiate local template", "--", "copier", "copy", "--vcs-ref", "HEAD",
-        "-d", "include_site_specific=false", template, ".", cwd=destination)
+    datalad = ("python", "-c", "from datalad.cli.main import main; main()")
+    engineering_environment = ("pixi", "run", "--manifest-path", engineering / "pixi.toml", "--locked")
+    run(*engineering_environment, *datalad, "create", "--no-annex", destination, cwd=engineering)
+    source_manifest = Path(os.path.relpath(engineering / "pixi.toml", destination))
+    template_source = Path(os.path.relpath(template, destination))
+    run(*engineering_environment, *datalad, "run", "--explicit", "--output", ".",
+        "-m", "chore: instantiate local template", "--", "pixi", "run", "--manifest-path", source_manifest,
+        "--locked", "copier", "copy", "--defaults", "--vcs-ref", git(template, "rev-parse", "HEAD"),
+        "-d", "include_site_specific=false", template_source, ".", cwd=destination)
+    # The copied scaffold may select an older release. Enable the candidate
+    # before using its independent conversion and import commands.
+    enable(destination, engineering)
     if site_specific is not None:
-        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
-            "-m", "chore: install site-specific subdataset", "--", "datalad", "install",
-            "--dataset", ".", "--source", site_specific, "site-specific", cwd=destination)
+        source = Path(os.path.relpath(site_specific, destination))
+        run("pixi", "run", "--locked", *datalad, "run", "--explicit", "--output", "site-specific",
+            "--output", ".gitmodules", "-m", "chore: install site-specific subdataset", "--",
+            "pixi", "run", "--locked", "datalad", "install", "--dataset", ".",
+            "--source", source, "site-specific", cwd=destination)
     else:
         print("Converting the cached pool snapshot into site-specific inputs...", flush=True)
-        run("pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
-            "-m", "chore: convert captured upstream site inputs", "--", sys.executable,
-            "-m", "orinoco_lite.instantiate", engineering, snapshot, "site-specific", cwd=destination, quiet=True)
-    enable(destination, engineering)
+        retained = Path("site-specific/sources/pool") / snapshot.name
+        (destination / retained).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(snapshot, destination / retained)
+        retained_files = [retained]
+        manifest = snapshot.with_name(snapshot.name + ".manifest.json")
+        if manifest.is_file():
+            companion = retained.with_name(retained.name + ".manifest.json")
+            shutil.copyfile(manifest, destination / companion)
+            retained_files.append(companion)
+        run("pixi", "run", "--locked", *datalad, "save", "-m", "chore: retain captured Pool input",
+            "--", *retained_files, cwd=destination)
+        run("pixi", "run", "--locked", "orinoco-lite", "dev", "records", "convert",
+            retained, "site-specific", cwd=destination)
+        run("pixi", "run", "--locked", "orinoco-lite", "dev", "inputs", "import", "site-specific",
+            "--presentation", ".orinoco-lite/dev/submodules/www-from-model", cwd=destination)
     print(f"\nSetup complete.\n\ncd {destination}\ngit log --oneline\ngit status\n"
           "\nBuild when ready: pixi run orinoco-lite build\nServe afterward: pixi run orinoco-lite serve")
-
-
-if __name__ == "__main__":
-    snapshot_site(*(Path(value) for value in sys.argv[1:]))

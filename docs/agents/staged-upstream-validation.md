@@ -4,15 +4,16 @@ Active build specification for maintainers implementing the comparison commands 
 Updated 18 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
 The [application README](../../packages/diff-review-application/README.md) describes the later web interface for reviewers.
 The [design charter](../project-design.md) supplies project constraints; this document specifies the planned interfaces, behavior, and delivery sequence.
-The commands and application described here are implementation targets.
+The staged CLI commands and a small terminal review are implemented; the web application remains a later target.
 The [exploration](provenance-comparison-exploration.md) records the research behind the [investigation procedure](../../.agents/skills/compare-orinoco-provenance/SKILL.md).
 
 ## Implementation sequence
 
 The letters identify proposed PRs, not GitHub PR numbers.
 Cleanup #160 and the upstream comparison charter principle in #162 are merged.
-The terminology charter principle in #167 and this specification remain separate PRs against `main`.
-After agreeing on the plan, start the capture PR from `main`.
+The specification merged in #161; the terminology charter principle in #167 remains separate.
+The CLI implementation stacks capture (#169), record conversion (#170), service and review (#171), then the website stages.
+Stages E–H share one reviewable change because projection, assembly, and rendering exercise the same website boundaries.
 Later command PRs may stack on their predecessor until it merges.
 Then rebase their unique changes onto `main` and repeat the affected checks.
 
@@ -34,8 +35,17 @@ Reviewers must be able to follow the data flow and assess each stage without a b
 
 Introduce CLI decision matching with D and extend it with subsequent stage reports.
 After H, validate complete-path comparison, scoped decision reuse across two runs, and report compatibility through the CLI.
+CLI summaries expose validated data-flow links and complete-path reports, but leave the overall integration judgment to the reviewer (`integration: not-established`).
+A matching decision or a collection of passing isolated stages never automatically approves the complete website.
 Only after maintainers have reviewed that behavior should a separate application PR add portable bundling, serving, viewers, and decision editing over the established reports.
 The application must reuse the CLI comparison and matching behavior.
+
+The initial terminal interface is `dev review inspect REPORT... --decisions FILE --author NAME`.
+It uses the same validated reports and matcher, previews decisions, requires an explicit save, and refuses to overwrite a decision file changed during review.
+`dev review decide` provides the same operation for a selected finding without an interactive terminal.
+These commands write only the selected decision file; agents identify themselves as the reviewer.
+Generated summaries show bounded examples, counts, and raw-evidence links rather than repeating every large value.
+The JSON reports retain every raw finding and full value.
 
 Review each stage's implementation and comparison outputs before merging its PR.
 Keep the existing #152 discussion available while extracting its changes.
@@ -149,6 +159,7 @@ The user-facing operation requiring durable state is reopening the review of a d
 Use one explicitly selected Git-tracked JSON decision file for that review scope, owned by the repository where the engineering review is maintained.
 It contains current decisions, not generated runs, copied dependency locks, or an inventory of patches.
 Git supplies history.
+The initial [engineering decisions](upstream-review-decisions.json) identify Codex as their reviewer and can be supplied with `--decisions`; they do not claim review by John.
 Do not use source-adapter `curation-records` for these engineering decisions.
 
 Each decision contains an ID, disposition (`intended`, `tolerated`, or `undecided`), rationale, operation responsible for the difference, subject/location selector, expected change, schema/comparator compatibility, relevant input conditions, evidence links, and a reconsideration/removal condition. `undecided` records a deferred issue without accepting its behavior. The initial matcher supports exact subject/location, change kind, and typed before/after values within a stage and compatible schema/comparator versions.
@@ -157,6 +168,8 @@ Whole-run IDs and dependency SHAs do not by themselves prevent reuse after a rep
 When a dependency-specific condition is required, save and evaluate it explicitly.
 
 Broader recurring patterns require a named, versioned comparator rule with behavioral tests and a reviewed decision selecting it.
+The implemented `annotation-representation-v1` rule recognizes compact/expanded annotation and PAV spelling differences only when the complete record's annotation semantic view is equal, preserving list order, multiplicity, values, and attribution. An explicit decision may select this rule for a complete all-record comparison within one stage and compatible schema/comparator versions.
+It does not accept downstream consequences or changes outside that equivalence.
 Do not offer executable browser predicates, unrestricted regular-expression suppression, or automatic widening of scopes.
 When applicability cannot be established, present the previous decision as context and require renewed review.
 Multiple conflicting matches, changed values, ambiguous identity, and incompatible versions require review rather than choosing a match arbitrarily.
@@ -221,7 +234,7 @@ Do not make web-interface completion a prerequisite for accepting a command stag
 
 ## Command review examples
 
-Run these proposed commands from the downstream directory after activating its [Pixi environment](../../README.md#command-environment).
+Run these commands from the downstream directory after activating its [Pixi environment](../../README.md#command-environment).
 The path names show how one command supplies the next command's input.
 Dependency selection comes from the downstream and package, without repeating upstream pins in command arguments.
 
@@ -233,8 +246,8 @@ orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-s
 orinoco-lite dev records export site-specific build/records/joined.jsonl
 orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
 orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
+orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.jsonl --stage service
+orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl --stage service --mode complete-path
 ```
 
 Annotation companions keep machine attribution for record assertions separate for human readability.
@@ -252,7 +265,7 @@ For example, inspect storage and RDF evidence before proceeding to projection:
 ```console
 orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl --report build/reports/storage
 orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
-orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
+orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --stage rdf --report build/reports/rdf
 orinoco-lite dev review summarize build/reports/storage build/reports/rdf --output build/review
 ```
 
@@ -274,6 +287,8 @@ The import reads selected site data from `www-from-model` and any referenced fil
 Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `site.yaml`.
 Hugo projection produces pages and graph data from the same joined records on both sides.
 The content diff reports page and graph differences separately.
+The upstream diagnostic resolves tool checkouts from the connected engineering repository and verifies them against its gitlinks.
+It runs the selected upstream code in that repository's locked environment; ordinary downstream builds do not gain those maintainer dependencies.
 
 ### Hugo assembly and build
 
@@ -282,7 +297,7 @@ These examples assemble both sets of Hugo inputs from the upstream generated con
 ```console
 orinoco-lite dev hugo assemble upstream build/upstream/projection build/upstream/assembly --inputs site-specific
 orinoco-lite dev hugo assemble lite build/upstream/projection build/lite/assembly --inputs site-specific
-orinoco-lite dev content diff build/upstream/assembly build/lite/assembly
+orinoco-lite dev content diff build/upstream/assembly build/lite/assembly --stage assembly
 ```
 
 Then use the upstream Hugo input tree for the build comparison.
@@ -296,7 +311,10 @@ orinoco-lite dev site check build/lite/site
 ```
 
 `dev hugo build` consumes the supplied Hugo input tree without reassembling it.
-The ordinary `orinoco-lite build` runs projection, assembly, and the website build together.
+Its scope is Hugo rendering and the selected output adapter.
+The ordinary `orinoco-lite build` runs projection, assembly, rendering, and static editor/review binding together.
+Binding reads workspace metadata and configuration, so it stays outside the diagnostic Hugo-only boundary and must be checked in the complete ordinary build before claiming whole-site agreement.
+Missing application routes in a diagnostic build remain visible in generic site checks.
 For the final comparison, project upstream content from the raw retained capture and Lite content from the converted records.
 Give each path its own generated content and Hugo input tree, then compare the rendered sites.
 This required final run checks how the reviewed steps work together, including interactions that same-input comparisons cannot expose.
@@ -371,13 +389,22 @@ Check portability by cloning into a different directory and rerunning a recorded
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
 Reuse the downstream tool lock and record both the input change and the parent submodule pointer.
 
+Upstream site-data import requires actual file bytes in a prepared maintainer checkout.
+The clean presentation cache can contain Annex pointers and must fail rather than import them or invoke Annex downstream.
+Local candidate setup selects the exact engineering gitlink through the existing development connection when importing those prepared site inputs.
+Its recorded public command retains that relative source path; output paths must remain inside the downstream.
+Import through this local development link declares the connection as an input and uses DataLad's native `--assume-ready inputs` after checking that source bytes are available.
+For this maintainer-only import, pass the same option to `datalad rerun --assume-ready inputs`; DataLad does not retain it in the run record.
+A relocated checkout must reconnect the selected, prepared maintainer source before replaying this import.
+Recorded conversion from a retained capture does not have this local-source requirement.
+
 ## Existing PRs and review
 
 | Existing PR | Place in this work |
 | --- | --- |
 | [Terminology charter #167](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/167) | One sentence on upstream terminology and operation reuse under the existing reuse principle. |
 | [Comparison charter #162](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/162) | Merged. One sentence on upstream comparison under the existing reuse principle. |
-| [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This specification and detailed agent guidance, proposed directly against `main`. |
+| [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | Merged. This specification and detailed agent guidance. |
 | [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Merged. Retains reusable operations and removes the old preview orchestration. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
 | [Package #154](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/154) | Tool research for H. Promote the chosen procedure, then retire the dated report. |
@@ -407,12 +434,12 @@ No comments were present on #142 or #154 during the initial review.
   It writes JSONL from Lite's stored records; upstream `dtc export` and `dtc import` instead transfer service collections to and from their filesystem format.
 - Conversion must update only the records and annotation companions it owns.
   Preserve the capture, authored inputs, and repository state in an existing `site-specific` directory.
-  The current converter replaces its output directory, so C must separate that write boundary before reusing it.
+  The converter now replaces only its owned record and annotation directories.
 - Implement `dev hugo project upstream` with the selected `query-things` operations, including `render-record`, and the upstream graph producer.
   Expose Lite Hugo projection through the existing projection code, with an explicit record input.
 - Extract shared Hugo input assembly and build functions from `site.py`.
   Ordinary `build` should call them too.
-  Its current implementation recreates the assembly before invoking Hugo.
+  The diagnostic build consumes an existing assembly; ordinary build composes these operations before binding applications.
 - Move user-facing operations out of recorded `python -m` calls in `instantiate.py` and `development.py`.
   Retain internal Python functions for code reuse.
 - Cleanup retains the tested checkout and worktree-preservation helpers.
@@ -427,8 +454,5 @@ No comments were present on #142 or #154 during the initial review.
   Pagination completeness checks do not detect every concurrent source edit.
 - The legacy capture contains 5,030 records.
   The initial local review found exact agreement with retained upstream YAML. #152 and site-input #1 preserve the date marker after annotation normalization.
-- Initial extraction checks passed 19 capture tests and 19 record-preservation tests.
-  Content-generation changes applied cleanly.
-  Service round-trip and content-tree comparisons remain implementation work.
 - Template #75 and #76 are merged.
   Read the selected template from the downstream rather than adding another template PR by default.

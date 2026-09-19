@@ -108,7 +108,10 @@ def _parser() -> argparse.ArgumentParser:
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
     enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
-    dev_commands.add_parser("disable", help="restore the package selection used before editable development")
+    enable.add_argument("--no-record", action="store_true")
+    enable.add_argument("--skip-prepare", action="store_true", help="connect without compiling package resources")
+    disable = dev_commands.add_parser("disable", help="restore the package selection used before editable development")
+    disable.add_argument("--no-record", action="store_true")
     setup = dev_commands.add_parser("setup", help="instantiate a downstream from local template and captured site inputs")
     setup.add_argument("destination", nargs="?", type=Path)
     setup.add_argument("--template", type=Path)
@@ -116,13 +119,14 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
     setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
-    from . import pool_capture, record_stages, service_stage, stage_review
+    from . import dev_site, pool_capture, record_stages, service_stage, stage_review
     records = dev_commands.add_parser("records", help="capture, transform, and compare retained records")
     record_commands = records.add_subparsers(dest="records_command", required=True)
     pool_capture.register_capture(record_commands)
     record_stages.register(record_commands)
     service_stage.register(record_commands)
     stage_review.register(dev_commands)
+    dev_site.register(dev_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -339,6 +343,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     args.invocation = ["orinoco-lite", *(list(argv) if argv is not None else sys.argv[1:])]
     try:
+        if args.command == "dev" and args.dev_command in {"records", "review"}:
+            root = (args.root or Path.cwd()).resolve()
+            for name in ("source", "output", "site_inputs", "left", "right", "report", "scratch", "decisions", "changes"):
+                value = getattr(args, name, None)
+                if isinstance(value, Path) and not value.is_absolute():
+                    setattr(args, name, root / value)
+            if hasattr(args, "reports"):
+                args.reports = [path if path.is_absolute() else root / path for path in args.reports]
+        if args.command == "dev" and args.dev_command in {"inputs", "hugo", "content", "site"}:
+            from . import dev_site
+            return dev_site.execute(args)
         if args.command == "dev" and args.dev_command == "review":
             from . import stage_review
             return stage_review.execute(args)
@@ -368,9 +383,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 instantiate.setup(args.destination, template=args.template, site_specific=args.site_specific,
                                   snapshot=args.snapshot, populate=args.populate, force=args.force)
             elif args.dev_command == "enable":
-                development.enable(args.root or Path.cwd(), args.path)
+                development.enable(args.root or Path.cwd(), args.path, no_record=args.no_record,
+                                   prepare=not args.skip_prepare)
             else:
-                development.disable(args.root or Path.cwd())
+                development.disable(args.root or Path.cwd(), no_record=args.no_record)
             return 0
         if args.command == "dev" and args.dev_command == "prepare-resources":
             from .prepare_resources import main as prepare_resources
