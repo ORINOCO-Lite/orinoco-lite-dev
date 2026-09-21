@@ -251,9 +251,11 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
     """Add ``get`` to the shared ``dev records`` command group."""
     parser = commands.add_parser(
         "get", help="capture public Pool records and their acquisition facts",
-        description=("Capture the public Thing collection as envelope JSONL. "
-                     "Reuse a verified capture unless --refresh is supplied. "
-                     "Record declared outputs with the downstream's locked DataLad by default."),
+        description=("Download public Pool records to OUTPUT as JSON Lines, "
+                     "with one record and its schema class per line. "
+                     "Save source information and verification details to OUTPUT.manifest.json. "
+                     "Reuse an existing verified capture unless --refresh is supplied. "
+                     "By default, commit both files using the downstream's locked DataLad environment."),
     )
     parser.add_argument("output", type=Path)
     parser.add_argument("--api", default=DEFAULT_API, help="public Pool API URL")
