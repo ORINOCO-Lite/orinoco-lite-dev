@@ -64,14 +64,33 @@ def test_cli_captures_exact_records_then_reuses_without_fetching(capture, monkey
     assert set(destination.parent.iterdir()) == {destination, manifest_path}
 
 
-def test_refresh_replaces_capture_and_records_its_actual_origin(capture):
+def test_default_path_downloads_reuses_and_force_replaces(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    fetch = Mock(return_value=({PID: record()}, {}))
+    monkeypatch.setattr(pool_capture, "fetch_live", fetch)
+
+    assert main(["get"]) == 0
+    destination = tmp_path / "site-specific/sources/pool/records.jsonl"
+    assert upstream_snapshot.load_jsonl(destination)[0].record == record()
+    assert destination.with_name("records.jsonl.manifest.json").is_file()
+
+    assert main(["get"]) == 0
+    assert fetch.call_count == 1
+
+    fetch.return_value = ({PID: record(name="Changed")}, {})
+    assert main(["get", "--force"]) == 0
+    assert fetch.call_count == 2
+    assert upstream_snapshot.load_jsonl(destination)[0].record == record(name="Changed")
+
+
+def test_force_replaces_capture_and_records_its_actual_origin(capture):
     destination, manifest_path, fetch = capture
     assert main(["get", str(destination), "--api", API + "/"]) == 0
     fetch.assert_called_once_with(API)
     fetch.return_value = ({PID: record(name="Changed")}, {"version": "new"})
     other_api = "https://other.example.test/api"
 
-    assert main(["get", str(destination), "--refresh", "--api", other_api]) == 0
+    assert main(["get", str(destination), "--force", "--api", other_api]) == 0
 
     fetch.assert_called_with(other_api)
     assert upstream_snapshot.load_jsonl(destination)[0].record == record(name="Changed")
@@ -84,8 +103,8 @@ def test_refresh_replaces_capture_and_records_its_actual_origin(capture):
     ("missing", "no provenance manifest"),
     ("malformed", "Invalid Pool capture manifest"),
     ("not-object", "manifest is not an object"),
-    ("unknown-origin", "use --refresh"),
-    ("other-origin", "use --refresh"),
+    ("unknown-origin", "use --force"),
+    ("other-origin", "use --force"),
     ("count", "count does not match"),
     ("digest", "digest does not match"),
 ])
@@ -120,11 +139,11 @@ def test_invalid_cache_is_not_fetched_or_rewritten(capture, damage, message, cap
     fetch.assert_not_called()
     assert destination.read_bytes() == before
     assert (manifest_path.read_bytes() if manifest_path.exists() else None) == manifest_before
-    assert main(["get", str(destination), "--api", API, "--refresh"]) == 0
+    assert main(["get", str(destination), "--api", API, "--force"]) == 0
     fetch.assert_called_once_with(API)
 
 
-def test_failed_refresh_preserves_existing_capture(capture):
+def test_failed_force_preserves_existing_capture(capture):
     destination, manifest_path, fetch = capture
     pool_capture.capture(destination)
     before = (destination.read_bytes(), manifest_path.read_bytes())
@@ -132,7 +151,7 @@ def test_failed_refresh_preserves_existing_capture(capture):
     fetch.return_value = ({PID: {"pid": PID}}, {})
 
     with pytest.raises(pool_capture.CaptureError, match="invalid class_name"):
-        pool_capture.capture(destination, refresh=True)
+        pool_capture.capture(destination, force=True)
 
     assert (destination.read_bytes(), manifest_path.read_bytes()) == before
     assert set(destination.parent.iterdir()) == {destination, manifest_path}
@@ -151,7 +170,7 @@ def test_failed_manifest_replacement_leaves_cache_fail_closed(capture, monkeypat
 
     monkeypatch.setattr(pool_capture.os, "replace", fail_manifest)
     with pytest.raises(pool_capture.CaptureError, match="manifest replacement failure"):
-        pool_capture.capture(destination, refresh=True)
+        pool_capture.capture(destination, force=True)
 
     fetch.reset_mock()
     with pytest.raises(pool_capture.CaptureError, match="digest does not match"):

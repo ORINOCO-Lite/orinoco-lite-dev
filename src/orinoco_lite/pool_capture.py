@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 from .errors import OrinocoError
 
 
+DEFAULT_OUTPUT = Path("site-specific/sources/pool/records.jsonl")
 DEFAULT_API = "https://pool.psychoinformatics.de/api"
 COMPLETENESS_LIMIT = (
     "Pagination, record count, and unique PIDs were checked. The service does "
@@ -144,7 +145,7 @@ def fetch_live(
 
 
 def capture(
-    destination: Path, *, api: str = DEFAULT_API, refresh: bool = False
+    destination: Path, *, api: str = DEFAULT_API, force: bool = False
 ) -> dict:
     """Keep exact record values; publish only a complete, checked JSONL capture."""
     destination = destination.absolute()
@@ -155,11 +156,11 @@ def capture(
         raise CaptureError("The Pool API must be an HTTP or HTTPS service URL")
     if source.username or source.password or source.query or source.fragment:
         raise CaptureError("The public Pool API URL must not contain credentials, a query, or a fragment")
-    if destination.exists() and not refresh:
+    if destination.exists() and not force:
         if not manifest_path.is_file():
             raise CaptureError(
                 "Cached Pool capture has no provenance manifest; "
-                "use --refresh to capture the requested API"
+                "use --force to capture the requested API"
             )
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -175,7 +176,7 @@ def capture(
         if not isinstance(cached_api, str) or cached_api.rstrip("/") != api:
             raise CaptureError(
                 f"Cached Pool capture is from {cached_api!r}, not {api!r}; "
-                "use --refresh to capture the requested API"
+                "use --force to capture the requested API"
             )
         records, digest = load_cache(destination)
         if manifest.get("record_count") != len(records):
@@ -184,7 +185,7 @@ def capture(
             raise CaptureError("Cached Pool capture digest does not match its manifest")
         print(
             f"Reusing {len(records)} records in {destination} "
-            "(use --refresh to fetch again)"
+            "(use --force to fetch again)"
         )
         return manifest
 
@@ -254,12 +255,13 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
         description=("Download public Pool records to OUTPUT as JSON Lines, "
                      "with one record and its schema class per line. "
                      "Save source information and verification details to OUTPUT.manifest.json. "
-                     "Reuse an existing verified capture unless --refresh is supplied. "
+                     "Reuse an existing verified capture unless --force is supplied. "
                      "By default, commit both files using the downstream's locked DataLad environment."),
     )
-    parser.add_argument("output", type=Path)
+    parser.add_argument("output", nargs="?", type=Path, default=DEFAULT_OUTPUT,
+                        help="capture file (default: %(default)s)")
     parser.add_argument("--api", default=DEFAULT_API, help="public Pool API URL")
-    parser.add_argument("--refresh", action="store_true", help="fetch again instead of reusing a verified capture")
+    parser.add_argument("--force", action="store_true", help="download again and replace the capture and its manifest")
     parser.add_argument("--no-record", action="store_true", help="write the capture without a DataLad commit")
 
 
@@ -269,12 +271,12 @@ def execute(args: argparse.Namespace) -> int:
     root = (getattr(args, "root", None) or Path.cwd()).resolve()
     output = args.output if args.output.is_absolute() else root / args.output
     if args.no_record:
-        capture(output, api=args.api, refresh=args.refresh)
+        capture(output, api=args.api, force=args.force)
     else:
         destination = recording.relative_path(root, output)
         command = ["dev", "records", "get", destination, "--api", args.api, "--no-record"]
-        if args.refresh:
-            command.append("--refresh")
+        if args.force:
+            command.append("--force")
         recording.record(
             root, command,
             outputs=(destination, destination + ".manifest.json"),

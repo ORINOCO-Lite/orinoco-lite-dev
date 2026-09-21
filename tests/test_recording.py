@@ -87,14 +87,14 @@ def test_capture_records_only_capture_and_acquisition_facts(downstream, monkeypa
     monkeypatch.setattr(pool_capture, "capture", lambda *args, **kwargs: pytest.fail("parent must not capture twice"))
     args = argparse.Namespace(
         root=downstream, output=Path("site-specific/sources/pool/records.jsonl"),
-        api=pool_capture.DEFAULT_API, refresh=True, no_record=False,
+        api=pool_capture.DEFAULT_API, force=True, no_record=False,
     )
     assert pool_capture.execute(args) == 0
     positional, keywords = calls[0]
     assert positional[0] == downstream
     assert positional[1] == [
         "dev", "records", "get", "site-specific/sources/pool/records.jsonl",
-        "--api", pool_capture.DEFAULT_API, "--no-record", "--refresh",
+        "--api", pool_capture.DEFAULT_API, "--no-record", "--force",
     ]
     assert keywords["outputs"] == (
         "site-specific/sources/pool/records.jsonl",
@@ -107,6 +107,6 @@ def test_no_record_writes_without_git_or_datalad(tmp_path, monkeypatch):
     monkeypatch.setattr(pool_capture, "capture", lambda *args, **kwargs: calls.append((args, kwargs)))
     monkeypatch.setattr(recording, "record", lambda *args, **kwargs: pytest.fail("must not invoke DataLad"))
     args = argparse.Namespace(root=tmp_path, output=Path("capture.jsonl"),
-                              api=pool_capture.DEFAULT_API, refresh=False, no_record=True)
+                              api=pool_capture.DEFAULT_API, force=False, no_record=True)
     assert pool_capture.execute(args) == 0
-    assert calls == [((tmp_path / "capture.jsonl",), {"api": pool_capture.DEFAULT_API, "refresh": False})]
+    assert calls == [((tmp_path / "capture.jsonl",), {"api": pool_capture.DEFAULT_API, "force": False})]
