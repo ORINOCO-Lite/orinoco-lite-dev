@@ -13,6 +13,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Center for Open Neuroscience" }]
 dependencies = [
+  "dump-things-pyclient @ git+https://github.com/ORINOCO-Lite/dump-things-pyclient.git@1e79391195ad4412286344189dc5f81a06accb90",
   "dump-things-service==6.3.6",
   "Jinja2==3.1.6",
   "linkml==1.11.1",

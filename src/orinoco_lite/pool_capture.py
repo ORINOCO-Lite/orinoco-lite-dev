@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
-import time
-from typing import Callable
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+
+from dump_things_pyclient import communicate
+from requests import RequestException
 
 from .errors import OrinocoError
 
@@ -22,8 +20,8 @@ from .errors import OrinocoError
 DEFAULT_OUTPUT = Path("captures/records.jsonl")
 DEFAULT_API = "https://pool.psychoinformatics.de/api"
 COMPLETENESS_LIMIT = (
-    "Pagination, record count, and unique PIDs were checked. The service does "
-    "not provide an atomic snapshot; concurrent edits that preserve these "
+    "Reported pagination totals, record count, and unique PIDs were checked. "
+    "The service does not provide an atomic snapshot; concurrent edits that preserve these "
     "checks can remain undetected."
 )
 
@@ -45,103 +43,31 @@ def load_capture(path: Path) -> tuple[dict[str, dict[str, object]], str]:
     return {item.pid: item.record for item in records}, digest
 
 
-def request_json(url: str, *, timeout: int = 120) -> object:
-    request = Request(url, headers={"Accept": "application/json"})
-    for attempt in range(4):
-        try:
-            with urlopen(request, timeout=timeout) as response:
-                return json.load(response)
-        except (HTTPError, URLError, TimeoutError) as error:
-            if (isinstance(error, HTTPError) and error.code == 413) or attempt == 3:
-                raise CaptureError(f"Could not fetch {url}: {error}") from error
-            time.sleep(2**attempt)
-        except (UnicodeError, json.JSONDecodeError) as error:
-            raise CaptureError(f"Invalid JSON response from {url}") from error
-    raise AssertionError("unreachable")
-
-
-def fetch_page(
-    api: str, page: int, size: int, fetch: Callable[[str], object]
-) -> tuple[dict[str, object], int]:
-    while size >= 1:
-        query = urlencode({"format": "json", "size": size, "page": page})
-        url = f"{api}/public/records/p/Thing?{query}"
-        try:
-            result = fetch(url)
-        except CaptureError as error:
-            if "413" not in str(error) or size == 1:
-                raise
-            size //= 2
-            continue
-        if not isinstance(result, dict) or "items" not in result:
-            raise CaptureError(f"Unexpected Pool response from {url}")
-        return result, size
-    raise AssertionError("unreachable")
-
-
-def fetch_live(
-    api: str,
-    *,
-    fetch: Callable[[str], object] = request_json,
-    workers: int = 8,
-) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
-    api = api.rstrip("/")
-    server = fetch(f"{api}/server")
-    size = 100
-    while True:
-        first, size = fetch_page(api, 1, size, fetch)
-        total, pages = first.get("total"), first.get("pages")
-        if type(total) is not int or type(pages) is not int:
-            raise CaptureError("Pool pagination metadata is invalid")
-        if total < 1 or pages < 1:
-            raise CaptureError("Pool capture must contain at least one record")
-        if pages != (total + size - 1) // size:
-            raise CaptureError("Pool pagination metadata is inconsistent")
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            remainder = list(
-                executor.map(
-                    lambda page: fetch_page(api, page, size, fetch),
-                    range(2, pages + 1),
-                )
+def fetch_live(api: str) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
+    """Use the pinned upstream reader; verify the returned stream before saving."""
+    records = {}
+    expected = None
+    try:
+        with communicate.get_session() as session:
+            server = communicate.server(api, session=session)
+            stream = communicate.collection_read_records_of_class(
+                service_url=api, collection="public", class_name="Thing",
+                session=session,
             )
-        effective_sizes = [effective_size for _, effective_size in remainder]
-        if any(effective_size != size for effective_size in effective_sizes):
-            size = min(effective_sizes)
-            continue
-        payloads = [first, *(payload for payload, _ in remainder)]
-        if any(
-            type(payload.get("total")) is not int
-            or payload.get("total") != total
-            or type(payload.get("pages")) is not int
-            or payload.get("pages") != pages
-            for payload in payloads[1:]
-        ):
-            raise CaptureError("Pool changed while the capture was fetched")
-        for page, payload in enumerate(payloads, start=1):
-            if ("page" in payload and payload["page"] != page) or (
-                "size" in payload and payload["size"] != size
-            ):
-                raise CaptureError("Pool returned unexpected pagination coordinates")
-        break
-    records: dict[str, dict[str, object]] = {}
-    for page, payload in enumerate(payloads, start=1):
-        items = payload.get("items")
-        if not isinstance(items, list):
-            raise CaptureError(f"Pool page {page} has invalid items")
-        for record in items:
-            if not isinstance(record, dict):
-                raise CaptureError(f"Pool page {page} has a non-object record")
-            pid = record.get("pid")
-            if not isinstance(pid, str) or not pid or pid in records:
-                raise CaptureError(
-                    f"Pool page {page} has an invalid or duplicate PID {pid!r}"
-                )
-            records[pid] = record
-    if len(records) != total:
-        raise CaptureError(
-            f"Pool capture is incomplete: expected {total}, fetched {len(records)}"
-        )
-    return records, server if isinstance(server, dict) else {}
+            for record, _page, pages, _size, total in stream:
+                if expected is None:
+                    expected = (pages, total)
+                if (pages, total) != expected:
+                    raise CaptureError("Pool pagination totals changed during acquisition")
+                pid = record.get("pid") if isinstance(record, dict) else None
+                if not isinstance(pid, str) or not pid or pid in records:
+                    raise CaptureError(f"Pool returned an invalid or duplicate PID {pid!r}")
+                records[pid] = record
+    except (RequestException, ValueError) as error:
+        raise CaptureError(f"Upstream record retrieval failed: {error}") from error
+    if expected is None or len(records) != expected[1]:
+        raise CaptureError("Pool capture is empty or incomplete")
+    return records, server
 
 
 def capture(
@@ -198,19 +124,8 @@ def capture(
         ) as temporary:
             raw = Path(temporary) / "capture.jsonl"
             with raw.open("w", encoding="utf-8") as stream:
-                for pid in sorted(records):
-                    record = records[pid]
-                    schema_type = record.get("schema_type", "")
-                    class_name = (
-                        schema_type.rsplit(":", 1)[-1]
-                        if isinstance(schema_type, str) else ""
-                    )
-                    stream.write(
-                        json.dumps(
-                            {"class_name": class_name, "record": record},
-                            sort_keys=True,
-                        ) + "\n"
-                    )
+                for record in records.values():
+                    stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             verified, digest = load_capture(raw)
             if len(verified) != len(records):
                 raise CaptureError("New Pool capture failed its count check")
@@ -226,7 +141,7 @@ def capture(
                 "captured_at": datetime.now(timezone.utc).isoformat(),
                 "capture_started_at": started_at,
                 "completeness": {
-                    "pagination_checked": True,
+                    "pagination_totals_checked": True,
                     "record_count_checked": True,
                     "unique_pids_checked": True,
                     "atomic_snapshot": False,
@@ -253,7 +168,7 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
     parser = commands.add_parser(
         "get", help="capture public Pool records and their acquisition facts",
         description=("Download public Pool records to OUTPUT as JSON Lines, "
-                     "with one record and its schema class per line. "
+                     "with one record per line. "
                      "Save source information and verification details to OUTPUT.manifest.json. "
                      "Reuse an existing verified capture unless --force is supplied."),
     )

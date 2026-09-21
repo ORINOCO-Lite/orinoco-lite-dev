@@ -96,6 +96,16 @@ class UpstreamSnapshotTests(unittest.TestCase):
             loaded = snapshot._load_yaml_mapping(path)
             self.assertEqual(path.read_bytes(), snapshot.canonical_yaml_bytes(loaded))
 
+    def test_upstream_plain_records_materialize_without_value_changes(self) -> None:
+        expected = self.fixture()
+        source = self.root / "upstream.jsonl"
+        source.write_text("".join(json.dumps(item.record) + "\n" for item in expected))
+        records_root = self.root / "records"
+
+        snapshot.materialize(source, records_root)
+
+        snapshot.compare_snapshots(expected, snapshot.load_records_tree(records_root))
+
     def test_materialization_is_independent_of_source_line_order(self) -> None:
         first_source = self.write_jsonl(self.fixture(), name="first.jsonl")
         second_source = self.write_jsonl(

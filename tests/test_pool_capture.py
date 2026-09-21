@@ -3,9 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 import json
-import math
 from unittest.mock import Mock
-from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -50,6 +48,7 @@ def test_cli_captures_exact_records_then_reuses_without_fetching(capture, monkey
 
     assert main(["get", str(destination)]) == 0
     fetch.assert_called_once_with(pool_capture.DEFAULT_API)
+    assert json.loads(destination.read_text()) == expected
     assert upstream_snapshot.load_jsonl(destination)[0].record == expected
     manifest = json.loads(manifest_path.read_text())
     assert datetime.fromisoformat(manifest["captured_at"]).utcoffset().total_seconds() == 0
@@ -150,7 +149,7 @@ def test_failed_force_preserves_existing_capture(capture):
     # A response with a PID but no schema class cannot become a usable capture.
     fetch.return_value = ({PID: {"pid": PID}}, {})
 
-    with pytest.raises(pool_capture.CaptureError, match="invalid class_name"):
+    with pytest.raises(pool_capture.CaptureError, match="schema_type"):
         pool_capture.capture(destination, force=True)
 
     assert (destination.read_bytes(), manifest_path.read_bytes()) == before
@@ -178,64 +177,87 @@ def test_failed_manifest_replacement_leaves_capture_fail_closed(capture, monkeyp
     fetch.assert_not_called()
 
 
-def test_capture_restarts_all_pages_when_a_later_page_needs_smaller_requests():
-    records = [record(f"example:{index}") for index in range(105)]
-    requests = []
+def test_upstream_reader_preserves_records_and_order(monkeypatch):
+    from dump_things_pyclient import communicate
+    from contextlib import nullcontext
 
-    def fetch(url):
-        if url.endswith("/server"):
-            return {"version": "fixture"}
-        query = parse_qs(urlparse(url).query)
-        page, size = int(query["page"][0]), int(query["size"][0])
-        requests.append((page, size))
-        if page > 1 and size > 50:
-            raise pool_capture.CaptureError("HTTP Error 413")
-        start = (page - 1) * size
-        return {"items": records[start:start + size], "total": len(records),
-                "pages": math.ceil(len(records) / size)}
+    session = object()
+    monkeypatch.setattr(communicate, "get_session", lambda: nullcontext(session))
+    monkeypatch.setattr(communicate, "server", lambda api, **kwargs: {"version": "fixture"})
+    rows = [record("example:z"), record("example:a")]
+    reader = Mock(return_value=iter((row, index + 1, 2, 1, 2) for index, row in enumerate(rows)))
+    monkeypatch.setattr(communicate, "collection_read_records_of_class", reader)
 
-    captured, server = pool_capture.fetch_live(API, fetch=fetch, workers=1)
+    captured, server = pool_capture.fetch_live(API)
 
-    assert list(captured.values()) == records
+    assert list(captured.values()) == rows
     assert server == {"version": "fixture"}
-    assert (1, 100) in requests and (1, 50) in requests
+    reader.assert_called_once_with(service_url=API, collection="public", class_name="Thing", session=session)
 
 
-@pytest.mark.parametrize("items,total,message", [
-    ([record(), record()], 2, "duplicate PID"),
-    ([record()], 2, "incomplete"),
+@pytest.mark.parametrize("rows,message", [
+    ([(record(), 1, 1, 2, 2), (record(), 1, 1, 2, 2)], "duplicate PID"),
+    ([(record(), 1, 1, 2, 2)], "incomplete"),
+    ([], "empty"),
+    ([(record(), 1, 2, 1, 2), (record("example:other"), 2, 3, 1, 3)], "totals changed"),
 ])
-def test_live_capture_rejects_duplicate_or_missing_records(items, total, message):
-    def fetch(url):
-        return {} if url.endswith("/server") else {"items": items, "total": total, "pages": 1}
-
+def test_upstream_stream_must_be_complete_and_unique(monkeypatch, rows, message):
+    monkeypatch.setattr(pool_capture.communicate, "server", lambda *args, **kwargs: {})
+    monkeypatch.setattr(pool_capture.communicate, "collection_read_records_of_class", lambda **kwargs: iter(rows))
     with pytest.raises(pool_capture.CaptureError, match=message):
-        pool_capture.fetch_live(API, fetch=fetch)
+        pool_capture.fetch_live(API)
 
 
-@pytest.mark.parametrize("total,pages", [(True, 1), (1, "1"), (1, 2), (-1, 1)])
-def test_live_capture_rejects_invalid_pagination(total, pages):
-    def fetch(url):
-        return {} if url.endswith("/server") else {"items": [record()], "total": total, "pages": pages}
+def test_upstream_failure_preserves_existing_capture(tmp_path, monkeypatch):
+    from requests import HTTPError
 
-    with pytest.raises(pool_capture.CaptureError, match="pagination|at least one"):
-        pool_capture.fetch_live(API, fetch=fetch)
+    destination = tmp_path / "records.jsonl"
+    reader = Mock(return_value=iter([(record(), 1, 1, 100, 1)]))
+    monkeypatch.setattr(pool_capture.communicate, "server", lambda *args, **kwargs: {})
+    monkeypatch.setattr(pool_capture.communicate, "collection_read_records_of_class", reader)
+    pool_capture.capture(destination, api=API)
+    manifest = destination.with_name("records.jsonl.manifest.json")
+    before = (destination.read_bytes(), manifest.read_bytes())
+    reader.side_effect = HTTPError("service unavailable")
+    with pytest.raises(pool_capture.CaptureError, match="retrieval failed"):
+        pool_capture.capture(destination, api=API, force=True)
+    assert (destination.read_bytes(), manifest.read_bytes()) == before
 
 
-@pytest.mark.parametrize("change", [{"total": 100}, {"pages": 3}, {"page": 1}, {"size": 50}])
-def test_live_capture_rejects_changed_paging_coordinates(change):
-    def fetch(url):
-        if url.endswith("/server"):
-            return {}
-        page = int(parse_qs(urlparse(url).query)["page"][0])
-        payload = {"items": [record(f"example:{page}-{index}") for index in range(100 if page == 1 else 1)],
-                   "total": 101, "pages": 2, "page": page, "size": 100}
-        if page == 2:
-            payload.update(change)
-        return payload
+def test_capture_matches_upstream_cli_jsonl(tmp_path):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from click.testing import CliRunner
+    from dump_things_pyclient.commands.dtc_plugins.get_records import cli
 
-    with pytest.raises(pool_capture.CaptureError, match="changed|pagination"):
-        pool_capture.fetch_live(API, fetch=fetch, workers=1)
+    rows = [record("example:z"), record("example:a", name="ü")]
+
+    class Service(BaseHTTPRequestHandler):
+        def do_GET(self):
+            payload = ({"version": "fixture"} if self.path == "/server" else
+                       {"items": rows, "page": 1, "pages": 1, "size": 100, "total": 2})
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(payload).encode())
+
+        def log_message(self, *args):
+            pass
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Service) as server:
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            api = f"http://127.0.0.1:{server.server_port}"
+            upstream = CliRunner().invoke(cli, [api, "public", "--class", "Thing", "--page-size", "100"])
+            assert upstream.exit_code == 0, upstream.output
+            destination = tmp_path / "records.jsonl"
+            pool_capture.capture(destination, api=api)
+            assert destination.read_text() == upstream.stdout
+            assert [item.record for item in upstream_snapshot.load_jsonl(destination)] == rows
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 @pytest.mark.parametrize("api", ["file:///tmp/source", "https://user:secret@example.test/api", "https://example.test/api?token=secret"])

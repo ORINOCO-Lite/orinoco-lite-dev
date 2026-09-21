@@ -237,6 +237,7 @@ orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.
 orinoco-lite dev records diff captures/records.jsonl build/records/returned.jsonl
 ```
 
+Acquisition uses the pinned upstream client behind `dtc get-records` and retains its plain-record JSONL format and order.
 The `get` command defaults to `captures/records.jsonl` and reuses an existing verified capture.
 Use `--force` to download again and replace the records and their manifest, or supply an output path for another capture.
 
@@ -429,7 +430,8 @@ No comments were present on #142 or #154 during the initial review.
   It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
   D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.
   Prefer the pinned `dtc get-records` and `dtc post-records` operations for capture and service round-trips before adding more HTTP code.
-- Use #152's capture implementation for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
+- Use the pinned upstream record reader for B; keep destination, reuse, and acquisition information in the Lite wrapper.
+  Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
   Keep #142 available until the useful behavior has been carried across.
 - The retained Pool-diff tool is self-contained.
   Cleanup updates its missing-capture message to select an existing capture instead of referring to removed tasks.
