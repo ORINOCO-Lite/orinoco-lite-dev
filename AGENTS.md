@@ -31,6 +31,10 @@
 
 ## Minimum machinery
 
+- Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.
+  Add only project-specific behavior around it.
+  A parallel implementation requires a demonstrated gap, an explanation of why composition cannot address it, and explicit user agreement before implementation.
+  Convenience or assumptions about upstream limitations are insufficient.
 - Do not create manifests, registries, ledgers, inventories, compatibility layers, validation frameworks, or other durable machinery merely to prove, document, or test facts already established by Git, gitlinks, dependency declarations, locks, licenses, or generated outputs.
 - New durable machinery is justified only when an operation requires it or when an existing authoritative source cannot represent the required state.
   Ease of testing, auditing, explanation, or agent completion is not sufficient justification.

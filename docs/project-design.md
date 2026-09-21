@@ -223,6 +223,8 @@ The normative contracts define the precise behavior:
 
 - **Reuse rather than fork.** The selected upstream revision and its declared dependencies provide the website.
   Orinoco-specific changes remain small, explicit, and separately owned.
+  Inspect the selected upstream API or CLI before implementing overlapping functionality, reuse it where applicable, and add only project-specific behavior around it.
+  A parallel implementation requires a demonstrated gap, an explanation of why composition cannot address it, and explicit user agreement before implementation; convenience or assumed upstream limitations are insufficient.
   Reuse upstream terminology and operations where their meanings match to ease collaboration with upstream maintainers.
   Use staged comparisons with upstream to detect unintended differences and keep this adaptation thin and maintainable as upstream evolves.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
