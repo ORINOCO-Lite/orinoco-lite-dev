@@ -361,7 +361,7 @@ Remove the adaptation when the selected upstream code handles this case and both
 ## DataLad recording
 
 `orinoco-lite dev records get` acquires or reuses records without invoking Pixi or DataLad.
-`pixi run get-records` displays and runs this command in the project environment:
+`pixi run records-get` displays and runs this command in the project environment:
 
 ```console
 datalad run --explicit --output captures/records.jsonl --output captures/records.jsonl.manifest.json orinoco-lite dev records get
