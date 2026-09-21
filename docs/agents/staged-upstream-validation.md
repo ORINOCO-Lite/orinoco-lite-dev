@@ -228,14 +228,17 @@ Dependency selection comes from the downstream and package, without repeating up
 ### Capture, conversion, and service round-trip
 
 ```console
-orinoco-lite dev records get site-specific/sources/pool/records.jsonl
-orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
+orinoco-lite dev records get
+orinoco-lite dev records convert captures/records.jsonl site-specific
 orinoco-lite dev records export site-specific build/records/joined.jsonl
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
+orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl
 orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
 orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
+orinoco-lite dev records diff captures/records.jsonl build/records/returned.jsonl
 ```
+
+The `get` command defaults to `captures/records.jsonl` and reuses an existing verified capture.
+Use `--force` to download again and replace the records and their manifest, or supply an output path for another capture.
 
 Annotation companions keep machine attribution for record assertions separate for human readability.
 The export rejoins them with the records without generating pages.
@@ -250,7 +253,7 @@ Use `dev records diff` to compare those returned records with the joined export;
 For example, inspect storage and RDF evidence before proceeding to projection:
 
 ```console
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl --report build/reports/storage
+orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl --report build/reports/storage
 orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
 orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
 orinoco-lite dev review summarize build/reports/storage build/reports/rdf --output build/review
@@ -358,7 +361,8 @@ Remove the adaptation when the selected upstream code handles this case and both
 
 Retained-input changes record by default, while comparisons leave reports uncommitted.
 The CLI owns recording and uses `--no-datalad` for the inner command to prevent nested recording.
-The same flag allows development runs without a DataLad commit.
+The same flag skips DataLad execution and its Git commit without changing Git ignore rules.
+Capture provenance describes acquisition and preserves existing record values; it does not add source-adapter assertion provenance.
 Pixi tasks and CI call that same interface.
 Required recording for automated metadata proposals and finalization follows the [source-adapter contract](contract/source-adapters.md).
 

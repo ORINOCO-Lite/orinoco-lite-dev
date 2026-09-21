@@ -32,10 +32,10 @@ def downstream(tmp_path):
 def test_recording_uses_public_cli_relative_paths_and_locked_environment(downstream, monkeypatch):
     calls = []
     mock_pixi(monkeypatch, lambda command, **kwargs: calls.append((command, kwargs)))
-    capture = downstream / "site-specific/sources/pool/records.jsonl"
+    capture = downstream / "captures/records.jsonl"
     recording.record(
         downstream,
-        ["dev", "records", "get", "site-specific/sources/pool/records.jsonl", "--no-datalad"],
+        ["dev", "records", "get", "captures/records.jsonl", "--no-datalad"],
         inputs=("pixi.toml",), outputs=(capture, str(capture) + ".manifest.json"),
         message="chore: capture public Pool records",
     )
@@ -47,11 +47,11 @@ def test_recording_uses_public_cli_relative_paths_and_locked_environment(downstr
     separator = command.index("--")
     assert command[separator + 1:] == [
         "pixi", "run", "--locked", "orinoco-lite", "dev", "records", "get",
-        "site-specific/sources/pool/records.jsonl", "--no-datalad",
+        "captures/records.jsonl", "--no-datalad",
     ]
     assert command.count("pixi.toml") == 1
     assert "pixi.lock" in command
-    assert "site-specific/sources/pool/records.jsonl.manifest.json" in command
+    assert "captures/records.jsonl.manifest.json" in command
     assert all(str(downstream) not in argument for argument in command)
     assert options == {"cwd": downstream, "check": True}
 
@@ -86,19 +86,19 @@ def test_capture_records_only_capture_and_acquisition_facts(downstream, monkeypa
     monkeypatch.setattr(recording, "record", lambda *args, **kwargs: calls.append((args, kwargs)))
     monkeypatch.setattr(pool_capture, "capture", lambda *args, **kwargs: pytest.fail("parent must not capture twice"))
     args = argparse.Namespace(
-        root=downstream, output=Path("site-specific/sources/pool/records.jsonl"),
+        root=downstream, output=Path("captures/records.jsonl"),
         api=pool_capture.DEFAULT_API, force=True, no_datalad=False,
     )
     assert pool_capture.execute(args) == 0
     positional, keywords = calls[0]
     assert positional[0] == downstream
     assert positional[1] == [
-        "dev", "records", "get", "site-specific/sources/pool/records.jsonl",
+        "dev", "records", "get", "captures/records.jsonl",
         "--api", pool_capture.DEFAULT_API, "--no-datalad", "--force",
     ]
     assert keywords["outputs"] == (
-        "site-specific/sources/pool/records.jsonl",
-        "site-specific/sources/pool/records.jsonl.manifest.json",
+        "captures/records.jsonl",
+        "captures/records.jsonl.manifest.json",
     )
 
 

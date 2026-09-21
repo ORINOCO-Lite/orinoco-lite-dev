@@ -19,7 +19,7 @@ from urllib.request import Request, urlopen
 from .errors import OrinocoError
 
 
-DEFAULT_OUTPUT = Path("site-specific/sources/pool/records.jsonl")
+DEFAULT_OUTPUT = Path("captures/records.jsonl")
 DEFAULT_API = "https://pool.psychoinformatics.de/api"
 COMPLETENESS_LIMIT = (
     "Pagination, record count, and unique PIDs were checked. The service does "
@@ -256,13 +256,13 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
                      "with one record and its schema class per line. "
                      "Save source information and verification details to OUTPUT.manifest.json. "
                      "Reuse an existing verified capture unless --force is supplied. "
-                     "By default, commit both files using the downstream's locked DataLad environment."),
+                     "By default, commit both files using the repository's locked DataLad environment."),
     )
     parser.add_argument("output", nargs="?", type=Path, default=DEFAULT_OUTPUT,
                         help="capture file (default: %(default)s)")
     parser.add_argument("--api", default=DEFAULT_API, help="public Pool API URL")
     parser.add_argument("--force", action="store_true", help="download again and replace the capture and its manifest")
-    parser.add_argument("--no-datalad", action="store_true", help="skip DataLad execution and its Git commit")
+    parser.add_argument("--no-datalad", action="store_true", help="skip DataLad execution and its Git commit; does not change Git ignore rules")
 
 
 def execute(args: argparse.Namespace) -> int:

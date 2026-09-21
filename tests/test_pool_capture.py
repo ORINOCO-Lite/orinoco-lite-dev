@@ -70,7 +70,7 @@ def test_default_path_downloads_reuses_and_force_replaces(tmp_path, monkeypatch)
     monkeypatch.setattr(pool_capture, "fetch_live", fetch)
 
     assert main(["get"]) == 0
-    destination = tmp_path / "site-specific/sources/pool/records.jsonl"
+    destination = tmp_path / "captures/records.jsonl"
     assert upstream_snapshot.load_jsonl(destination)[0].record == record()
     assert destination.with_name("records.jsonl.manifest.json").is_file()
 

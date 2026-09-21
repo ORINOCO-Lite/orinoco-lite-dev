@@ -48,7 +48,7 @@ def record(
     except (OSError, subprocess.CalledProcessError) as error:
         raise ConfigurationError("Recording requires a Git repository; use --no-datalad for a scratch run.") from error
     if Path(repository).resolve() != root:
-        raise ConfigurationError("Run recorded operations from the downstream repository root.")
+        raise ConfigurationError("Run recorded operations from the repository root.")
     for name in ("pixi.toml", "pixi.lock"):
         if not (root / name).is_file():
             raise ConfigurationError(f"Recording requires {name} and the locked DataLad tool; use --no-datalad for a scratch run.")
