@@ -237,10 +237,6 @@ orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.
 orinoco-lite dev records diff captures/records.jsonl build/records/returned.jsonl
 ```
 
-Acquisition uses the pinned upstream client behind `dtc get-records` and retains its plain-record JSONL format and order.
-The `get` command defaults to `captures/records.jsonl` and reuses an existing verified capture.
-Use `--force` to download again and replace the records and their manifest, or supply an output path for another capture.
-
 Annotation companions keep machine attribution for record assertions separate for human readability.
 The export rejoins them with the records without generating pages.
 The round-trip command manages the temporary service and retains the returned dump for inspection.
@@ -360,23 +356,13 @@ Remove the adaptation when the selected upstream code handles this case and both
 
 ## DataLad recording
 
-`orinoco-lite dev records get` acquires or reuses records without invoking Pixi or DataLad.
-`pixi run records-get` displays and runs this command in the project environment:
-
-```console
-datalad run --explicit --output captures/records.jsonl --output captures/records.jsonl.manifest.json orinoco-lite dev records get
-```
-
-Users can run and modify the explicit command directly, including adding `--force` to fetch again.
-The repository's DataLad configuration determines Git or Git Annex storage.
-Capture provenance describes acquisition and preserves existing record values; it does not add source-adapter assertion provenance.
-Comparisons leave reports uncommitted.
+DataLad recording is composed outside the CLI through explicit tasks; comparisons leave reports uncommitted.
 Required recording for automated metadata proposals and finalization follows the [source-adapter contract](contract/source-adapters.md).
 
 Record the public command, relative paths, declared inputs, and only the operation's outputs.
 Use the project's locked tools instead of absolute Python paths or a separately resolved `pixi exec` environment.
 External inputs use retrievable repository or service URLs.
-Acquisition does not configure or enforce DataLad storage policy.
+Repository owners control DataLad storage policy.
 Check portability by cloning into a different directory and rerunning a recorded conversion from the retained capture.
 
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
@@ -430,8 +416,7 @@ No comments were present on #142 or #154 during the initial review.
   It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
   D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.
   Prefer the pinned `dtc get-records` and `dtc post-records` operations for capture and service round-trips before adding more HTTP code.
-- Use the pinned upstream record reader for B; keep destination, reuse, and acquisition information in the Lite wrapper.
-  Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
+- Use the pinned upstream record reader for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
   Keep #142 available until the useful behavior has been carried across.
 - The retained Pool-diff tool is self-contained.
   Cleanup updates its missing-capture message to select an existing capture instead of referring to removed tasks.
