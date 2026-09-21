@@ -262,7 +262,7 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
                         help="capture file (default: %(default)s)")
     parser.add_argument("--api", default=DEFAULT_API, help="public Pool API URL")
     parser.add_argument("--force", action="store_true", help="download again and replace the capture and its manifest")
-    parser.add_argument("--no-record", action="store_true", help="write the capture without a DataLad commit")
+    parser.add_argument("--no-datalad", action="store_true", help="skip DataLad execution and its Git commit")
 
 
 def execute(args: argparse.Namespace) -> int:
@@ -270,11 +270,11 @@ def execute(args: argparse.Namespace) -> int:
 
     root = (getattr(args, "root", None) or Path.cwd()).resolve()
     output = args.output if args.output.is_absolute() else root / args.output
-    if args.no_record:
+    if args.no_datalad:
         capture(output, api=args.api, force=args.force)
     else:
         destination = recording.relative_path(root, output)
-        command = ["dev", "records", "get", destination, "--api", args.api, "--no-record"]
+        command = ["dev", "records", "get", destination, "--api", args.api, "--no-datalad"]
         if args.force:
             command.append("--force")
         recording.record(

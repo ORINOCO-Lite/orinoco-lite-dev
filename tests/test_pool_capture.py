@@ -20,7 +20,7 @@ def main(arguments):
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="records_command", required=True)
     pool_capture.register_capture(commands)
-    args = parser.parse_args([*arguments, "--no-record"])
+    args = parser.parse_args([*arguments, "--no-datalad"])
     try:
         return pool_capture.execute(args)
     except pool_capture.CaptureError as error:

@@ -34,7 +34,7 @@ def record(
 ) -> None:
     """Run and record only declared outputs, including subdataset Gitlinks.
 
-    ``command`` contains public ``orinoco-lite`` arguments and ``--no-record``.
+    ``command`` contains public ``orinoco-lite`` arguments and ``--no-datalad``.
     URLs belong in those arguments; retained file inputs belong in ``inputs``.
     DataLad saves the explicit outputs recursively, so a site-specific subdataset
     and its parent pointer are recorded together without enabling Git Annex.
@@ -46,14 +46,14 @@ def record(
             text=True, stderr=subprocess.PIPE,
         ).strip()
     except (OSError, subprocess.CalledProcessError) as error:
-        raise ConfigurationError("Recording requires a Git repository; use --no-record for a scratch run.") from error
+        raise ConfigurationError("Recording requires a Git repository; use --no-datalad for a scratch run.") from error
     if Path(repository).resolve() != root:
         raise ConfigurationError("Run recorded operations from the downstream repository root.")
     for name in ("pixi.toml", "pixi.lock"):
         if not (root / name).is_file():
-            raise ConfigurationError(f"Recording requires {name} and the locked DataLad tool; use --no-record for a scratch run.")
-    if "--no-record" not in command:
-        raise ConfigurationError("The recorded public command must include --no-record.")
+            raise ConfigurationError(f"Recording requires {name} and the locked DataLad tool; use --no-datalad for a scratch run.")
+    if "--no-datalad" not in command:
+        raise ConfigurationError("The recorded public command must include --no-datalad.")
     if not outputs:
         raise ConfigurationError("A recorded operation must declare its outputs.")
     # Import from the locked Python environment: Pixi's command lookup otherwise

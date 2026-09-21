@@ -35,7 +35,7 @@ def test_recording_uses_public_cli_relative_paths_and_locked_environment(downstr
     capture = downstream / "site-specific/sources/pool/records.jsonl"
     recording.record(
         downstream,
-        ["dev", "records", "get", "site-specific/sources/pool/records.jsonl", "--no-record"],
+        ["dev", "records", "get", "site-specific/sources/pool/records.jsonl", "--no-datalad"],
         inputs=("pixi.toml",), outputs=(capture, str(capture) + ".manifest.json"),
         message="chore: capture public Pool records",
     )
@@ -47,7 +47,7 @@ def test_recording_uses_public_cli_relative_paths_and_locked_environment(downstr
     separator = command.index("--")
     assert command[separator + 1:] == [
         "pixi", "run", "--locked", "orinoco-lite", "dev", "records", "get",
-        "site-specific/sources/pool/records.jsonl", "--no-record",
+        "site-specific/sources/pool/records.jsonl", "--no-datalad",
     ]
     assert command.count("pixi.toml") == 1
     assert "pixi.lock" in command
@@ -60,7 +60,7 @@ def test_recording_uses_public_cli_relative_paths_and_locked_environment(downstr
 def test_recording_refuses_outputs_outside_operation_boundary(downstream, monkeypatch, path):
     mock_pixi(monkeypatch, lambda *args, **kwargs: pytest.fail("must not start a command"))
     with pytest.raises(ConfigurationError, match="Recorded paths|operation-owned"):
-        recording.record(downstream, ["dev", "records", "get", path, "--no-record"],
+        recording.record(downstream, ["dev", "records", "get", path, "--no-datalad"],
                          outputs=(path,), message="test: blocked")
 
 
@@ -72,12 +72,12 @@ def test_recording_refuses_an_output_through_an_external_symlink(downstream, tmp
 
 def test_recording_requires_a_lock_and_prevents_nested_recording(downstream, monkeypatch):
     mock_pixi(monkeypatch, lambda *args, **kwargs: pytest.fail("must not start a command"))
-    with pytest.raises(ConfigurationError, match="include --no-record"):
+    with pytest.raises(ConfigurationError, match="include --no-datalad"):
         recording.record(downstream, ["dev", "records", "get", "capture.jsonl"],
                          outputs=("capture.jsonl",), message="test: blocked")
     (downstream / "pixi.lock").unlink()
     with pytest.raises(ConfigurationError, match="requires pixi.lock"):
-        recording.record(downstream, ["dev", "records", "get", "capture.jsonl", "--no-record"],
+        recording.record(downstream, ["dev", "records", "get", "capture.jsonl", "--no-datalad"],
                          outputs=("capture.jsonl",), message="test: blocked")
 
 
@@ -87,14 +87,14 @@ def test_capture_records_only_capture_and_acquisition_facts(downstream, monkeypa
     monkeypatch.setattr(pool_capture, "capture", lambda *args, **kwargs: pytest.fail("parent must not capture twice"))
     args = argparse.Namespace(
         root=downstream, output=Path("site-specific/sources/pool/records.jsonl"),
-        api=pool_capture.DEFAULT_API, force=True, no_record=False,
+        api=pool_capture.DEFAULT_API, force=True, no_datalad=False,
     )
     assert pool_capture.execute(args) == 0
     positional, keywords = calls[0]
     assert positional[0] == downstream
     assert positional[1] == [
         "dev", "records", "get", "site-specific/sources/pool/records.jsonl",
-        "--api", pool_capture.DEFAULT_API, "--no-record", "--force",
+        "--api", pool_capture.DEFAULT_API, "--no-datalad", "--force",
     ]
     assert keywords["outputs"] == (
         "site-specific/sources/pool/records.jsonl",
@@ -102,11 +102,11 @@ def test_capture_records_only_capture_and_acquisition_facts(downstream, monkeypa
     )
 
 
-def test_no_record_writes_without_git_or_datalad(tmp_path, monkeypatch):
+def test_no_datalad_writes_without_git_or_datalad(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(pool_capture, "capture", lambda *args, **kwargs: calls.append((args, kwargs)))
     monkeypatch.setattr(recording, "record", lambda *args, **kwargs: pytest.fail("must not invoke DataLad"))
     args = argparse.Namespace(root=tmp_path, output=Path("capture.jsonl"),
-                              api=pool_capture.DEFAULT_API, force=False, no_record=True)
+                              api=pool_capture.DEFAULT_API, force=False, no_datalad=True)
     assert pool_capture.execute(args) == 0
     assert calls == [((tmp_path / "capture.jsonl",), {"api": pool_capture.DEFAULT_API, "force": False})]
