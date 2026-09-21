@@ -108,7 +108,7 @@ def test_force_replaces_capture_and_records_its_actual_origin(capture):
     ("count", "count does not match"),
     ("digest", "digest does not match"),
 ])
-def test_invalid_cache_is_not_fetched_or_rewritten(capture, damage, message, capsys):
+def test_invalid_capture_is_not_fetched_or_rewritten(capture, damage, message, capsys):
     destination, manifest_path, fetch = capture
     pool_capture.capture(destination, api=API)
     manifest = json.loads(manifest_path.read_text())
@@ -157,7 +157,7 @@ def test_failed_force_preserves_existing_capture(capture):
     assert set(destination.parent.iterdir()) == {destination, manifest_path}
 
 
-def test_failed_manifest_replacement_leaves_cache_fail_closed(capture, monkeypatch):
+def test_failed_manifest_replacement_leaves_capture_fail_closed(capture, monkeypatch):
     destination, manifest_path, fetch = capture
     pool_capture.capture(destination)
     fetch.return_value = ({PID: record(name="Changed")}, {})

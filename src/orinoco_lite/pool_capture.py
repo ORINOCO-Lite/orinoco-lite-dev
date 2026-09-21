@@ -32,7 +32,7 @@ class CaptureError(OrinocoError):
     """The capture or live Pool response cannot be safely used."""
 
 
-def load_cache(path: Path) -> tuple[dict[str, dict[str, object]], str]:
+def load_capture(path: Path) -> tuple[dict[str, dict[str, object]], str]:
     from .upstream_snapshot import SnapshotError, load_jsonl
 
     try:
@@ -159,7 +159,7 @@ def capture(
     if destination.exists() and not force:
         if not manifest_path.is_file():
             raise CaptureError(
-                "Cached Pool capture has no provenance manifest; "
+                "Existing Pool capture has no provenance manifest; "
                 "use --force to capture the requested API"
             )
         try:
@@ -172,17 +172,17 @@ def capture(
             raise CaptureError(
                 f"Pool capture manifest is not an object: {manifest_path}"
             )
-        cached_api = manifest.get("source_api")
-        if not isinstance(cached_api, str) or cached_api.rstrip("/") != api:
+        captured_api = manifest.get("source_api")
+        if not isinstance(captured_api, str) or captured_api.rstrip("/") != api:
             raise CaptureError(
-                f"Cached Pool capture is from {cached_api!r}, not {api!r}; "
+                f"Existing Pool capture is from {captured_api!r}, not {api!r}; "
                 "use --force to capture the requested API"
             )
-        records, digest = load_cache(destination)
+        records, digest = load_capture(destination)
         if manifest.get("record_count") != len(records):
-            raise CaptureError("Cached Pool capture count does not match its manifest")
+            raise CaptureError("Existing Pool capture count does not match its manifest")
         if manifest.get("snapshot_sha256") != digest:
-            raise CaptureError("Cached Pool capture digest does not match its manifest")
+            raise CaptureError("Existing Pool capture digest does not match its manifest")
         print(
             f"Reusing {len(records)} records in {destination} "
             "(use --force to fetch again)"
@@ -211,7 +211,7 @@ def capture(
                             sort_keys=True,
                         ) + "\n"
                     )
-            verified, digest = load_cache(raw)
+            verified, digest = load_capture(raw)
             if len(verified) != len(records):
                 raise CaptureError("New Pool capture failed its count check")
             manifest = {
