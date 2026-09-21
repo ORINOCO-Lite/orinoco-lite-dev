@@ -19,7 +19,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | PR | Scope | What the reviewer runs and inspects |
 | --- | --- | --- |
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
-| B — Capture and recording | Expose #152's capture operation as `dev records get`. Add shared CLI-owned DataLad recording and `--no-datalad`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
+| B — Capture and recording | Expose #152's capture operation as `dev records get`. Provide an explicit DataLad acquisition task. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, field-level comparison, and the existing RDF conversion check. Carry the reviewed date-preservation fix from #152. | Inspect storage preservation separately from joined-record/RDF/returned-record preservation, including intermediate RDF and changed assertions. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
@@ -359,17 +359,23 @@ Remove the adaptation when the selected upstream code handles this case and both
 
 ## DataLad recording
 
-Retained-input changes record by default, while comparisons leave reports uncommitted.
-The CLI owns recording and uses `--no-datalad` for the inner command to prevent nested recording.
-The same flag skips DataLad execution and its Git commit without changing Git ignore rules.
+`orinoco-lite dev records get` acquires or reuses records without invoking Pixi or DataLad.
+`pixi run get-records` displays and runs this command in the project environment:
+
+```console
+datalad run --explicit --output captures/records.jsonl --output captures/records.jsonl.manifest.json orinoco-lite dev records get
+```
+
+Users can run and modify the explicit command directly, including adding `--force` to fetch again.
+The repository's DataLad configuration determines Git or Git Annex storage.
 Capture provenance describes acquisition and preserves existing record values; it does not add source-adapter assertion provenance.
-Pixi tasks and CI call that same interface.
+Comparisons leave reports uncommitted.
 Required recording for automated metadata proposals and finalization follows the [source-adapter contract](contract/source-adapters.md).
 
 Record the public command, relative paths, declared inputs, and only the operation's outputs.
 Use the project's locked tools instead of absolute Python paths or a separately resolved `pixi exec` environment.
 External inputs use retrievable repository or service URLs.
-Use ordinary Git without requiring Git Annex.
+Acquisition does not configure or enforce DataLad storage policy.
 Check portability by cloning into a different directory and rerunning a recorded conversion from the retained capture.
 
 Use the downstream and its pinned site-specific submodule together as the rerun unit.

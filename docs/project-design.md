@@ -236,6 +236,10 @@ The normative contracts define the precise behavior:
   A separate release lock is unnecessary.
   Change history belongs in Git and GitHub.
   Do not add parallel ledgers or inventories merely for explanation or proof.
+- **Keep tool layers explicit.** Pixi supplies environments and convenient tasks; commands running in those environments must not invoke or wrap Pixi.
+  Tasks should expose commands that users can run and modify directly.
+  Compose DataLad around operations at the task or caller boundary; avoid commands that invoke DataLad to rerun themselves with recursion-suppression flags.
+  Repository owners control DataLad storage policy.
 - **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
   DataLad records downstream adapter runs in ordinary Git.
   Downstream builds and adapter runs do not require Git Annex.
