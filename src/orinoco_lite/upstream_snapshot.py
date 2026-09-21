@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Materialize and audit lossless upstream JSONL/YAML snapshots.
 
-The upstream API snapshot is an envelope JSONL stream whose records include a
-top-level ``schema_type``.  Dump Things record-directory stores serialize the
-same JSON values as YAML, but the default schema-type layer removes that field
+Upstream record JSONL contains one record per line with a top-level
+``schema_type``. Existing captures may wrap each record with its class name.
+Dump Things record-directory stores serialize the same JSON values as YAML, but the default schema-type layer removes that field
 on disk and reconstructs it from the class directory on read.  Orinoco Lite,
 by contrast, requires ``schema_type`` in every canonical YAML record.
 
@@ -193,7 +193,7 @@ def _check_unique(envelopes: Iterable[RecordEnvelope], *, location: str) -> None
 
 
 def load_jsonl(path: Path) -> list[RecordEnvelope]:
-    """Load an exact envelope JSONL snapshot without accepting ambiguity."""
+    """Load upstream record JSONL or an existing class-qualified capture."""
 
     envelopes: list[RecordEnvelope] = []
     with path.open(encoding="utf-8") as stream:
@@ -207,11 +207,12 @@ def load_jsonl(path: Path) -> list[RecordEnvelope]:
                 raise SnapshotError(f"{location}: invalid JSON: {error}") from error
             if not isinstance(item, dict):
                 raise SnapshotError(f"{location}: expected a JSON object")
-            if set(item) != {"class_name", "record"}:
-                raise SnapshotError(
-                    f"{location}: envelope keys must be exactly "
-                    "'class_name' and 'record'"
-                )
+            if "schema_type" in item:
+                if not isinstance(item["schema_type"], str) or not item["schema_type"]:
+                    raise SnapshotError(f"{location}: record must have a non-empty string schema_type")
+                item = {"class_name": _schema_class_name(item["schema_type"]), "record": item}
+            elif set(item) != {"class_name", "record"}:
+                raise SnapshotError(f"{location}: expected a record with schema_type")
             envelopes.append(
                 _validate_envelope(
                     item["class_name"],

@@ -19,7 +19,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | PR | Scope | What the reviewer runs and inspects |
 | --- | --- | --- |
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
-| B — Capture and recording | Expose #152's capture operation as `dev records get`. Add shared CLI-owned DataLad recording and `--no-record`. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
+| B — Capture and recording | Expose #152's capture operation as `dev records get`. Provide an explicit DataLad acquisition task. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C — Record conversion | Expose conversion, joined export, field-level comparison, and the existing RDF conversion check. Carry the reviewed date-preservation fix from #152. | Inspect storage preservation separately from joined-record/RDF/returned-record preservation, including intermediate RDF and changed assertions. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
@@ -228,13 +228,13 @@ Dependency selection comes from the downstream and package, without repeating up
 ### Capture, conversion, and service round-trip
 
 ```console
-orinoco-lite dev records get site-specific/sources/pool/records.jsonl
-orinoco-lite dev records convert site-specific/sources/pool/records.jsonl site-specific
+orinoco-lite dev records get
+orinoco-lite dev records convert captures/records.jsonl site-specific
 orinoco-lite dev records export site-specific build/records/joined.jsonl
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl
+orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl
 orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
 orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/returned.jsonl
+orinoco-lite dev records diff captures/records.jsonl build/records/returned.jsonl
 ```
 
 Annotation companions keep machine attribution for record assertions separate for human readability.
@@ -250,7 +250,7 @@ Use `dev records diff` to compare those returned records with the joined export;
 For example, inspect storage and RDF evidence before proceeding to projection:
 
 ```console
-orinoco-lite dev records diff site-specific/sources/pool/records.jsonl build/records/joined.jsonl --report build/reports/storage
+orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl --report build/reports/storage
 orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
 orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
 orinoco-lite dev review summarize build/reports/storage build/reports/rdf --output build/review
@@ -356,16 +356,13 @@ Remove the adaptation when the selected upstream code handles this case and both
 
 ## DataLad recording
 
-Retained-input changes record by default, while comparisons leave reports uncommitted.
-The CLI owns recording and uses `--no-record` for the inner command to prevent nested recording.
-The same flag allows development runs without a DataLad commit.
-Pixi tasks and CI call that same interface.
+DataLad recording is composed outside the CLI through explicit tasks; comparisons leave reports uncommitted.
 Required recording for automated metadata proposals and finalization follows the [source-adapter contract](contract/source-adapters.md).
 
 Record the public command, relative paths, declared inputs, and only the operation's outputs.
 Use the project's locked tools instead of absolute Python paths or a separately resolved `pixi exec` environment.
 External inputs use retrievable repository or service URLs.
-Use ordinary Git without requiring Git Annex.
+Repository owners control DataLad storage policy.
 Check portability by cloning into a different directory and rerunning a recorded conversion from the retained capture.
 
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
@@ -419,7 +416,7 @@ No comments were present on #142 or #154 during the initial review.
   It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
   D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.
   Prefer the pinned `dtc get-records` and `dtc post-records` operations for capture and service round-trips before adding more HTTP code.
-- Use #152's capture implementation for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
+- Use the pinned upstream record reader for B. Reuse #142's authored section and page-resource preservation and its behavioral record, content, and route checks in their owning stages. #142's generator calls the Lite renderer, so upstream generation still needs the selected upstream commands.
   Keep #142 available until the useful behavior has been carried across.
 - The retained Pool-diff tool is self-contained.
   Cleanup updates its missing-capture message to select an existing capture instead of referring to removed tasks.

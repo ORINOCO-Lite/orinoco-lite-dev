@@ -116,6 +116,10 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
     setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
     setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
+    from . import pool_capture
+    records = dev_commands.add_parser("records", help="capture, transform, and compare retained records")
+    record_commands = records.add_subparsers(dest="records_command", required=True)
+    pool_capture.register_capture(record_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -331,6 +335,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "dev" and args.dev_command == "records":
+            from . import pool_capture
+            return pool_capture.execute(args)
         if args.command in {"verify-site", "publication", "shacl-handoff", "curation"}:
             from . import local_preview, publication, shacl_handoff, curation_actions
             return {"verify-site": local_preview, "publication": publication,
