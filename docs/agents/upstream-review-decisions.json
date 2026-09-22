@@ -1,0 +1,552 @@
+{
+  "schema_version": 1,
+  "decisions": [
+    {
+      "id": "903a53a9-6264-46cd-88b3-3690951d7349",
+      "stage": "storage",
+      "subject": "*",
+      "location": [],
+      "disposition": "intended",
+      "rationale": "Machine annotation companions use the tested compact representation; this rule applies only when the joined record has identical annotation semantics, including list order and multiplicity.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "records export"
+      },
+      "expected": {
+        "representation_equivalence": "annotation-representation-v1"
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "records-v1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "rule": "annotation-representation-v1",
+          "selection": "all records",
+          "exclusions": []
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "f4940026-8ea4-4162-b3d6-67e95d72a20c",
+          "finding": "storage:1"
+        },
+        {
+          "url": "https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171"
+        }
+      ],
+      "reconsider_when": "The comparator rule or schema changes, or a difference changes semantic values or attribution.",
+      "author": "Codex (delegated engineering review)",
+      "rule": "annotation-representation-v1"
+    },
+    {
+      "id": "213b8bdd-8562-4693-b599-dee3c27e55c1",
+      "stage": "site-check",
+      "subject": "instruments/8b75c829-479e-4bc4-8354-2fdf29a7d213/index.html",
+      "location": [
+        "links",
+        "hub.datalad.org/datalad/datalad-core"
+      ],
+      "disposition": "undecided",
+      "rationale": "The retained source URL has no scheme and becomes a relative target in both paths. Resolve the source metadata deliberately; no scheme is inferred by the renderer.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "hub.datalad.org/datalad/datalad-core",
+        "after": {
+          "error": "missing local target",
+          "target": "instruments/8b75c829-479e-4bc4-8354-2fdf29a7d213/hub.datalad.org/datalad/datalad-core"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "instruments/8b75c829-479e-4bc4-8354-2fdf29a7d213/index.html",
+          "location": [
+            "links",
+            "hub.datalad.org/datalad/datalad-core"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:1"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "780e42c0-18d5-420b-9070-f1c7c2cd9af7",
+      "stage": "site-check",
+      "subject": "instruments/index.html",
+      "location": [
+        "links",
+        "hub.datalad.org/datalad/datalad-core"
+      ],
+      "disposition": "undecided",
+      "rationale": "The retained source URL has no scheme and becomes a relative target in both paths. Resolve the source metadata deliberately; no scheme is inferred by the renderer.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "hub.datalad.org/datalad/datalad-core",
+        "after": {
+          "error": "missing local target",
+          "target": "instruments/hub.datalad.org/datalad/datalad-core"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "instruments/index.html",
+          "location": [
+            "links",
+            "hub.datalad.org/datalad/datalad-core"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:2"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "1f4f3354-ec99-47e3-9f6c-c834aaf3a0c5",
+      "stage": "site-check",
+      "subject": "projects/a605574d-ee49-4ad4-8348-599b632ed5eb/index.html",
+      "location": [
+        "links",
+        "/orcid:0000-0003-3456-2493"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream template treats this ORCID person identity as a local path. Both paths inherit the broken target; resolve routing in its owning upstream presentation.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/orcid:0000-0003-3456-2493",
+        "after": {
+          "error": "missing local target",
+          "target": "orcid:0000-0003-3456-2493"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/a605574d-ee49-4ad4-8348-599b632ed5eb/index.html",
+          "location": [
+            "links",
+            "/orcid:0000-0003-3456-2493"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:3"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "0f3d3174-4005-45dc-8d4a-520627f1d43d",
+      "stage": "site-check",
+      "subject": "projects/abcd-j/index.html",
+      "location": [
+        "links",
+        "/depictions/logo_abcd-j"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream project template links a depiction output as a page, although this class has no selected page renderer. Both paths inherit the target; decide the intended output link.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/depictions/logo_abcd-j",
+        "after": {
+          "error": "missing local target",
+          "target": "depictions/logo_abcd-j"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/abcd-j/index.html",
+          "location": [
+            "links",
+            "/depictions/logo_abcd-j"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:4"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "95a96886-21ef-4322-b720-2532d1d4b97d",
+      "stage": "site-check",
+      "subject": "projects/datalad/index.html",
+      "location": [
+        "links",
+        "/orcid:0000-0003-3456-2493"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream template treats this ORCID person identity as a local path. Both paths inherit the broken target; resolve routing in its owning upstream presentation.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/orcid:0000-0003-3456-2493",
+        "after": {
+          "error": "missing local target",
+          "target": "orcid:0000-0003-3456-2493"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/datalad/index.html",
+          "location": [
+            "links",
+            "/orcid:0000-0003-3456-2493"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:5"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "66b67f5b-5599-42ff-96ed-a252eaa22370",
+      "stage": "site-check",
+      "subject": "projects/sfb1451/index.html",
+      "location": [
+        "links",
+        "/depictions/logo_sfb1451"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream project template links a depiction output as a page, although this class has no selected page renderer. Both paths inherit the target; decide the intended output link.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/depictions/logo_sfb1451",
+        "after": {
+          "error": "missing local target",
+          "target": "depictions/logo_sfb1451"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/sfb1451/index.html",
+          "location": [
+            "links",
+            "/depictions/logo_sfb1451"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:6"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "46d114f1-9ca1-4f4b-87db-ecd963c97dba",
+      "stage": "site-check",
+      "subject": "projects/studyforrest/index.html",
+      "location": [
+        "links",
+        "/depictions/141b8e85-5cc0-40f9-bf60-21cd89292177"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream project template links a depiction output as a page, although this class has no selected page renderer. Both paths inherit the target; decide the intended output link.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/depictions/141b8e85-5cc0-40f9-bf60-21cd89292177",
+        "after": {
+          "error": "missing local target",
+          "target": "depictions/141b8e85-5cc0-40f9-bf60-21cd89292177"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/studyforrest/index.html",
+          "location": [
+            "links",
+            "/depictions/141b8e85-5cc0-40f9-bf60-21cd89292177"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:7"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "7419e298-4705-4a62-8781-8c85e1d601ba",
+      "stage": "site-check",
+      "subject": "projects/trr379_q02/index.html",
+      "location": [
+        "links",
+        "/projects/trr379"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream template links a record omitted by the same selected membership policy on both paths. Decide the intended relation between selection and link rendering.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/projects/trr379",
+        "after": {
+          "error": "missing local target",
+          "target": "projects/trr379"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/trr379_q02/index.html",
+          "location": [
+            "links",
+            "/projects/trr379"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:8"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "e90d6007-6d70-4498-82b0-59a6106aa293",
+      "stage": "site-check",
+      "subject": "projects/trr379_q02/index.html",
+      "location": [
+        "links",
+        "/publications/fd7f3b66-e9f2-49ab-8a9f-3e3a9abc891a"
+      ],
+      "disposition": "undecided",
+      "rationale": "The selected upstream template links a record omitted by the same selected membership policy on both paths. Decide the intended relation between selection and link rendering.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": "/publications/fd7f3b66-e9f2-49ab-8a9f-3e3a9abc891a",
+        "after": {
+          "error": "missing local target",
+          "target": "publications/fd7f3b66-e9f2-49ab-8a9f-3e3a9abc891a"
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "projects/trr379_q02/index.html",
+          "location": [
+            "links",
+            "/publications/fd7f3b66-e9f2-49ab-8a9f-3e3a9abc891a"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:9"
+        }
+      ],
+      "reconsider_when": "The source value, selected page membership, or upstream link renderer changes; inspect both paths before retiring this issue.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    },
+    {
+      "id": "8d8158d0-fe50-4bcc-a256-d20c0b6bff93",
+      "stage": "site-check",
+      "subject": "/edit/",
+      "location": [
+        "browser"
+      ],
+      "disposition": "tolerated",
+      "rationale": "The selected editor probes config.yaml, config.yml, then config.json with HEAD. The first two return 404 and Playwright also reports aborted HEAD requests. Separate inspection verified successful configuration, records and schema GETs, a populated 33-input edit form, and no JavaScript page errors. Retain this exact browser diagnostic without treating it as a functional editor failure.",
+      "operation": {
+        "left": "supplied-input",
+        "right": "supplied-input"
+      },
+      "expected": {
+        "change": "changed",
+        "before_present": true,
+        "after_present": true,
+        "before": null,
+        "after": {
+          "route": "/edit/",
+          "status": 200,
+          "errors": [
+            "Failed to load resource: the server responded with a status of 404 (File not found)",
+            "/edit/config.yaml: net::ERR_ABORTED",
+            "Failed to load resource: the server responded with a status of 404 (File not found)",
+            "/edit/config.yml: net::ERR_ABORTED",
+            "/edit/config.json: net::ERR_ABORTED"
+          ]
+        }
+      },
+      "compatibility": {
+        "schema_version": 1,
+        "comparator": "local-html-targets/1",
+        "schemas": {
+          "left": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5",
+          "right": "890d5d05a8747208c80a7be1b880cbb41e13bd9728cbba311a8f3fbd9e5285c5"
+        }
+      },
+      "input_conditions": {
+        "scope": {
+          "subject": "/edit/",
+          "location": [
+            "browser"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "run_id": "a6da9adb-3947-4f02-afff-abc6920c9412",
+          "finding": "site-check:10"
+        }
+      ],
+      "reconsider_when": "The exact observed diagnostics change, or the configuration and populated record form no longer load; do not extend this tolerance to other browser errors.",
+      "author": "Codex (delegated engineering review; not reviewed by John)"
+    }
+  ]
+}

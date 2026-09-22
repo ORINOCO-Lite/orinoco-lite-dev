@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from collections.abc import Mapping
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -15,6 +17,7 @@ from typing import Any, Sequence
 from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+import tomlkit
 
 from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
@@ -77,6 +80,38 @@ def _copy_tree(source: Path, destination: Path) -> None:
         elif candidate.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(candidate, target)
+
+
+
+def _overlay_config(source: Path, destination: Path) -> None:
+    """Apply authored TOML settings without dropping other selected tables."""
+    if source.is_symlink():
+        raise DriverError(f"Configuration source cannot be a symlink: {source}")
+    if not source.is_dir():
+        return
+
+    def merge(base, override):
+        for key, value in override.items():
+            if isinstance(value, Mapping) and isinstance(base.get(key), Mapping):
+                merge(base[key], value)
+            else:
+                base[key] = deepcopy(value)
+
+    for path in sorted(source.rglob("*")):
+        if path.is_symlink():
+            raise DriverError(f"Configuration override cannot be a symlink: {path}")
+        if not path.is_file():
+            continue
+        target = destination / path.relative_to(source)
+        if target.is_file() and path.suffix == ".toml":
+            try:
+                document = tomlkit.parse(target.read_text())
+                merge(document, tomlkit.parse(path.read_text()))
+                target.write_text(tomlkit.dumps(document))
+            except (ValueError, TypeError) as error:
+                raise DriverError(f"Cannot apply TOML configuration override {path}: {error}") from error
+        else:
+            _copy_file(path, target)
 
 
 def _copy_file(source: Path, destination: Path) -> None:
@@ -327,10 +362,13 @@ def _assemble(
     assembly: Path,
     *,
     presentation: Path | None = None,
+    projection: Path | None = None,
+    inputs: Path | None = None,
 ) -> None:
     presentation = presentation or resolve_presentation(workspace.root, resources_root)
     upstream = presentation
     theme = upstream / "themes" / "congo"
+    inputs = inputs or workspace.path("site")
     adapter = workspace.root / ".orinoco-lite" / "presentation"
     materialized = (
         workspace.root
@@ -368,22 +406,22 @@ def _assemble(
         assembly / "static" / "LICENSES" / "materialized-presentation.txt",
     )
 
-    _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
+    _copy_tree(inputs / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
     # Copying that topology-only file would disable Hugo's implicit mounts and
     # point at paths that no longer exist inside the assembly.
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
     _render_site_surfaces(workspace, adapter, upstream, assembly)
-    overrides = workspace.path("site") / "overrides"
-    _copy_tree(overrides / "config", assembly / "config" / "con")
+    overrides = inputs / "overrides"
+    _overlay_config(overrides / "config", assembly / "config" / "con")
     _copy_tree(overrides / "layouts", assembly / "layouts")
     _copy_tree(overrides / "static", assembly / "static")
-    _copy_tree(workspace.path("site") / "assets", assembly / "assets")
-    _copy_tree(workspace.path("site") / "static", assembly / "static")
-    projection = workspace.path("generated") / "projection"
+    _copy_tree(inputs / "assets", assembly / "assets")
+    _copy_tree(inputs / "static", assembly / "static")
+    projection = projection or workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
-    _copy_tree(workspace.path("editorial"), assembly / "content")
+    _copy_tree(inputs / "content" if inputs != workspace.path("site") else workspace.path("editorial"), assembly / "content")
     _copy_file(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",
@@ -480,49 +518,17 @@ def build_site(
         if github_repository_coordinate is not None
         else workspace.repository
     )
-    parsed = urlsplit(base_url)
     assembly = workspace.path("build") / "assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
-    assembly.mkdir(parents=True)
-    _assemble(workspace, resources_root, assembly)
+    if destination.exists():
+        shutil.rmtree(destination)
+    assemble_hugo(workspace, resources_root, assembly)
     _write_build_provenance_footer(
         assembly,
         _build_provenance(workspace, resources_root, repository, build_timestamp),
     )
-    if destination.exists():
-        shutil.rmtree(destination)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    _run(
-        [
-            "hugo",
-            "--minify",
-            "--cleanDestinationDir",
-            "--environment",
-            "con",
-            "--source",
-            assembly,
-            "--destination",
-            destination,
-            "--baseURL",
-            base_url,
-        ],
-        cwd=workspace.root,
-    )
-    adapter = _site_adapter(resources_root)
-    if adapter.is_file():
-        _run(
-            [
-                sys.executable,
-                adapter,
-                destination,
-                "--base-path",
-                parsed.path or base_url,
-                "--edit-url",
-                f"{base_url}edit/",
-            ],
-            cwd=workspace.root,
-        )
+    build_hugo(workspace, resources_root, assembly, destination, base_url)
     editor_report = bind_editor(
         workspace,
         resources_root,
@@ -554,6 +560,110 @@ def build_site(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return report
+
+
+
+def assemble_hugo(
+    workspace, resources_root: Path, destination: Path, *,
+    projection: Path | None = None, inputs: Path | None = None,
+    presentation: Path | None = None, flavor: str = "lite",
+) -> dict[str, Any]:
+    """Assemble explicit projection and authored inputs without invoking Hugo."""
+    projection = projection or workspace.path("generated") / "projection"
+    inputs = inputs or workspace.path("site")
+    destination = destination.resolve()
+    sources = [projection, inputs, workspace.root / ".orinoco-lite"]
+    if presentation is not None:
+        sources.append(presentation)
+    for source in sources:
+        if (destination == source.resolve() or destination in source.resolve().parents
+                or source.resolve() in destination.parents):
+            raise ConfigurationError("Assembly output must not contain its inputs")
+    if not (projection / "content").is_dir():
+        raise DriverError(f"Projection content is missing: {projection}")
+    if destination.exists():
+        raise DriverError(f"Assembly output already exists: {destination}")
+    destination.mkdir(parents=True)
+    if flavor == "lite":
+        _assemble(workspace, resources_root, destination, presentation=presentation,
+                  projection=projection, inputs=inputs)
+    elif flavor == "upstream":
+        presentation = presentation or resolve_presentation(workspace.root, resources_root)
+        for name in PRESENTATION_SURFACES:
+            _copy_tree(presentation / name, destination / name)
+            _copy_tree(presentation / "themes/congo" / name,
+                       destination / "themes/congo" / name)
+            _copy_tree(workspace.root / ".orinoco-lite/materialized-presentation/upstream" / name,
+                       destination / name)
+        _copy_file(presentation / "themes/congo/theme.toml", destination / "themes/congo/theme.toml")
+        _copy_file(presentation / "themes/congo/LICENSE", destination / "themes/congo/LICENSE")
+        _copy_tree(projection / "content", destination / "content")
+        _copy_tree(projection / "static", destination / "static")
+        _copy_tree(inputs / "content", destination / "content")
+        _copy_tree(inputs / "assets", destination / "assets")
+        _copy_tree(inputs / "static", destination / "static")
+        _copy_tree(inputs / "config", destination / "config/_default")
+        for name in ("layouts", "static"):
+            _copy_tree(inputs / "overrides" / name, destination / name)
+        _overlay_config(inputs / "overrides/config", destination / "config/_default")
+        _reject_annex_pointers(destination)
+    else:
+        raise ConfigurationError(f"Unknown Hugo assembly operation: {flavor}")
+    return {"files": len(_manifest(destination)), "operation": flavor,
+            "projection": str(projection), "inputs": str(inputs), "output": str(destination)}
+
+
+def build_hugo(
+    workspace, resources_root: Path, assembly: Path, destination: Path,
+    base_url: str, *, flavor: str = "lite",
+) -> dict[str, Any]:
+    """Build the supplied tree, without projection, assembly, or input writes."""
+    assembly = assembly.resolve()
+    destination = destination.resolve()
+    if (assembly == destination or assembly in destination.parents
+            or destination in assembly.parents):
+        raise ConfigurationError("Hugo build input and output must not overlap")
+    if not assembly.is_dir():
+        raise DriverError(f"Hugo input tree is missing: {assembly}")
+    if destination.exists():
+        raise DriverError(f"Hugo output already exists: {destination}")
+    base_url = normalize_build_base_url(base_url)
+    parsed = urlsplit(base_url)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # Hugo writes its lock and resource cache under --source. Build a disposable
+    # copy so the supplied boundary artifact remains immutable and reusable.
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="orinoco-hugo-") as temporary:
+        source = Path(temporary) / "source"
+        shutil.copytree(assembly, source)
+        command = ["hugo", "--minify", "--cleanDestinationDir", "--source", source,
+                   "--destination", destination, "--baseURL", base_url]
+        if flavor == "lite":
+            command.extend(["--environment", "con"])
+        elif flavor != "upstream":
+            raise ConfigurationError(f"Unknown Hugo build operation: {flavor}")
+        _run(command, cwd=workspace.root)
+    if flavor == "upstream":
+        return {"base_url": base_url, "files": len(_manifest(destination)),
+                "operation": flavor, "input": str(assembly), "output": str(destination),
+                "scope": "Hugo rendering; application binding excluded"}
+    adapter = _site_adapter(resources_root)
+    if adapter.is_file():
+        _run(
+            [
+                sys.executable,
+                adapter,
+                destination,
+                "--base-path",
+                parsed.path or base_url,
+                "--edit-url",
+                f"{base_url}edit/",
+            ],
+            cwd=workspace.root,
+        )
+    return {"base_url": base_url, "files": len(_manifest(destination)),
+            "operation": flavor, "input": str(assembly), "output": str(destination),
+            "scope": "Hugo rendering and Orinoco output adapter; application binding excluded"}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
