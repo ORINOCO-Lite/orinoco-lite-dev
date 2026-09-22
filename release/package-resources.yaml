@@ -8,6 +8,12 @@ licenses:
   - licenses/review-dependencies/inventory.json
 
 resources:
+  - source: packages/diff-review-application/index.html
+    destination: diff-review-app/index.html
+  - source: packages/diff-review-application/app.js
+    destination: diff-review-app/app.js
+  - source: packages/diff-review-application/app.css
+    destination: diff-review-app/app.css
   - source: tools/adapt_upstream_pages.py
     destination: drivers/adapt_pages.py
   - source: release/package-licenses/README.md

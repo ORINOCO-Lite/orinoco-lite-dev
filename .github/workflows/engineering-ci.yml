@@ -57,6 +57,14 @@ jobs:
       - name: Prepare editable package resources
         run: pixi run orinoco-lite dev prepare-resources
 
+      - name: Install the browser regression runtime
+        shell: bash
+        run: |
+          pixi run npm install --prefix "$RUNNER_TEMP/review-browser" --no-save playwright@1.62.1
+          pixi run node "$RUNNER_TEMP/review-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/review-browser/node_modules" >> "$GITHUB_ENV"
+          echo "ORINOCO_REQUIRE_BROWSER_TESTS=1" >> "$GITHUB_ENV"
+
       - name: Run package and engineering tests
         run: pixi run pytest
 

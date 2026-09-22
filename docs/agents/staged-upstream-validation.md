@@ -2,9 +2,9 @@
 
 Active build specification for maintainers implementing the comparison commands and diff review application.
 Updated 18 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
-The [application README](../../packages/diff-review-application/README.md) describes the later web interface for reviewers.
+The [application README](../../packages/diff-review-application/README.md) describes the local web interface and its review workflow.
 The [design charter](../project-design.md) supplies project constraints; this document specifies the planned interfaces, behavior, and delivery sequence.
-The staged CLI commands and a small terminal review are implemented; the web application remains a later target.
+The staged CLI commands, terminal review, and local web application are implemented in stacked changes for review.
 The [exploration](provenance-comparison-exploration.md) records the research behind the [investigation procedure](../../.agents/skills/compare-orinoco-provenance/SKILL.md).
 
 ## Implementation sequence
@@ -12,7 +12,8 @@ The [exploration](provenance-comparison-exploration.md) records the research beh
 The letters identify proposed PRs, not GitHub PR numbers.
 Cleanup #160 and the upstream comparison charter principle in #162 are merged.
 The specification merged in #161; the terminology charter principle in #167 remains separate.
-The CLI implementation stacks capture (#169), record conversion (#170), service and review (#171), then the website stages.
+The CLI implementation stacks capture (#169), record conversion (#170), service and review (#171), then website stages E–H (#172).
+The web application stacks separately after E–H.
 Stages E–H share one reviewable change because projection, assembly, and rendering exercise the same website boundaries.
 Later command PRs may stack on their predecessor until it merges.
 Then rebase their unique changes onto `main` and repeat the affected checks.
@@ -28,8 +29,10 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
 | G — Hugo input assembly | Separate assembly of Hugo inputs from building the website. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
 | H — Hugo build and comparison | Build the website from the supplied Hugo input tree. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new website differences, then run the complete generation comparison. |
+| I — Web review | Bundle explicit reports, serve the maintainer application, inspect artifacts, and export scoped decision edits. | Navigate real isolated and complete-path runs; preview edits through the CLI matcher; verify stale-digest rejection and isolated HTML inspection. |
 
-Complete and review B–H through the CLI before starting the web application.
+B–H establish the comparison and matching behavior used by the web application.
+Review their CLI evidence independently; the application can stack after them to support that review.
 Each stage delivers its operations, retained intermediate outputs, machine-readable comparison report, and readable summary together.
 The summary identifies inputs, operations, comparison scope, detected differences, and failures, with paths to inspect the evidence and commands to reproduce it.
 Reviewers must be able to follow the data flow and assess each stage without a browser application.
@@ -38,10 +41,11 @@ Introduce CLI decision matching with D and extend it with subsequent stage repor
 After H, validate complete-path comparison, scoped decision reuse across two runs, and report compatibility through the CLI.
 CLI summaries expose validated data-flow links and complete-path reports, but leave the overall integration judgment to the reviewer (`integration: not-established`).
 A matching decision or a collection of passing isolated stages never automatically approves the complete website.
-Only after maintainers have reviewed that behavior should a separate application PR add portable bundling, serving, viewers, and decision editing over the established reports.
+A separate application PR adds portable bundling, serving, viewers, and decision editing over those reports.
+Its completion does not imply that maintainers have accepted the underlying stage findings.
 The application must reuse the CLI comparison and matching behavior.
 
-The initial terminal interface is `dev review inspect REPORT... --decisions FILE --author NAME`.
+The initial terminal interface is `dev review inspect [COMPARISON...] --author NAME`.
 It uses the same validated reports and matcher, previews decisions, requires an explicit save, and refuses to overwrite a decision file changed during review.
 `dev review decide` provides the same operation for a selected finding without an interactive terminal.
 These commands write only the selected decision file; agents identify themselves as the reviewer.
@@ -61,11 +65,14 @@ The Python package owns operations, comparisons, report generation, and decision
 The application reads their outputs and edits review decisions; it does not implement a second comparator or run transformations in the browser.
 Use `orinoco-lite` for routine operations and `orinoco-lite dev` for diagnostic operations; Pixi and CI call the same interfaces.
 
-In the later application phase, expose `dev review bundle REPORT... --output DIRECTORY --decisions FILE` to collect explicit stage reports and their referenced artifacts into a portable review directory.
-Expose `dev review serve DIRECTORY` to serve that directory and the application locally on loopback.
+Expose `dev review bundle [COMPARISON...]` to collect explicit stage reports and their referenced artifacts into a portable review directory.
+Expose `dev review serve` to serve that directory and the application locally on loopback.
 Bundling must not silently run missing stages, fetch dependencies, or declare integration success.
-The directory contains `review.json`, a snapshot of the supplied decisions, and relative artifact paths; it is untracked generated output.
-No absolute machine paths, credentials, or live-service access are required to open it.
+The investigation’s `bundle/` directory contains `review.json` with a snapshot of the supplied decisions, copied reports, and relative artifact paths; it is untracked generated output.
+The installed package supplies trusted application assets, never the bundle.
+The loopback server previews edits in memory; repository writes remain an explicit `dev review apply --write` operation.
+No original machine paths, credentials, or live-service access are required to open copied evidence.
+Recorded commands may retain original paths as provenance.
 Git selections and locks remain authoritative.
 Reports record the revisions and inputs used to produce their evidence.
 
@@ -215,7 +222,7 @@ The user-facing operation requiring durable state is reopening the review of a d
 Use one explicitly selected Git-tracked JSON decision file for that review scope, owned by the repository where the engineering review is maintained.
 It contains current decisions, not generated runs, copied dependency locks, or an inventory of patches.
 Git supplies history.
-The initial [engineering decisions](upstream-review-decisions.json) identify Codex as their reviewer and can be supplied with `--decisions`; they do not claim review by John.
+The initial [engineering decisions](upstream-review-decisions.json) identify Codex as their reviewer and may be deliberately copied to an investigation’s `decisions.json`; they do not claim review by John.
 Do not use source-adapter `curation-records` for these engineering decisions.
 
 Each decision contains an ID, disposition (`intended`, `tolerated`, or `undecided`), rationale, operation responsible for the difference, subject/location selector, expected change, schema/comparator compatibility, relevant input conditions, evidence links, and a reconsideration/removal condition. `undecided` records a deferred issue without accepting its behavior. The initial matcher supports exact subject/location, change kind, and typed before/after values within a stage and compatible schema/comparator versions.
@@ -245,13 +252,13 @@ Apply these rules to CLI summaries and subsequent web views alike.
 Retain access to all raw differences, including matched findings and collapsed effects.
 Additional differences not explained by the earlier change still require review, even when they affect the same page as a change that matches a saved decision.
 
-In the later application phase, the application exports decision changes as a JSON document containing the original decision-file digest and explicit additions, updates, or removals.
+The application exports decision changes as a JSON document containing the original decision-file digest and explicit additions, updates, or removals.
 This document describes edits to the decision file; it is not a Git patch.
-`dev review apply CHANGES --decisions FILE` validates the schema and base digest, previews the changes, and writes only that file; stale edits must be reopened against the current file.
+`dev review apply` reads `decision-edits.json`, validates its schema and base digest, previews the changes, and writes `decisions.json` only with `--write`; stale edits must be reopened against the current file.
 The operation does not commit, modify metadata, change retained patches, or post to GitHub.
 Reviewers inspect and commit the resulting Git diff through their normal workflow.
 
-### Later web review interface
+### Web review interface
 
 The initial page shows execution context, comparison scope and stage status, and a queue of new or changed findings.
 Show unchanged outstanding findings and retirement candidates in separate accessible views.
@@ -285,8 +292,8 @@ Test observable review behavior across multiple schema-valid cases, not just the
 - Raw evidence remains accessible after grouping in CLI summaries.
 
 Use unit tests for comparator and matcher semantics and CLI integration tests for write boundaries and report interchange.
-Exercise at least two successive review runs after B–H, and review their readable outputs before starting application work.
-The later application adds browser tests for equivalent review interactions, portable bundles, invalid artifact paths, unsupported versions, stale decision changes, and isolation of inspected HTML.
+Exercise at least two successive review runs after B–H and inspect their readable outputs alongside the application.
+The application adds browser tests for equivalent review interactions, portable bundles, invalid artifact paths, unsupported versions, stale decision changes, and isolation of inspected HTML.
 Do not make web-interface completion a prerequisite for accepting a command stage.
 
 ## Command review examples
