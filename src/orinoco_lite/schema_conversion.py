@@ -46,7 +46,7 @@ class _SourceLexicalRdfReader:
         return self.converter.convert(data, target_class)
 
 
-def build_format_converters(schema: Path) -> tuple[Any, Any]:
+def build_format_converters(schema: Path, *, writer_only: bool = False) -> tuple[Any, ...]:
     """Build JSON/RDF converters without changing the caller's recursion limit."""
 
     from dump_things_service import Format
@@ -61,8 +61,11 @@ def build_format_converters(schema: Path) -> tuple[Any, Any]:
         try:
             if previous_limit < PYDANTIC_MODEL_REBUILD_RECURSION_LIMIT:
                 sys.setrecursionlimit(PYDANTIC_MODEL_REBUILD_RECURSION_LIMIT)
+            writer = FormatConverter(str(schema), Format.json, Format.ttl)
+            if writer_only:
+                return (writer,)
             return (
-                FormatConverter(str(schema), Format.json, Format.ttl),
+                writer,
                 _SourceLexicalRdfReader(
                     FormatConverter(str(schema), Format.ttl, Format.json)
                 ),

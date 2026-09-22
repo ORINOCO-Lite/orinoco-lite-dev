@@ -32,10 +32,10 @@ The website comparisons follow projection, assembly, and rendering:
 
 ```mermaid
 flowchart LR
-  records[Records] -->|hugo project| projection[Pages and graph data]
-  projection -->|hugo assemble| assembly[Hugo input tree]
+  records["Records (jsonl)"] -->|hugo project| projection["Pages and graph data (Markdown and JSON)"]
+  projection -->|hugo assemble| assembly["Hugo inputs (file tree)"]
   sources[Upstream presentation, template, and site inputs] --> assembly
-  assembly -->|hugo build| website[Website]
+  assembly -->|hugo build| website["Website (HTML and assets)"]
   projection -. content diff .-> p[Projection differences]
   assembly -. content diff .-> a[Assembly differences]
   website -. site diff .-> w[Website differences]

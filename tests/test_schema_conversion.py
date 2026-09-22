@@ -113,5 +113,16 @@ ex:datatype t:at_time "-"^^ex:other .
         self.assertEqual(reader.convert(unchanged, "Thing"), unchanged)
 
 
+def test_selected_conversion_preserves_source_date_marker():
+    from orinoco_lite.resources import resolve_resources
+    schema = resolve_resources().root / "schema/demo-research-information/unreleased.yaml"
+    writer, reader = build_format_converters(schema)
+    record = {"pid": "xyzrins:publications/marker-test", "schema_type": "xyzri:XYZPublication",
+              "generated_by": [{"object": "xyzrins:projects/example", "at_time": "-",
+                                "schema_type": "dlthings:Generation"}]}
+    returned = reader.convert(writer.convert(record, "XYZPublication"), "XYZPublication")
+    assert returned["generated_by"][0]["at_time"] == "-"
+
+
 if __name__ == "__main__":
     unittest.main()
