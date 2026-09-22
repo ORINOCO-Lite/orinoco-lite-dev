@@ -29,6 +29,11 @@
   Keep non-empty `latest-upstream` and `orinoco-lite-diff` comparisons into `main` as draft pull requests; do not merge them.
   Delete superseded mirror branches after preserving active-purpose branches, including Git Annex branches.
 
+## Data provenance
+
+- Use `.agents/skills/datalad-provenance/SKILL.md` when designing or reviewing capture, ingestion, transformation, or rerun workflows.
+  Distinguish recording a command from making its inputs and environment recoverable.
+
 ## Minimum machinery
 
 - Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.

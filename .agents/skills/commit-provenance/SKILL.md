@@ -9,7 +9,12 @@ Run `scripts/resolve.sh` immediately before creating the commit.
 Do not reuse a previous result after a model or effort switch.
 
 The script resolves the current task from `CODEX_THREAD_ID`, then reads the latest `turn_context` in that task's local session transcript.
-Treat this as authoritative for model and reasoning effort.
+If no transcript exists (as observed for side conversations), it reads the local `logs_2.sqlite` database in read-only mode using the bundled Python 3 helper.
+The fallback requires matching thread and turn metadata from the last five minutes, selects the newest matching record, and reports its turn ID on stderr.
+It never borrows a parent thread's settings.
+Missing, stale, or unrecognized metadata causes failure; do not substitute saved defaults.
+Runtime logs are an internal format: revalidate this fallback after format changes.
+Treat the resolved per-turn evidence as authoritative for model and reasoning effort.
 Never infer either from prose or use `config.toml` as the current-turn value.
 
 ## Commit trailer

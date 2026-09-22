@@ -11,11 +11,18 @@ thread_id="${CODEX_THREAD_ID:-}"
 
 codex_root="${CODEX_HOME:-$HOME/.codex}"
 session_file=$(find "$codex_root/sessions" -type f \
-  -name "*-${thread_id}.jsonl" -print -quit 2>/dev/null)
-[ -n "$session_file" ] || fail "no local session transcript for $thread_id"
-
-turn_context=$(jq -sc '[.[] | select(.type == "turn_context")][-1].payload' \
-  "$session_file")
+  -name "*-${thread_id}.jsonl" -print -quit 2>/dev/null || true)
+if [ -n "$session_file" ]; then
+  turn_context=$(jq -sc '[.[] | select(.type == "turn_context")][-1].payload' \
+    "$session_file")
+else
+  command -v python3 >/dev/null || fail 'python3 is required for runtime-log fallback'
+  script_dir=$(cd "$(dirname "$0")" && pwd)
+  turn_context=$(python3 "$script_dir/runtime_context.py" \
+    "$codex_root/logs_2.sqlite" "$thread_id")
+  printf 'commit-provenance: runtime-log fallback for thread %s, turn %s\n' \
+    "$thread_id" "$(jq -r '.turn_id' <<<"$turn_context")" >&2
+fi
 model=$(jq -r '.model // empty' <<<"$turn_context")
 effort=$(jq -r '.reasoning_effort // .effort // empty' <<<"$turn_context")
 [ -n "$model" ] || fail 'latest turn context does not contain a model'
