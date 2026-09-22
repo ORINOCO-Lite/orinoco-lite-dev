@@ -107,6 +107,11 @@ def apply(root: Path, action: str, checkout: Path | None) -> None:
 
 def enable(root: Path, path: Path | None = None) -> None:
     root = root.resolve()
+    if (root / "pyproject.toml").is_file() and (root / "src/orinoco_lite").is_dir():
+        raise ConfigurationError(
+            "This is an Orinoco Lite source checkout. Its environment should already "
+            "use this directory. Run 'dev enable' from a downstream website."
+        )
     check_workspace(root)
     print("Enabling editable Orinoco Lite...", flush=True)
     checkout = (path if path is not None else root.parent / "orinoco-lite-dev").resolve()
@@ -137,6 +142,7 @@ def enable(root: Path, path: Path | None = None) -> None:
             run("git", "submodule", "update", "--init", "--recursive", "--", submodule, cwd=checkout)
     run("pixi", "run", "--manifest-path", checkout / "pixi.toml",
         "orinoco-lite", "dev", "prepare-resources", cwd=checkout)
+    print(f"Editable Orinoco Lite source: {checkout}", flush=True)
 
 
 def disable(root: Path) -> None:
