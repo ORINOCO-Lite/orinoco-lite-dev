@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Orinoco · Change review</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#workspace">Skip to review</a>
+<header class="topbar">
+  <a class="brand" href="#" aria-label="Orinoco review home"><span class="brand-mark" aria-hidden="true">o<span>↗</span></span><span>orinoco<span class="brand-sub">change review</span></span></a>
+  <div class="session-label"><span class="status-dot"></span>Local review · repository unchanged</div>
+  <button id="draft-open" class="button primary" type="button">Draft changes <span id="draft-count" class="button-count">0</span></button>
+</header>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="Review navigation">
+    <div class="eyebrow">REVIEW WORKSPACE</div>
+    <h1 id="review-title">Staged comparison</h1>
+    <p class="sidebar-intro">Follow a change from records to the rendered website.</p>
+    <nav id="view-nav" aria-label="Finding views"></nav>
+    <div class="sidebar-rule"></div>
+    <div class="eyebrow">REVIEW CONTEXT</div>
+    <button class="nav-button" id="context-open" type="button"><span>Reports &amp; data flow</span><span aria-hidden="true">↗</span></button>
+    <div class="sidebar-note"><span class="note-icon" aria-hidden="true">◎</span><p>Decisions stay in a draft until you export and apply them with the CLI.</p></div>
+    <p class="baseline-note">Counts reflect saved decisions. Draft matching is shown in Preview.</p>
+    <p id="base-label" class="base-label"></p>
+  </aside>
+  <main id="workspace" tabindex="-1">
+    <section class="orientation" aria-labelledby="orientation-title">
+      <div class="section-heading"><div><div class="eyebrow">FOLLOW THE TRANSFORMATIONS</div><h2 id="orientation-title">Where does the change begin?</h2></div><button class="text-button" id="stage-reset" type="button">Show every stage</button></div>
+      <div id="stage-flow" class="stage-flow" aria-label="Comparison stages"></div>
+      <div id="integration" class="integration"></div>
+    </section>
+    <section class="review-workspace" aria-labelledby="queue-heading">
+      <div class="queue-heading"><div><h2 id="queue-heading">New &amp; changed</h2><p id="queue-description">Raw observations that need a fresh judgment; they are not a count of defects.</p></div><span id="queue-total" class="total-label"></span></div>
+      <div class="filters">
+        <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">Search findings</span><input id="search" type="search" placeholder="Search subject, field, or value…" autocomplete="off"></label>
+        <label class="state-select"><span class="sr-only">Filter by review state</span><select id="state-filter"><option value="queue">New &amp; changed</option><option value="new">New only</option><option value="changed">Changed only</option><option value="outstanding">Known outstanding</option><option value="matched">Carried decisions</option><option value="all">All findings</option><option value="not-observed">Retirement candidates</option><option value="not-evaluated">Not evaluated</option></select></label>
+        <label class="stage-select"><span class="sr-only">Filter by report stage</span><select id="stage-filter"><option value="">All reports and stages</option></select></label>
+      </div>
+      <div id="active-filter" class="active-filter" hidden></div>
+      <div class="review-columns">
+        <section class="finding-column" aria-label="Findings">
+          <div id="findings" class="finding-list" aria-busy="true"></div>
+          <div class="pagination"><button id="page-prev" class="button quiet" type="button">← Previous</button><span id="page-range" aria-live="polite"></span><button id="page-next" class="button quiet" type="button">Next →</button></div>
+        </section>
+        <section id="detail" class="detail" aria-label="Selected finding"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">↔</span><h3>Make the difference visible</h3><p>Select a finding to compare its values, trace its evidence, and record a scoped decision.</p></div></section>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<dialog id="draft-dialog" class="wide-dialog" aria-labelledby="draft-title"><div class="dialog-header"><div><div class="eyebrow">LOCAL DRAFT</div><h2 id="draft-title">Review your decision changes</h2></div><button class="icon-button" type="button" data-close="draft-dialog" aria-label="Close draft changes">×</button></div><p class="dialog-intro">Preview how these edits match the current evidence. Export creates a JSON file; applying it remains a separate CLI action.</p><div id="draft-list"></div><div id="preview-result" aria-live="polite"></div><details class="json-details"><summary>Inspect change document</summary><pre id="draft-json"></pre></details><div class="dialog-footer"><span id="draft-status"></span><button id="draft-preview" class="button" type="button">Preview matching</button><button id="draft-export" class="button primary" type="button">Validate &amp; export JSON</button></div></dialog>
+<dialog id="context-dialog" class="wide-dialog" aria-labelledby="context-title"><div class="dialog-header"><div><div class="eyebrow">EVIDENCE &amp; COVERAGE</div><h2 id="context-title">Reports and data flow</h2></div><button class="icon-button" type="button" data-close="context-dialog" aria-label="Close report context">×</button></div><div id="context-body"></div></dialog>
+</body>
+</html>
