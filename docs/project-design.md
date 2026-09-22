@@ -137,9 +137,9 @@ site-specific/                         # Downstream-owned declarative site data
   assets/                              # Source assets processed by Hugo during the build
   content/                             # Hand-authored editorial pages
   static/                              # Site files published verbatim
-  metadata/                            # Canonical records and their annotation companions for validation and RDF view
+  metadata/                            # Metadata describing organization entities
     records/                           # Schema-compliant YAML describing organization entities
-    overlays/annotations/              # Separate tree for messier record components that are part of the realized graph
+    overlays/annotations/              # Machine provenance kept separate for readability
   curation-records/                    # Current reviewed automated data import decisions
   sources/<adapter>/                   # Inputs, evidence, and mapping policy for metadata automation tools
   overrides/                           # Bounded replacements for framework surfaces
@@ -153,9 +153,14 @@ extensions/                            # Downstream-owned executable code for me
 People curate `site-specific/`.
 This directory is the complete source for the organization's site content and appearance.
 It is declarative: it describes what the site should contain and look like without implementing how Orinoco Lite performs the work.
-It holds semantic assertions, machine-provenance companions, editorial material, identity, and presentation data.
+It holds metadata records, editorial material, identity, and presentation data.
 It also holds assets, source evidence, policy, current curation decisions, and supported small overrides.
 It does not hold implementation code.
+
+Keep metadata records easy for people to read and edit.
+Store machine provenance separately in overlays so people can focus on the metadata that matters to them; combine it automatically when needed.
+Everyday commands and explanations describe records, mentioning overlays only when people need to inspect or manage provenance.
+The records should retain the same data across representations: diagrams call them “Records” throughout, with the source or format in parentheses and operations on the arrows.
 
 `extensions/source-adapters/` is exclusively for site-specific executable metadata acquisition and curation code.
 It is not a website extension surface.

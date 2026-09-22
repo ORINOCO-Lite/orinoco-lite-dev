@@ -15,7 +15,8 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Establish the live scope
 
 1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
-   Git Annex is permitted only in the engineering repinning path.
+   Git Annex is permitted for engineering repinning and explicit upstream-site media retrieval.
+   Site-specific media go into downstream site inputs, not the generic template.
    Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
 2. Identify the package and template candidates and any downstream inputs to inject.
    Local candidate testing is the default.
@@ -34,22 +35,29 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 
 ## Exercise a local downstream
 
-Use the public CLI from the engineering checkout:
+Use the Pixi composition task from the engineering checkout:
 
 ```console
-pixi run orinoco-lite dev setup
+pixi run setup-upstream
 ```
 
-This creates `../orinoco-lite-test-downstream` from the sibling template, converts the cached pool snapshot into ordinary committed site inputs, enables the editable package, and prepares resources.
-It does not run projection or build the website.
-Use `--site-specific /path/to/site-specific` for an existing input repository, `--snapshot /path/to/pool.jsonl` for another captured pool, and `--template /path/to/template` for another template checkout.
-Use `--populate` for missing template or site-specific repositories and `--force` only to deliberately replace the output.
-Never recreate a developer's existing downstream as part of routine validation.
+The engineering Bash task verifies a remotely fetchable immutable package candidate, creates the dataset, applies the selected template through Pixi exec, and records `package update`.
+It switches once into the downstream Pixi environment and calls `dev upstream populate`.
+No setup workflow files are copied into downstreams.
+The package's Bash population workflow records each public operation through DataLad; individual acquisition, conversion, and site-import commands do not record themselves.
+Setup stops before projection, builds, comparisons, and deployment.
 
-In any downstream, `pixi run orinoco-lite dev enable [PATH]` records an editable package connection.
-The default source is `../orinoco-lite-dev`, cloned when absent.
-`pixi run orinoco-lite dev disable` restores the prior package selection from Git history, preserving unrelated changes.
-These operations do not upgrade the selected release.
+Use `--package-repository URL` / `--package-revision REV` for another package candidate, `--template PATH` / `--template-ref REV` for the template candidate, `--snapshot PATH` to retain a capture, and `--site-specific PATH` to install an existing ordinary Git dataset as a submodule.
+New inputs default to a non-Annex subdataset; use `--site-layout directory` to store them directly in the downstream.
+Unpublished package candidates and existing destinations are refused.
+Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
+
+Repeat acquisition and transformations with `dev upstream populate`, or preserve data with `--reuse-capture`.
+Individual stages accept explicit paths: `dev records get`, `dev records jsonl-to-yaml`, `dev records yaml-to-jsonl`, and `dev upstream import-from-www`.
+Record comparisons can consume the populated downstream directly.
+For software comparisons, record a new package selection and lock with `package update`, then launch a fresh `pixi run datalad rerun` for the relevant transformation commits.
+Historical replay restores the desired package, input, and subdataset states before starting Pixi.
+DataLad does not replace the running environment or automatically restore subdataset worktrees through `rerun --onto`.
 
 Use ordinary `orinoco-lite validate`, `build`, and `serve` commands when requested.
 The package owns projection and validation sequencing.

@@ -271,7 +271,15 @@ def _ensure_checkout(
 
 
 def _package_source(resources_root: Path) -> tuple[str, str]:
-    return SOURCE_REPOSITORY, source_commit(resources_root)
+    commit = source_commit(resources_root)
+    from .package_update import installed_git_source
+    installed = installed_git_source()
+    if installed:
+        repository, installed_commit = installed
+        if installed_commit != commit:
+            raise IntegrityError("Installed package source and bundled resource commit disagree")
+        return repository, commit
+    return SOURCE_REPOSITORY, commit
 
 
 def resolve_presentation(workspace: Path, resources_root: Path | None = None) -> Path:

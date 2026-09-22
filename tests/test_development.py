@@ -88,7 +88,7 @@ def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypa
             (checkout / "src/orinoco_lite").mkdir(parents=True)
             (checkout / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
     monkeypatch.setattr(dev, "run", run)
-    monkeypatch.setattr(dev, "record", lambda root, action, path: calls.append((action, path)))
+    monkeypatch.setattr(dev, "apply", lambda root, action, path: calls.append((action, path)))
     dev.enable(root)
     assert calls[0] == ("git", "clone", dev.PACKAGE_REPOSITORY, checkout)
     assert ("enable", checkout) in calls
@@ -117,7 +117,6 @@ def test_enable_cannot_redirect_source_checkout(downstream, monkeypatch, explici
         pytest.fail("Source checkout rejection must precede external operations")
 
     monkeypatch.setattr(dev, "run", unexpected)
-    monkeypatch.setattr(dev, "record", unexpected)
     with pytest.raises(ConfigurationError, match="Run 'dev enable' from a downstream website"):
         dev.enable(root, root.parent / "another-checkout" if explicit_path else None)
     assert {name: (root / name).read_bytes() for name in before} == before

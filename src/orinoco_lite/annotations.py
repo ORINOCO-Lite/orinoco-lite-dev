@@ -99,8 +99,8 @@ def _line(value: object, label: str) -> str:
     return value
 
 
-def _annotation_entry(value: object) -> dict[str, str]:
-    if not isinstance(value, Mapping) or set(value) != ANNOTATION_FIELDS:
+def _annotation_entry(value: object) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) not in (ANNOTATION_FIELDS, ANNOTATION_FIELDS | {"source_annotations"}):
         raise ConfigurationError(
             "Annotation assertion has missing or unexpected fields"
         )
@@ -115,12 +115,22 @@ def _annotation_entry(value: object) -> dict[str, str]:
         raise ConfigurationError(
             "Assertion digest must be sha256 followed by 64 lowercase hex digits"
         )
-    return {
+    entry = {
         "path": path,
         "assertion_sha256": digest,
         PAV_IMPORTED_BY: _line(value.get(PAV_IMPORTED_BY), PAV_IMPORTED_BY),
         PAV_IMPORTED_FROM: _line(value.get(PAV_IMPORTED_FROM), PAV_IMPORTED_FROM),
     }
+    if "source_annotations" in value:
+        original = value["source_annotations"]
+        if not isinstance(original, Mapping) or len(original) != 2:
+            raise ConfigurationError("Source annotations must contain the two machine PAV annotations")
+        for canonical, aliases in _MACHINE_PAV_ALIASES.items():
+            present = [key for key in aliases if key in original]
+            if len(present) != 1 or _compact_machine_value(original[present[0]], canonical=canonical) != entry[canonical]:
+                raise ConfigurationError("Source annotations disagree with machine PAV values")
+        entry["source_annotations"] = deepcopy(dict(original))
+    return entry
 
 
 def annotation_companion(
@@ -159,7 +169,7 @@ def validate_stored_record(record: Mapping[str, Any]) -> None:
     inspect(record)
 
 
-def _validated_companion(value: object, record_pid: str) -> list[dict[str, str]]:
+def _validated_companion(value: object, record_pid: str) -> list[dict[str, Any]]:
     if not isinstance(value, Mapping) or set(value) != COMPANION_FIELDS:
         raise ConfigurationError(
             "Annotation companion has missing or unexpected top-level fields"
@@ -392,12 +402,22 @@ def _matched_assertion(
 
 def _apply_entry(
     record: dict[str, Any],
-    entry: Mapping[str, str],
+    entry: Mapping[str, Any],
     *,
     compact: bool,
+    preserve_source: bool = False,
 ) -> None:
     assertion = _matched_assertion(record, entry)
-    if compact:
+    if preserve_source and "source_annotations" in entry:
+        raw_annotations = assertion.get("annotations")
+        if raw_annotations is not None and not isinstance(raw_annotations, Mapping):
+            raise ConfigurationError("Stored annotations must be a mapping")
+        annotations = deepcopy(dict(raw_annotations)) if raw_annotations is not None else {}
+        if any(tag in annotations for tag in _MACHINE_PAV_TAGS):
+            raise ConfigurationError("Stored assertion already contains machine PAV")
+        annotations.update(deepcopy(entry["source_annotations"]))
+        assertion["annotations"] = annotations
+    elif compact:
         _attach_compact_to_object(assertion, entry)
     else:
         _attach_to_object(assertion, entry)
@@ -428,7 +448,7 @@ def reconcile_annotation_companion(
     pid = copied.get("pid")
     if not isinstance(pid, str) or not pid:
         raise ConfigurationError("Annotated Thing requires a non-empty PID")
-    retained: list[dict[str, str]] = []
+    retained: list[dict[str, Any]] = []
     for entry in _validated_companion(companion, pid):
         try:
             _matched_assertion(copied, entry)
@@ -476,12 +496,15 @@ def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
 def compact_enrichment_view(
     record: Mapping[str, Any],
     companion: Mapping[str, object] | None,
+    *,
+    preserve_source: bool = False,
 ) -> dict[str, Any]:
     """Build a detached compact-PAV view for pinned enrichment helpers.
 
     The pinned helpers match ownership only in their compact annotation form.
     This view is therefore deliberately distinct from the expanded join used
-    for schema validation and RDF conversion.
+    for schema validation and RDF conversion. With preserve_source, restore
+    original annotation spelling and structure for lossless JSONL export.
     """
 
     working = deepcopy(dict(record))
@@ -492,7 +515,7 @@ def compact_enrichment_view(
     if companion is None:
         return working
     for entry in _validated_companion(companion, pid):
-        _apply_entry(working, entry, compact=True)
+        _apply_entry(working, entry, compact=True, preserve_source=preserve_source)
     return working
 
 
@@ -534,7 +557,7 @@ def split_enrichment_view(
     pid = record.get("pid")
     if not isinstance(pid, str) or not pid:
         raise ConfigurationError("Enrichment-view Thing requires a non-empty PID")
-    entries: list[dict[str, str]] = []
+    entries: list[dict[str, Any]] = []
 
     def inspect_mapping(value: dict[str, Any], path: str) -> None:
         raw_annotations = value.get("annotations")
@@ -564,6 +587,8 @@ def split_enrichment_view(
                     raise ConfigurationError(
                         "The top-level Thing cannot be an imported assertion"
                     )
+                original = {aliases[0]: deepcopy(annotations[aliases[0]])
+                            for aliases in present.values()}
                 imported_by = _line(
                     _compact_machine_value(
                         annotations.pop(present[PAV_IMPORTED_BY][0]),
@@ -582,14 +607,15 @@ def split_enrichment_view(
                     value["annotations"] = annotations
                 else:
                     value.pop("annotations", None)
-                entries.append(
-                    {
-                        "path": path,
-                        "assertion_sha256": assertion_sha256(value),
-                        PAV_IMPORTED_BY: imported_by,
-                        PAV_IMPORTED_FROM: imported_from,
-                    }
-                )
+                entry = {
+                    "path": path,
+                    "assertion_sha256": assertion_sha256(value),
+                    PAV_IMPORTED_BY: imported_by,
+                    PAV_IMPORTED_FROM: imported_from,
+                }
+                if original != {PAV_IMPORTED_BY: imported_by, PAV_IMPORTED_FROM: imported_from}:
+                    entry["source_annotations"] = original
+                entries.append(entry)
 
         for key, child in tuple(value.items()):
             if key == "annotations":

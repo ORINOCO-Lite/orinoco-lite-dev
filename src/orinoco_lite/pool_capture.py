@@ -17,7 +17,6 @@ from requests import RequestException
 from .errors import OrinocoError
 
 
-DEFAULT_OUTPUT = Path("captures/records.jsonl")
 DEFAULT_API = "https://pool.psychoinformatics.de/api"
 COMPLETENESS_LIMIT = (
     "Reported pagination totals, record count, and unique PIDs were checked. "
@@ -126,7 +125,12 @@ def capture(
             with raw.open("w", encoding="utf-8") as stream:
                 for record in records.values():
                     stream.write(json.dumps(record, ensure_ascii=False) + "\n")
-            verified, digest = load_capture(raw)
+            verified, _ = load_capture(raw)
+            # Finish acquisition with the same ordering and JSON serialization
+            # used by reconstruction, so ordinary diff/cmp can verify equality.
+            from .upstream_snapshot import load_jsonl, write_jsonl
+            write_jsonl(raw, load_jsonl(raw))
+            digest = hashlib.sha256(raw.read_bytes()).hexdigest()
             if len(verified) != len(records):
                 raise CaptureError("New Pool capture failed its count check")
             manifest = {
@@ -158,28 +162,31 @@ def capture(
     except OSError as error:
         raise CaptureError(f"Could not save Pool capture {destination}: {error}") from error
     print(f"Captured {len(records)} records in {destination}")
+    print("Ordered records by class and PID, and object keys by name; arrays unchanged.")
     print(f"SHA-256: {digest}")
     print(COMPLETENESS_LIMIT)
     return manifest
 
 
 def register_capture(commands: argparse._SubParsersAction) -> None:
-    """Add ``get`` to the shared ``dev records`` command group."""
+    """Add ``get`` to the ``dev records`` command group."""
+    from .diagnostics import options
     parser = commands.add_parser(
-        "get", help="capture public Pool records and their acquisition facts",
-        description=("Download public Pool records to OUTPUT as JSON Lines, "
-                     "with one record per line. "
-                     "Save source information and verification details to OUTPUT.manifest.json. "
-                     "Reuse an existing verified capture unless --force is supplied."),
+        "get", help="download records (jsonl), or reuse the existing download",
+        description=("Download public Pool records to downloaded/records.jsonl in the investigation "
+                     "directory, ordered by class and PID with sorted object keys, compact JSON, "
+                     "and UTF-8 characters. Array order and duplicates are preserved. "
+                     "Reuse the verified records without contacting the service; "
+                     "--force downloads again. Source information is saved beside the records."),
     )
-    parser.add_argument("output", nargs="?", type=Path, default=DEFAULT_OUTPUT,
-                        help="capture file (default: %(default)s)")
+    options(parser)
+    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/downloaded/records.jsonl)")
     parser.add_argument("--api", default=DEFAULT_API, help="public Pool API URL")
-    parser.add_argument("--force", action="store_true", help="download again and replace the capture and its manifest")
 
 
 def execute(args: argparse.Namespace) -> int:
-    root = (getattr(args, "root", None) or Path.cwd()).resolve()
-    output = args.output if args.output.is_absolute() else root / args.output
+    from .diagnostics import directory
+    from .diagnostics import explicit_path
+    output = explicit_path(args, args.output) if args.output else directory(args) / "downloaded/records.jsonl"
     capture(output, api=args.api, force=args.force)
     return 0

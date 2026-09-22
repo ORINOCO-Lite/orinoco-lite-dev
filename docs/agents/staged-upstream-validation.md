@@ -20,7 +20,8 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | --- | --- | --- |
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
 | B — Capture and recording | Expose #152's capture operation as `dev records get`. Provide an explicit DataLad acquisition task. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
-| C — Record conversion | Expose conversion, joined export, field-level comparison, and the existing RDF conversion check. Carry the reviewed date-preservation fix from #152. | Inspect storage preservation separately from joined-record/RDF/returned-record preservation, including intermediate RDF and changed assertions. |
+| C1 — Downstream preparation | Capture, JSONL → YAML → JSONL, record comparison, site import, and DataLad replay in an immutable package environment. | Verify direct JSONL equality and replay without the original checkouts. Review and merge before RDF. |
+| C2 — RDF comparison | Separate follow-up for RDF generation, comparison, attribution, and the RDF reader adaptation. | Review RDF semantics and failure boundaries independently of preparation. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
 | F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
@@ -225,45 +226,29 @@ Run these proposed commands from the downstream directory after activating its [
 The path names show how one command supplies the next command's input.
 Dependency selection comes from the downstream and package, without repeating upstream pins in command arguments.
 
-### Capture, conversion, and service round-trip
+### Capture and record preservation
 
 ```console
 orinoco-lite dev records get
-orinoco-lite dev records convert captures/records.jsonl site-specific
-orinoco-lite dev records export site-specific build/records/joined.jsonl
-orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl
-orinoco-lite dev records roundtrip build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff build/records/joined.jsonl build/records/returned.jsonl
-orinoco-lite dev records diff captures/records.jsonl build/records/returned.jsonl
+orinoco-lite dev records jsonl-to-yaml
+orinoco-lite dev records yaml-to-jsonl
+cmp upstream-diffing/downloaded/records.jsonl upstream-diffing/yaml-jsonl/records.jsonl
+orinoco-lite dev records diff downloaded yaml-jsonl --summary
 ```
 
-Annotation companions keep machine attribution for record assertions separate for human readability.
-The export rejoins them with the records without generating pages.
-The round-trip command manages the temporary service and retains the returned dump for inspection.
-The final diff checks the complete round-trip against the original capture.
-The diff shows raw field changes and identifies reviewed annotation-equivalent changes separately.
-It preserves list order, duplicate values, scalar types, and the distinction between null and missing values.
-The record-conversion stage also exposes `dev records rdf-roundtrip INPUT OUTPUT_DIRECTORY`, retaining `intermediate.rdf` and `returned.jsonl` in that directory.
-It reuses the selected schema conversion operations and reports conversion failures at this boundary.
-This diagnostic operation is separate from the service round-trip and projection graph generation.
-Use `dev records diff` to compare those returned records with the joined export; do not treat the service dump as a substitute for this check.
-For example, inspect storage and RDF evidence before proceeding to projection:
+For a downstream, `pixi run setup-upstream` composes template application, package selection, capture, conversion, and site import with DataLad provenance.
+`dev upstream populate --reuse-capture` repeats preparation using retained data.
+Annotation companions preserve machine attribution separately and rejoin it for JSONL reconstruction.
+Record comparison preserves scalar types, null versus missing values, array order, and duplicates.
+A diff exit code of 1 means differences.
 
-```console
-orinoco-lite dev records diff captures/records.jsonl build/records/joined.jsonl --report build/reports/storage
-orinoco-lite dev records rdf-roundtrip build/records/joined.jsonl build/records/rdf
-orinoco-lite dev records diff build/records/joined.jsonl build/records/rdf/returned.jsonl --report build/reports/rdf
-orinoco-lite dev review summarize build/reports/storage build/reports/rdf --output build/review
-```
-
-Read the generated summaries and inspect their referenced records and RDF.
-Once scoped decisions have been recorded, rerun `dev review summarize` with `--decisions FILE` to inspect which findings remain new, changed, matched to a saved decision, or outside the evaluated comparison scope.
-A diff exit code of 1 means differences were found and should be inspected; it is not an execution failure.
+RDF and temporary-service operations belong to subsequent PRs and are not part of the preparation merge.
+The later interfaces below remain design targets.
 
 ### Site-data import and Hugo projection
 
 ```console
-orinoco-lite dev inputs import site-specific
+orinoco-lite dev upstream import-from-www --destination site-specific
 orinoco-lite dev inputs diff site-specific
 orinoco-lite dev hugo project upstream build/upstream/projection --records build/records/joined.jsonl
 orinoco-lite dev hugo project lite build/lite/projection --records build/records/joined.jsonl

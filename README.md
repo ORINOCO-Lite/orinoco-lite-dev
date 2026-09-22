@@ -74,31 +74,65 @@ orinoco-lite dev prepare-resources
 pytest
 ```
 
-Create an inspectable downstream with the local template and cached upstream pool snapshot:
+Create an inspectable downstream populated from the upstream Pool:
 
 ```console
-PIXI_LOCKED=false orinoco-lite dev setup
+pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-The default destination is `../orinoco-lite-test-downstream`.
-Use `--site-specific ../con-site-specific` to install that repository instead of converting the cached pool.
-Use `--populate` to clone missing template or site-specific repositories, and `--force` to remove and recreate the destination.
-Setup records its changes in DataLad, prepares editable package resources, and stops before projection or website building.
+The [setup script](tools/setup-upstream.sh) verifies that the package candidate is fetchable, creates a non-Annex dataset, applies the selected template through `pixi exec`, and records an immutable package selection and lock.
+It switches once into the downstream Pixi environment and invokes the package-owned `dev upstream populate` workflow.
+Existing destinations and unpublished package candidates are refused; setup never pushes code.
+The default package candidate is the engineering checkout's committed HEAD on its origin remote.
+Use `--package-repository URL` and `--package-revision REV` to choose another.
 
-In any downstream, enable or undo editable package development:
+`--template PATH` and `--template-ref REV` select a template commit; setup verifies it on that checkout's origin and records the remote URL, not the local checkout path.
+`--snapshot PATH` saves supplied bytes as the retained input boundary instead of recording a machine-local copy command; `--site-specific PATH` installs an existing dataset as a submodule and skips imports.
+New site inputs become an ordinary Git subdataset by default; `--site-layout directory` keeps them directly in the downstream repository.
+Site-specific Annex support remains a separate experiment in issue #168.
+
+In any downstream, the installed package owns the repeatable workflow:
 
 ```console
-PIXI_LOCKED=false orinoco-lite dev enable
-PIXI_LOCKED=false orinoco-lite dev disable
+pixi run orinoco-lite dev upstream populate
+pixi run orinoco-lite dev upstream populate --reuse-capture
 ```
 
-`enable` uses `../orinoco-lite-dev` by default; an optional path selects another checkout.
-If missing, it clones the repository and checks out the running package’s source commit.
-It records a relative development link and editable dependency, then prepares resources using the engineering environment.
-Python edits take effect immediately.
-After changing bundled resource sources, run `orinoco-lite dev prepare-resources` from the engineering checkout.
-`disable` restores the prior package selection from Git history while preserving site edits and unrelated dependency changes.
-Upgrading to a newer release is a separate operation.
+The first records a fresh acquisition, JSONL-to-YAML conversion, and site import as separate DataLad runs.
+The second transforms the retained capture without acquisition.
+`--directory` and `--destination` select the capture and site-input directories.
+Recorded acquisition and conversion commands include `--force` so reruns can replace their outputs.
+Site import follows the installed package's upstream pins and retrieves the selected upstream media into `site-specific/` as ordinary files.
+It synchronizes imported content, assets, and static files, deleting obsolete files like `rsync --delete`; metadata remains separate.
+This preparation step always uses the pinned Git Annex package through an isolated `pixi exec` / `uvx` invocation; it prints the retrieval commands.
+The generic template does not contain upstream site media, and ordinary builds do not use Annex.
+Setup and population stop before projection, builds, comparisons, and deployment.
+
+Individual commands also accept explicit paths, without recording themselves:
+
+```console
+pixi run orinoco-lite dev records get --output sourcedata/pool.jsonl --force
+pixi run orinoco-lite dev records jsonl-to-yaml --source sourcedata/pool.jsonl --destination site-specific --force
+pixi run orinoco-lite dev upstream import-from-www --destination site-specific
+pixi run orinoco-lite dev records yaml-to-jsonl --source site-specific --output inspection/records.jsonl
+pixi run orinoco-lite dev records diff sourcedata/pool.jsonl site-specific --report inspection/comparison
+```
+
+`records get --api URL` supports other compatible Dump Things servers.
+Without explicit paths, individual record commands retain the `upstream-diffing/` layout.
+Site import reports its upstream revision and files; `--source` and `--revision` remain available for explicit upstream experiments.
+The default media source is the original upstream Annex host; `--media-remote URL` selects another source.
+With an explicit `--source` checkout, its existing Annex remotes are used unless overridden.
+
+Select a newer package with `orinoco-lite package update --revision REV`, optionally wrapped in `datalad run --explicit --output pixi.toml --output pixi.lock --`.
+It resolves the remote revision to an exact commit and updates the lock without replacing the running environment.
+Record transformations reject a running package that differs from the manifest’s immutable Git selection.
+Inspect and record the selection, then start a fresh `pixi run datalad rerun RUN_COMMIT` to execute a recorded transformation in that environment.
+Keep the capture fixed to inspect software changes, or record a fresh capture to inspect data changes.
+For historical reproduction, restore the desired environment and inputs before starting Pixi; DataLad rerun does not switch a running environment, and its `--onto` option does not restore subdataset worktrees.
+
+`dev enable [PATH]` and `dev disable` remain explicit editable-development conveniences; normal setup does not use them.
+After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
 Pixi's downstream tasks only supply convenient arguments.

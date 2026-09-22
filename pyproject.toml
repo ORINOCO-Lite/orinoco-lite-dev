@@ -39,7 +39,7 @@ orinoco-lite = "orinoco_lite.cli:main"
 package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
-orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
+orinoco_lite = ["default_projection.yaml", "*.sh", "_resources/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

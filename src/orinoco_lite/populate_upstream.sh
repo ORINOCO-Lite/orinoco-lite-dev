@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Package-owned workflow. Caller has already selected the downstream environment.
+set -euo pipefail
+
+directory=sourcedata
+destination=site-specific
+api=https://pool.psychoinformatics.de/api
+site_layout=submodule
+snapshot=
+site_specific=
+reuse_capture=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --directory) directory=$2; shift 2 ;;
+    --destination) destination=$2; shift 2 ;;
+    --api) api=$2; shift 2 ;;
+    --site-layout) site_layout=$2; shift 2 ;;
+    --snapshot) snapshot=$2; shift 2 ;;
+    --site-specific) site_specific=$2; shift 2 ;;
+    --reuse-capture) reuse_capture=true; shift ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+capture=$directory/downloaded/records.jsonl
+[[ -f pixi.toml && -f pixi.lock ]] || { echo 'Populate requires the downstream Pixi selection and lock.' >&2; exit 2; }
+git diff --quiet HEAD -- pixi.toml pixi.lock || {
+  echo 'Record the package selection and lock before populating the downstream.' >&2; exit 2;
+}
+[[ -z $snapshot || -f $snapshot ]] || { echo "Missing capture: $snapshot" >&2; exit 2; }
+if $reuse_capture; then
+  [[ -f $capture ]] || { echo "Missing retained capture: $capture" >&2; exit 2; }
+fi
+set -x
+if [[ -n $site_specific ]]; then
+  datalad run -m "chore: install site-specific subdataset" -- \
+    datalad install --dataset . --source "$site_specific" "$destination"
+  exit
+fi
+if [[ ! -e $destination && $site_layout == submodule ]]; then
+  datalad create --no-annex --dataset . "$destination"
+fi
+if [[ -n $snapshot ]]; then
+  mkdir -p "$directory/downloaded"
+  # Supplied bytes establish the replay boundary; the external path is not a
+  # recoverable source for a recorded copy command.
+  if [[ ! "$snapshot" -ef "$capture" ]]; then cp "$snapshot" "$capture"; fi
+  if [[ -f $snapshot.manifest.json ]]; then
+    if [[ ! "$snapshot.manifest.json" -ef "$capture.manifest.json" ]]; then
+      cp "$snapshot.manifest.json" "$capture.manifest.json"
+    fi
+  else
+    rm -f -- "$capture.manifest.json"
+  fi
+  datalad save -m "chore: retain supplied pool capture
+
+Retain supplied bytes as inputs for subsequent recorded transformations.
+The original acquisition was not executed by this workflow." -- "$directory/downloaded"
+
+elif ! $reuse_capture; then
+  datalad run --explicit -m "chore: capture upstream pool records" \
+    --input pixi.toml --input pixi.lock \
+    --output "$capture" --output "$capture.manifest.json" -- \
+    orinoco-lite dev records get --output "$capture" --api "$api" --force
+fi
+
+datalad run --explicit -m "chore: convert captured pool records" \
+  --input pixi.toml --input pixi.lock --input "$capture" \
+  --output "$destination/metadata" -- \
+  orinoco-lite dev records jsonl-to-yaml \
+    --source "$capture" --destination "$destination" --force
+
+datalad run --explicit -m "chore: import upstream site inputs" \
+  --input pixi.toml --input pixi.lock \
+  --output "$destination/site.yaml" --output "$destination/content" \
+  --output "$destination/assets" --output "$destination/static" \
+  --output "$destination/overrides" -- \
+  orinoco-lite dev upstream import-from-www --destination "$destination"

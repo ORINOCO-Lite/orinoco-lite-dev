@@ -68,7 +68,7 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
         )
         return path
 
-    def test_storage_projection_normalizes_pav_and_is_reversible(self) -> None:
+    def test_storage_projection_reconstructs_original_machine_pav_exactly(self) -> None:
         record = {
             "pid": "xyzrins:publications/one",
             "schema_type": "xyzri:XYZPublication",
@@ -99,21 +99,14 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
         self.assertEqual(report["record_count"], 1)
         self.assertEqual(report["annotation_companions"], 1)
         self.assertEqual(report["annotation_assertions"], 1)
-        self.assertEqual(report["machine_pav_uri_aliases_normalized"], 2)
-        self.assertEqual(report["machine_pav_expanded_values_normalized"], 2)
         self.assertEqual(
-            report["joined_orinoco_semantic_sha256"],
-            report["normalized_source_semantic_sha256"],
+            report["reconstructed_semantic_sha256"],
+            report["source_semantic_sha256"],
         )
         stored = snapshot.load_records_tree(output / "metadata" / "records")[0]
         self.assertEqual(
             stored.record["attributes"][0]["annotations"],
-            {
-                "ex:reviewed": {
-                    "annotation_tag": "ex:reviewed",
-                    "annotation_value": "yes",
-                }
-            },
+            {"ex:reviewed": "yes"},
         )
         companion_path = next(
             (output / "metadata" / "overlays" / "annotations").rglob("*.yaml")
@@ -123,6 +116,9 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
             companion["assertions"][0]["pav:importedBy"],
             "xyzrins:adapters/example",
         )
+        from orinoco_lite.record_stages import yaml_to_jsonl
+        returned = yaml_to_jsonl(output, self.root / "returned.jsonl")
+        self.assertEqual(returned[0].record, record)
         self.assertEqual(storage.verify_projection(source, output), report)
 
     def test_records_without_machine_pav_remain_byte_semantically_equal(self) -> None:
@@ -142,7 +138,7 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
             report["stored_records_semantic_sha256"],
         )
 
-    def test_invalid_optional_datetime_sentinel_is_omitted_and_reported(self) -> None:
+    def test_source_datetime_marker_is_preserved_without_inventing_a_date(self) -> None:
         record = {
             "pid": "xyzrins:publications/sentinel",
             "schema_type": "xyzri:XYZPublication",
@@ -159,24 +155,15 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
 
         report = storage.project(source, output)
 
-        self.assertEqual(report["schema_compatibility_adjustment_count"], 1)
-        self.assertEqual(
-            report["schema_compatibility_adjustments"],
-            [
-                {
-                    "action": "omit-invalid-optional-datetime-sentinel",
-                    "path": "/generated_by/0/at_time",
-                    "pid": "xyzrins:publications/sentinel",
-                    "source_value": "-",
-                }
-            ],
-        )
         stored = snapshot.load_records_tree(output / "metadata" / "records")[0]
-        self.assertNotIn("at_time", stored.record["generated_by"][0])
-        self.assertNotEqual(
+        self.assertEqual(stored.record, record)
+        self.assertEqual(
             report["source_semantic_sha256"],
-            report["normalized_source_semantic_sha256"],
+            report["reconstructed_semantic_sha256"],
         )
+        from orinoco_lite.record_stages import yaml_to_jsonl
+        returned = yaml_to_jsonl(output, self.root / "returned.jsonl")
+        self.assertEqual(returned[0].record, record)
         self.assertEqual(storage.verify_projection(source, output), report)
 
 

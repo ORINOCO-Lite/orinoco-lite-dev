@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -39,16 +38,6 @@ def check_workspace(root: Path) -> None:
         raise ConfigurationError("Commit or discard changes to pixi.toml, pixi.lock, and the development link first.")
     if not (root / "pixi.toml").is_file():
         raise ConfigurationError("The downstream has no pixi.toml.")
-
-
-def record(root: Path, action: str, *arguments: str | Path) -> None:
-    """Record only the package connection; leave unrelated site edits alone."""
-    command = ["pixi", "exec", "--spec", "datalad", "--", "datalad", "run",
-               "--explicit", "-m", f"chore: {action} editable Orinoco Lite"]
-    for path in FILES:
-        command.extend(("--output", path))
-    run(*command, "--", sys.executable, "-m", "orinoco_lite.development",
-        action, *arguments, "--apply", cwd=root)
 
 
 def previous_selection(root: Path) -> object:
@@ -132,7 +121,7 @@ def enable(root: Path, path: Path | None = None) -> None:
         if selection != EDITABLE:
             raise ConfigurationError("The development link and package selection disagree.")
     else:
-        record(root, "enable", checkout)
+        apply(root, "enable", checkout)
     # Compilation tools belong to the source checkout, not the site environment.
     for submodule, required in (
         ("submodules/pool.psychoinformatics.de-ui", "shacl-vue/package-lock.json"),
@@ -151,18 +140,4 @@ def disable(root: Path) -> None:
     if not (root / LINK).is_symlink():
         raise ConfigurationError("This downstream has no editable development connection.")
     print("Restoring the previous package selection...", flush=True)
-    record(root, "disable")
-
-
-def main() -> None:
-    # Invoked by DataLad to record the actual mutation, not resource compilation.
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enable", "disable"))
-    parser.add_argument("path", type=Path, nargs="?")
-    parser.add_argument("--apply", action="store_true", required=True)
-    args = parser.parse_args()
-    apply(Path.cwd(), args.action, args.path)
-
-
-if __name__ == "__main__":
-    main()
+    apply(root, "disable", None)
