@@ -78,7 +78,7 @@ def test_disable_refuses_changed_package_selection(downstream):
     assert (root / dev.LINK).is_symlink()
 
 
-def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypatch):
+def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypatch, capsys):
     root = downstream
     checkout = root.parent / "orinoco-lite-dev"
     calls = []
@@ -93,6 +93,7 @@ def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypa
     assert calls[0] == ("git", "clone", dev.PACKAGE_REPOSITORY, checkout)
     assert ("enable", checkout) in calls
     assert calls[-1][-3:] == ("orinoco-lite", "dev", "prepare-resources")
+    assert f"Editable Orinoco Lite source: {checkout}" in capsys.readouterr().out
 
 
 def test_dirty_connection_files_are_not_overwritten(downstream):
@@ -100,3 +101,24 @@ def test_dirty_connection_files_are_not_overwritten(downstream):
     manifest.write_text(manifest.read_text() + "# pending edit\n")
     with pytest.raises(ConfigurationError, match="Commit or discard"):
         dev.check_workspace(downstream)
+
+
+@pytest.mark.parametrize("explicit_path", [False, True])
+def test_enable_cannot_redirect_source_checkout(downstream, monkeypatch, explicit_path):
+    root = downstream
+    (root / "src/orinoco_lite").mkdir(parents=True)
+    (root / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
+    manifest = root / "pixi.toml"
+    manifest.write_text('[pypi-dependencies]\norinoco-lite = { path = ".", editable = true }\n')
+    commit(root, "test: package source checkout")
+    before = {name: (root / name).read_bytes() for name in ("pixi.toml", "pixi.lock")}
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Source checkout rejection must precede external operations")
+
+    monkeypatch.setattr(dev, "run", unexpected)
+    monkeypatch.setattr(dev, "record", unexpected)
+    with pytest.raises(ConfigurationError, match="Run 'dev enable' from a downstream website"):
+        dev.enable(root, root.parent / "another-checkout" if explicit_path else None)
+    assert {name: (root / name).read_bytes() for name in before} == before
+    assert not (root / dev.LINK).is_symlink()
