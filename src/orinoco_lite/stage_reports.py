@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import uuid
 from typing import Any
+from collections import Counter
 
 from .errors import ConfigurationError
 from .progress import progress
@@ -29,6 +30,13 @@ def canonical(value: Any) -> str:
 
 def json_digest(value: Any) -> str:
     return hashlib.sha256(canonical(value).encode()).hexdigest()
+
+
+def scope_text(scope: dict) -> str:
+    value = dict(scope)
+    if "subjects" in value:
+        value["subjects"] = f"{len(value['subjects'])} evaluated subjects (listed in report.json)"
+    return canonical(value)
 
 
 def read_json(path: Path) -> Any:
@@ -83,7 +91,7 @@ def receipt_path(path: Path) -> Path:
     return path.with_name(path.name + ".operation.json")
 
 
-def operation_receipt(path: Path) -> dict | None:
+def operation_receipt(path: Path, *, allow_failed: bool = False) -> dict | None:
     receipt = receipt_path(path)
     if not receipt.is_file():
         return None
@@ -92,7 +100,7 @@ def operation_receipt(path: Path) -> dict | None:
         raise ConfigurationError(f"Unsupported operation receipt at {receipt}")
     if not isinstance(data.get("operation"), str) or not isinstance(data.get("inputs"), dict):
         raise ConfigurationError(f"Invalid operation receipt at {receipt}")
-    if data.get("context", {}).get("status", "complete") != "complete":
+    if not allow_failed and data.get("context", {}).get("status", "complete") != "complete":
         raise ConfigurationError(f"Operation did not complete: {path}; inspect its partial artifacts")
     if data.get("output_digest") != artifact_digest(path):
         return None  # Edited diagnostic input is comparable, without producer attribution.
@@ -136,9 +144,9 @@ def write_operation(output: Path, *, operation: str, inputs: dict[str, Path],
     return data
 
 
-def _copy_artifact(source: Path, destination: Path) -> dict:
+def _copy_artifact(source: Path, destination: Path, *, allow_failed: bool = False) -> dict:
     digest = artifact_digest(source)
-    producer = operation_receipt(source)
+    producer = operation_receipt(source, allow_failed=allow_failed)
     destination.parent.mkdir(parents=True, exist_ok=True)
     if source.is_dir():
         shutil.copytree(source, destination, ignore=lambda _, names: [
@@ -180,7 +188,7 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
             raise ConfigurationError("Evidence roles must contain only letters, digits, hyphens and underscores")
         if source.exists():
             destination = report_dir / "artifacts" / (side + (source.suffix if source.is_file() else ""))
-            artifacts[side] = _copy_artifact(source, destination)
+            artifacts[side] = _copy_artifact(source, destination, allow_failed=status != "complete")
             artifacts[side]["path"] = destination.relative_to(report_dir).as_posix()
         elif status == "complete":
             raise ConfigurationError(f"Completed comparison has missing {side} evidence: {source}")
@@ -199,7 +207,7 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
     validate_report(report, report_dir)
     write_json(report_dir / "report.json", report)
     lines = [f"# {stage}: {status}", "", f"Mode: {mode}",
-             f"Comparator: {comparator}", f"Scope: {canonical(entry['scope'])}",
+             f"Comparator: {comparator}", f"Scope: {scope_text(entry['scope'])}",
              f"Raw findings: {len(rows)}", ""]
     if command:
         import shlex
@@ -209,10 +217,18 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
         lines.append(f"{side}: [{artifact['path']}]({artifact['path']})"
                      + (f" ({operation['operation']})" if operation else " (supplied input)"))
     lines += ["", *diagnostics] if diagnostics else [""]
-    for row in rows:
+    categories = Counter(row.get("representation_equivalence", "unclassified raw changes") for row in rows)
+    lines.append("Finding categories: " + canonical(dict(categories)))
+    shown = sorted(rows, key=lambda row: ("representation_equivalence" in row, row["id"]))[:50]
+    def brief(value):
+        text = canonical(value)
+        return text if len(text) <= 400 else text[:397] + "... (full value in report.json)"
+    for row in shown:
         lines += [f"- {row['id']} {row['subject']} {canonical(row['location'])}: {row['change']}",
-                  f"  before: {canonical(row.get('before')) if row.get('before_present', True) else '<missing>'}",
-                  f"  after: {canonical(row.get('after')) if row.get('after_present', True) else '<missing>'}"]
+                  f"  before: {brief(row.get('before')) if row.get('before_present', True) else '<missing>'}",
+                  f"  after: {brief(row.get('after')) if row.get('after_present', True) else '<missing>'}"]
+    if len(rows) > len(shown):
+        lines.append(f"Showing {len(shown)} of {len(rows)}; report.json retains all raw findings and values.")
     (report_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report
 
@@ -279,6 +295,10 @@ def validate_report(report: dict, root: Path) -> None:
                 raise ConfigurationError("Finding requires subject, structured location, and change")
             if any(type(part) not in (str, int) for part in finding["location"]):
                 raise ConfigurationError("Finding location components must be strings or integers")
+            if not {"before", "after", "before_present", "after_present"} <= finding.keys() or any(
+                type(finding[key]) is not bool for key in ("before_present", "after_present")
+            ):
+                raise ConfigurationError("Finding must preserve typed values and explicit before/after presence")
             if finding.get("stage") != stage["stage"] or finding.get("comparator") != stage["comparator"]:
                 raise ConfigurationError("Finding stage/comparator does not match its report")
             if any(key not in stage["artifacts"] for key in finding.get("evidence", [])):

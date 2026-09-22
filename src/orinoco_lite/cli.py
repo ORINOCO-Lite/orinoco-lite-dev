@@ -125,13 +125,15 @@ def _parser() -> argparse.ArgumentParser:
         "Use pixi run dev-disable in a downstream to record this operation with DataLad. "
         "Direct CLI use leaves changes uncommitted.",
     )
-    from . import upstream, pool_capture, record_stages, rdf_stages
+    from . import upstream, pool_capture, record_stages, rdf_stages, service_stage, stage_review
     upstream.register(dev_commands)
     records = dev_commands.add_parser("records", help="capture, convert, and compare records")
     record_commands = records.add_subparsers(dest="records_command", required=True)
     pool_capture.register_capture(record_commands)
     record_stages.register(record_commands)
+    service_stage.register(record_commands)
     rdf_stages.register(dev_commands, record_commands)
+    stage_review.register(dev_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -363,6 +365,7 @@ def _run(args: argparse.Namespace) -> int:
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    args.invocation = ["orinoco-lite", *(list(argv) if argv is not None else sys.argv[1:])]
     try:
         if (args.command == "dev" and args.dev_command in {"records", "upstream", "rdf"}
                 and getattr(args, "records_command", None) != "diff"):
@@ -379,10 +382,15 @@ def _main(argv: Sequence[str] | None = None) -> int:
         if args.command == "template":
             from . import template_update
             return template_update.execute(args)
+        if args.command == "dev" and args.dev_command == "review":
+            from . import stage_review
+            return stage_review.execute(args)
         if args.command == "dev" and args.dev_command == "records":
-            from . import pool_capture, record_stages
+            from . import pool_capture, record_stages, service_stage
             if args.records_command == "get":
                 return pool_capture.execute(args)
+            if args.records_command == "roundtrip":
+                return service_stage.execute(args)
             return record_stages.execute(args)
         if args.command in {"verify-site", "publication", "shacl-handoff", "curation"}:
             from . import local_preview, publication, shacl_handoff, curation_actions
