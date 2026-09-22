@@ -39,6 +39,7 @@ def local_service(
     *,
     port: int,
     timeout: float = 120,
+    backend: str = "record_dir+stl",
 ) -> Iterator[LocalService]:
     """Start a fresh loopback Pool; stop it when the caller leaves the context.
 
@@ -67,6 +68,7 @@ def local_service(
                 "curated": "public/curated",
                 "incoming": "public/incoming",
                 "schema": str(schema),
+                "backend": {"type": backend},
                 "auth_sources": [{"type": "config"}],
             },
         },

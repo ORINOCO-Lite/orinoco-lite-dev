@@ -76,14 +76,15 @@ def assert_stopped(url):
         urlopen(f"{url}/server", timeout=1)
 
 
-def test_real_service_preserves_records_and_stops_after_success(tmp_path, schema):
+@pytest.mark.parametrize("backend", ["record_dir+stl", "sqlite+stl"])
+def test_real_service_preserves_records_and_stops_after_success(tmp_path, schema, backend):
     capture = tmp_path / "source.jsonl"
     records = captured_records()
     capture.write_text(
         "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in records),
         encoding="utf-8",
     )
-    with local_service(tmp_path / "service", schema, port=available_port()) as service:
+    with local_service(tmp_path / "service", schema, port=available_port(), backend=backend) as service:
         with pytest.raises(HTTPError) as rejection:
             urlopen(f"{service.url}/public/curated/records/p/", timeout=1)
         assert rejection.value.code in {401, 403}
@@ -95,9 +96,10 @@ def test_real_service_preserves_records_and_stops_after_success(tmp_path, schema
             capture, "public", service.token, service_url=service.url,
         ) == 2
         # Check the stored representation too, including its class mapping.
-        upstream_snapshot.verify(
-            capture, service.store / "public/curated", upstream_store=True,
-        )
+        if backend == "record_dir+stl":
+            upstream_snapshot.verify(
+                capture, service.store / "public/curated", upstream_store=True,
+            )
 
         changed = deepcopy(records[0]["record"])
         changed["title"] = "Changed title"
