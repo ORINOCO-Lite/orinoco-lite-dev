@@ -53,8 +53,22 @@ def record_path(root, name):
         path, command = root / name / "records.jsonl", "records get"
     elif name == "yaml-jsonl":
         path, command = root / name / "records.jsonl", "records yaml-to-jsonl"
+    elif name.endswith("-pool-jsonl"):
+        source, operation = name.rsplit("-", 2)[:2]
+        command = f"records roundtrip {source}"
+        path = root / name / "records.jsonl"
     else:
         raise ConfigurationError(f"Unknown record state: {name}")
     return require(path, command)
 
 
+def report_paths(root, names):
+    if not names:
+        paths = sorted((root / "reports").glob("*/report.json"))
+        if not paths:
+            raise ConfigurationError("No comparisons found. Run 'orinoco-lite dev records diff' with the same --directory first.")
+        return paths
+    for name in names:
+        if Path(name).name != name or name in {".", ".."}:
+            raise ConfigurationError("Select a comparison name, such as downloaded-vs-yaml-jsonl, rather than a path")
+    return [require(root / "reports" / name / "report.json", "records diff") for name in names]

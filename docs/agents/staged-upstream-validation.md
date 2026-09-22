@@ -320,8 +320,20 @@ RDF does not produce a JSONL return state.
 
 ### Service round-trip
 
-The dependent service stage adds `records roundtrip` and the `downloaded-pool-jsonl` and `yaml-jsonl-pool-jsonl` states.
-It must follow the same directory and replacement conventions.
+The service diagnostic uses the same investigation directory:
+
+```console
+orinoco-lite dev records roundtrip downloaded
+orinoco-lite dev records roundtrip yaml-jsonl
+orinoco-lite dev records diff all --summary
+orinoco-lite dev review summarize
+```
+
+`roundtrip` uploads records through the selected upstream client to a temporary local service, then reads them back through that client.
+`review summarize` reads existing comparisons and optional `decisions.json`, writing its summary under `review/`; it does not run missing stages.
+Select individual comparisons by name, such as `review summarize downloaded-vs-yaml-jsonl rdf rdf-records`.
+`review inspect` reviews findings in the terminal; `review decide` previews a decision and saves it only with `--write`.
+Decisions live in the investigation directory and are not metadata curation decisions.
 Website and review commands below are proposed interfaces pending review of their owning stages.
 
 ### Site-data import and Hugo projection
