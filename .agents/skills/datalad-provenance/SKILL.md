@@ -10,14 +10,17 @@ A recorded command is evidence of execution, not proof that another clone can re
 
 ## Choose the provenance boundary
 
-- **Supplied snapshot:** copy the supplied bytes into the dataset, then use `datalad save -m "chore: retain supplied capture" -- sourcedata/records.jsonl`.
-  Preserve supplied acquisition metadata when available.
-  Describe this as ingestion; do not invent an acquisition command or wrap a machine-local copy in `run`.
-  Reproducible transformations start from the saved bytes.
-  If the source is an independently versioned dataset, consider a pinned subdataset instead.
-- **Acquisition:** record the actual public acquisition command and destination.
+- **Acquisition:** wrap the actual acquisition command in `datalad run` and declare its outputs, so execution and output recording stay together.
+  Do not replace a recordable acquisition with a bare command followed by `datalad save`.
   Retain its output for historical replay.
   Repeating a request to a changing server is a new acquisition; it need not reproduce the original bytes.
+- **Snapshot from a recoverable versioned source:** reference the source and its revision, for example through a pinned input subdataset.
+  Record any copy or transformation with `datalad run`, declaring that recoverable source as input and the destination as output.
+  Copying is a valid recorded operation; an unversioned machine-local source is the portability problem.
+- **Supplied bytes without a recoverable source:** ingest and use `datalad save -m "chore: retain supplied capture" -- sourcedata/records.jsonl` to establish a versioned input boundary.
+  Preserve any supplied acquisition metadata and state what is unknown; do not invent the generating operation.
+  This fallback records the supplied bytes, not their acquisition, and is not equivalent to capturing execution with `datalad run`.
+  Subsequent reproducible transformations consume those saved bytes.
 - **Transformation:** use `datalad run` with explicit, dataset-relative inputs and outputs, including relevant configuration and environment selections.
   Invoke public executables.
   Keep independently useful stages separately runnable.

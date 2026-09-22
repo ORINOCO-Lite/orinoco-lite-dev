@@ -23,7 +23,8 @@ Reuse Git and DataLad evidence rather than adding provenance inventories or scor
 ## Calibration examples
 
 - Recorded `cp ../../../Users/person/source.jsonl sourcedata/records.jsonl`: the destination may be recoverable, but the copy cannot be claimed portable.
-  Ingest and save supplied bytes; replay downstream transformations from them.
+  Prefer recording acquisition or a copy from a recoverable versioned source.
+  If only supplied bytes are available, ingest and save them, disclose the source-provenance gap, and replay downstream transformations from that saved boundary.
 - Same command after a package upgrade: useful recomputation, not automatically a historical reproduction.
   Check which environment actually executed it.
 - A clone without the original source path successfully transforms retained data: evidence for that transformation's portability, not for replaying acquisition or accessing every remote on another person's machine.
