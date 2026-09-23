@@ -214,14 +214,14 @@ def _safe_output(path: Path) -> None:
 
 
 def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
-    """Replace records and companions, preserving authored inputs and captures."""
+    """Replace records and companions, preserving authored inputs and dumps."""
 
     targets = [site_inputs / "metadata/records",
                site_inputs / "metadata/overlays/annotations"]
     for target in targets:
         _safe_output(target)
         if source.resolve().is_relative_to(target.resolve()):
-            raise snapshot.SnapshotError(f"capture is inside a replaced output: {source}")
+            raise snapshot.SnapshotError(f"dump is inside a replaced output: {source}")
         if target.exists() and not target.is_dir():
             raise snapshot.SnapshotError(f"metadata output is not a directory: {target}")
     site_inputs.parent.mkdir(parents=True, exist_ok=True)
@@ -286,7 +286,7 @@ def yaml_to_jsonl(site_inputs: Path, output: Path) -> list[snapshot.RecordEnvelo
 def register(subparsers: Any) -> None:
     from .diagnostics import options
     parser = subparsers.add_parser("jsonl-to-yaml", help="write YAML records from downloaded JSONL",
-        description="Convert captured JSONL into site-specific/metadata. Only metadata/records "
+        description="Convert a JSONL dump into site-specific/metadata. Only metadata/records "
                     "and metadata/overlays/annotations are replaced; use --force for existing metadata.")
     options(parser)
     parser.add_argument("--source", type=Path, help="JSONL input (default: DIRECTORY/downloaded/records.jsonl)")

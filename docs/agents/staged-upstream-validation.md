@@ -237,7 +237,7 @@ orinoco-lite dev records diff --summary
 ```
 
 For a downstream, `pixi run setup-upstream` composes template application, package selection, capture, conversion, and site import with DataLad provenance.
-`dev upstream populate --reuse-capture` retains the Pool capture and repeats conversion and site import.
+`dev upstream populate --reuse-dump` retains the records dump and repeats conversion and site import.
 Annotation companions preserve machine attribution separately and rejoin it for JSONL reconstruction.
 Record comparison preserves scalar types, null versus missing values, array order, and duplicates.
 A diff exit code of 1 means differences.

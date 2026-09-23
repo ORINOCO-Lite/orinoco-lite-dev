@@ -56,22 +56,22 @@ def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path
     run(site, "git", "config", "user.email", "test@example.invalid")
     (site / "pixi.toml").write_text('[workspace]\nname="fixture"\n')
     (site / "pixi.lock").write_text("fixture version one\n")
-    capture = site / "sourcedata/downloaded/records.jsonl"
-    capture.parent.mkdir(parents=True)
-    capture.write_text(json.dumps({"pid": "ex:person", "schema_type": "xyzri:XYZPerson", "name": "One"}) + "\n")
+    dump = site / "sourcedata/downloaded/records.jsonl"
+    dump.parent.mkdir(parents=True)
+    dump.write_text(json.dumps({"pid": "ex:person", "schema_type": "xyzri:XYZPerson", "name": "One"}) + "\n")
     supplied = tmp_path / "supplied.jsonl"
-    supplied.write_bytes(capture.read_bytes())
-    capture.unlink()
-    manifest = capture.with_name(capture.name + ".manifest.json")
+    supplied.write_bytes(dump.read_bytes())
+    dump.unlink()
+    manifest = dump.with_name(dump.name + ".manifest.json")
     if layout == "submodule":
-        manifest.write_text('{"source": "previous capture"}\n')
+        manifest.write_text('{"source": "previous dump"}\n')
     else:
-        supplied.with_name(supplied.name + ".manifest.json").write_text('{"source": "supplied capture"}\n')
-    note = capture.parent / "notes.txt"
+        supplied.with_name(supplied.name + ".manifest.json").write_text('{"source": "supplied dump"}\n')
+    note = dump.parent / "notes.txt"
     note.write_text("saved note\n")
     commit(site, "test: environment")
     note.write_text("unfinished note edit\n")
-    scratch = capture.parent / "scratch.txt"
+    scratch = dump.parent / "scratch.txt"
     scratch.write_text("untracked work\n")
     # Replace only remote source resolution, so commands, conversion, file import,
     # DataLad recording, and rerun all execute their real implementations.
@@ -89,12 +89,12 @@ raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], TEST_WWW=str(www))
-    run(site, "orinoco-lite", "dev", "upstream", "populate", "--snapshot", str(supplied), "--site-layout", layout, env=env)
+    run(site, "orinoco-lite", "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, env=env)
     supplied.unlink()
-    ingestion = run(site, "git", "log", "--format=%B", "--grep=retain supplied pool capture")
+    ingestion = run(site, "git", "log", "--format=%B", "--grep=retain supplied records dump")
     assert ingestion
     assert "DATALAD RUNCMD" not in ingestion
-    ingestion_commit = run(site, "git", "log", "-1", "--format=%H", "--grep=retain supplied pool capture")
+    ingestion_commit = run(site, "git", "log", "-1", "--format=%H", "--grep=retain supplied records dump")
     assert set(run(site, "git", "show", "--format=", "--name-only", ingestion_commit).splitlines()) == {
         "sourcedata/downloaded/records.jsonl", "sourcedata/downloaded/records.jsonl.manifest.json",
     }
@@ -104,10 +104,10 @@ raise SystemExit(cli.main())
     assert not run(site, "git", "ls-files", "--", "sourcedata/downloaded/scratch.txt")
     assert scratch.read_text() == "untracked work\n"
     # Reuse accepts unrelated dirty files and still performs site import.
-    (www / "content/contact.md").write_text("Reused capture import\n")
-    commit(www, "test: update site before capture reuse")
-    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-capture", env=env)
-    assert (site / "site-specific/content/contact.md").read_text() == "Reused capture import\n"
+    (www / "content/contact.md").write_text("Reused dump import\n")
+    commit(www, "test: update site before dump reuse")
+    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", env=env)
+    assert (site / "site-specific/content/contact.md").read_text() == "Reused dump import\n"
     assert note.read_text() == "unfinished note edit\n"
     assert scratch.read_text() == "untracked work\n"
     note.write_text("saved note\n")
@@ -140,7 +140,7 @@ raise SystemExit(cli.main())
     assert (site / "site-specific/content/contact.md").read_text() == "Version two\n"
     assert not (site / "site-specific/content/persons/example/photo.png").exists()
     # New data can pass through the same conversion run without changing commands.
-    capture.write_text(json.dumps({"pid": "ex:person", "schema_type": "xyzri:XYZPerson", "name": "Two"}) + "\n")
+    dump.write_text(json.dumps({"pid": "ex:person", "schema_type": "xyzri:XYZPerson", "name": "Two"}) + "\n")
     commit(site, "test: refresh input")
     run(site, "datalad", "rerun", conversion[1], env=env)
     rows = list((site / "site-specific/metadata/records").rglob("*.yaml"))
@@ -184,7 +184,7 @@ def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection)
         if selection == "staged":
             run(tmp_path, "git", "add", "pixi.lock")
     before = run(tmp_path, "git", "status", "--porcelain")
-    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-capture"], cwd=tmp_path,
+    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-dump"], cwd=tmp_path,
                             capture_output=True, text=True)
     assert result.returncode == 2, result.stdout + result.stderr
     assert "Record the package selection and lock" in result.stderr
@@ -200,22 +200,22 @@ def test_reuse_requires_saved_capture_before_writes(tmp_path, state):
     run(tmp_path, "git", "config", "user.email", "test@example.invalid")
     (tmp_path / "pixi.toml").write_text('[workspace]\nname="fixture"\n')
     (tmp_path / "pixi.lock").write_text("saved lock\n")
-    capture = tmp_path / "source data/downloaded/records.jsonl"
-    capture.parent.mkdir(parents=True)
+    dump = tmp_path / "source data/downloaded/records.jsonl"
+    dump.parent.mkdir(parents=True)
     if state not in {"untracked", "staged-new"}:
-        capture.write_text("saved capture\n")
+        dump.write_text("saved dump\n")
     commit(tmp_path, "test: saved inputs")
-    capture.write_text("unsaved capture\n")
+    dump.write_text("unsaved dump\n")
     if state.startswith("staged"):
-        run(tmp_path, "git", "add", str(capture))
+        run(tmp_path, "git", "add", str(dump))
     if state == "staged-restored":
-        capture.write_text("saved capture\n")
+        dump.write_text("saved dump\n")
     before = run(tmp_path, "git", "status", "--porcelain")
     head = run(tmp_path, "git", "rev-parse", "HEAD")
-    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-capture",
+    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-dump",
                              "--directory", "source data"], cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 2, result.stdout + result.stderr
-    assert 'datalad save -m "chore: retain pool capture" -- source\\ data/downloaded/records.jsonl' in result.stderr
+    assert 'datalad save -m "chore: retain records dump" -- source\\ data/downloaded/records.jsonl' in result.stderr
     assert run(tmp_path, "git", "status", "--porcelain") == before
     assert run(tmp_path, "git", "rev-parse", "HEAD") == head
     assert not (tmp_path / "site-specific").exists()

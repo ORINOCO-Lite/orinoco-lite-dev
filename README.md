@@ -80,7 +80,7 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-Setup captures records, converts them to site-specific YAML, and imports upstream site content and media into the downstream.
+Setup downloads a records dump, converts them to site-specific YAML, and imports upstream site content and media into the downstream.
 The template remains generic.
 Setup stops before projection and building; run `pixi run build` in the downstream when ready.
 

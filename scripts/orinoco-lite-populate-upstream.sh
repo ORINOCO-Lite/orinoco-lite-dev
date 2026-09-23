@@ -6,33 +6,33 @@ directory=sourcedata
 destination=site-specific
 api=https://pool.psychoinformatics.de/api
 site_layout=submodule
-snapshot=
+supplied_dump=
 site_specific=
-reuse_capture=false
+reuse_dump=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --directory) directory=$2; shift 2 ;;
     --destination) destination=$2; shift 2 ;;
     --api) api=$2; shift 2 ;;
     --site-layout) site_layout=$2; shift 2 ;;
-    --snapshot) snapshot=$2; shift 2 ;;
+    --dump) supplied_dump=$2; shift 2 ;;
     --site-specific) site_specific=$2; shift 2 ;;
-    --reuse-capture) reuse_capture=true; shift ;;
+    --reuse-dump) reuse_dump=true; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-capture=$directory/downloaded/records.jsonl
+dump_path=$directory/downloaded/records.jsonl
 [[ -f pixi.toml && -f pixi.lock ]] || { echo 'Populate requires the downstream Pixi selection and lock.' >&2; exit 2; }
 git ls-files --error-unmatch -- pixi.toml pixi.lock >/dev/null 2>&1 &&
   git diff --quiet HEAD -- pixi.toml pixi.lock || {
   echo 'Record the package selection and lock before populating the downstream.' >&2; exit 2;
 }
-[[ -z $snapshot || -f $snapshot ]] || { echo "Missing capture: $snapshot" >&2; exit 2; }
-if $reuse_capture; then
-  [[ -f $capture ]] || { echo "Missing retained capture: $capture" >&2; exit 2; }
-  if ! git ls-files --error-unmatch -- "$capture" >/dev/null 2>&1 ||
-      [[ -n $(git status --porcelain -- "$capture") ]]; then
-    printf 'Save the retained capture before reusing it:\n  datalad save -m "chore: retain pool capture" -- %q\n' "$capture" >&2
+[[ -z $supplied_dump || -f $supplied_dump ]] || { echo "Missing dump: $supplied_dump" >&2; exit 2; }
+if $reuse_dump; then
+  [[ -f $dump_path ]] || { echo "Missing retained dump: $dump_path" >&2; exit 2; }
+  if ! git ls-files --error-unmatch -- "$dump_path" >/dev/null 2>&1 ||
+      [[ -n $(git status --porcelain -- "$dump_path") ]]; then
+    printf 'Save the retained dump before reusing it:\n  datalad save -m "chore: retain records dump" -- %q\n' "$dump_path" >&2
     exit 2
   fi
 fi
@@ -45,40 +45,40 @@ fi
 if [[ ! -e $destination && $site_layout == submodule ]]; then
   datalad create --no-annex --dataset . "$destination"
 fi
-if [[ -n $snapshot ]]; then
+if [[ -n $supplied_dump ]]; then
   mkdir -p "$directory/downloaded"
   # Supplied bytes establish the replay boundary; the external path is not a
   # recoverable source for a recorded copy command.
-  if [[ ! "$snapshot" -ef "$capture" ]]; then cp "$snapshot" "$capture"; fi
-  saved_capture=("$capture")
-  if [[ -f $snapshot.manifest.json ]]; then
-    if [[ ! "$snapshot.manifest.json" -ef "$capture.manifest.json" ]]; then
-      cp "$snapshot.manifest.json" "$capture.manifest.json"
+  if [[ ! "$supplied_dump" -ef "$dump_path" ]]; then cp "$supplied_dump" "$dump_path"; fi
+  saved_dump=("$dump_path")
+  if [[ -f $supplied_dump.manifest.json ]]; then
+    if [[ ! "$supplied_dump.manifest.json" -ef "$dump_path.manifest.json" ]]; then
+      cp "$supplied_dump.manifest.json" "$dump_path.manifest.json"
     fi
-    saved_capture+=("$capture.manifest.json")
+    saved_dump+=("$dump_path.manifest.json")
   else
-    if git ls-files --error-unmatch -- "$capture.manifest.json" >/dev/null 2>&1; then
-      saved_capture+=("$capture.manifest.json")
+    if git ls-files --error-unmatch -- "$dump_path.manifest.json" >/dev/null 2>&1; then
+      saved_dump+=("$dump_path.manifest.json")
     fi
-    rm -f -- "$capture.manifest.json"
+    rm -f -- "$dump_path.manifest.json"
   fi
-  datalad save -m "chore: retain supplied pool capture
+  datalad save -m "chore: retain supplied records dump
 
 Retain supplied bytes as inputs for subsequent recorded transformations.
-The original acquisition was not executed by this workflow." -- "${saved_capture[@]}"
+The original acquisition was not executed by this workflow." -- "${saved_dump[@]}"
 
-elif ! $reuse_capture; then
-  datalad run --explicit -m "chore: capture upstream pool records" \
+elif ! $reuse_dump; then
+  datalad run --explicit -m "chore: download records dump" \
     --input pixi.toml --input pixi.lock \
-    --output "$capture" --output "$capture.manifest.json" -- \
-    orinoco-lite dev records get --output "$capture" --api "$api" --force
+    --output "$dump_path" --output "$dump_path.manifest.json" -- \
+    orinoco-lite dev records get --output "$dump_path" --api "$api" --force
 fi
 
-datalad run --explicit -m "chore: convert captured pool records" \
-  --input pixi.toml --input pixi.lock --input "$capture" \
+datalad run --explicit -m "chore: convert records dump" \
+  --input pixi.toml --input pixi.lock --input "$dump_path" \
   --output "$destination/metadata" -- \
   orinoco-lite dev records jsonl-to-yaml \
-    --source "$capture" --destination "$destination" --force
+    --source "$dump_path" --destination "$destination" --force
 
 datalad run --explicit -m "chore: import upstream site inputs" \
   --input pixi.toml --input pixi.lock \

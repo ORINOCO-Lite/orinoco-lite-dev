@@ -100,7 +100,7 @@ def test_force_replaces_capture_and_records_its_actual_origin(capture):
 
 @pytest.mark.parametrize("damage, message", [
     ("missing", "no provenance manifest"),
-    ("malformed", "Invalid Pool capture manifest"),
+    ("malformed", "Invalid records dump manifest"),
     ("not-object", "manifest is not an object"),
     ("unknown-origin", "use --force"),
     ("other-origin", "use --force"),

@@ -21,23 +21,23 @@ def register(commands):
         "and site overrides from the installed package's pinned www-from-model revision. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
         "are synchronized, including deletions; metadata is preserved."))
-    export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected presentation)")
+    export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected www-from-model checkout)")
     export.add_argument("--media-remote", help="Annex source Git URL (default: upstream host for package-selected www; existing remotes with --source)")
     export.add_argument("--revision", help="require this Git revision at the source checkout's HEAD")
     export.add_argument("--destination", type=Path, help="site-input directory (default: site-specific)")
     populate = groups.add_parser("populate", description=(
-        "Record acquisition, record conversion, and site import as separate DataLad runs. "
-        "Use --snapshot to retain a supplied capture, or --reuse-capture to transform "
-        "the retained Pool records without refetching them; site and media import still runs. "
+        "Download the public collection of a Dump Things service, convert records, and import site inputs as separate DataLad runs. "
+        "Use --dump to retain a supplied dump, or --reuse-dump to transform "
+        "the retained records without refetching them; site and media import still runs. "
         "Run individual record or import commands to repeat only that stage. Does not build, compare, or deploy."))
-    populate.add_argument("--directory", type=Path, default=Path("sourcedata"), help="capture directory (default: sourcedata)")
+    populate.add_argument("--directory", type=Path, default=Path("sourcedata"), help="dump directory (default: sourcedata)")
     populate.add_argument("--destination", type=Path, default=Path("site-specific"), help="site-input directory (default: site-specific)")
     acquisition = populate.add_mutually_exclusive_group()
-    acquisition.add_argument("--snapshot", type=Path, help="retain this JSONL capture instead of fetching")
-    acquisition.add_argument("--reuse-capture", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl (must be committed and unchanged) without refetching Pool records; still import site files")
+    acquisition.add_argument("--dump", type=Path, help="retain this JSONL dump instead of fetching")
+    acquisition.add_argument("--reuse-dump", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl (must be committed and unchanged) without refetching records; still import site files")
     populate.add_argument("--api", default=DEFAULT_API, help="public Dump Things API for acquisition")
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
-    populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip capture and imports")
+    populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip dump and imports")
 
 
 
@@ -52,13 +52,13 @@ def execute(args):
         command = ["orinoco-lite-populate-upstream.sh",
                    "--directory", relative(args.directory), "--destination", relative(args.destination),
                    "--api", args.api, "--site-layout", args.site_layout]
-        if args.snapshot:
-            command.extend(["--snapshot", relative(args.snapshot)])
-        if args.reuse_capture:
-            command.append("--reuse-capture")
+        if args.dump:
+            command.extend(["--dump", relative(args.dump)])
+        if args.reuse_dump:
+            command.append("--reuse-dump")
         if args.site_specific:
-            if args.snapshot or args.reuse_capture:
-                raise ConfigurationError("Choose --site-specific or a capture input, not both.")
+            if args.dump or args.reuse_dump:
+                raise ConfigurationError("Choose --site-specific or a dump input, not both.")
             command.extend(["--site-specific", relative(args.site_specific)])
         return subprocess.run(command, cwd=root).returncode
     source = (explicit_path(args, args.source) if args.source else
