@@ -6,40 +6,32 @@ usage() {
   cat <<'HELP'
 Usage: pixi run setup-upstream [DESTINATION] [OPTIONS]
 
-Create a downstream from a published template revision and populate it from upstream.
-Stops before projection, building, comparison, or deployment.
+Create and populate a downstream; stop before projection and building.
+Uses template origin/main and the package version and lock supplied by that template.
 
-  DESTINATION               New downstream (default: ../orinoco-lite-test-downstream)
+  DESTINATION               New directory (default: ../orinoco-lite-test-downstream)
 
 Inputs:
-  --dump PATH               Use an existing JSONL dump; convert records and import site files
-  --site-specific PATH      Install an existing dataset as a submodule; skip imports
-  --api URL                 API for a new dump (default: https://pool.psychoinformatics.de/api)
-  --site-layout MODE        Store new inputs as submodule (default) or directory
+  --dump PATH               Import an existing JSONL dump and upstream site files
+  --site-specific PATH      Use an existing dataset as a submodule instead of importing
+  --api URL                 Fetch a dump when neither input above is supplied
+                            (default: https://pool.psychoinformatics.de/api)
+  --site-layout MODE        Store imported inputs as submodule (default) or directory;
+                            ignored with --site-specific
 
-Version selection:
-  --local-heads             Use both local checkout HEADs for development
-  --template PATH           Checkout supplying the template remote (default: ../orinoco-lite-template)
-  --template-ref REV        Template revision resolved in that checkout (default: remote main)
-  --package-repository URL  Override the package repository; retain the selected revision
-  --package-revision REV    Override the package revision; retain the selected repository
+Version overrides (optional):
+  --local-heads             Use committed template and package HEADs from local checkouts
+                            (package remote: engineering origin; explicit overrides win)
+  --template PATH           Checkout whose origin supplies the template
+                            (default: ../orinoco-lite-template)
+  --template-ref REV        Use a template revision from that checkout
+  --package-repository URL  Replace the package repository, keeping its selected revision
+  --package-revision REV    Replace the package revision, keeping its selected repository
 
-Other options:
   -h, --help                Show this help
 
---dump and --site-specific are mutually exclusive. --api is used only when
-neither is supplied. --site-layout has no effect with --site-specific.
-
-By default, select remote template main and keep its declared package and lock.
---local-heads instead selects the template checkout HEAD and engineering HEAD,
-using engineering origin for the package. Explicit overrides take precedence;
-they do not require --local-heads. Outside --local-heads, package overrides
-inherit any unspecified repository or revision from the selected template.
---template always supplies the remote; --template-ref resolves in that checkout.
-
-Paths are relative to the engineering directory. Existing destinations are refused.
-Development commits must already be remotely fetchable; uncommitted changes are
-excluded. Setup does not push commits or modify either source checkout.
+Paths are relative to the engineering directory. Selected commits must be
+available from their remotes; uncommitted changes are not included.
 
 HELP
 }
