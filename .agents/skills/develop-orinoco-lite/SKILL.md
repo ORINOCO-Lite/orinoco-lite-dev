@@ -35,29 +35,12 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 
 ## Exercise a local downstream
 
-Use the Pixi composition task from the engineering checkout:
-
-```console
-pixi run setup-upstream
-```
-
-The engineering Bash task verifies a remotely fetchable immutable package candidate, creates the dataset, applies the selected template through Pixi exec, and records `package update`.
-It switches once into the downstream Pixi environment and calls `dev upstream populate`.
-No setup workflow files are copied into downstreams.
-The package's Bash population workflow records each public operation through DataLad; individual acquisition, conversion, and site-import commands do not record themselves.
-Setup stops before projection, builds, comparisons, and deployment.
-
-Use `--package-repository URL` / `--package-revision REV` for another package candidate, `--template PATH` / `--template-ref REV` for the template candidate, `--snapshot PATH` to retain a capture, and `--site-specific PATH` to install an existing ordinary Git dataset as a submodule.
-New inputs default to a non-Annex subdataset; use `--site-layout directory` to store them directly in the downstream.
-Unpublished package candidates and existing destinations are refused.
+Use the engineering `setup-upstream` task to test candidates in a fresh downstream.
+Consult its `--help` and the installed CLI help for input selection and individual stages.
 Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
 
-Repeat acquisition and transformations with `dev upstream populate`, or reuse Pool records with `--reuse-capture`; site and media import still runs.
-Individual stages accept explicit paths: `dev records get`, `dev records jsonl-to-yaml`, `dev records yaml-to-jsonl`, and `dev upstream import-from-www`.
-Record comparisons can consume the populated downstream directly.
-For software comparisons, record a new package selection and lock with `package update`, then launch a fresh `pixi run datalad rerun` for the relevant transformation commits.
-Historical replay restores the desired package, input, and subdataset states before starting Pixi.
-DataLad does not replace the running environment or automatically restore subdataset worktrees through `rerun --onto`.
+For software comparisons, retain the input data while changing the package selection.
+For historical replay, restore the desired package, input, and subdataset states before starting Pixi: DataLad does not replace a running environment or restore subdataset worktrees through `rerun --onto`.
 
 Use ordinary `orinoco-lite validate`, `build`, and `serve` commands when requested.
 The package owns projection and validation sequencing.

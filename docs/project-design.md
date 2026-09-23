@@ -160,7 +160,6 @@ It does not hold implementation code.
 Keep metadata records easy for people to read and edit.
 Store machine provenance separately in overlays so people can focus on the metadata that matters to them; combine it automatically when needed.
 Everyday commands and explanations describe records, mentioning overlays only when people need to inspect or manage provenance.
-The records should retain the same data across representations: diagrams call them “Records” throughout, with the source or format in parentheses and operations on the arrows.
 
 `extensions/source-adapters/` is exclusively for site-specific executable metadata acquisition and curation code.
 It is not a website extension surface.

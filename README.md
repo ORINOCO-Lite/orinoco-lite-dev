@@ -80,56 +80,12 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-The [setup script](tools/setup-upstream.sh) verifies that the package candidate is fetchable, creates a non-Annex dataset, applies the selected template through `pixi exec`, and records an immutable package selection and lock.
-It switches once into the downstream Pixi environment and invokes the package-owned `dev upstream populate` workflow.
-Existing destinations and unpublished package candidates are refused; setup never pushes code.
-The default package candidate is the engineering checkout's committed HEAD on its origin remote.
-Use `--package-repository URL` and `--package-revision REV` to choose another.
+Setup captures records, converts them to site-specific YAML, and imports upstream site content and media into the downstream.
+The template remains generic.
+Setup stops before projection and building; run `pixi run build` in the downstream when ready.
 
-`--template PATH` and `--template-ref REV` select a template commit; setup verifies it on that checkout's origin and records the remote URL, not the local checkout path.
-`--snapshot PATH` saves supplied bytes as the retained input boundary instead of recording a machine-local copy command; `--site-specific PATH` installs an existing dataset as a submodule and skips imports.
-New site inputs become an ordinary Git subdataset by default; `--site-layout directory` keeps them directly in the downstream repository.
-Site-specific Annex support remains a separate experiment in issue #168.
-
-In any downstream, the installed package owns the repeatable workflow:
-
-```console
-pixi run orinoco-lite dev upstream populate
-pixi run orinoco-lite dev upstream populate --reuse-capture
-```
-
-The first records a fresh acquisition, JSONL-to-YAML conversion, and site import as separate DataLad runs.
-The second reuses the Pool capture; site and media import still runs.
-`--directory` and `--destination` select the capture and site-input directories.
-Recorded acquisition and conversion commands include `--force` so reruns can replace their outputs.
-Site import follows the installed package's upstream pins and retrieves the selected upstream media into `site-specific/` as ordinary files.
-It synchronizes imported content, assets, and static files, deleting obsolete files like `rsync --delete`; metadata remains separate.
-This preparation step always uses the pinned Git Annex package through an isolated `pixi exec` / `uvx` invocation; it prints the retrieval commands.
-The generic template does not contain upstream site media, and ordinary builds do not use Annex.
-Setup and population stop before projection, builds, comparisons, and deployment.
-
-Individual commands also accept explicit paths, without recording themselves:
-
-```console
-pixi run orinoco-lite dev records get --output sourcedata/pool.jsonl --force
-pixi run orinoco-lite dev records jsonl-to-yaml --source sourcedata/pool.jsonl --destination site-specific --force
-pixi run orinoco-lite dev upstream import-from-www --destination site-specific
-pixi run orinoco-lite dev records yaml-to-jsonl --source site-specific --output inspection/records.jsonl
-pixi run orinoco-lite dev records diff sourcedata/pool.jsonl site-specific
-```
-
-`records get --api URL` supports other compatible Dump Things servers.
-Defaults use `sourcedata/downloaded/records.jsonl` and `site-specific/`; JSONL export writes `sourcedata/records.jsonl`.
-Site import reports its upstream revision and files; `--source` and `--revision` remain available for explicit upstream experiments.
-The default media source is the original upstream Annex host; `--media-remote URL` selects another source.
-With an explicit `--source` checkout, its existing Annex remotes are used unless overridden.
-
-Select a newer package with `orinoco-lite package update --revision REV`, optionally wrapped in `datalad run --explicit --output pixi.toml --output pixi.lock --`.
-It resolves the remote revision to an exact commit and updates the lock without replacing the running environment.
-Record transformations reject a running package that differs from the manifest’s immutable Git selection.
-Inspect and record the selection, then start a fresh `pixi run datalad rerun RUN_COMMIT` to execute a recorded transformation in that environment.
-Keep the capture fixed to inspect software changes, or record a fresh capture to inspect data changes.
-For historical reproduction, restore the desired environment and inputs before starting Pixi; DataLad rerun does not switch a running environment, and its `--onto` option does not restore subdataset worktrees.
+Use `pixi run setup-upstream --help` for candidate and input selection, and `pixi run orinoco-lite dev upstream --help` or `dev records --help` for individual stages.
+CLI help is the reference for options and defaults.
 
 `dev enable [PATH]` and `dev disable` remain explicit editable-development conveniences; normal setup does not use them.
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
