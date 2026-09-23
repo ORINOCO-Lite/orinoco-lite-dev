@@ -37,9 +37,10 @@ orinoco-lite = "orinoco_lite.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
+script-files = ["scripts/orinoco-lite-populate-upstream"]
 
 [tool.setuptools.package-data]
-orinoco_lite = ["default_projection.yaml", "*.sh", "_resources/**/*"]
+orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
