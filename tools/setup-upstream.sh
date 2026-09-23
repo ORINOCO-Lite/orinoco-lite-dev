@@ -11,17 +11,21 @@ Stops before projection, building, comparison, or deployment.
 
   DESTINATION               New downstream (default: ../orinoco-lite-test-downstream)
   --template PATH           Checkout selecting the template remote (default: ../orinoco-lite-template)
-  --template-ref REV        Template revision (default: HEAD)
+  --template-ref REV        Template revision in the local checkout (default: remote main)
+  --local-heads             Default to both local checkout HEADs for development
   --dump PATH               Copy an existing JSONL dump instead of fetching
   --package-repository URL  Package Git remote (default: engineering origin)
-  --package-revision REV    Fetchable package revision (default: engineering HEAD)
+  --package-revision REV    Fetchable package revision (default: remote main)
   --api URL                 Dump Things public collection API (default: https://pool.psychoinformatics.de/api)
   --site-specific PATH      Install an existing dataset as a submodule; skip imports
   --site-layout MODE        New inputs: submodule (default) or directory
   -h, --help                Show this help
 
 Paths are relative to the engineering directory. Existing destinations are refused.
-The package commit must be remotely fetchable. No editable installation is used.
+Selected commits must be remotely fetchable. No editable installation is used.
+By default, resolve main from both selected remotes without changing checkouts.
+--local-heads selects checkout HEADs instead; uncommitted changes are not included.
+Explicit --template-ref and --package-revision override the respective defaults.
 HELP
 }
 
@@ -34,6 +38,9 @@ engineering=$PWD
 destination=../orinoco-lite-test-downstream
 template=../orinoco-lite-template
 template_ref=HEAD
+local_heads=false
+explicit_template_ref=false
+explicit_package_revision=false
 dump=
 site_specific=
 site_layout=submodule
@@ -44,17 +51,18 @@ if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
+    --local-heads) local_heads=true; shift ;;
     --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
         --template) template=$2 ;;
-        --template-ref) template_ref=$2 ;;
+        --template-ref) template_ref=$2; explicit_template_ref=true ;;
         --dump) dump=$2 ;;
         --api) api=$2 ;;
         --site-specific) site_specific=$2 ;;
         --site-layout) site_layout=$2 ;;
         --package-repository) package_repository=$2 ;;
-        --package-revision) package_revision=$2 ;;
+        --package-revision) package_revision=$2; explicit_package_revision=true ;;
       esac
       shift 2 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -68,15 +76,39 @@ done
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
 
-# Verify the actual remote before creating anything; never silently publish or
-# substitute an editable checkout for an unavailable package candidate.
+template_repository=$(git -C "$template" remote get-url origin)
+if $explicit_package_revision; then
+  package_selection="explicit revision $package_revision"
+elif $local_heads; then
+  package_branch=$(git symbolic-ref --quiet --short HEAD || true)
+  package_selection="local HEAD (${package_branch:-detached HEAD})"
+else
+  package_revision=refs/heads/main
+  package_selection='remote branch main'
+fi
+if $explicit_template_ref || $local_heads; then
+  if [[ $template_ref == HEAD ]]; then
+    template_branch=$(git -C "$template" symbolic-ref --quiet --short HEAD || true)
+  else
+    template_branch=$(git -C "$template" rev-parse --symbolic-full-name "$template_ref")
+  fi
+  template_selection="local $template_ref (${template_branch:-detached commit})"
+  template_ref=$(git -C "$template" rev-parse "$template_ref^{commit}")
+else
+  template_ref=refs/heads/main
+  template_selection='remote branch main'
+fi
+
+# Resolve each selection once before creating anything. Later commands use only
+# the verified commits, even if a remote branch moves while setup runs.
 package_commit=$(orinoco-lite package update --check \
   --repository "$package_repository" --revision "$package_revision")
-
-template_ref=$(git -C "$template" rev-parse "$template_ref^{commit}")
-template_repository=$(git -C "$template" remote get-url origin)
-template_ref=$(orinoco-lite package update --check \
+template_commit=$(orinoco-lite package update --check \
   --repository "$template_repository" --revision "$template_ref")
+printf '\nSelected downstream versions:\n'
+printf '  Package:  %s\n    Source: %s\n    Commit: %s\n' "$package_repository" "$package_selection" "$package_commit"
+printf '  Template: %s\n    Source: %s\n    Commit: %s\n' "$template_repository" "$template_selection" "$template_commit"
+printf '  Uncommitted checkout changes are not included.\n\n'
 if [[ -n $dump ]]; then dump_relative=$(relative_to "$dump" "$destination"); fi
 if [[ -n $site_specific ]]; then site_relative=$(relative_to "$site_specific" "$destination"); fi
 destination=$(relative_to "$destination" "$engineering")
@@ -92,7 +124,7 @@ Executed through:
 pixi exec --spec datalad --spec copier -- datalad run
 
 DataLad records the Copier command; this note records its Pixi bootstrap." -- \
-  copier copy --defaults --vcs-ref "$template_ref" \
+  copier copy --defaults --vcs-ref "$template_commit" \
     -d include_site_specific=false "$template_repository" .
 
 # Still in the inherited engineering environment. Lock the immutable candidate;
