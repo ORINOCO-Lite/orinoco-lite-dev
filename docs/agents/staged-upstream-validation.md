@@ -232,7 +232,7 @@ Dependency selection comes from the downstream and package, without repeating up
 orinoco-lite dev records get
 orinoco-lite dev records jsonl-to-yaml
 orinoco-lite dev records yaml-to-jsonl
-cmp sourcedata/downloaded/records.jsonl sourcedata/records.jsonl
+cmp sourcedata/downloaded/records.jsonl sourcedata/yaml-jsonl/records.jsonl
 orinoco-lite dev records diff --summary
 ```
 

@@ -294,12 +294,12 @@ def register(subparsers: Any) -> None:
                         help="site-input directory (default: %(default)s)")
     parser.set_defaults(records_action="jsonl-to-yaml")
     parser = subparsers.add_parser("yaml-to-jsonl", help="rejoin YAML records and annotations into JSONL",
-        description="Rejoin site-specific metadata into sourcedata/records.jsonl. "
+        description="Rejoin site-specific metadata into sourcedata/yaml-jsonl/records.jsonl. "
                     "Use --source and --output for other paths; existing output requires --force.")
     options(parser)
     parser.add_argument("--source", type=Path, default=Path("site-specific"),
                         help="site-input directory containing metadata (default: %(default)s)")
-    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/records.jsonl)")
+    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/yaml-jsonl/records.jsonl)")
     parser.set_defaults(records_action="yaml-to-jsonl")
     parser = subparsers.add_parser("diff", help="compare two representations of the records",
         description="Compare sourcedata/downloaded/records.jsonl with site-specific metadata by default. "
@@ -337,7 +337,7 @@ def execute(args: argparse.Namespace) -> int:
             print(f"Converted {result['record_count']} records (YAML): {site_inputs}")
         elif action == "yaml-to-jsonl":
             site_inputs = explicit_path(args, args.source)
-            output = explicit_path(args, args.output) if args.output else data / "records.jsonl"
+            output = explicit_path(args, args.output) if args.output else data / "yaml-jsonl/records.jsonl"
             _safe_output(output)
             if output.exists() and not args.force:
                 raise ConfigurationError(f"JSONL output already exists: {output}; use --force to replace it")

@@ -176,7 +176,7 @@ def test_public_workflow_uses_setup_paths_and_preserves_authored_inputs(tmp_path
     assert run("jsonl-to-yaml") == 2
     assert record.read_bytes() == before
     assert run("yaml-to-jsonl") == 0
-    assert (tmp_path / "sourcedata/records.jsonl").is_file()
+    assert (tmp_path / "sourcedata/yaml-jsonl/records.jsonl").is_file()
     files = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     assert run("diff") == 1
     assert "Reviewed title" in capsys.readouterr().out
@@ -236,7 +236,7 @@ def test_native_temporary_path_and_explicit_data_directory(tmp_path, monkeypatch
     for command in ("jsonl-to-yaml", "yaml-to-jsonl", "diff"):
         assert cli.main(["dev", "records", command, "--directory", str(data)]) == 0
     assert (tmp_path / "site-specific/metadata/records").is_dir()
-    assert (data / "records.jsonl").read_bytes() == (data / "downloaded/records.jsonl").read_bytes()
+    assert (data / "yaml-jsonl/records.jsonl").read_bytes() == (data / "downloaded/records.jsonl").read_bytes()
 
 
 def test_public_conversion_preserves_annotation_values_without_edits(tmp_path, monkeypatch):
@@ -254,7 +254,7 @@ def test_public_conversion_preserves_annotation_values_without_edits(tmp_path, m
     snapshot.write_jsonl(root / 'downloaded/records.jsonl', [original])
     for command in ('jsonl-to-yaml', 'yaml-to-jsonl', 'diff'):
         assert cli.main(['dev', 'records', command]) == 0
-    assert snapshot.load_jsonl(root / 'records.jsonl')[0].record == original.record
+    assert snapshot.load_jsonl(root / 'yaml-jsonl/records.jsonl')[0].record == original.record
 
 
 def test_diff_filters_and_repeated_inspection_write_nothing(tmp_path, monkeypatch, capsys):
@@ -297,7 +297,7 @@ def test_public_roundtrip_preserves_original_pav_forms(tmp_path, monkeypatch, pr
     snapshot.write_jsonl(tmp_path / 'downloaded/records.jsonl', [original])
     for command in ('jsonl-to-yaml', 'yaml-to-jsonl', 'diff'):
         assert cli.main(['dev', 'records', command, '--directory', str(tmp_path)]) == 0
-    assert snapshot.load_jsonl(tmp_path / 'records.jsonl')[0].record == original.record
+    assert snapshot.load_jsonl(tmp_path / 'yaml-jsonl/records.jsonl')[0].record == original.record
     # Retained original syntax must not contradict the provenance values.
     if prefix != 'pav:' or expanded:
         import yaml
@@ -344,7 +344,7 @@ def test_download_yaml_jsonl_can_be_verified_by_byte_comparison(tmp_path, monkey
         assert cli.main(["dev", "records", command, "--directory", str(tmp_path)]) == 0
 
     downloaded = (tmp_path / "downloaded/records.jsonl").read_bytes()
-    reconstructed = (tmp_path / "records.jsonl").read_bytes()
+    reconstructed = (tmp_path / "yaml-jsonl/records.jsonl").read_bytes()
     # Independent standard-library expectation; no project comparator.
     expected = "".join(json.dumps(row, sort_keys=True, ensure_ascii=False,
                                  separators=(",", ":")) + "\n" for row in reversed(rows)).encode()
