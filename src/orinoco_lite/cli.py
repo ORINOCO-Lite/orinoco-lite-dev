@@ -13,7 +13,7 @@ import subprocess
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
-from . import __version__, source_description
+from . import __version__
 from .config import (
     github_repository,
     load_workspace,
@@ -33,7 +33,7 @@ def _parser() -> argparse.ArgumentParser:
                 "'orinoco-lite dev --help' when contributing package or template changes."),
     )
     parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
-    parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}\nsource: {source_description()}")
+    parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     validate = commands.add_parser(

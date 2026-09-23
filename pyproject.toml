@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools==80.9.0", "PyYAML==6.0.2"]
+requires = ["setuptools==80.9.0", "PyYAML==6.0.2", "versioneer[toml]==0.29"]
 build-backend = "_build_backend"
 backend-path = ["."]
 
 [project]
 name = "orinoco-lite"
-version = "0.3.0rc6"
+dynamic = ["version"]
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
 license = "MIT"
@@ -49,3 +49,11 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra --import-mode=importlib"
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "src/orinoco_lite/_version.py"
+versionfile_build = "orinoco_lite/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "orinoco_lite-"

@@ -151,15 +151,6 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_installed_package_inside_engineering_environment_is_not_a_checkout(tmp_path, monkeypatch):
-    import orinoco_lite
-    (tmp_path / ".git").mkdir()
-    (tmp_path / "release").mkdir()
-    (tmp_path / "release/package-resources.yaml").touch()
-    module = tmp_path / ".pixi/envs/default/lib/python3.12/site-packages/orinoco_lite/__init__.py"
-    monkeypatch.setattr(orinoco_lite, "__file__", str(module))
-    assert orinoco_lite.source_description() == "installed package"
-
 
 def test_validate_checks_inputs_without_generating_projection():
     args = cli._parser().parse_args(["validate", "--no-cache"])
