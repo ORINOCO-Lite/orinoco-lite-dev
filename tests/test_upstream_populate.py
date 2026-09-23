@@ -42,7 +42,10 @@ def make_website(root):
 
 
 @pytest.mark.parametrize("layout", ["directory", "submodule"])
-def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path, layout):
+def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path, layout, monkeypatch):
+    for role in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
+        monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.invalid")
     if not shutil.which("datalad"):
         pytest.skip("Run in the engineering Pixi environment for DataLad coverage")
     www = tmp_path / "www"
