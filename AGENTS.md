@@ -37,6 +37,8 @@
 
 ## Minimum machinery
 
+- Use `.agents/skills/review-terminology/SKILL.md` before establishing or changing shared component or interface terminology, or when a term denotes different things across code, configuration, and guidance.
+  Delegate its exploratory review to a sub-agent and use the returned recommendations to resolve naming before implementation depends on it.
 - Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.
   Add only project-specific behavior around it.
   A parallel implementation requires a demonstrated gap, an explanation of why composition cannot address it, and explicit user agreement before implementation.
