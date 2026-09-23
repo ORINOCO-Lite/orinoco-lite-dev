@@ -11,11 +11,11 @@ Stops before projection, building, comparison, or deployment.
 
   DESTINATION               New downstream (default: ../orinoco-lite-test-downstream)
   --template PATH           Checkout selecting the template remote (default: ../orinoco-lite-template)
-  --template-ref REV        Template revision (default: local HEAD)
-  --latest-main             Select remote main for both package and template
+  --template-ref REV        Template revision in the local checkout (default: remote main)
+  --local-heads             Default to both local checkout HEADs for development
   --dump PATH               Copy an existing JSONL dump instead of fetching
   --package-repository URL  Package Git remote (default: engineering origin)
-  --package-revision REV    Fetchable package revision (default: engineering HEAD)
+  --package-revision REV    Fetchable package revision (default: remote main)
   --api URL                 Dump Things public collection API (default: https://pool.psychoinformatics.de/api)
   --site-specific PATH      Install an existing dataset as a submodule; skip imports
   --site-layout MODE        New inputs: submodule (default) or directory
@@ -23,9 +23,9 @@ Stops before projection, building, comparison, or deployment.
 
 Paths are relative to the engineering directory. Existing destinations are refused.
 Selected commits must be remotely fetchable. No editable installation is used.
-By default, use local checkout HEADs; uncommitted changes are not included.
---latest-main resolves main from the selected remotes without changing checkouts.
-It cannot be combined with --template-ref or --package-revision.
+By default, resolve main from both selected remotes without changing checkouts.
+--local-heads selects checkout HEADs instead; uncommitted changes are not included.
+Explicit --template-ref and --package-revision override the respective defaults.
 HELP
 }
 
@@ -38,7 +38,7 @@ engineering=$PWD
 destination=../orinoco-lite-test-downstream
 template=../orinoco-lite-template
 template_ref=HEAD
-latest_main=false
+local_heads=false
 explicit_template_ref=false
 explicit_package_revision=false
 dump=
@@ -51,7 +51,7 @@ if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
-    --latest-main) latest_main=true; shift ;;
+    --local-heads) local_heads=true; shift ;;
     --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
@@ -68,10 +68,6 @@ while [[ $# -gt 0 ]]; do
     *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
-if $latest_main && { $explicit_template_ref || $explicit_package_revision; }; then
-  echo 'Choose --latest-main or explicit revisions (--template-ref / --package-revision), not both.' >&2
-  exit 2
-fi
 [[ -f release/package-resources.yaml ]] || { echo 'Run through the engineering Pixi task.' >&2; exit 2; }
 [[ ! -e $destination && ! -L $destination ]] || { echo "Destination already exists: $destination" >&2; exit 2; }
 [[ -d $template ]] || { echo "Missing template: $template" >&2; exit 2; }
@@ -81,18 +77,16 @@ fi
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
 
 template_repository=$(git -C "$template" remote get-url origin)
-if $latest_main; then
-  package_revision=refs/heads/main
-  template_ref=refs/heads/main
-  package_selection='remote branch main'
-  template_selection='remote branch main'
+if $explicit_package_revision; then
+  package_selection="explicit revision $package_revision"
+elif $local_heads; then
+  package_branch=$(git symbolic-ref --quiet --short HEAD || true)
+  package_selection="local HEAD (${package_branch:-detached HEAD})"
 else
-  if $explicit_package_revision; then
-    package_selection="explicit revision $package_revision"
-  else
-    package_branch=$(git symbolic-ref --quiet --short HEAD || true)
-    package_selection="local HEAD (${package_branch:-detached HEAD})"
-  fi
+  package_revision=refs/heads/main
+  package_selection='remote branch main'
+fi
+if $explicit_template_ref || $local_heads; then
   if [[ $template_ref == HEAD ]]; then
     template_branch=$(git -C "$template" symbolic-ref --quiet --short HEAD || true)
   else
@@ -100,6 +94,9 @@ else
   fi
   template_selection="local $template_ref (${template_branch:-detached commit})"
   template_ref=$(git -C "$template" rev-parse "$template_ref^{commit}")
+else
+  template_ref=refs/heads/main
+  template_selection='remote branch main'
 fi
 
 # Resolve each selection once before creating anything. Later commands use only

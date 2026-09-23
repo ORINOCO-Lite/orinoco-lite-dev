@@ -73,7 +73,7 @@ elif name == "datalad" and args[0] == "create":
 @pytest.mark.parametrize("latest", [False, True])
 def test_selection_summary_and_immutable_handoff(setup, latest):
     run, engineering, template, destination, package_head, template_head = setup
-    result, calls = run(*(["--latest-main"] if latest else []))
+    result, calls = run(*([] if latest else ["--local-heads"]))
     assert result.returncode == 0, result.stderr
     expected_package, expected_template = ("a" * 40, "b" * 40) if latest else (package_head, template_head)
     assert f"Commit: {expected_package}" in result.stdout
@@ -97,16 +97,17 @@ def test_selection_summary_and_immutable_handoff(setup, latest):
     assert git(template, "branch", "--show-current") == "template-candidate"
 
 
+@pytest.mark.parametrize("local", [False, True])
 @pytest.mark.parametrize("option", ["--template-ref", "--package-revision"])
-@pytest.mark.parametrize("latest_first", [False, True])
-def test_latest_main_rejects_explicit_revision_before_external_operations(setup, option, latest_first):
-    run, _, _, destination, _, _ = setup
-    arguments = ["--latest-main", option, "HEAD"] if latest_first else [option, "HEAD", "--latest-main"]
-    result, calls = run(*arguments)
-    assert result.returncode == 2
-    assert "Choose --latest-main or explicit revisions" in result.stderr
-    assert not calls
-    assert not destination.exists()
+def test_explicit_revision_overrides_only_its_selection(setup, local, option):
+    run, _, _, _, package_head, template_head = setup
+    selected = template_head if option == "--template-ref" else "c" * 40
+    result, calls = run(*(["--local-heads"] if local else []), option, selected)
+    assert result.returncode == 0, result.stderr
+    expected_package = selected if option == "--package-revision" else package_head if local else "refs/heads/main"
+    expected_template = selected if option == "--template-ref" else template_head if local else "refs/heads/main"
+    assert calls[0][-1] == expected_package
+    assert calls[1][-1] == expected_template
 
 
 def test_explicit_selections_and_detached_template(setup):
@@ -122,7 +123,7 @@ def test_explicit_selections_and_detached_template(setup):
 
 def test_unavailable_remote_main_does_not_create_destination(setup):
     run, _, _, destination, _, _ = setup
-    result, calls = run("--latest-main", fail=True)
+    result, calls = run(fail=True)
     assert result.returncode == 2
     assert not destination.exists()
     assert all(call[0] == "orinoco-lite" for call in calls)
