@@ -410,8 +410,33 @@ def test_old_overlay_path_requires_explicit_rename(tmp_path, both):
     for operation in (lambda: annotation_root(workspace),
                       lambda: stages.yaml_to_jsonl(site, tmp_path / "export.jsonl"),
                       lambda: stages.jsonl_to_yaml(dump, site)):
-        with pytest.raises(ConfigurationError, match="git mv --"):
+        with pytest.raises(ConfigurationError, match="git -C .* mv --"):
             operation()
         assert marker.read_text() == "old overlay\n"
     assert not (metadata / "records").exists()
     assert not (tmp_path / "export.jsonl").exists()
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_overlay_move_hint_works_in_owning_repository(tmp_path, nested):
+    import shlex
+    import subprocess
+    from types import SimpleNamespace
+    from orinoco_lite.annotations import annotation_root
+    from orinoco_lite.errors import ConfigurationError
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    site = tmp_path / "site-specific"
+    site.mkdir()
+    if nested:
+        subprocess.run(["git", "init", "-q", str(site)], check=True)
+    metadata = site / "metadata"
+    old = metadata / "overlays/annotations"
+    old.mkdir(parents=True)
+    (old / "record.yaml").write_text("retained overlay\n")
+    subprocess.run(["git", "-C", str(site), "add", "metadata"], check=True)
+    with pytest.raises(ConfigurationError) as error:
+        annotation_root(SimpleNamespace(path=lambda name: metadata / "records"))
+    command = str(error.value).split("Rename it with: ", 1)[1].split(". If both", 1)[0]
+    subprocess.run(shlex.split(command), cwd=tmp_path, check=True)
+    assert not old.exists()
+    assert (metadata / "overlays/machine-provenance-annotations/record.yaml").read_text() == "retained overlay\n"

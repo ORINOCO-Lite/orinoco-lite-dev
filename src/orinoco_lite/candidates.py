@@ -336,13 +336,13 @@ class Candidate:
         )
         baseline_companion = _companion(
             self.baseline_companion,
-            label="Candidate baseline companion",
+            label="Candidate baseline overlay",
             expected_pid=pid,
             record=baseline_record,
         )
         proposed_companion = _companion(
             self.proposed_companion,
-            label="Candidate proposed companion",
+            label="Candidate proposed overlay",
             expected_pid=pid,
             record=proposed_record,
         )
@@ -436,7 +436,7 @@ class Candidate:
         return canonical_yaml_bytes(dict(record))
 
     def canonical_companion_bytes(self, *, proposed: bool) -> bytes | None:
-        """Serialize one side of the companion proposal with the shared writer."""
+        """Serialize one side of the overlay proposal with the shared writer."""
 
         companion = self.proposed_companion if proposed else self.baseline_companion
         if companion is None:
@@ -472,7 +472,7 @@ def _companion_assertions(
     if not isinstance(assertions, list) or not all(
         isinstance(assertion, Mapping) for assertion in assertions
     ):
-        raise AssertionError("validated companion has invalid assertions")
+        raise AssertionError("validated overlay has invalid assertions")
     return tuple(assertions)
 
 
@@ -480,7 +480,7 @@ def _assertion_selector(assertion: Mapping[str, object]) -> tuple[str, str]:
     path = assertion.get("path")
     digest = assertion.get("assertion_sha256")
     if not isinstance(path, str) or not isinstance(digest, str):
-        raise AssertionError("validated companion has an invalid selector")
+        raise AssertionError("validated overlay has an invalid selector")
     return path, digest
 
 
@@ -558,7 +558,7 @@ class CandidatePlan:
                     continue
                 if assertion.get("pav:importedBy") != adapter_agent_pid:
                     raise ConfigurationError(
-                        "New or changed companion assertion does not use the "
+                        "New or changed overlay assertion does not use the "
                         "candidate-plan adapter agent PID"
                     )
 

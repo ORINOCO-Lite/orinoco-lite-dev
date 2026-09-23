@@ -1,4 +1,4 @@
-"""Companion-aware use of the pinned Things enrichment helpers."""
+"""Overlay-aware use of the pinned Things enrichment helpers."""
 
 from __future__ import annotations
 

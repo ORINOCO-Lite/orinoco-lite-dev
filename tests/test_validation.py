@@ -41,7 +41,7 @@ class DownstreamValidationTests(unittest.TestCase):
         old = self.root / "site-specific/metadata/overlays/annotations"
         old.parent.mkdir(parents=True, exist_ok=True)
         old.symlink_to(self.root / "missing-overlay-directory")
-        with self.assertRaisesRegex(ConfigurationError, "git mv --"):
+        with self.assertRaisesRegex(ConfigurationError, "git -C .* mv --"):
             load_workspace(self.root)
 
     def setUp(self) -> None:

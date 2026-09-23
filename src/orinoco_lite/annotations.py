@@ -140,7 +140,7 @@ def annotation_companion(
 ) -> dict[str, object]:
     """Build one deterministic overlay file from current assertion provenance."""
 
-    pid = _line(record, "Companion record")
+    pid = _line(record, "Overlay record")
     entries = [_annotation_entry(value) for value in assertions]
     entries.sort(key=lambda item: (item["path"], item["assertion_sha256"]))
     selectors = [(item["path"], item["assertion_sha256"]) for item in entries]
@@ -197,8 +197,8 @@ def _validated_companion(value: object, record_pid: str) -> list[dict[str, Any]]
 def _check_overlay_path(metadata: Path) -> None:
     old = metadata / "overlays/annotations"
     if old.exists() or old.is_symlink():
-        new = metadata / ANNOTATION_RELATIVE
-        command = shlex.join(["git", "mv", "--", str(old), str(new)])
+        command = shlex.join(["git", "-C", str(metadata), "mv", "--",
+                              "overlays/annotations", str(ANNOTATION_RELATIVE)])
         raise ConfigurationError(
             f"Old overlay path is unsupported: {old}. Rename it with: {command}. "
             "If both directories exist, reconcile their contents before moving the old directory."
