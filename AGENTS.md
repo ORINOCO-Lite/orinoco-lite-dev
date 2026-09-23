@@ -18,6 +18,8 @@
   Use the real browser action and verify the resulting pull-request commit and trusted workflow.
   A downstream may select an official release, a release from its own fork, or an exact package commit from any suitable fork.
   An immutable Git commit is a sufficient reproducibility coordinate; do not require a central release or a separate release lock.
+  For adopted dependency pins, use commits reachable from the source repository's maintained default branch or a retained release tag.
+  Pull-request-only commits are temporary test candidates; replace them with retained commits before adoption because deleting a branch can remove their only durable reference.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
 - Prefer one source of truth.
@@ -37,6 +39,9 @@
 
 ## Minimum machinery
 
+- Across the package and template, CI installs the latest Pixi without a version pin; manifests require `>=0.76` without an upper bound.
+  Set `PIXI_LOCKED=true` in CI and local shells, and use locked installation rather than frozen execution or lock-file byte comparisons.
+  Unset `PIXI_LOCKED` only for deliberate dependency updates; do not restore Pixi pins to work around lock serialization changes.
 - Use `.agents/skills/review-terminology/SKILL.md` before establishing or changing shared component or interface terminology, or when a term denotes different things across code, configuration, and guidance.
   Delegate its exploratory review to a sub-agent and use the returned recommendations to resolve naming before implementation depends on it.
 - Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.

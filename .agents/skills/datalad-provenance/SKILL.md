@@ -41,6 +41,7 @@ Keep the package selection and lock committed.
 A run record does not capture its outer launcher automatically or restore software on rerun.
 Record an exceptional bootstrap invocation in the run message when necessary.
 Avoid editable/local-only software for a claimed independently recoverable result; exact available commits are sufficient without requiring releases or additional ledgers.
+For adopted software pins, verify that a maintained default branch or retained release tag keeps the commit reachable; a SHA that is fetchable only through a temporary pull-request branch is not a retention guarantee.
 
 Inspect `datalad status` before writing, and save only the intended paths.
 Preserve unrelated changes.

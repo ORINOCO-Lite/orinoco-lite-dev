@@ -24,7 +24,9 @@ The central curation service, or an optional replacement, provides only GitHub a
 
 ## Command environment
 
-Use the Pixi version range declared in the repository's `pixi.toml`.
+Use Pixi 0.76 or newer; CI always installs the latest Pixi.
+Older local versions receive best-effort support without a formal version matrix.
+Use `pixi run --locked <command>` to reject stale dependency locks without rewriting them.
 Before running the commands below, enter that repository's environment:
 
 ```console
@@ -37,7 +39,7 @@ To leave an already installed environment and its lock unchanged, use `pixi shel
 See the [Pixi shell options](https://pixi.prefix.dev/latest/reference/cli/pixi/shell/).
 Run installed commands directly inside the shell; use `exit` before switching repositories and activating another environment.
 For noninteractive execution, use `pixi run <command>`.
-Commands that intentionally change dependencies use `PIXI_LOCKED=false` to allow the required lock update, as shown below.
+For a deliberate dependency update, run `env -u PIXI_LOCKED pixi lock`, then review and commit the manifest and lock changes.
 
 ## Downstream interface
 
@@ -85,8 +87,8 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-Setup defaults to the package and template remotes' `main` branches and prints both resolved commits before creating the downstream.
-For development with the checkouts' current commits, use `pixi run setup-upstream --local-heads`; explicit revision options override either selection.
+Setup selects the template remote's `main` commit and keeps that template's declared package dependency and lock.
+For development with both checkouts' current commits, use `pixi run setup-upstream --local-heads`; explicit overrides are also available independently.
 
 See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.
 Setup stops before projection and building; run `pixi run build` in the downstream when ready.

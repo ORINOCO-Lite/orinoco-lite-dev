@@ -28,7 +28,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         manifest = tomllib.loads(serialized)
         workspace = manifest["workspace"]
-        self.assertEqual(workspace["requires-pixi"], ">=0.76,<0.77")
         self.assertEqual(manifest["dependencies"]["python"], ">=3.12,<3.13")
         for name in ("hugo", "nodejs", "make"):
             self.assertIn(name, manifest["dependencies"])

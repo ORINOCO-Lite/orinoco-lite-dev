@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PIXI_LOCKED: "true"
+
 jobs:
   package:
     name: Engineering contracts (${{ matrix.runner }})
@@ -45,11 +48,7 @@ jobs:
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: true
-          frozen: true
-          pixi-version: v0.76.2
-
-      - name: Check dependency locks
-        run: pixi lock --check
+          locked: true
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files
@@ -65,7 +64,7 @@ jobs:
         run: |
           pixi run build-package
           wheels=(build/package/*.whl)
-          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          env -u PIXI_LOCKED pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run python - <<'PY'
           from importlib.metadata import distribution
           import json
