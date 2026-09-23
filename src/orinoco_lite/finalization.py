@@ -266,7 +266,7 @@ def _verify_base_candidate(
         )
     if (companion_bytes is None) != (expected_companion is None):
         raise ConfigurationError(
-            f"Candidate baseline companion presence does not match Git at "
+            f"Candidate baseline overlay presence does not match Git at "
             f"{candidate.companion_repository_path}"
         )
     record: dict[str, Any] | None = None
@@ -285,10 +285,10 @@ def _verify_base_candidate(
             )
     if companion_bytes is not None and expected_companion is not None:
         if record is None:  # pragma: no cover - presence check above
-            raise AssertionError("baseline companion has no baseline record")
+            raise AssertionError("baseline overlay file has no baseline record")
         companion = _load_mapping(
             companion_bytes,
-            f"Baseline companion {candidate.companion_repository_path}",
+            f"Baseline overlay {candidate.companion_repository_path}",
         )
         validate_annotation_companion(record, companion)
         if not _semantic_equal(companion, expected_companion):
@@ -519,7 +519,7 @@ def _assertions(
         return ()
     raw = companion.get("assertions")
     if not isinstance(raw, list) or not all(isinstance(item, Mapping) for item in raw):
-        raise AssertionError("validated candidate companion has invalid assertions")
+        raise AssertionError("validated candidate overlay has invalid assertions")
     return tuple(dict(item) for item in raw)
 
 
@@ -543,7 +543,7 @@ def _selector_is_stale(
         ) from error
     retained = reconciled.get("assertions")
     if not isinstance(retained, list):  # pragma: no cover - helper invariant
-        raise AssertionError("reconciled companion has invalid assertions")
+        raise AssertionError("reconciled overlay has invalid assertions")
     return not retained
 
 
@@ -565,7 +565,7 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
     companion_source = _worktree_mapping(
         worktree,
         candidate.companion_repository_path,
-        label="Accepted companion",
+        label="Accepted overlay",
         canonical=True,
     )
     baseline = {_selector(item): item for item in _assertions(candidate.baseline_companion)}
@@ -577,7 +577,7 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
         missing = sorted(retained_baseline)
         if missing:
             raise ConfigurationError(
-                f"Accepted companion removed non-proposal assertions for "
+                f"Accepted overlay removed non-proposal assertions for "
                 f"{candidate.pid}: {missing!r}"
             )
         return
@@ -586,12 +586,12 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
     raw_assertions = current.get("assertions")
     if not isinstance(raw_assertions, list):
         raise ConfigurationError(
-            f"Accepted companion assertions must be a list for {candidate.pid}"
+            f"Accepted overlay assertions must be a list for {candidate.pid}"
         )
     rebuilt = annotation_companion(candidate.pid, raw_assertions)
     if current != rebuilt:
         raise ConfigurationError(
-            f"Accepted companion has changed fields, identity, or assertion order "
+            f"Accepted overlay has changed fields, identity, or assertion order "
             f"for {candidate.pid}"
         )
     current_assertions = tuple(dict(item) for item in rebuilt["assertions"])
@@ -599,7 +599,7 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
     missing = retained_baseline - set(current_by_selector)
     if missing:
         raise ConfigurationError(
-            f"Accepted companion removed non-proposal assertions for "
+            f"Accepted overlay removed non-proposal assertions for "
             f"{candidate.pid}: {sorted(missing)!r}"
         )
 
@@ -610,25 +610,25 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
         expected = proposed.get(selector)
         if expected is not None and assertion != expected:
             raise ConfigurationError(
-                f"Accepted companion changed a reviewed assertion for "
+                f"Accepted overlay changed a reviewed assertion for "
                 f"{candidate.pid} at {selector!r}"
             )
         if expected is None and selector in baseline and assertion != baseline[selector]:
             raise ConfigurationError(
-                f"Accepted companion changed a non-proposal assertion for "
+                f"Accepted overlay changed a non-proposal assertion for "
                 f"{candidate.pid} at {selector!r}"
             )
         try:
             stale = _selector_is_stale(record, candidate.pid, assertion)
         except ConfigurationError as error:
             raise ConfigurationError(
-                f"Accepted companion cannot be reconciled for {candidate.pid}: "
+                f"Accepted overlay cannot be reconciled for {candidate.pid}: "
                 f"{error}"
             ) from error
         if stale:
             if selector not in proposal_added or assertion != proposed[selector]:
                 raise ConfigurationError(
-                    f"Accepted companion contains a stale non-proposal assertion "
+                    f"Accepted overlay contains a stale non-proposal assertion "
                     f"for {candidate.pid} at {selector!r}"
                 )
             removed = True
@@ -641,7 +641,7 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
             path.unlink()
         except OSError as error:
             raise ConfigurationError(
-                f"Could not delete empty companion for {candidate.pid}: {error}"
+                f"Could not delete empty overlay for {candidate.pid}: {error}"
             ) from error
         return
     if removed:
@@ -651,7 +651,7 @@ def _reconcile_accepted_companion(worktree: Path, candidate: Candidate) -> None:
             )
         except OSError as error:
             raise ConfigurationError(
-                f"Could not reconcile companion for {candidate.pid}: {error}"
+                f"Could not reconcile overlay for {candidate.pid}: {error}"
             ) from error
 
 
@@ -855,7 +855,7 @@ def _finalize_candidate_plan(
 
     Reject and defer dispositions reverse candidate-specific proposal patches
     using Git's three-way merge.  The operation is rehearsed in a temporary
-    clone, so a conflict or invalid companion cannot alter the caller's clean
+    clone, so a conflict or invalid overlay cannot alter the caller's clean
     worktree.  Only the resulting candidate paths below the two metadata roots
     are copied back; this function does not stage or commit them.
     """

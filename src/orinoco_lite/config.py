@@ -399,7 +399,7 @@ def load_workspace(
             "orinoco.yaml site.repository",
         )
 
-    return WorkspaceConfig(
+    workspace = WorkspaceConfig(
         root=resolved_root,
         config_path=config_path,
         site_name=site_name,
@@ -410,6 +410,10 @@ def load_workspace(
         repository=repository,
         curation_service=curation_service,
     )
+    from .annotations import annotation_root
+
+    annotation_root(workspace)
+    return workspace
 
 
 def load_config_path(path: Path) -> WorkspaceConfig:

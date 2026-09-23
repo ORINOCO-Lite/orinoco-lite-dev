@@ -21,15 +21,16 @@ Current downstreams use:
 site-specific/
   metadata/
     records/
-    overlays/annotations/
+    overlays/machine-provenance-annotations/
   curation-records/
   sources/<adapter>/
 extensions/source-adapters/<adapter>/
 ```
 
 - Records contain semantic assertion content.
-- Annotation companions contain only machine PAV for assertions present in the corresponding record.
+- Overlay files contain only machine PAV for assertions present in the corresponding record.
   Joining them produces the validation and RDF view.
+  When needed, an assertion entry retains `source_annotations` to restore the original PAV spelling and structure on JSONL export; these must agree with its PAV values.
 - `site-specific/sources/<adapter>/` contains source configuration, captured distributable input, and mapping policy.
 - `site-specific/curation-records/<adapter>.yaml` contains current decisions.
 - Consumer-specific executable adapters live under `extensions/`; reusable adapters belong to the package or template.
@@ -49,7 +50,7 @@ The adapter MUST:
 2. map each source record to a stable source identifier and canonical PID;
 3. hash only normalized source facts that can affect the proposed semantics;
 4. derive an untracked deterministic candidate plan;
-5. write only canonical records and matching annotation companions;
+5. write only canonical records and matching overlay files;
 6. validate every changed record and the complete joined graph; and
 7. produce the same output for the same source, base, policy, and decisions.
 
@@ -144,7 +145,7 @@ It does not change source-adapter candidate or decision semantics.
 ## Guardrails
 
 - Source-adapter proposals and finalization MUST support `site-specific` as either a directory or a Git submodule.
-  With a submodule, metadata, annotation companions, and decisions remain in the metadata repository; the website records the corresponding gitlink.
+  With a submodule, metadata, overlay files, and decisions remain in the metadata repository; the website records the corresponding gitlink.
   Coordinated writes MUST check both repository heads and validate the combined website and metadata state.
 - Static validation, review, build, and publication require no metadata service.
 - Git commits and Git revert are the transaction and recovery mechanisms.

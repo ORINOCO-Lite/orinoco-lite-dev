@@ -280,7 +280,7 @@ async function canonicalCommit(
       : files.some(
           (f) =>
             typeof f.filename !== "string" ||
-            !/^metadata\/(records|overlays\/annotations)\/.+\.ya?ml$/.test(
+            !/^metadata\/(records|overlays\/machine-provenance-annotations)\/.+\.ya?ml$/.test(
               f.filename,
             ) ||
             f.previous_filename,

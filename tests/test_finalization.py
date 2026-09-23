@@ -78,7 +78,7 @@ def candidate(
     proposed_companion: Mapping[str, object] | None = None,
     record_root: str | None = "site-specific/metadata/records",
     annotation_root: str | None = (
-        "site-specific/metadata/overlays/annotations"
+        "site-specific/metadata/overlays/machine-provenance-annotations"
     ),
 ) -> Candidate:
     return Candidate(
@@ -315,7 +315,7 @@ class FinalizationTests(unittest.TestCase):
         self.assertTrue(result.metadata_changed)
         self.assertTrue(
             all(
-                path.startswith(("site-specific/metadata/records/", "site-specific/metadata/overlays/annotations/"))
+                path.startswith(("site-specific/metadata/records/", "site-specific/metadata/overlays/machine-provenance-annotations/"))
                 for path in result.changed_paths
             )
         )
@@ -428,7 +428,7 @@ class FinalizationTests(unittest.TestCase):
             baseline=None,
             proposed=record(pid, "Custom root"),
             record_root="custom/library/records",
-            annotation_root="custom/library/overlays/annotations",
+            annotation_root="custom/library/overlays/machine-provenance-annotations",
         )
         base = self.repo.commit("base")
         plan = self.plan(base, (item,))
@@ -604,7 +604,7 @@ class FinalizationTests(unittest.TestCase):
         old_companion = provenance("xyzrins:records/stale", "old")
         stale_repo.write("site-specific/metadata/records/XYZOrganization/stale.yaml", old_record)
         stale_repo.write(
-            "site-specific/metadata/overlays/annotations/XYZOrganization/stale.yaml",
+            "site-specific/metadata/overlays/machine-provenance-annotations/XYZOrganization/stale.yaml",
             old_companion,
         )
         stale_base = stale_repo.commit("base")

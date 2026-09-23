@@ -15,7 +15,8 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Establish the live scope
 
 1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
-   Git Annex is permitted only in the engineering repinning path.
+   Git Annex is permitted for engineering repinning and explicit upstream-site media retrieval.
+   Site-specific media go into downstream site inputs, not the generic template.
    Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
 2. Identify the package and template candidates and any downstream inputs to inject.
    Local candidate testing is the default.
@@ -34,22 +35,12 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 
 ## Exercise a local downstream
 
-Use the public CLI from the engineering checkout:
+Use the engineering `setup-upstream` task to test candidates in a fresh downstream.
+Consult its `--help` and the installed CLI help for input selection and individual stages.
+Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
 
-```console
-pixi run orinoco-lite dev setup
-```
-
-This creates `../orinoco-lite-test-downstream` from the sibling template, converts the cached pool snapshot into ordinary committed site inputs, enables the editable package, and prepares resources.
-It does not run projection or build the website.
-Use `--site-specific /path/to/site-specific` for an existing input repository, `--snapshot /path/to/pool.jsonl` for another captured pool, and `--template /path/to/template` for another template checkout.
-Use `--populate` for missing template or site-specific repositories and `--force` only to deliberately replace the output.
-Never recreate a developer's existing downstream as part of routine validation.
-
-In any downstream, `pixi run orinoco-lite dev enable [PATH]` records an editable package connection.
-The default source is `../orinoco-lite-dev`, cloned when absent.
-`pixi run orinoco-lite dev disable` restores the prior package selection from Git history, preserving unrelated changes.
-These operations do not upgrade the selected release.
+For software comparisons, retain the input data while changing the package selection.
+For historical replay, restore the desired package, input, and subdataset states before starting Pixi: DataLad does not replace a running environment or restore subdataset worktrees through `rerun --onto`.
 
 Use ordinary `orinoco-lite validate`, `build`, and `serve` commands when requested.
 The package owns projection and validation sequencing.

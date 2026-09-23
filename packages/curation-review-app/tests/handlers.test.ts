@@ -180,7 +180,7 @@ function proposalApi(
         },
         {
           filename:
-            "site-specific/metadata/overlays/annotations/example/first.yaml",
+            "site-specific/metadata/overlays/machine-provenance-annotations/example/first.yaml",
           status: "modified",
         },
         {
@@ -189,7 +189,7 @@ function proposalApi(
         },
         {
           filename:
-            "site-specific/metadata/overlays/annotations/example/second.yaml",
+            "site-specific/metadata/overlays/machine-provenance-annotations/example/second.yaml",
           status: "added",
         },
       ],

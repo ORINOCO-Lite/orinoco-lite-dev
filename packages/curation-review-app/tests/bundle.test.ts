@@ -39,7 +39,7 @@ describe("ephemeral review bundle", () => {
     first.record_path = "site-specific/metadata/records/example/first.yml";
     first.paths = [
       first.record_path,
-      "site-specific/metadata/overlays/annotations/example/first.yml",
+      "site-specific/metadata/overlays/machine-provenance-annotations/example/first.yml",
     ];
 
     expect(
@@ -58,8 +58,8 @@ describe("ephemeral review bundle", () => {
         path
           .replace("site-specific/metadata/records/", "metadata/records/")
           .replace(
-            "site-specific/metadata/overlays/annotations/",
-            "metadata/overlays/annotations/",
+            "site-specific/metadata/overlays/machine-provenance-annotations/",
+            "metadata/overlays/machine-provenance-annotations/",
           ),
       );
     }

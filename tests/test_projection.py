@@ -643,7 +643,7 @@ class GenericProjectionContractTests(unittest.TestCase):
 
     def test_joined_annotations_reach_machine_projection_only(self) -> None:
         companion = self.root / (
-            "site-specific/metadata/overlays/annotations/Person/one.yaml"
+            "site-specific/metadata/overlays/machine-provenance-annotations/Person/one.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(

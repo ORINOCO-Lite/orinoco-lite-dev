@@ -1,4 +1,4 @@
-"""Resolve the exact upstream presentation selected by engineering Git."""
+"""Resolve the exact www-from-model checkout selected by engineering Git."""
 
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def _selected_presentation_commit(engineering: Path, commit: str) -> str:
     output = _git_text(
         engineering,
         ("ls-tree", "--full-tree", commit, "--", _PRESENTATION_GITLINK),
-        operation="read the selected presentation Gitlink",
+        operation="read the selected www-from-model Gitlink",
     )
     match = re.fullmatch(
         rf"160000 commit (?P<commit>[0-9a-f]{{40}})\t{re.escape(_PRESENTATION_GITLINK)}",
@@ -130,17 +130,17 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
     selected_commit = _selected_presentation_commit(engineering, expected_commit)
     presentation = engineering / _PRESENTATION_GITLINK
     if presentation.is_symlink() or not presentation.is_dir():
-        raise IntegrityError("Selected presentation submodule is not initialized")
+        raise IntegrityError("Selected www-from-model submodule is not initialized")
     if (
-        _repository_head(presentation, label="Selected presentation checkout")
+        _repository_head(presentation, label="Selected www-from-model checkout")
         != selected_commit
     ):
-        raise IntegrityError("Selected presentation checkout does not match its Gitlink")
+        raise IntegrityError("Selected www-from-model checkout does not match its Gitlink")
 
     status = _git(
         engineering,
         ("submodule", "status", "--recursive", "--", _PRESENTATION_GITLINK),
-        operation="verify the presentation dependency closure",
+        operation="verify the www-from-model dependency closure",
     ).stdout
     try:
         lines = status.decode("utf-8", "strict").splitlines()
@@ -159,10 +159,10 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
             "--untracked-files=all",
             "--ignore-submodules=none",
         ),
-        operation="verify presentation checkout cleanliness",
+        operation="verify www-from-model checkout cleanliness",
     ).stdout
     if dirty:
-        raise IntegrityError("Cached presentation dependency closure is not clean")
+        raise IntegrityError("Cached www-from-model dependency closure is not clean")
     return presentation.resolve()
 
 
@@ -215,7 +215,7 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
             "--",
             _PRESENTATION_GITLINK,
         ),
-        operation="resolve the presentation dependency closure",
+        operation="resolve the www-from-model dependency closure",
     )
     return _verify_checkout(destination, commit)
 
@@ -258,12 +258,12 @@ def _ensure_checkout(
     except Exception as error:
         if mismatch is not None:
             raise IntegrityError(
-                f"Cached presentation failed verification ({mismatch}); "
+                f"Cached www-from-model checkout failed verification ({mismatch}); "
                 f"repair failed: {error}"
             ) from error
         if isinstance(error, IntegrityError):
             raise
-        raise IntegrityError(f"Could not resolve presentation: {error}") from error
+        raise IntegrityError(f"Could not resolve www-from-model checkout: {error}") from error
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
     _verify_checkout(destination, commit)
@@ -271,11 +271,19 @@ def _ensure_checkout(
 
 
 def _package_source(resources_root: Path) -> tuple[str, str]:
-    return SOURCE_REPOSITORY, source_commit(resources_root)
+    commit = source_commit(resources_root)
+    from .package_update import installed_git_source
+    installed = installed_git_source()
+    if installed:
+        repository, installed_commit = installed
+        if installed_commit != commit:
+            raise IntegrityError("Installed package source and bundled resource commit disagree")
+        return repository, commit
+    return SOURCE_REPOSITORY, commit
 
 
 def resolve_presentation(workspace: Path, resources_root: Path | None = None) -> Path:
-    """Return the presentation checkout selected by the package source commit."""
+    """Return the www-from-model checkout selected by the package source commit."""
 
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():

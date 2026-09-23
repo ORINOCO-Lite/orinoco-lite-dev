@@ -388,7 +388,7 @@ class JoinTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(
-            ConfigurationError, "configured annotation companion tree"
+            ConfigurationError, "configured overlay file tree"
         ):
             join_annotations(stored, companion)
 
@@ -403,7 +403,7 @@ class JoinTests(unittest.TestCase):
                 stored = record()
                 stored["identifiers"][0]["annotations"] = {tag: AGENT}
                 with self.assertRaisesRegex(
-                    ConfigurationError, "configured annotation companion tree"
+                    ConfigurationError, "configured overlay file tree"
                 ):
                     join_annotations(stored, None)
 

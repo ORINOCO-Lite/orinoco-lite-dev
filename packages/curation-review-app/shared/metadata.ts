@@ -34,7 +34,7 @@ export function metadataRoots(recordRoot: string): MetadataRoots {
   parts.pop();
   const parent = parts.join("/");
   return {
-    annotations: `${parent ? `${parent}/` : ""}overlays/annotations`,
+    annotations: `${parent ? `${parent}/` : ""}overlays/machine-provenance-annotations`,
     records: normalized,
   };
 }

@@ -33,8 +33,8 @@ def record(pid=PID, name="Initial"):
 def capture(tmp_path, monkeypatch):
     fetch = Mock(return_value=({PID: record()}, {"version": "fixture"}))
     monkeypatch.setattr(pool_capture, "fetch_live", fetch)
-    destination = tmp_path / "pool.jsonl"
-    manifest = tmp_path / "pool.jsonl.manifest.json"
+    destination = tmp_path / "downloaded/records.jsonl"
+    manifest = tmp_path / "downloaded/records.jsonl.manifest.json"
     return destination, manifest, fetch
 
 
@@ -46,7 +46,7 @@ def test_cli_captures_exact_records_then_reuses_without_fetching(capture, monkey
     expected["extra"] = {"ordered": [2, 1, 2], "text": "ü", "optional": None}
     fetch.return_value = ({PID: expected}, {"version": "fixture"})
 
-    assert main(["get", str(destination)]) == 0
+    assert main(["get", "--directory", str(destination.parent.parent)]) == 0
     fetch.assert_called_once_with(pool_capture.DEFAULT_API)
     assert json.loads(destination.read_text()) == expected
     assert upstream_snapshot.load_jsonl(destination)[0].record == expected
@@ -57,7 +57,7 @@ def test_cli_captures_exact_records_then_reuses_without_fetching(capture, monkey
     assert "concurrent edits" in manifest["completeness"]["limitations"]
     before = (destination.read_bytes(), manifest_path.read_bytes())
 
-    assert main(["get", str(destination)]) == 0
+    assert main(["get", "--directory", str(destination.parent.parent)]) == 0
     assert fetch.call_count == 1
     assert (destination.read_bytes(), manifest_path.read_bytes()) == before
     assert set(destination.parent.iterdir()) == {destination, manifest_path}
@@ -69,7 +69,7 @@ def test_default_path_downloads_reuses_and_force_replaces(tmp_path, monkeypatch)
     monkeypatch.setattr(pool_capture, "fetch_live", fetch)
 
     assert main(["get"]) == 0
-    destination = tmp_path / "captures/records.jsonl"
+    destination = tmp_path / "sourcedata/downloaded/records.jsonl"
     assert upstream_snapshot.load_jsonl(destination)[0].record == record()
     assert destination.with_name("records.jsonl.manifest.json").is_file()
 
@@ -84,12 +84,12 @@ def test_default_path_downloads_reuses_and_force_replaces(tmp_path, monkeypatch)
 
 def test_force_replaces_capture_and_records_its_actual_origin(capture):
     destination, manifest_path, fetch = capture
-    assert main(["get", str(destination), "--api", API + "/"]) == 0
+    assert main(["get", "--directory", str(destination.parent.parent), "--api", API + "/"]) == 0
     fetch.assert_called_once_with(API)
     fetch.return_value = ({PID: record(name="Changed")}, {"version": "new"})
     other_api = "https://other.example.test/api"
 
-    assert main(["get", str(destination), "--force", "--api", other_api]) == 0
+    assert main(["get", "--directory", str(destination.parent.parent), "--force", "--api", other_api]) == 0
 
     fetch.assert_called_with(other_api)
     assert upstream_snapshot.load_jsonl(destination)[0].record == record(name="Changed")
@@ -100,7 +100,7 @@ def test_force_replaces_capture_and_records_its_actual_origin(capture):
 
 @pytest.mark.parametrize("damage, message", [
     ("missing", "no provenance manifest"),
-    ("malformed", "Invalid Pool capture manifest"),
+    ("malformed", "Invalid records dump manifest"),
     ("not-object", "manifest is not an object"),
     ("unknown-origin", "use --force"),
     ("other-origin", "use --force"),
@@ -131,14 +131,14 @@ def test_invalid_capture_is_not_fetched_or_rewritten(capture, damage, message, c
     fetch.reset_mock()
 
     with pytest.raises(SystemExit) as error:
-        main(["get", str(destination), "--api", API])
+        main(["get", "--directory", str(destination.parent.parent), "--api", API])
 
     assert error.value.code == 2
     assert message in capsys.readouterr().err
     fetch.assert_not_called()
     assert destination.read_bytes() == before
     assert (manifest_path.read_bytes() if manifest_path.exists() else None) == manifest_before
-    assert main(["get", str(destination), "--api", API, "--force"]) == 0
+    assert main(["get", "--directory", str(destination.parent.parent), "--api", API, "--force"]) == 0
     fetch.assert_called_once_with(API)
 
 
@@ -224,7 +224,7 @@ def test_upstream_failure_preserves_existing_capture(tmp_path, monkeypatch):
     assert (destination.read_bytes(), manifest.read_bytes()) == before
 
 
-def test_capture_matches_upstream_cli_jsonl(tmp_path):
+def test_capture_orders_and_serializes_upstream_cli_jsonl(tmp_path):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
     from click.testing import CliRunner
@@ -253,8 +253,14 @@ def test_capture_matches_upstream_cli_jsonl(tmp_path):
             assert upstream.exit_code == 0, upstream.output
             destination = tmp_path / "records.jsonl"
             pool_capture.capture(destination, api=api)
-            assert destination.read_text() == upstream.stdout
-            assert [item.record for item in upstream_snapshot.load_jsonl(destination)] == rows
+            # Independently reproduce the documented final acquisition step
+            # with the standard library, not the project comparison serializer.
+            downloaded = [json.loads(line) for line in upstream.stdout.splitlines()]
+            downloaded.sort(key=lambda row: (row["schema_type"].split(":")[-1], row["pid"]))
+            expected = "".join(json.dumps(row, sort_keys=True, ensure_ascii=False,
+                                         separators=(",", ":")) + "\n" for row in downloaded)
+            assert destination.read_text() == expected
+            assert [item.record for item in upstream_snapshot.load_jsonl(destination)] == list(reversed(rows))
         finally:
             server.shutdown()
             thread.join()
@@ -266,3 +272,14 @@ def test_capture_does_not_store_credentials_or_accept_non_service_urls(tmp_path,
     with pytest.raises(pool_capture.CaptureError, match="HTTP|credentials"):
         pool_capture.capture(tmp_path / "capture.jsonl", api=api)
     assert not list(tmp_path.iterdir())
+
+
+def test_public_upstream_cli_accepts_explicit_output(tmp_path, monkeypatch):
+    from orinoco_lite import cli
+    monkeypatch.chdir(tmp_path)
+    fetch = Mock(return_value=({PID: record()}, {}))
+    monkeypatch.setattr(pool_capture, "fetch_live", fetch)
+    assert cli.main(["dev", "records", "get", "--output", "custom/pool.jsonl"]) == 0
+    assert upstream_snapshot.load_jsonl(tmp_path / "custom/pool.jsonl")[0].record == record()
+    assert (tmp_path / "custom/pool.jsonl.manifest.json").is_file()
+    assert not (tmp_path / "sourcedata").exists()

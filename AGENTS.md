@@ -6,11 +6,12 @@
   Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in package or downstream configuration.
   The package owns generic source resolution, metadata, projection, and composition operations.
   Keep the template thin: it contains the Orinoco adaptation, bounded materialized presentation assets, Copier scaffold, workflows, and dependency locks, not a copied website.
-- Git Annex is maintainer-only repinning tooling.
+- Git Annex is used for maintainer repinning and explicit upstream-site preparation.
   It may hydrate and verify Annex-backed content required by the selected upstream functionality before ordinary files are copied into the licensed template overlay.
-  Released package and template tasks and downstream website builds must not invoke or depend on Git Annex.
+  `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.
+  Ordinary downstream website builds and template tasks must not invoke or depend on Git Annex.
   DataLad remains a downstream dependency for recording source-adapter run provenance; correctly configured downstream repositories keep those records in Git without requiring Git Annex.
-- Test unreleased package and template work together by applying a selected downstream's declared inputs to a fresh disposable template instance with `pixi run orinoco-lite dev setup` when practical.
+- Test unreleased package and template work together by applying a selected downstream's declared inputs to a fresh disposable template instance with `pixi run setup-upstream` when practical.
   Setup stops before projection and building; run those explicitly only when they are part of the requested validation.
   When multi-repository rendering remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.
   An exact-SHA Netlify deploy preview may exercise an authenticated GitHub write only into its own open same-repository draft pull request after the service verifies GitHub's successful Netlify status for that exact head and origin.

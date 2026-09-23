@@ -1,4 +1,4 @@
-"""Validation and joining for machine-assertion annotation companions."""
+"""Validation and joining for machine-assertion overlay files."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+import shlex
 import re
 from typing import Any
 
@@ -39,12 +40,12 @@ _MACHINE_PAV_ALIASES = {
     PAV_IMPORTED_FROM: (PAV_IMPORTED_FROM, PAV_IMPORTED_FROM_URI),
 }
 _ASSERTION_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
-ANNOTATION_RELATIVE = Path("overlays/annotations")
+ANNOTATION_RELATIVE = Path("overlays/machine-provenance-annotations")
 
 
 @dataclass(frozen=True)
 class CompanionSource:
-    """One validated companion and its mirrored stored record."""
+    """One validated overlay file and its mirrored stored record."""
 
     path: Path
     record_path: Path
@@ -99,8 +100,8 @@ def _line(value: object, label: str) -> str:
     return value
 
 
-def _annotation_entry(value: object) -> dict[str, str]:
-    if not isinstance(value, Mapping) or set(value) != ANNOTATION_FIELDS:
+def _annotation_entry(value: object) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) not in (ANNOTATION_FIELDS, ANNOTATION_FIELDS | {"source_annotations"}):
         raise ConfigurationError(
             "Annotation assertion has missing or unexpected fields"
         )
@@ -115,31 +116,41 @@ def _annotation_entry(value: object) -> dict[str, str]:
         raise ConfigurationError(
             "Assertion digest must be sha256 followed by 64 lowercase hex digits"
         )
-    return {
+    entry = {
         "path": path,
         "assertion_sha256": digest,
         PAV_IMPORTED_BY: _line(value.get(PAV_IMPORTED_BY), PAV_IMPORTED_BY),
         PAV_IMPORTED_FROM: _line(value.get(PAV_IMPORTED_FROM), PAV_IMPORTED_FROM),
     }
+    if "source_annotations" in value:
+        original = value["source_annotations"]
+        if not isinstance(original, Mapping) or len(original) != 2:
+            raise ConfigurationError("Source annotations must contain the two machine PAV annotations")
+        for canonical, aliases in _MACHINE_PAV_ALIASES.items():
+            present = [key for key in aliases if key in original]
+            if len(present) != 1 or _compact_machine_value(original[present[0]], canonical=canonical) != entry[canonical]:
+                raise ConfigurationError("Source annotations disagree with machine PAV values")
+        entry["source_annotations"] = deepcopy(dict(original))
+    return entry
 
 
 def annotation_companion(
     record: str,
     assertions: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    """Build one deterministic companion from current assertion provenance."""
+    """Build one deterministic overlay file from current assertion provenance."""
 
-    pid = _line(record, "Companion record")
+    pid = _line(record, "Overlay record")
     entries = [_annotation_entry(value) for value in assertions]
     entries.sort(key=lambda item: (item["path"], item["assertion_sha256"]))
     selectors = [(item["path"], item["assertion_sha256"]) for item in entries]
     if len(selectors) != len(set(selectors)):
-        raise ConfigurationError("Annotation companion repeats an assertion selector")
+        raise ConfigurationError("Overlay file repeats an assertion selector")
     return {"record": pid, "assertions": entries}
 
 
 def validate_stored_record(record: Mapping[str, Any]) -> None:
-    """Reject machine PAV that bypasses the annotation companion tree."""
+    """Reject machine PAV that bypasses the overlay file tree."""
 
     def inspect(value: Any) -> None:
         if isinstance(value, Mapping):
@@ -149,7 +160,7 @@ def validate_stored_record(record: Mapping[str, Any]) -> None:
                 ):
                     raise ConfigurationError(
                         "Machine pav:importedBy and pav:importedFrom annotations "
-                        "must be stored in the configured annotation companion tree"
+                        "must be stored in the configured overlay file tree"
                     )
                 inspect(item)
         elif isinstance(value, list):
@@ -159,18 +170,18 @@ def validate_stored_record(record: Mapping[str, Any]) -> None:
     inspect(record)
 
 
-def _validated_companion(value: object, record_pid: str) -> list[dict[str, str]]:
+def _validated_companion(value: object, record_pid: str) -> list[dict[str, Any]]:
     if not isinstance(value, Mapping) or set(value) != COMPANION_FIELDS:
         raise ConfigurationError(
-            "Annotation companion has missing or unexpected top-level fields"
+            "Overlay file has missing or unexpected top-level fields"
         )
     if value.get("record") != record_pid:
         raise ConfigurationError(
-            "Annotation companion record does not match the mirrored Thing PID"
+            "Overlay file record does not match the mirrored Thing PID"
         )
     assertions = value.get("assertions")
     if not isinstance(assertions, list):
-        raise ConfigurationError("Annotation companion assertions must be a list")
+        raise ConfigurationError("Overlay file assertions must be a list")
     entries = [_annotation_entry(item) for item in assertions]
     expected = sorted(entries, key=lambda item: (item["path"], item["assertion_sha256"]))
     if entries != expected:
@@ -179,18 +190,31 @@ def _validated_companion(value: object, record_pid: str) -> list[dict[str, str]]
         )
     selectors = [(item["path"], item["assertion_sha256"]) for item in entries]
     if len(selectors) != len(set(selectors)):
-        raise ConfigurationError("Annotation companion repeats an assertion selector")
+        raise ConfigurationError("Overlay file repeats an assertion selector")
     return entries
+
+
+def _check_overlay_path(metadata: Path) -> None:
+    old = metadata / "overlays/annotations"
+    if old.exists() or old.is_symlink():
+        command = shlex.join(["git", "-C", str(metadata), "mv", "--",
+                              "overlays/annotations", str(ANNOTATION_RELATIVE)])
+        raise ConfigurationError(
+            f"Old overlay path is unsupported: {old}. Rename it with: {command}. "
+            "If both directories exist, reconcile their contents before moving the old directory."
+        )
 
 
 def annotation_root(workspace: WorkspaceConfig) -> Path:
     """Return the one specification-defined annotation overlay root."""
 
-    return workspace.path("records").parent / ANNOTATION_RELATIVE
+    metadata = workspace.path("records").parent
+    _check_overlay_path(metadata)
+    return metadata / ANNOTATION_RELATIVE
 
 
 def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
-    """Return every regular canonical companion, failing closed."""
+    """Return every regular canonical overlay file, failing closed."""
 
     root = annotation_root(workspace)
     root_label = root.relative_to(workspace.root).as_posix()
@@ -210,7 +234,7 @@ def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
             continue
         if not candidate.is_file():
             raise ConfigurationError(
-                f"Annotation companion path is not regular: {candidate}"
+                f"Overlay file path is not regular: {candidate}"
             )
         relative = candidate.relative_to(root)
         if (
@@ -219,7 +243,7 @@ def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
         ):
             raise ConfigurationError(
                 f"Everything below {root_label} must be a Thing "
-                f"annotation companion; found unsupported content: {candidate}"
+                f"overlay file; found unsupported content: {candidate}"
             )
         companions.append(candidate)
     return companions
@@ -392,12 +416,22 @@ def _matched_assertion(
 
 def _apply_entry(
     record: dict[str, Any],
-    entry: Mapping[str, str],
+    entry: Mapping[str, Any],
     *,
     compact: bool,
+    preserve_source: bool = False,
 ) -> None:
     assertion = _matched_assertion(record, entry)
-    if compact:
+    if preserve_source and "source_annotations" in entry:
+        raw_annotations = assertion.get("annotations")
+        if raw_annotations is not None and not isinstance(raw_annotations, Mapping):
+            raise ConfigurationError("Stored annotations must be a mapping")
+        annotations = deepcopy(dict(raw_annotations)) if raw_annotations is not None else {}
+        if any(tag in annotations for tag in _MACHINE_PAV_TAGS):
+            raise ConfigurationError("Stored assertion already contains machine PAV")
+        annotations.update(deepcopy(entry["source_annotations"]))
+        assertion["annotations"] = annotations
+    elif compact:
         _attach_compact_to_object(assertion, entry)
     else:
         _attach_to_object(assertion, entry)
@@ -406,7 +440,7 @@ def _apply_entry(
 def validate_annotation_companion(
     record: Mapping[str, Any], companion: Mapping[str, object]
 ) -> int:
-    """Validate companion shape, identity, order, and every selector."""
+    """Validate overlay shape, identity, order, and every selector."""
 
     copied = deepcopy(dict(record))
     pid = copied.get("pid")
@@ -428,7 +462,7 @@ def reconcile_annotation_companion(
     pid = copied.get("pid")
     if not isinstance(pid, str) or not pid:
         raise ConfigurationError("Annotated Thing requires a non-empty PID")
-    retained: list[dict[str, str]] = []
+    retained: list[dict[str, Any]] = []
     for entry in _validated_companion(companion, pid):
         try:
             _matched_assertion(copied, entry)
@@ -439,7 +473,7 @@ def reconcile_annotation_companion(
 
 
 def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
-    """Load canonical companions and bind each to its mirrored record."""
+    """Load canonical overlay files and bind each to its mirrored record."""
 
     overlay = annotation_root(workspace)
     records = workspace.path("records")
@@ -449,7 +483,7 @@ def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
         record_path = records / relative
         if record_path.is_symlink() or not record_path.is_file():
             raise ConfigurationError(
-                f"Annotation companion has no mirrored metadata record: {path}"
+                f"Overlay file has no mirrored metadata record: {path}"
             )
         try:
             text = path.read_text(encoding="utf-8")
@@ -457,15 +491,15 @@ def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
             record = yaml.safe_load(record_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
             raise ConfigurationError(
-                f"Annotation companion or mirrored record is invalid UTF-8 YAML: {path}"
+                f"Overlay file or mirrored record is invalid UTF-8 YAML: {path}"
             ) from error
         if not isinstance(value, Mapping) or not isinstance(record, Mapping):
             raise ConfigurationError(
-                f"Annotation companion and mirrored record must be mappings: {path}"
+                f"Overlay file and mirrored record must be mappings: {path}"
             )
         if canonicalize_yaml_text(text) != text:
             raise ConfigurationError(
-                f"Annotation companion is not canonically serialized: {path}"
+                f"Overlay file is not canonically serialized: {path}"
             )
         validate_stored_record(record)
         count = validate_annotation_companion(record, value)
@@ -476,12 +510,15 @@ def companion_sources(workspace: WorkspaceConfig) -> list[CompanionSource]:
 def compact_enrichment_view(
     record: Mapping[str, Any],
     companion: Mapping[str, object] | None,
+    *,
+    preserve_source: bool = False,
 ) -> dict[str, Any]:
     """Build a detached compact-PAV view for pinned enrichment helpers.
 
     The pinned helpers match ownership only in their compact annotation form.
     This view is therefore deliberately distinct from the expanded join used
-    for schema validation and RDF conversion.
+    for schema validation and RDF conversion. With preserve_source, restore
+    original annotation spelling and structure for lossless JSONL export.
     """
 
     working = deepcopy(dict(record))
@@ -492,7 +529,7 @@ def compact_enrichment_view(
     if companion is None:
         return working
     for entry in _validated_companion(companion, pid):
-        _apply_entry(working, entry, compact=True)
+        _apply_entry(working, entry, compact=True, preserve_source=preserve_source)
     return working
 
 
@@ -525,7 +562,7 @@ def split_enrichment_view(
     """Split compact or expanded machine PAV from a detached record.
 
     The returned record contains all semantic assertion objects and no machine
-    PAV.  The optional companion contains only PAV selectors for those stored
+    PAV.  The optional overlay contains only PAV selectors for those stored
     mappings.  Rejoining the two values is the inverse operation for the
     supported compact machine annotations.
     """
@@ -534,7 +571,7 @@ def split_enrichment_view(
     pid = record.get("pid")
     if not isinstance(pid, str) or not pid:
         raise ConfigurationError("Enrichment-view Thing requires a non-empty PID")
-    entries: list[dict[str, str]] = []
+    entries: list[dict[str, Any]] = []
 
     def inspect_mapping(value: dict[str, Any], path: str) -> None:
         raw_annotations = value.get("annotations")
@@ -564,6 +601,8 @@ def split_enrichment_view(
                     raise ConfigurationError(
                         "The top-level Thing cannot be an imported assertion"
                     )
+                original = {aliases[0]: deepcopy(annotations[aliases[0]])
+                            for aliases in present.values()}
                 imported_by = _line(
                     _compact_machine_value(
                         annotations.pop(present[PAV_IMPORTED_BY][0]),
@@ -582,14 +621,15 @@ def split_enrichment_view(
                     value["annotations"] = annotations
                 else:
                     value.pop("annotations", None)
-                entries.append(
-                    {
-                        "path": path,
-                        "assertion_sha256": assertion_sha256(value),
-                        PAV_IMPORTED_BY: imported_by,
-                        PAV_IMPORTED_FROM: imported_from,
-                    }
-                )
+                entry = {
+                    "path": path,
+                    "assertion_sha256": assertion_sha256(value),
+                    PAV_IMPORTED_BY: imported_by,
+                    PAV_IMPORTED_FROM: imported_from,
+                }
+                if original != {PAV_IMPORTED_BY: imported_by, PAV_IMPORTED_FROM: imported_from}:
+                    entry["source_annotations"] = original
+                entries.append(entry)
 
         for key, child in tuple(value.items()):
             if key == "annotations":
@@ -619,7 +659,7 @@ def join_annotations(
     record: Mapping[str, Any],
     companion: Mapping[str, object] | None,
 ) -> dict[str, Any]:
-    """Join one stored Thing and its optional annotation companion."""
+    """Join one stored Thing and its optional overlay file."""
 
     joined = deepcopy(dict(record))
     validate_stored_record(joined)

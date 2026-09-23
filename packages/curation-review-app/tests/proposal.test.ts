@@ -26,7 +26,8 @@ const defaultFiles = [
     status: "added",
   },
   {
-    filename: "site-specific/metadata/overlays/annotations/example/second.yaml",
+    filename:
+      "site-specific/metadata/overlays/machine-provenance-annotations/example/second.yaml",
     status: "added",
   },
   {
@@ -34,7 +35,8 @@ const defaultFiles = [
     status: "modified",
   },
   {
-    filename: "site-specific/metadata/overlays/annotations/example/first.yaml",
+    filename:
+      "site-specific/metadata/overlays/machine-provenance-annotations/example/first.yaml",
     status: "modified",
   },
 ];
@@ -253,7 +255,7 @@ describe("artifact-backed GitHub proposal loading", () => {
     first.record_path = "other/metadata/records/example/first.yaml";
     first.paths = [
       first.record_path,
-      "other/metadata/overlays/annotations/example/first.yaml",
+      "other/metadata/overlays/machine-provenance-annotations/example/first.yaml",
     ];
     const contentRequests: ContentRequest[][] = [];
 
@@ -541,13 +543,13 @@ describe("artifact-backed GitHub proposal loading", () => {
         status: "added",
       },
       {
-        filename: `site-specific/metadata/overlays/annotations/example/extra-${index}.yaml`,
+        filename: `site-specific/metadata/overlays/machine-provenance-annotations/example/extra-${index}.yaml`,
         status: "added",
       },
     ]).flat();
     files.push({
       filename:
-        "site-specific/metadata/overlays/annotations/example/overflow.yaml",
+        "site-specific/metadata/overlays/machine-provenance-annotations/example/overflow.yaml",
       status: "added",
     });
     expect(files).toHaveLength(MAX_REVIEW_PATHS + 1);

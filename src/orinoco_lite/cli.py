@@ -103,23 +103,20 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
     run.add_argument("arguments", nargs=argparse.REMAINDER)
+    from . import package_update
+    package_update.register(commands)
     dev = commands.add_parser("dev", help="development-only commands")
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
     enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
     dev_commands.add_parser("disable", help="restore the package selection used before editable development")
-    setup = dev_commands.add_parser("setup", help="instantiate a downstream from local template and captured site inputs")
-    setup.add_argument("destination", nargs="?", type=Path)
-    setup.add_argument("--template", type=Path)
-    setup.add_argument("--site-specific", type=Path, help="install this repository instead of converting the cached pool")
-    setup.add_argument("--snapshot", type=Path, help="cached pool JSONL (default: engineering build/upstream-stack/pool/public-thing.jsonl)")
-    setup.add_argument("--populate", action="store_true", help="clone missing template or site-specific repositories")
-    setup.add_argument("--force", action="store_true", help="remove and recreate the downstream destination")
-    from . import pool_capture
-    records = dev_commands.add_parser("records", help="capture, transform, and compare retained records")
+    from . import upstream, pool_capture, record_stages
+    upstream.register(dev_commands)
+    records = dev_commands.add_parser("records", help="capture, convert, and compare records")
     record_commands = records.add_subparsers(dest="records_command", required=True)
     pool_capture.register_capture(record_commands)
+    record_stages.register(record_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -335,19 +332,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
+        if (args.command == "dev" and args.dev_command in {"records", "upstream"}
+                and getattr(args, "records_command", None) != "diff"):
+            from .package_update import check_environment
+            check_environment(args.root or Path.cwd())
+        if args.command == "package":
+            from . import package_update
+            package_update.update(args.root or Path.cwd(), args.revision, args.repository, check=args.check)
+            return 0
         if args.command == "dev" and args.dev_command == "records":
-            from . import pool_capture
-            return pool_capture.execute(args)
+            from . import pool_capture, record_stages
+            if args.records_command == "get":
+                return pool_capture.execute(args)
+            return record_stages.execute(args)
         if args.command in {"verify-site", "publication", "shacl-handoff", "curation"}:
             from . import local_preview, publication, shacl_handoff, curation_actions
             return {"verify-site": local_preview, "publication": publication,
                     "shacl-handoff": shacl_handoff, "curation": curation_actions}[args.command].execute(args)
-        if args.command == "dev" and args.dev_command in {"enable", "disable", "setup"}:
-            from . import development, instantiate
-            if args.dev_command == "setup":
-                instantiate.setup(args.destination, template=args.template, site_specific=args.site_specific,
-                                  snapshot=args.snapshot, populate=args.populate, force=args.force)
-            elif args.dev_command == "enable":
+        if args.command == "dev" and args.dev_command == "upstream":
+            from . import upstream
+            return upstream.execute(args)
+        if args.command == "dev" and args.dev_command in {"enable", "disable"}:
+            from . import development
+            if args.dev_command == "enable":
                 development.enable(args.root or Path.cwd(), args.path)
             else:
                 development.disable(args.root or Path.cwd())

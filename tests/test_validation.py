@@ -37,6 +37,13 @@ DISPLAY_LABEL_ASSERTION = {
 
 
 class DownstreamValidationTests(unittest.TestCase):
+    def test_workspace_rejects_old_overlay_path_before_use(self):
+        old = self.root / "site-specific/metadata/overlays/annotations"
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.symlink_to(self.root / "missing-overlay-directory")
+        with self.assertRaisesRegex(ConfigurationError, "git -C .* mv --"):
+            load_workspace(self.root)
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -205,14 +212,14 @@ class DownstreamValidationTests(unittest.TestCase):
         )
         unsupported = (
             self.root
-            / "site-specific/metadata/overlays/annotations/README.md"
+            / "site-specific/metadata/overlays/machine-provenance-annotations/README.md"
         )
         unsupported.parent.mkdir(parents=True)
         unsupported.write_text("not a companion\n", encoding="utf-8")
 
         with self.assertRaisesRegex(
             ConfigurationError,
-            "Everything below site-specific/metadata/overlays/annotations",
+            "Everything below site-specific/metadata/overlays/machine-provenance-annotations",
         ):
             annotation_files(load_workspace(self.root))
 
@@ -245,7 +252,7 @@ class DownstreamValidationTests(unittest.TestCase):
     def test_mirrored_canonical_annotation_companion_passes(self) -> None:
         companion_path = (
             self.root
-            / "site-specific/metadata/overlays/annotations/XYZPerson/person.yaml"
+            / "site-specific/metadata/overlays/machine-provenance-annotations/XYZPerson/person.yaml"
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
@@ -270,12 +277,12 @@ class DownstreamValidationTests(unittest.TestCase):
         unknown = self.root / "site-specific/metadata/overlays/private/state.yaml"
         unknown.parent.mkdir(parents=True)
         unknown.write_text("not: allowed\n", encoding="utf-8")
-        with self.assertRaisesRegex(ConfigurationError, "overlays/annotations"):
+        with self.assertRaisesRegex(ConfigurationError, "overlays/machine-provenance-annotations"):
             validate_workspace(load_workspace(self.root))
         unknown.unlink()
         unknown.parent.rmdir()
 
-        orphan = self.root / "site-specific/metadata/overlays/annotations/orphan.yaml"
+        orphan = self.root / "site-specific/metadata/overlays/machine-provenance-annotations/orphan.yaml"
         orphan.parent.mkdir(parents=True, exist_ok=True)
         orphan.write_text(
             canonical_yaml(
@@ -289,7 +296,7 @@ class DownstreamValidationTests(unittest.TestCase):
     def test_annotation_tree_rejects_noncanonical_and_stale_selector(self) -> None:
         companion_path = (
             self.root
-            / "site-specific/metadata/overlays/annotations/XYZPerson/person.yaml"
+            / "site-specific/metadata/overlays/machine-provenance-annotations/XYZPerson/person.yaml"
         )
         companion_path.parent.mkdir(parents=True)
         entry = {
@@ -328,7 +335,7 @@ class DownstreamValidationTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(
-            ConfigurationError, "configured annotation companion tree"
+            ConfigurationError, "configured overlay file tree"
         ):
             validate_workspace(load_workspace(self.root))
 

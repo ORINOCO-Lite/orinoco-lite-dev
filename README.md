@@ -74,31 +74,20 @@ orinoco-lite dev prepare-resources
 pytest
 ```
 
-Create an inspectable downstream with the local template and cached upstream pool snapshot:
+Create an inspectable downstream populated from the upstream Pool:
 
 ```console
-PIXI_LOCKED=false orinoco-lite dev setup
+pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-The default destination is `../orinoco-lite-test-downstream`.
-Use `--site-specific ../con-site-specific` to install that repository instead of converting the cached pool.
-Use `--populate` to clone missing template or site-specific repositories, and `--force` to remove and recreate the destination.
-Setup records its changes in DataLad, prepares editable package resources, and stops before projection or website building.
+See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.
+Setup stops before projection and building; run `pixi run build` in the downstream when ready.
 
-In any downstream, enable or undo editable package development:
+Use `pixi run setup-upstream --help` for candidate and input selection, and `pixi run orinoco-lite dev upstream --help` or `dev records --help` for individual stages.
+CLI help is the reference for options and defaults.
 
-```console
-PIXI_LOCKED=false orinoco-lite dev enable
-PIXI_LOCKED=false orinoco-lite dev disable
-```
-
-`enable` uses `../orinoco-lite-dev` by default; an optional path selects another checkout.
-If missing, it clones the repository and checks out the running package’s source commit.
-It records a relative development link and editable dependency, then prepares resources using the engineering environment.
-Python edits take effect immediately.
-After changing bundled resource sources, run `orinoco-lite dev prepare-resources` from the engineering checkout.
-`disable` restores the prior package selection from Git history while preserving site edits and unrelated dependency changes.
-Upgrading to a newer release is a separate operation.
+`dev enable [PATH]` and `dev disable` remain explicit editable-development conveniences; normal setup does not use them.
+After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
 Pixi's downstream tasks only supply convenient arguments.

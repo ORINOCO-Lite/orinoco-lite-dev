@@ -94,7 +94,7 @@ def joined_records(
     workspace: WorkspaceConfig,
     schema: Path,
 ) -> list[dict[str, Any]]:
-    """Load records joined with their mirrored machine PAV companions."""
+    """Load records joined with their mirrored machine PAV overlay files."""
 
     # Retain the schema argument as part of the established record-loading
     # surface.  Annotation joining no longer derives assertions from scalar

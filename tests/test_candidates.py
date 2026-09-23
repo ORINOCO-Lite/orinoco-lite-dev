@@ -77,7 +77,7 @@ def candidate(
     blockers: tuple[str, ...] = (),
     record_root: str | None = "site-specific/metadata/records",
     annotation_root: str | None = (
-        "site-specific/metadata/overlays/annotations"
+        "site-specific/metadata/overlays/machine-provenance-annotations"
     ),
 ) -> Candidate:
     return Candidate(
@@ -314,7 +314,7 @@ class CandidateTests(unittest.TestCase):
             set(changes),
             {
                 "site-specific/metadata/records/XYZOrganization/one.yaml",
-                "site-specific/metadata/overlays/annotations/XYZOrganization/one.yaml",
+                "site-specific/metadata/overlays/machine-provenance-annotations/XYZOrganization/one.yaml",
             },
         )
         self.assertEqual(
@@ -345,15 +345,15 @@ class CandidateTests(unittest.TestCase):
         cases = (
             (
                 "records",
-                "overlays/annotations",
+                "overlays/machine-provenance-annotations",
             ),
             (
                 "metadata/records",
-                "metadata/overlays/annotations",
+                "metadata/overlays/machine-provenance-annotations",
             ),
             (
                 "custom/library/records",
-                "custom/library/overlays/annotations",
+                "custom/library/overlays/machine-provenance-annotations",
             ),
         )
         with tempfile.TemporaryDirectory() as temporary:
@@ -459,7 +459,7 @@ class CandidateTests(unittest.TestCase):
                 Candidate(
                     **common,
                     record_root="other/records",
-                    annotation_root="other/overlays/annotations",
+                    annotation_root="other/overlays/machine-provenance-annotations",
                 )
 
     def test_invalid_identity_record_path_and_companion_fail_closed(self) -> None:
@@ -646,7 +646,7 @@ class CandidatePlanTests(unittest.TestCase):
             baseline=None,
             proposed=record(pid, "Custom"),
             record_root="custom/records",
-            annotation_root="custom/overlays/annotations",
+            annotation_root="custom/overlays/machine-provenance-annotations",
         )
 
         with self.assertRaisesRegex(ConfigurationError, "metadata root pair"):
