@@ -23,7 +23,8 @@ while [[ $# -gt 0 ]]; do
 done
 capture=$directory/downloaded/records.jsonl
 [[ -f pixi.toml && -f pixi.lock ]] || { echo 'Populate requires the downstream Pixi selection and lock.' >&2; exit 2; }
-git diff --quiet HEAD -- pixi.toml pixi.lock || {
+git ls-files --error-unmatch -- pixi.toml pixi.lock >/dev/null 2>&1 &&
+  git diff --quiet HEAD -- pixi.toml pixi.lock || {
   echo 'Record the package selection and lock before populating the downstream.' >&2; exit 2;
 }
 [[ -z $snapshot || -f $snapshot ]] || { echo "Missing capture: $snapshot" >&2; exit 2; }
@@ -44,17 +45,22 @@ if [[ -n $snapshot ]]; then
   # Supplied bytes establish the replay boundary; the external path is not a
   # recoverable source for a recorded copy command.
   if [[ ! "$snapshot" -ef "$capture" ]]; then cp "$snapshot" "$capture"; fi
+  saved_capture=("$capture")
   if [[ -f $snapshot.manifest.json ]]; then
     if [[ ! "$snapshot.manifest.json" -ef "$capture.manifest.json" ]]; then
       cp "$snapshot.manifest.json" "$capture.manifest.json"
     fi
+    saved_capture+=("$capture.manifest.json")
   else
+    if git ls-files --error-unmatch -- "$capture.manifest.json" >/dev/null 2>&1; then
+      saved_capture+=("$capture.manifest.json")
+    fi
     rm -f -- "$capture.manifest.json"
   fi
   datalad save -m "chore: retain supplied pool capture
 
 Retain supplied bytes as inputs for subsequent recorded transformations.
-The original acquisition was not executed by this workflow." -- "$directory/downloaded"
+The original acquisition was not executed by this workflow." -- "${saved_capture[@]}"
 
 elif ! $reuse_capture; then
   datalad run --explicit -m "chore: capture upstream pool records" \

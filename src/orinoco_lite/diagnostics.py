@@ -1,16 +1,15 @@
-"""Conventional paths for an explicit upstream investigation."""
+"""Default data paths and explicit command paths."""
 
 from pathlib import Path
-import shutil
 
 from .errors import ConfigurationError
 
-DEFAULT_DIRECTORY = Path("upstream-diffing")
+DEFAULT_DIRECTORY = Path("sourcedata")
 
 
 def options(parser, *, replace=True):
     parser.add_argument("--directory", type=Path, default=DEFAULT_DIRECTORY,
-                        help="investigation directory (default: %(default)s)")
+                        help="source-data directory (default: %(default)s)")
     if replace:
         parser.add_argument("--force", action="store_true",
                             help="replace this command's existing output; preserve its inputs")
@@ -26,31 +25,6 @@ def require(path, command):
     if not path.exists():
         raise ConfigurationError(f"Missing input: {path}. Run 'orinoco-lite dev {command}' with the same --directory first.")
     return path
-
-
-def prepare_output(path, force=False):
-    if path.is_symlink():
-        raise ConfigurationError(f"Output must not be a symbolic link: {path}")
-    if path.exists():
-        if not force:
-            raise ConfigurationError(f"Output already exists: {path}. Use --force to replace it, or --directory for another investigation.")
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
-    return path
-
-
-def record_path(root, name):
-    if name == "downloaded":
-        path, command = root / name / "records.jsonl", "records get"
-    elif name == "yaml":
-        path, command = root / name, "records jsonl-to-yaml"
-    elif name == "yaml-jsonl":
-        path, command = root / name / "records.jsonl", "records yaml-to-jsonl"
-    else:
-        raise ConfigurationError(f"Unknown record state: {name}")
-    return require(path, command)
 
 
 def explicit_path(args, path):

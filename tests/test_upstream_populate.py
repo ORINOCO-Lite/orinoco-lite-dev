@@ -62,7 +62,17 @@ def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path
     supplied = tmp_path / "supplied.jsonl"
     supplied.write_bytes(capture.read_bytes())
     capture.unlink()
+    manifest = capture.with_name(capture.name + ".manifest.json")
+    if layout == "submodule":
+        manifest.write_text('{"source": "previous capture"}\n')
+    else:
+        supplied.with_name(supplied.name + ".manifest.json").write_text('{"source": "supplied capture"}\n')
+    note = capture.parent / "notes.txt"
+    note.write_text("saved note\n")
     commit(site, "test: environment")
+    note.write_text("unfinished note edit\n")
+    scratch = capture.parent / "scratch.txt"
+    scratch.write_text("untracked work\n")
     # Replace only remote source resolution, so commands, conversion, file import,
     # DataLad recording, and rerun all execute their real implementations.
     commands = tmp_path / "bin"
@@ -84,6 +94,17 @@ raise SystemExit(cli.main())
     ingestion = run(site, "git", "log", "--format=%B", "--grep=retain supplied pool capture")
     assert ingestion
     assert "DATALAD RUNCMD" not in ingestion
+    ingestion_commit = run(site, "git", "log", "-1", "--format=%H", "--grep=retain supplied pool capture")
+    assert set(run(site, "git", "show", "--format=", "--name-only", ingestion_commit).splitlines()) == {
+        "sourcedata/downloaded/records.jsonl", "sourcedata/downloaded/records.jsonl.manifest.json",
+    }
+    assert manifest.exists() == (layout == "directory")
+    assert run(site, "git", "show", "HEAD:sourcedata/downloaded/notes.txt") == "saved note"
+    assert note.read_text() == "unfinished note edit\n"
+    assert not run(site, "git", "ls-files", "--", "sourcedata/downloaded/scratch.txt")
+    assert scratch.read_text() == "untracked work\n"
+    note.write_text("saved note\n")
+    scratch.unlink()
     history = run(site, "git", "log", "--format=%H").splitlines()
     runs = {}
     for sha in history:
@@ -135,3 +156,31 @@ def test_setup_refuses_unpublished_candidate_before_creating_destination(tmp_pat
     assert result.returncode == 2
     assert not destination.exists()
     assert "Cannot fetch" in result.stderr
+
+
+@pytest.mark.parametrize("selection", ["untracked-manifest", "untracked-lock", "modified", "staged"])
+def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection):
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Test")
+    run(tmp_path, "git", "config", "user.email", "test@example.invalid")
+    manifest, lock = tmp_path / "pixi.toml", tmp_path / "pixi.lock"
+    manifest.write_text('[workspace]\nname="fixture"\n')
+    lock.write_text("saved lock\n")
+    tracked = (lock if selection == "untracked-manifest" else
+               manifest if selection == "untracked-lock" else None)
+    if tracked:
+        run(tmp_path, "git", "add", tracked.name)
+        run(tmp_path, "git", "commit", "-qm", "test: partially saved selection")
+    else:
+        commit(tmp_path, "test: saved selection")
+        lock.write_text("modified lock\n")
+        if selection == "staged":
+            run(tmp_path, "git", "add", "pixi.lock")
+    before = run(tmp_path, "git", "status", "--porcelain")
+    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-capture"], cwd=tmp_path,
+                            capture_output=True, text=True)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Record the package selection and lock" in result.stderr
+    assert run(tmp_path, "git", "status", "--porcelain") == before
+    assert not (tmp_path / "site-specific").exists()
+    assert not (tmp_path / "sourcedata").exists()

@@ -31,16 +31,7 @@ from .annotations import assertion_sha256
 from .errors import ConfigurationError
 
 
-COMPARATOR = "records-v1"
-SCHEMA_RELATIVE = Path("schema/demo-research-information/unreleased.yaml")
 _MISSING = object()
-
-# Describe the operation that produced each state; none of these reads a live API.
-RECORD_STATES = {
-    "downloaded": ("downloaded", "Downloaded records (JSONL)"),
-    "yaml": ("yaml", "Records after conversion to YAML"),
-    "yaml-jsonl": ("yaml-jsonl", "Records after YAML → JSONL"),
-}
 
 
 def _limit(value):
@@ -222,24 +213,9 @@ def _safe_output(path: Path) -> None:
         raise snapshot.SnapshotError(f"output must not be a symlink: {path}")
 
 
-def _check_record_input(path: Path) -> None:
-    from .stage_reports import operation_receipt, read_json
-
-    operation_receipt(path)
-    # Interruptions can leave evidence before the CLI writes its receipt.
-    if path.name == "returned.partial.jsonl":
-        raise snapshot.SnapshotError(f"Incomplete RDF return cannot be a complete record input: {path}")
-    conversion = path.with_name("conversion.json")
-    if path.name == "records.jsonl" and conversion.is_file():
-        result = read_json(conversion)
-        if not isinstance(result, dict) or result.get("status") != "complete":
-            raise snapshot.SnapshotError(f"RDF conversion did not complete: {conversion}")
-
-
 def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
     """Replace records and companions, preserving authored inputs and captures."""
 
-    _check_record_input(source)
     targets = [site_inputs / "metadata/records",
                site_inputs / "metadata/overlays/annotations"]
     for target in targets:
@@ -310,144 +286,78 @@ def yaml_to_jsonl(site_inputs: Path, output: Path) -> list[snapshot.RecordEnvelo
 def register(subparsers: Any) -> None:
     from .diagnostics import options
     parser = subparsers.add_parser("jsonl-to-yaml", help="write YAML records from downloaded JSONL",
-        description="Convert JSONL to YAML records and annotation companions. Defaults use the investigation directory; --destination selects a site-input directory. Only metadata/records and metadata/overlays/annotations are replaced, with --force required for existing metadata.")
+        description="Convert captured JSONL into site-specific/metadata. Only metadata/records "
+                    "and metadata/overlays/annotations are replaced; use --force for existing metadata.")
     options(parser)
     parser.add_argument("--source", type=Path, help="JSONL input (default: DIRECTORY/downloaded/records.jsonl)")
-    parser.add_argument("--destination", type=Path, help="site-input directory (default: DIRECTORY/yaml)")
+    parser.add_argument("--destination", type=Path, default=Path("site-specific"),
+                        help="site-input directory (default: %(default)s)")
     parser.set_defaults(records_action="jsonl-to-yaml")
     parser = subparsers.add_parser("yaml-to-jsonl", help="rejoin YAML records and annotations into JSONL",
-        description="Rejoin the investigation's YAML records and annotation companions into yaml-jsonl/records.jsonl. Existing output requires --force.")
+        description="Rejoin site-specific metadata into sourcedata/records.jsonl. "
+                    "Use --source and --output for other paths; existing output requires --force.")
     options(parser)
-    parser.add_argument("--source", type=Path, help="site-input directory containing metadata (default: DIRECTORY/yaml)")
-    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/yaml-jsonl/records.jsonl)")
+    parser.add_argument("--source", type=Path, default=Path("site-specific"),
+                        help="site-input directory containing metadata (default: %(default)s)")
+    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/records.jsonl)")
     parser.set_defaults(records_action="yaml-to-jsonl")
     parser = subparsers.add_parser("diff", help="compare two representations of the records",
-        description="Compare existing records: downloaded against yaml-jsonl by default. Use 'all' to list available states and compare each conversion. No downloads or conversions are run. Results are always displayed; existing saved reports are replaced only with --force. Exit 1 means differences, 2 means an error.")
-    names = ", ".join(RECORD_STATES)
-    parser.add_argument("left", nargs="?", default="downloaded", metavar="STATE|PATH|all", help="JSONL file, site-input directory, or state: " + names)
-    parser.add_argument("right", nargs="?", metavar="STATE|PATH", help="JSONL file, site-input directory, or state: " + names)
-    parser.add_argument("--report", type=Path, help="comparison report directory (required for explicit input paths)")
+        description="Compare sourcedata/downloaded/records.jsonl with site-specific metadata by default. "
+                    "Pass two paths to compare other JSONL files or site-input directories. "
+                    "Print differences without writing files, downloading, or changing inputs. "
+                    "Exit 0 means equal, 1 means differences, and 2 means an error.")
+    parser.add_argument("left", nargs="?", type=Path, help="JSONL file or site-input directory (default: DIRECTORY/downloaded/records.jsonl)")
+    parser.add_argument("right", nargs="?", type=Path, default=Path("site-specific"),
+                        help="JSONL file or site-input directory (default: %(default)s)")
     parser.add_argument("--summary", action="store_true", help="show counts without individual differences")
-    parser.add_argument("--limit", type=_limit, default=30, help="maximum displayed differences per comparison (default: 30)")
+    parser.add_argument("--limit", type=_limit, default=30, help="maximum displayed differences (default: 30)")
     parser.add_argument("--record", action="append", help="select a record identifier; repeat for several")
     parser.add_argument("--field", help="show differences within this top-level field")
     parser.add_argument("--full-values", action="store_true", help="print complete before/after values instead of abbreviating them")
-    options(parser)
+    options(parser, replace=False)
     parser.set_defaults(records_action="diff")
 
 
 def execute(args: argparse.Namespace) -> int:
-    from .stage_reports import write_operation, write_report
-
-    from .diagnostics import directory, record_path, prepare_output, explicit_path
+    from .diagnostics import directory, explicit_path, require
 
     action = args.records_action
     try:
-        root = directory(args)
-        if action == "diff" and args.left == "all":
-            if args.right is not None:
-                raise ConfigurationError("Use 'diff all' without a second state")
-            available = set()
-            results = []
-            print("Record states in this investigation:")
-            for name, (previous, label) in RECORD_STATES.items():
-                try:
-                    path = record_path(root, previous)
-                except ConfigurationError as error:
-                    if (root / previous).exists():
-                        print(f"  {name}: incomplete output. {error}")
-                        results.append(2)
-                    else:
-                        print(f"  {name}: not written")
-                else:
-                    available.add(name)
-                    print(f"  {name}: {label}\n    {path}")
-            pairs = [("downloaded", "yaml"), ("yaml", "yaml-jsonl"), ("downloaded", "yaml-jsonl")]
-            for left, right in pairs:
-                if left in available and right in available:
-                    print()
-                    results.append(execute(argparse.Namespace(**{**vars(args), "left": left, "right": right})))
-            if not results:
-                raise ConfigurationError("No pair of record states is available. Run 'records get', 'records jsonl-to-yaml', and 'records yaml-to-jsonl' first.")
-            return max(results)
+        data = directory(args)
         if action == "jsonl-to-yaml":
-            source = getattr(args, "source", None)
-            destination = getattr(args, "destination", None)
-            args.source = explicit_path(args, source) if source else record_path(root, "downloaded")
-            _check_record_input(args.source)
-            snapshot.load_jsonl(args.source)
-            args.site_inputs = explicit_path(args, destination) if destination else root / "yaml"
+            source = explicit_path(args, args.source) if args.source else require(data / "downloaded/records.jsonl", "records get")
+            site_inputs = explicit_path(args, args.destination)
             # Never delete the enclosing site directory: it may be a subdataset.
             for name in ("metadata/records", "metadata/overlays/annotations"):
-                target = args.site_inputs / name
+                target = site_inputs / name
                 _safe_output(target)
                 if target.exists() and not args.force:
                     raise ConfigurationError(f"Metadata output already exists: {target}; use --force to replace it")
+            result = jsonl_to_yaml(source, site_inputs)
+            print(f"Converted {result['record_count']} records (YAML): {site_inputs}")
         elif action == "yaml-to-jsonl":
-            source = getattr(args, "source", None)
-            output = getattr(args, "output", None)
-            args.site_inputs = explicit_path(args, source) if source else record_path(root, "yaml")
-            args.output = explicit_path(args, output) if output else root / "yaml-jsonl/records.jsonl"
-            _safe_output(args.output)
-            if args.output.exists() and not args.force:
-                raise ConfigurationError(f"JSONL output already exists: {args.output}; use --force to replace it")
+            site_inputs = explicit_path(args, args.source)
+            output = explicit_path(args, args.output) if args.output else data / "records.jsonl"
+            _safe_output(output)
+            if output.exists() and not args.force:
+                raise ConfigurationError(f"JSONL output already exists: {output}; use --force to replace it")
+            joined = yaml_to_jsonl(site_inputs, output)
+            print(f"Wrote {len(joined)} records (JSONL): {output}")
         elif action == "diff":
-            left_name, right_name = args.left, args.right or "yaml-jsonl"
-            def selected(value):
-                if value in RECORD_STATES:
-                    key, label = RECORD_STATES[value]
-                    return record_path(root, key), label
-                path = explicit_path(args, Path(value))
-                if not path.exists():
-                    raise ConfigurationError(f"Record input does not exist: {path}")
-                return path, value
-            args.left, left_label = selected(left_name)
-            args.right, right_label = selected(right_name)
-            args.stage = "storage"
-            args.mode = "isolated"
-            report = getattr(args, "report", None)
-            if report:
-                args.report = explicit_path(args, report)
-            elif left_name in RECORD_STATES and right_name in RECORD_STATES:
-                args.report = root / "reports" / f"{left_name}-vs-{right_name}"
-            else:
-                raise ConfigurationError("Explicit record paths require --report DIRECTORY")
-            if any(path.resolve().is_relative_to(args.report.resolve()) for path in (args.left, args.right)):
-                raise ConfigurationError("Comparison report must not contain an input")
-            for path in (args.left, args.right):
-                if path.is_file():
-                    _check_record_input(path)
-            if args.report.is_symlink():
-                raise ConfigurationError(f"Report must not be a symbolic link: {args.report}")
-        if action == "jsonl-to-yaml":
-            result = jsonl_to_yaml(args.source, args.site_inputs)
-            print(f"Converted {result['record_count']} records (YAML): {args.site_inputs}")
-        elif action == "yaml-to-jsonl":
-            joined = yaml_to_jsonl(args.site_inputs, args.output)
-            inputs = {"metadata": args.site_inputs / "metadata"}
-            write_operation(args.output, operation="records yaml-to-jsonl", inputs=inputs, command=getattr(args, "invocation", []))
-            print(f"Wrote {len(joined)} records (JSONL): {args.output}")
-        elif action == "diff":
-            # A failed conversion cannot support a completed comparison.
-            _check_record_input(args.left)
-            _check_record_input(args.right)
+            left_path = explicit_path(args, args.left) if args.left else require(data / "downloaded/records.jsonl", "records get")
+            right_path = explicit_path(args, args.right)
             def read(path):
                 if path.is_dir():
                     with tempfile.TemporaryDirectory() as temporary:
                         return yaml_to_jsonl(path, Path(temporary) / "records.jsonl")
                 return snapshot.load_jsonl(path)
-            left, right = read(args.left), read(args.right)
-            comparison_status, diagnostics = "complete", []
+            left, right = read(left_path), read(right_path)
             findings = compare_records(left, right)
-            print(f"{left_label} → {right_label}")
-            print(f"  Before: {args.left}\n  After:  {args.right}")
-            if comparison_status == "complete":
-                print(f"{len(left)} records before; {len(right)} after; {len({item['subject'] for item in findings})} records differ.")
-            else:
-                print(diagnostics[0], file=sys.stderr)
+            print(f"Before: {left_path}\nAfter:  {right_path}")
+            print(f"{len(left)} records before; {len(right)} after; {len({item['subject'] for item in findings})} records differ.")
             fields = defaultdict(set)
             for item in findings:
-                fields[str(item['location'][0]) if item['location'] else '<whole record>'].add(item['subject'])
+                fields[str(item["location"][0]) if item["location"] else '<whole record>'].add(item['subject'])
             for field, subjects in sorted(fields.items(), key=lambda item: (-len(item[1]), item[0])):
                 print(f"  {field}: {len(subjects)} records")
             selected = [item for item in findings if
@@ -474,22 +384,8 @@ def execute(args: argparse.Namespace) -> int:
             if findings:
                 print("Difference counts include both changed lists and changes within them.")
             if args.record or args.field:
-                print("Filters affect displayed differences only; counts, exit status, and saved report cover all records.")
-            if args.report.exists() and not args.force:
-                print(f"Existing report kept: {args.report}. The comparison above is current; use --force to replace the saved report.")
-            else:
-                prepare_output(args.report, args.force)
-                evidence: dict[str, Path] = {}
-                write_report(args.report, stage=args.stage, left=args.left, right=args.right,
-                             findings=findings, comparator=COMPARATOR, mode=args.mode,
-                             status=comparison_status, diagnostics=diagnostics,
-                             scope={"complete": comparison_status == "complete",
-                                    "subjects": sorted({item.pid for item in [*left, *right]}),
-                                    "all_locations": True, "selection": "all records",
-                                    "exclusions": []},
-                             command=getattr(args, "invocation", []), evidence=evidence)
-                print(f"Report: {args.report}")
-            return 2 if comparison_status != "complete" else 1 if findings else 0
+                print("Filters affect displayed differences only; counts and exit status cover all records.")
+            return 1 if findings else 0
         else:
             raise ValueError(f"unknown record operation: {action}")
     except (OSError, ValueError, ConfigurationError, snapshot.SnapshotError, storage.StorageProjectionError) as error:

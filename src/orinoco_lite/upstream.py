@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 
 from .pool_capture import DEFAULT_API
-from .diagnostics import directory, explicit_path, options
+from .diagnostics import explicit_path
 from .errors import ConfigurationError
 from .presentation import resolve_presentation
 from .resources import resolve_resources
@@ -19,20 +19,20 @@ def register(commands):
         "and site overrides from the installed package's pinned www-from-model revision. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
         "are synchronized, including deletions; metadata is preserved."))
-    options(export, replace=False)
     export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected presentation)")
     export.add_argument("--media-remote", help="Annex source Git URL (default: upstream host for package-selected www; existing remotes with --source)")
     export.add_argument("--revision", help="require this Git revision at the source checkout's HEAD")
-    export.add_argument("--destination", type=Path, help="site-input directory (default: DIRECTORY/site-inputs)")
+    export.add_argument("--destination", type=Path, help="site-input directory (default: site-specific)")
     populate = groups.add_parser("populate", description=(
         "Record acquisition, record conversion, and site import as separate DataLad runs. "
         "Use --snapshot to retain a supplied capture, or --reuse-capture to transform "
-        "an existing capture without acquisition. Does not build, compare, or deploy."))
+        "the retained Pool records without refetching them; site and media import still runs. "
+        "Run individual record or import commands to repeat only that stage. Does not build, compare, or deploy."))
     populate.add_argument("--directory", type=Path, default=Path("sourcedata"), help="capture directory (default: sourcedata)")
     populate.add_argument("--destination", type=Path, default=Path("site-specific"), help="site-input directory (default: site-specific)")
     acquisition = populate.add_mutually_exclusive_group()
     acquisition.add_argument("--snapshot", type=Path, help="retain this JSONL capture instead of fetching")
-    acquisition.add_argument("--reuse-capture", action="store_true", help="use DIRECTORY/downloaded/records.jsonl without fetching")
+    acquisition.add_argument("--reuse-capture", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl without refetching Pool records; still import site files")
     populate.add_argument("--api", default=DEFAULT_API, help="public Dump Things API for acquisition")
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
     populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip capture and imports")
@@ -71,7 +71,7 @@ def execute(args):
         raise ConfigurationError("Upstream site checkout does not match --revision")
     git("diff", "--exit-code", "HEAD", "--", "config", "content", "assets", "static")
     destination = (explicit_path(args, args.destination) if args.destination else
-                   directory(args) / "site-inputs")
+                   root / "site-specific")
     if (destination.resolve() == source.resolve()
             or destination.resolve().is_relative_to(source.resolve())
             or source.resolve().is_relative_to(destination.resolve())):

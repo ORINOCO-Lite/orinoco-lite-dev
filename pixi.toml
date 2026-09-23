@@ -28,8 +28,8 @@ click-option-group = ">=0.5, <0.6"
 copier = "==9.10.3"
 
 [tasks]
-records-jsonl-to-yaml = "datalad run --explicit --input upstream-diffing/downloaded/records.jsonl --output upstream-diffing/yaml orinoco-lite dev records jsonl-to-yaml"
-records-get = "datalad run --explicit --output upstream-diffing/downloaded/records.jsonl --output upstream-diffing/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
+records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"
+records-get = "datalad run --explicit --output sourcedata/downloaded/records.jsonl --output sourcedata/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
 build-package = "python -m build --outdir build/package"
 setup-upstream = "bash tools/setup-upstream.sh"
 install-hooks = "git config core.hooksPath .githooks"

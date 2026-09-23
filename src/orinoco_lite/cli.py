@@ -332,7 +332,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "dev" and args.dev_command in {"records", "upstream"}:
+        if (args.command == "dev" and args.dev_command in {"records", "upstream"}
+                and getattr(args, "records_command", None) != "diff"):
             from .package_update import check_environment
             check_environment(args.root or Path.cwd())
         if args.command == "package":

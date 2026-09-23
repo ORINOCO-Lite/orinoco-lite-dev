@@ -60,7 +60,7 @@ Git selections and locks remain authoritative.
 Reports record the revisions and inputs used to produce their evidence.
 
 Operations write only their declared outputs.
-Comparisons accept `--report DIRECTORY` and produce a machine-readable report alongside a readable summary.
+In the later review phase, comparisons accept `--report DIRECTORY` and produce a machine-readable report alongside a readable summary.
 Expose `dev review summarize REPORT... --decisions FILE --output DIRECTORY` before the application phase to validate report compatibility and produce readable and machine-readable decision-matching results.
 Omit `--decisions` for an initial review; all findings then have no prior decision.
 Maintainers can edit the scoped decision file directly and inspect its Git diff, then rerun this command to validate and apply the decisions to the reports.
@@ -232,12 +232,12 @@ Dependency selection comes from the downstream and package, without repeating up
 orinoco-lite dev records get
 orinoco-lite dev records jsonl-to-yaml
 orinoco-lite dev records yaml-to-jsonl
-cmp upstream-diffing/downloaded/records.jsonl upstream-diffing/yaml-jsonl/records.jsonl
-orinoco-lite dev records diff downloaded yaml-jsonl --summary
+cmp sourcedata/downloaded/records.jsonl sourcedata/records.jsonl
+orinoco-lite dev records diff --summary
 ```
 
 For a downstream, `pixi run setup-upstream` composes template application, package selection, capture, conversion, and site import with DataLad provenance.
-`dev upstream populate --reuse-capture` repeats preparation using retained data.
+`dev upstream populate --reuse-capture` retains the Pool capture and repeats conversion and site import.
 Annotation companions preserve machine attribution separately and rejoin it for JSONL reconstruction.
 Record comparison preserves scalar types, null versus missing values, array order, and duplicates.
 A diff exit code of 1 means differences.

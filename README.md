@@ -99,7 +99,7 @@ pixi run orinoco-lite dev upstream populate --reuse-capture
 ```
 
 The first records a fresh acquisition, JSONL-to-YAML conversion, and site import as separate DataLad runs.
-The second transforms the retained capture without acquisition.
+The second reuses the Pool capture; site and media import still runs.
 `--directory` and `--destination` select the capture and site-input directories.
 Recorded acquisition and conversion commands include `--force` so reruns can replace their outputs.
 Site import follows the installed package's upstream pins and retrieves the selected upstream media into `site-specific/` as ordinary files.
@@ -115,11 +115,11 @@ pixi run orinoco-lite dev records get --output sourcedata/pool.jsonl --force
 pixi run orinoco-lite dev records jsonl-to-yaml --source sourcedata/pool.jsonl --destination site-specific --force
 pixi run orinoco-lite dev upstream import-from-www --destination site-specific
 pixi run orinoco-lite dev records yaml-to-jsonl --source site-specific --output inspection/records.jsonl
-pixi run orinoco-lite dev records diff sourcedata/pool.jsonl site-specific --report inspection/comparison
+pixi run orinoco-lite dev records diff sourcedata/pool.jsonl site-specific
 ```
 
 `records get --api URL` supports other compatible Dump Things servers.
-Without explicit paths, individual record commands retain the `upstream-diffing/` layout.
+Defaults use `sourcedata/downloaded/records.jsonl` and `site-specific/`; JSONL export writes `sourcedata/records.jsonl`.
 Site import reports its upstream revision and files; `--source` and `--revision` remain available for explicit upstream experiments.
 The default media source is the original upstream Annex host; `--media-remote URL` selects another source.
 With an explicit `--source` checkout, its existing Annex remotes are used unless overridden.

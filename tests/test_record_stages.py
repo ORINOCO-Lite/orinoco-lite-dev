@@ -159,36 +159,33 @@ def test_failed_conversion_preserves_existing_metadata(tmp_path):
     assert existing.read_bytes() == original
 
 
-def test_public_workflow_preserves_curated_inputs_and_requires_explicit_replacement(tmp_path, monkeypatch, capsys):
+def test_public_workflow_uses_setup_paths_and_preserves_authored_inputs(tmp_path, monkeypatch, capsys):
     from orinoco_lite import cli
 
     monkeypatch.chdir(tmp_path)
-    root = tmp_path / "upstream-diffing"
-    root.mkdir()
-    snapshot.write_jsonl(root / "downloaded/records.jsonl", [envelope(title="Original title")])
-    curated = tmp_path / "site-specific/metadata/records/human.yaml"
+    snapshot.write_jsonl(tmp_path / "sourcedata/downloaded/records.jsonl", [envelope(title="Original title")])
+    curated = tmp_path / "site-specific/content/index.md"
     curated.parent.mkdir(parents=True)
-    curated.write_text("Human curated input\n")
+    curated.write_text("Human curated page\n")
     def run(*args):
         return cli.main(["dev", "records", *args])
     assert run("jsonl-to-yaml") == 0
-    record = next((root / "yaml/metadata/records").rglob("*.yaml"))
+    record = next((tmp_path / "site-specific/metadata/records").rglob("*.yaml"))
     record.write_text(record.read_text().replace("Original title", "Reviewed title"))
     before = record.read_bytes()
     assert run("jsonl-to-yaml") == 2
     assert record.read_bytes() == before
     assert run("yaml-to-jsonl") == 0
+    assert (tmp_path / "sourcedata/records.jsonl").is_file()
+    files = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     assert run("diff") == 1
-    report = root / "reports/downloaded-vs-yaml-jsonl/report.json"
-    assert "Reviewed title" in report.read_text()
-    saved_report = report.read_bytes()
+    assert "Reviewed title" in capsys.readouterr().out
     assert run("diff") == 1
-    assert report.read_bytes() == saved_report
-    assert run("diff", "--force") == 1
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == files
     assert run("jsonl-to-yaml", "--force") == 0
     assert "Original title" in record.read_text()
-    assert curated.read_text() == "Human curated input\n"
-    assert run("jsonl-to-yaml", "--directory", "another-investigation") == 2
+    assert curated.read_text() == "Human curated page\n"
+    assert run("jsonl-to-yaml", "--directory", "another-capture") == 2
     assert "records get" in capsys.readouterr().err
 
 
@@ -214,44 +211,39 @@ def test_export_rejects_orphan_companion_before_output(tmp_path):
     assert not output.exists()
 
 
-
-
-
-
-
-
-
-
-
-def test_diff_accepts_deliberate_diagnostic_edits_without_false_producer_attribution(tmp_path):
+def test_diff_reads_only_metadata_and_does_not_require_matching_package(tmp_path, monkeypatch, capsys):
     from orinoco_lite import cli
-    from orinoco_lite.stage_reports import write_operation
-    left = tmp_path / "downloaded/records.jsonl"
-    right = tmp_path / "yaml-jsonl/records.jsonl"
-    snapshot.write_jsonl(left, [envelope(title="before")])
-    snapshot.write_jsonl(right, [envelope(title="before")])
-    write_operation(right, operation="records yaml-to-jsonl", inputs={"records": left})
-    snapshot.write_jsonl(right, [envelope(title="after")])
-    assert cli.main(["dev", "records", "diff", "--directory", str(tmp_path)]) == 1
-    raw = json.loads((tmp_path / "reports/downloaded-vs-yaml-jsonl/report.json").read_text())
-    assert raw["stages"][0]["findings"][0]["location"] == ["title"]
-    assert raw["stages"][0]["artifacts"]["right"]["operation"] is None
+    monkeypatch.chdir(tmp_path)
+    source = capture(tmp_path, envelope(title="before"))
+    inputs = tmp_path / "site-specific"
+    stages.jsonl_to_yaml(source, inputs)
+    (inputs / ".git").symlink_to(tmp_path / "missing-git-directory")
+    (inputs / "assets").mkdir()
+    (inputs / "assets/unavailable").symlink_to(tmp_path / "missing-image")
+    (tmp_path / "pixi.toml").write_text(
+        '[pypi-dependencies]\norinoco-lite = { git = "https://example.invalid/package.git", rev = "' + 'a' * 40 + '" }\n')
+    assert cli.main(["dev", "records", "diff", source.name, "site-specific"]) == 0
+    assert "0 records differ" in capsys.readouterr().out
+    with pytest.raises(SystemExit, match="2"):
+        cli.main(["dev", "records", "jsonl-to-yaml", "--source", source.name, "--force"])
 
 
-def test_native_temporary_path_is_a_valid_investigation_directory():
-    import tempfile
+def test_native_temporary_path_and_explicit_data_directory(tmp_path, monkeypatch):
     from orinoco_lite import cli
-    with tempfile.TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        snapshot.write_jsonl(root / "downloaded/records.jsonl", [envelope()])
-        assert cli.main(["dev", "records", "jsonl-to-yaml", "--directory", temporary]) == 0
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "other-data"
+    snapshot.write_jsonl(data / "downloaded/records.jsonl", [envelope()])
+    for command in ("jsonl-to-yaml", "yaml-to-jsonl", "diff"):
+        assert cli.main(["dev", "records", command, "--directory", str(data)]) == 0
+    assert (tmp_path / "site-specific/metadata/records").is_dir()
+    assert (data / "records.jsonl").read_bytes() == (data / "downloaded/records.jsonl").read_bytes()
 
 
 def test_public_conversion_preserves_annotation_values_without_edits(tmp_path, monkeypatch):
     from orinoco_lite import cli
 
     monkeypatch.chdir(tmp_path)
-    root = tmp_path / 'upstream-diffing'
+    root = tmp_path / 'sourcedata'
     root.mkdir()
     original = envelope(annotations={'ex:review': 'yes'}, attributes=[{
         'predicate': 'ex:title', 'value': 'A title',
@@ -262,49 +254,41 @@ def test_public_conversion_preserves_annotation_values_without_edits(tmp_path, m
     snapshot.write_jsonl(root / 'downloaded/records.jsonl', [original])
     for command in ('jsonl-to-yaml', 'yaml-to-jsonl', 'diff'):
         assert cli.main(['dev', 'records', command]) == 0
-    assert snapshot.load_jsonl(root / 'yaml-jsonl/records.jsonl')[0].record == original.record
+    assert snapshot.load_jsonl(root / 'records.jsonl')[0].record == original.record
 
 
-def test_diff_all_filters_and_repeat_inspection_preserve_saved_report(tmp_path, monkeypatch, capsys):
+def test_diff_filters_and_repeated_inspection_write_nothing(tmp_path, monkeypatch, capsys):
     from orinoco_lite import cli
-
     monkeypatch.chdir(tmp_path)
-    root = tmp_path / 'upstream-diffing'
-    root.mkdir()
-    snapshot.write_jsonl(root / 'downloaded/records.jsonl', [envelope(title='before', description='old')])
-    for command in ('jsonl-to-yaml', 'yaml-to-jsonl'):
-        assert cli.main(['dev', 'records', command]) == 0
-    snapshot.write_jsonl(root / 'yaml-jsonl/records.jsonl', [envelope(title='after', description='new')])
-    assert cli.main(['dev', 'records', 'diff', 'all', '--summary']) == 1
-    output = capsys.readouterr().out
-    assert 'Downloaded records (JSONL)' in output
-    assert 'Records after YAML → JSONL' in output
-    assert '1 records differ' in output
-    report = root / 'reports/downloaded-vs-yaml-jsonl/report.json'
-    before = report.read_bytes()
-    assert cli.main(['dev', 'records', 'diff', '--field', 'title', '--limit', '1']) == 1
+    left, right = tmp_path / "before.jsonl", tmp_path / "after.jsonl"
+    snapshot.write_jsonl(left, [envelope(title="before", description="old")])
+    snapshot.write_jsonl(right, [envelope(title="after", description="new")])
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    command = ["dev", "records", "diff", str(left), str(right)]
+    assert cli.main(command + ["--summary"]) == 1
+    assert "1 records differ" in capsys.readouterr().out
+    assert cli.main(command + ["--field", "title", "--limit", "1"]) == 1
     output = capsys.readouterr().out
     assert 'before: "before"' in output and 'after:  "after"' in output
     assert 'before: "old"' not in output
-    assert report.read_bytes() == before
-    # A failed re-comparison must not erase evidence, even with --force.
-    (root / 'yaml-jsonl/records.jsonl').write_text('not JSON\n')
-    assert cli.main(['dev', 'records', 'diff', '--force']) == 2
-    assert report.read_bytes() == before
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+    right.write_text("not JSON\n")
+    assert cli.main(command) == 2
+    assert set(tmp_path.iterdir()) == {left, right}
+    assert left.read_bytes() == before[left.name]
 
 
-def test_diff_all_without_inputs_explains_what_to_run(tmp_path, monkeypatch, capsys):
+def test_default_diff_without_capture_explains_what_to_run(tmp_path, monkeypatch, capsys):
     from orinoco_lite import cli
     monkeypatch.chdir(tmp_path)
-    assert cli.main(['dev', 'records', 'diff', 'all']) == 2
-    assert 'records get' in capsys.readouterr().err
-
-
+    assert cli.main(["dev", "records", "diff"]) == 2
+    assert "records get" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize('prefix', ['pav:', 'http://purl.org/pav/'])
 @pytest.mark.parametrize('expanded', [False, True])
-def test_public_roundtrip_preserves_original_pav_forms(tmp_path, prefix, expanded):
+def test_public_roundtrip_preserves_original_pav_forms(tmp_path, monkeypatch, prefix, expanded):
+    monkeypatch.chdir(tmp_path)
     from orinoco_lite import cli
     annotations = {prefix + 'importedBy': 'ex:adapter', prefix + 'importedFrom': 'https://example.org/source'}
     if expanded:
@@ -313,18 +297,16 @@ def test_public_roundtrip_preserves_original_pav_forms(tmp_path, prefix, expande
     snapshot.write_jsonl(tmp_path / 'downloaded/records.jsonl', [original])
     for command in ('jsonl-to-yaml', 'yaml-to-jsonl', 'diff'):
         assert cli.main(['dev', 'records', command, '--directory', str(tmp_path)]) == 0
-    assert snapshot.load_jsonl(tmp_path / 'yaml-jsonl/records.jsonl')[0].record == original.record
+    assert snapshot.load_jsonl(tmp_path / 'records.jsonl')[0].record == original.record
     # Retained original syntax must not contradict the provenance values.
     if prefix != 'pav:' or expanded:
         import yaml
-        companion = next((tmp_path / 'yaml/metadata/overlays/annotations').rglob('*.yaml'))
+        companion = next((tmp_path / 'site-specific/metadata/overlays/annotations').rglob('*.yaml'))
         value = yaml.safe_load(companion.read_text())
         value['assertions'][0]['pav:importedBy'] = 'ex:different-adapter'
         companion.write_bytes(snapshot.canonical_yaml_bytes(value))
         with pytest.raises(ConfigurationError, match='disagree'):
-            stages.yaml_to_jsonl(tmp_path / 'yaml', tmp_path / 'invalid.jsonl')
-
-
+            stages.yaml_to_jsonl(tmp_path / 'site-specific', tmp_path / 'invalid.jsonl')
 
 
 @pytest.mark.parametrize(("before", "after", "same", "removed", "added"), [
@@ -348,6 +330,7 @@ def test_list_summary_counts_occurrences_without_approving_order(before, after, 
 def test_download_yaml_jsonl_can_be_verified_by_byte_comparison(tmp_path, monkeypatch):
     from orinoco_lite import cli, pool_capture
 
+    monkeypatch.chdir(tmp_path)
     rows = [
         envelope(pid="ex:z", title="Données 🧠", exact_mappings=["ex:b", "ex:a", "ex:b"],
                  attributes=[{"predicate": "ex:title", "value": "ü",
@@ -361,7 +344,7 @@ def test_download_yaml_jsonl_can_be_verified_by_byte_comparison(tmp_path, monkey
         assert cli.main(["dev", "records", command, "--directory", str(tmp_path)]) == 0
 
     downloaded = (tmp_path / "downloaded/records.jsonl").read_bytes()
-    reconstructed = (tmp_path / "yaml-jsonl/records.jsonl").read_bytes()
+    reconstructed = (tmp_path / "records.jsonl").read_bytes()
     # Independent standard-library expectation; no project comparator.
     expected = "".join(json.dumps(row, sort_keys=True, ensure_ascii=False,
                                  separators=(",", ":")) + "\n" for row in reversed(rows)).encode()
@@ -390,10 +373,9 @@ def test_explicit_paths_roundtrip_downstream_and_preserve_unrelated_files(tmp_pa
     assert cli.main(export) == 2
     assert cli.main(export + ["--force"]) == 0
     assert snapshot.load_jsonl(source) == snapshot.load_jsonl(tmp_path / "inspection/roundtrip.jsonl")
-    assert cli.main(["dev", "records", "diff", source.name, "site-specific",
-                     "--report", "inspection/comparison"]) == 0
-    assert cli.main(["dev", "records", "diff", source.name, "site-specific",
-                     "--report", ".", "--force"]) == 2
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert cli.main(["dev", "records", "diff", source.name, "site-specific"]) == 0
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
     assert source.is_file()
 
 

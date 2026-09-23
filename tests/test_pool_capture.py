@@ -69,7 +69,7 @@ def test_default_path_downloads_reuses_and_force_replaces(tmp_path, monkeypatch)
     monkeypatch.setattr(pool_capture, "fetch_live", fetch)
 
     assert main(["get"]) == 0
-    destination = tmp_path / "upstream-diffing/downloaded/records.jsonl"
+    destination = tmp_path / "sourcedata/downloaded/records.jsonl"
     assert upstream_snapshot.load_jsonl(destination)[0].record == record()
     assert destination.with_name("records.jsonl.manifest.json").is_file()
 
@@ -282,4 +282,4 @@ def test_public_upstream_cli_accepts_explicit_output(tmp_path, monkeypatch):
     assert cli.main(["dev", "records", "get", "--output", "custom/pool.jsonl"]) == 0
     assert upstream_snapshot.load_jsonl(tmp_path / "custom/pool.jsonl")[0].record == record()
     assert (tmp_path / "custom/pool.jsonl.manifest.json").is_file()
-    assert not (tmp_path / "upstream-diffing").exists()
+    assert not (tmp_path / "sourcedata").exists()

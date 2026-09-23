@@ -52,7 +52,7 @@ New inputs default to a non-Annex subdataset; use `--site-layout directory` to s
 Unpublished package candidates and existing destinations are refused.
 Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
 
-Repeat acquisition and transformations with `dev upstream populate`, or preserve data with `--reuse-capture`.
+Repeat acquisition and transformations with `dev upstream populate`, or reuse Pool records with `--reuse-capture`; site and media import still runs.
 Individual stages accept explicit paths: `dev records get`, `dev records jsonl-to-yaml`, `dev records yaml-to-jsonl`, and `dev upstream import-from-www`.
 Record comparisons can consume the populated downstream directly.
 For software comparisons, record a new package selection and lock with `package update`, then launch a fresh `pixi run datalad rerun` for the relevant transformation commits.

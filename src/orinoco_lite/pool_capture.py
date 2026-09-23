@@ -173,7 +173,7 @@ def register_capture(commands: argparse._SubParsersAction) -> None:
     from .diagnostics import options
     parser = commands.add_parser(
         "get", help="download records (jsonl), or reuse the existing download",
-        description=("Download public Pool records to downloaded/records.jsonl in the investigation "
+        description=("Download public Pool records to downloaded/records.jsonl in the source-data "
                      "directory, ordered by class and PID with sorted object keys, compact JSON, "
                      "and UTF-8 characters. Array order and duplicates are preserved. "
                      "Reuse the verified records without contacting the service; "
