@@ -74,6 +74,11 @@ orinoco-lite dev prepare-resources
 pytest
 ```
 
+Package versions come from Git tags through Versioneer.
+`orinoco-lite --version` reports the current commit and dirty state in an editable checkout; installed distribution metadata refreshes when the package is reinstalled.
+Normal downstream installations retain the version recorded at build time.
+Release tags use `v` followed by a Python package version; manually dispatched artifact builds use the selected ref's derived version.
+
 Create an inspectable downstream populated from the upstream Pool:
 
 ```console

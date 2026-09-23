@@ -2,11 +2,6 @@ name: Orinoco release artifacts
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Release version to apply while assembling the artifact
-        required: true
-        type: string
   push:
     tags:
       - v*
@@ -24,6 +19,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Initialize only release-authorized components
         shell: bash
@@ -42,25 +38,6 @@ jobs:
           cache: true
           frozen: true
           pixi-version: v0.76.2
-
-      - name: Set the release version
-        env:
-          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
-        run: |
-          pixi run python - <<'PY'
-          import os, pathlib, re
-          from packaging.version import Version
-
-          version = os.environ["RELEASE_VERSION"].removeprefix("v")
-          if str(Version(version)) != version:
-              raise SystemExit("Release version must be canonical PEP 440")
-          path = pathlib.Path("pyproject.toml")
-          source, count = re.subn(r'(?m)^version = "[^"]+"$',
-                                  f'version = "{version}"', path.read_text())
-          if count != 1:
-              raise SystemExit("Could not set the release version")
-          path.write_text(source)
-          PY
 
       - name: Build twice and compare release artifacts
         env:
