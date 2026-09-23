@@ -6,11 +6,29 @@ Until then, maintainers assess each stage through readable reports, intermediate
 The interface reuses those established reports and matching operations.
 It brings comparisons from each stage into one review, locates where differences first appear, and carries reviewed decisions into the next dependency update.
 
+The CLI now supplies capture, conversion, RDF and service round-trips, site-data import, projection, assembly, rendering, and comparison commands.
+Start with `orinoco-lite dev --help`.
+`dev review summarize REPORT... --output DIRECTORY` validates evidence and summarizes the findings.
+Add `--decisions FILE` to carry saved decisions into the review.
+For a small terminal review, run `dev review inspect REPORT... --decisions FILE --author NAME`.
+It shows the raw before/after values and evidence, and previews each decision before saving it.
+It does not commit the decision file.
+Summaries validate explicit data-flow links and show complete-path evidence; the reviewer makes the overall integration judgment.
+
+Summaries show bounded examples and counts; `report.json` and `review.json` retain every raw finding.
+The tested `annotation-representation-v1` rule can be selected explicitly with `dev review decide --equivalence-rule annotation-representation-v1` or the terminal's `rule` command.
+It covers equivalent annotation spelling and structure only when the complete record has unchanged annotation semantics.
+It does not accept resulting page changes or other new consequences.
+
+Diagnostic `dev hugo build` covers Hugo rendering and the selected output adapter.
+The ordinary `orinoco-lite build` also binds the editor and review applications, whose inputs include workspace metadata and configuration.
+Check that complete build separately before claiming whole-site agreement.
+
 ## Follow the metadata
 
 Record preservation is checked before differences reach pages.
 Storage, RDF conversion, and service upload each have their own comparison, so a conversion loss has a place in the diagnosis.
-Arrow labels abbreviate proposed commands under `orinoco-lite dev`; the build specification supplies their arguments.
+Arrow labels abbreviate commands under `orinoco-lite dev`; the build specification supplies their arguments.
 
 ```mermaid
 flowchart TD

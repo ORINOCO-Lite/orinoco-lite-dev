@@ -213,12 +213,14 @@ def load_contract(
         select = raw.get("select", {})
         inline = raw.get("inline", [])
         reverse = raw.get("reverse_injections", [])
-        if not isinstance(select, dict) or set(select) - {"linked_from", "links_to"}:
+        if not isinstance(select, dict) or set(select) - {"linked_from", "links_to", "links_to_members"}:
             raise ConfigurationError(f"{label}.select is unsupported")
         if len(select) > 1 or not all(isinstance(item, dict) for item in select.values()):
             raise ConfigurationError(f"{label}.select must contain at most one operator")
         for operator, arguments in select.items():
             required = {"pid", "field"}
+            if operator == "links_to_members":
+                required.add("members_field")
             permitted = required | ({"recursive"} if operator == "links_to" else set())
             if (
                 set(arguments) - permitted
@@ -769,6 +771,12 @@ def _render_record(
     records: Sequence[dict[str, Any]],
 ) -> str:
     rec = deepcopy(record)
+    annotations = rec.get("annotations")
+    if isinstance(annotations, dict):
+        rec["annotations"] = {
+            key: value.get("annotation_value", value) if isinstance(value, dict) else value
+            for key, value in annotations.items()
+        }
     for source_field, target_field in policy.reverse_injections:
         rec[target_field] = _incoming(records, rec["pid"], source_field)
     for operation in policy.inline:
@@ -798,6 +806,14 @@ def _matches_policy(
 ) -> bool:
     if not policy.select:
         return True
+    if "links_to_members" in policy.select:
+        arguments = policy.select["links_to_members"]
+        source = by_pid.get(arguments["pid"])
+        if source is None:
+            raise DriverError(f"Projection selector source is missing: {arguments['pid']}")
+        members = set(_relationship_targets(source, arguments["members_field"]))
+        people = {pid for pid in members if by_pid.get(pid, {}).get("schema_type") == "xyzri:XYZPerson"}
+        return bool(people & set(_relationship_targets(record, arguments["field"])))
     if "linked_from" in policy.select:
         arguments = policy.select["linked_from"]
         source = by_pid.get(arguments["pid"])
@@ -899,13 +915,24 @@ def render_projection(
     workspace: WorkspaceConfig,
     resources_root: Path,
     output: Path,
+    *, records_input: Path | None = None, presentation_root: Path | None = None,
 ) -> dict[str, Any]:
-    presentation_root = _presentation_root(workspace, resources_root)
-    semantic = validate_semantics(workspace, resources_root, presentation_root)
+    if records_input is not None:
+        from .record_stages import _check_record_input
+        _check_record_input(records_input)
+    presentation_root = presentation_root or _presentation_root(workspace, resources_root)
     contract = load_contract(workspace, presentation_root)
-    records, record_pids = _records(workspace)
-    schema = resources_root / "schema/demo-research-information/unreleased.yaml"
-    machine_records, machine_pids = _records(workspace, schema)
+    if records_input is None:
+        semantic = validate_semantics(workspace, resources_root, presentation_root)
+        records, record_pids = _records(workspace)
+        schema = resources_root / "schema/demo-research-information/unreleased.yaml"
+        machine_records, machine_pids = _records(workspace, schema)
+    else:
+        from .upstream_snapshot import load_jsonl
+        records = [deepcopy(item.record) for item in load_jsonl(records_input)]
+        record_pids = {item["pid"] for item in records}
+        machine_records, machine_pids = records, record_pids
+        semantic = {"records": len(records), "validation": "explicit-stream envelope validation"}
     if machine_pids != record_pids:
         raise DriverError("Joined projection changed the metadata record inventory")
     by_pid = {record["pid"]: record for record in records}

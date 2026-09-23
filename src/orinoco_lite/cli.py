@@ -111,7 +111,7 @@ def _parser() -> argparse.ArgumentParser:
     enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
     enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
     dev_commands.add_parser("disable", help="restore the package selection used before editable development")
-    from . import upstream, pool_capture, record_stages, rdf_stages, service_stage, stage_review
+    from . import dev_site, upstream, pool_capture, record_stages, rdf_stages, service_stage, stage_review
     upstream.register(dev_commands)
     records = dev_commands.add_parser("records", help="capture, convert, and compare records")
     record_commands = records.add_subparsers(dest="records_command", required=True)
@@ -120,6 +120,7 @@ def _parser() -> argparse.ArgumentParser:
     service_stage.register(record_commands)
     rdf_stages.register(dev_commands, record_commands)
     stage_review.register(dev_commands)
+    dev_site.register(dev_commands)
     from . import local_preview, publication, shacl_handoff, curation_actions
 
     preview_parser = local_preview.parser()
@@ -340,6 +341,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 and getattr(args, "records_command", None) != "diff"):
             from .package_update import check_environment
             check_environment(args.root or Path.cwd())
+        if args.command == "dev" and args.dev_command in {"inputs", "hugo", "content", "site"}:
+            from . import dev_site
+            return dev_site.execute(args)
         if args.command == "dev" and (args.dev_command == "rdf" or
                                       getattr(args, "records_command", None) == "jsonl-to-rdf"):
             from . import rdf_stages
