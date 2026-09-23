@@ -80,6 +80,9 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
+Setup defaults to the package and template checkouts' current commits and prints both selections before creating the downstream.
+To select both remote `main` branches instead, use `pixi run setup-upstream --latest-main`.
+
 See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.
 Setup stops before projection and building; run `pixi run build` in the downstream when ready.
 
