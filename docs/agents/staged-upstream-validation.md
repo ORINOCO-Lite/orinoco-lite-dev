@@ -325,7 +325,7 @@ The service diagnostic uses the same investigation directory:
 ```console
 orinoco-lite dev records roundtrip downloaded
 orinoco-lite dev records roundtrip yaml-jsonl
-orinoco-lite dev records diff all --summary
+orinoco-lite dev records diff all --summary --report sourcedata/reports
 orinoco-lite dev review summarize
 ```
 

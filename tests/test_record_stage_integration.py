@@ -78,7 +78,7 @@ def test_failed_record_producer_cannot_appear_clean(tmp_path, capsys):
     source(right)
     stage_reports.write_operation(right, operation="records yaml-to-jsonl", inputs={"source": left},
                                   context={"status": "failed"})
-    assert cli.main(["dev", "records", "diff", "--directory", str(tmp_path)]) == 2
+    assert cli.main(["dev", "records", "diff", "downloaded", "yaml-jsonl", "--directory", str(tmp_path)]) == 2
     assert "did not complete" in capsys.readouterr().err
 
 

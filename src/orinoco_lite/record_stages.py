@@ -408,7 +408,7 @@ def execute(args: argparse.Namespace) -> int:
                 if str(value) in RECORD_STATES:
                     return record_path(data, str(value))
                 return explicit_path(args, value)
-            left_path = selected(args.left, data / "downloaded/records.jsonl")
+            left_path = selected(args.left, None) if args.left else record_path(data, "downloaded")
             right_path = selected(args.right, explicit_path(args, Path("site-specific")))
             report = explicit_path(args, args.report) if args.report else None
             if report:
