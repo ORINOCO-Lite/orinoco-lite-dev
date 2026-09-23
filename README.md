@@ -24,7 +24,7 @@ The central curation service, or an optional replacement, provides only GitHub a
 
 ## Command environment
 
-Use the latest Pixi; CI also follows the latest version.
+Use Pixi 0.76 or newer; CI always installs the latest Pixi.
 Older local versions receive best-effort support without a formal version matrix.
 Use `pixi run --locked <command>` to reject stale dependency locks without rewriting them.
 Before running the commands below, enter that repository's environment:
@@ -39,7 +39,7 @@ To leave an already installed environment and its lock unchanged, use `pixi shel
 See the [Pixi shell options](https://pixi.prefix.dev/latest/reference/cli/pixi/shell/).
 Run installed commands directly inside the shell; use `exit` before switching repositories and activating another environment.
 For noninteractive execution, use `pixi run <command>`.
-Commands that intentionally change dependencies use `PIXI_LOCKED=false` to allow the required lock update, as shown below.
+For a deliberate dependency update, run `env -u PIXI_LOCKED pixi lock`, then review and commit the manifest and lock changes.
 
 ## Downstream interface
 
