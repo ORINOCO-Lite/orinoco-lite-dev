@@ -74,7 +74,7 @@ A bundle may contain failed and skipped stages, but must display failed, skipped
 | Stage | Inputs and comparison | Required inspection |
 | --- | --- | --- |
 | Capture | Retained API response stream and acquisition information | Source, pagination failures, and limits on capture completeness |
-| Storage | Raw JSONL versus export joining stored records and annotation companions | Record/assertion additions, removals, value and attribution changes |
+| Storage | Raw JSONL versus export joining stored records and overlay files | Record/assertion additions, removals, value and attribution changes |
 | RDF conversion | Joined records, selected record-to-RDF conversion, selected inverse conversion | Intermediate RDF, returned records, and field-level preservation failures |
 | Service | Export versus upload/dump from a temporary service | Returned records, service failures, and separate conversion evidence |
 | Site input import | Selected upstream site data versus imported site inputs | Copied bytes, mapped settings, authored content and resources |
@@ -238,7 +238,7 @@ orinoco-lite dev records diff --summary
 
 For a downstream, `pixi run setup-upstream` composes template application, package selection, capture, conversion, and site import with DataLad provenance.
 `dev upstream populate --reuse-dump` retains the records dump and repeats conversion and site import.
-Annotation companions preserve machine attribution separately and rejoin it for JSONL reconstruction.
+Overlay files preserve machine attribution separately and rejoin it for JSONL reconstruction.
 Record comparison preserves scalar types, null versus missing values, array order, and duplicates.
 A diff exit code of 1 means differences.
 
@@ -385,9 +385,9 @@ No comments were present on #142 or #154 during the initial review.
 ## Implementation details
 
 - `upstream_snapshot` and record split/join code already exist on `main`.
-  The new record export must include annotation companions.
+  The new record export must include overlay files.
   It writes JSONL from Lite's stored records; upstream `dtc export` and `dtc import` instead transfer service collections to and from their filesystem format.
-- Conversion must update only the records and annotation companions it owns.
+- Conversion must update only the records and overlay files it owns.
   Preserve the capture, authored inputs, and repository state in an existing `site-specific` directory.
   The current converter replaces its output directory, so C must separate that write boundary before reusing it.
 - Implement `dev hugo project upstream` with the selected `query-things` operations, including `render-record`, and the upstream graph producer.

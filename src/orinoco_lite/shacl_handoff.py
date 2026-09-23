@@ -19,7 +19,7 @@ BUNDLE_VERSION = 2
 MAX_BUNDLE_BYTES = 10 * 1024 * 1024
 MAX_BUNDLE_RECORDS = 50
 RECORD_ROOT = PurePosixPath("site-specific/metadata/records")
-ANNOTATION_ROOT = PurePosixPath("site-specific/metadata/overlays/annotations")
+ANNOTATION_ROOT = PurePosixPath("site-specific/metadata/overlays/machine-provenance-annotations")
 SHA40 = re.compile(r"[0-9a-f]{40}")
 SOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 

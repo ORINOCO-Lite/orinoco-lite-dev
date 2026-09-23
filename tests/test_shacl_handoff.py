@@ -411,7 +411,7 @@ class MaterializedCommitTests(unittest.TestCase):
 
     def test_metadata_root_stages_without_an_annotation_tree(self) -> None:
         annotation_root = (
-            self.repository.root / "site-specific/metadata/overlays/annotations"
+            self.repository.root / "site-specific/metadata/overlays/machine-provenance-annotations"
         )
         self.assertFalse(annotation_root.exists())
         self.repository.write(

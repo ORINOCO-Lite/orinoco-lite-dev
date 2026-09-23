@@ -109,7 +109,7 @@ class UpstreamOrinocoRecordTests(unittest.TestCase):
             {"ex:reviewed": "yes"},
         )
         companion_path = next(
-            (output / "metadata" / "overlays" / "annotations").rglob("*.yaml")
+            (output / "metadata" / "overlays" / "machine-provenance-annotations").rglob("*.yaml")
         )
         companion = storage._load_companion(companion_path)
         self.assertEqual(

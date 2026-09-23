@@ -27,7 +27,7 @@ from typing import Any, Sequence
 
 from . import upstream_orinoco_records as storage
 from . import upstream_snapshot as snapshot
-from .annotations import assertion_sha256
+from .annotations import assertion_sha256, _check_overlay_path
 from .errors import ConfigurationError
 
 
@@ -214,10 +214,11 @@ def _safe_output(path: Path) -> None:
 
 
 def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
-    """Replace records and companions, preserving authored inputs and dumps."""
+    """Replace records and overlay files, preserving authored inputs and dumps."""
 
+    _check_overlay_path(site_inputs / "metadata")
     targets = [site_inputs / "metadata/records",
-               site_inputs / "metadata/overlays/annotations"]
+               site_inputs / "metadata/overlays/machine-provenance-annotations"]
     for target in targets:
         _safe_output(target)
         if source.resolve().is_relative_to(target.resolve()):
@@ -249,36 +250,37 @@ def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
 
 
 def yaml_to_jsonl(site_inputs: Path, output: Path) -> list[snapshot.RecordEnvelope]:
-    """Join canonical records with only their validated mirrored companions."""
+    """Join canonical records with only their validated mirrored overlay files."""
 
+    _check_overlay_path(site_inputs / "metadata")
     records_root = site_inputs / "metadata/records"
-    companions_root = site_inputs / "metadata/overlays/annotations"
+    companions_root = site_inputs / "metadata/overlays/machine-provenance-annotations"
     stored = snapshot.load_records_tree(records_root)
     # Canonical human-edited record names need not be generated PID hashes.
     by_pid = {item.pid: item for item in stored}
     companions: dict[str, dict[str, Any]] = {}
     if companions_root.exists():
         if companions_root.is_symlink() or not companions_root.is_dir():
-            raise snapshot.SnapshotError(f"invalid companion root: {companions_root}")
+            raise snapshot.SnapshotError(f"invalid overlay root: {companions_root}")
         for path in sorted(companions_root.rglob("*")):
             if path.is_symlink():
-                raise snapshot.SnapshotError(f"companion must not be a symlink: {path}")
+                raise snapshot.SnapshotError(f"overlay file must not be a symlink: {path}")
             if path.is_dir():
                 continue
             relative = path.relative_to(companions_root)
             if path.suffix != ".yaml" or not (records_root / relative).is_file():
-                raise snapshot.SnapshotError(f"companion has no mirrored YAML record: {path}")
+                raise snapshot.SnapshotError(f"overlay file has no mirrored YAML record: {path}")
             companion = storage._load_companion(path)
             mirrored = snapshot._load_yaml_mapping(records_root / relative)
             pid = companion.get("record")
             if pid not in by_pid or pid in companions or mirrored.get("pid") != pid:
-                raise snapshot.SnapshotError(f"companion identity does not match its record: {path}")
+                raise snapshot.SnapshotError(f"overlay file identity does not match its record: {path}")
             companions[pid] = companion
     joined = [snapshot.RecordEnvelope(item.class_name,
               storage.compact_enrichment_view(item.record, companions.get(item.pid), preserve_source=True)) for item in stored]
     _safe_output(output)
     if output.resolve().is_relative_to(records_root.resolve()) or output.resolve().is_relative_to(companions_root.resolve()):
-        raise snapshot.SnapshotError("export output must be outside records and companions")
+        raise snapshot.SnapshotError("export output must be outside records and overlay files")
     snapshot.write_jsonl(output, joined)
     return joined
 
@@ -287,7 +289,7 @@ def register(subparsers: Any) -> None:
     from .diagnostics import options
     parser = subparsers.add_parser("jsonl-to-yaml", help="write YAML records from downloaded JSONL",
         description="Convert a JSONL dump into site-specific/metadata. Only metadata/records "
-                    "and metadata/overlays/annotations are replaced; use --force for existing metadata.")
+                    "and metadata/overlays/machine-provenance-annotations are replaced; use --force for existing metadata.")
     options(parser)
     parser.add_argument("--source", type=Path, help="JSONL input (default: DIRECTORY/downloaded/records.jsonl)")
     parser.add_argument("--destination", type=Path, default=Path("site-specific"),
@@ -328,7 +330,7 @@ def execute(args: argparse.Namespace) -> int:
             source = explicit_path(args, args.source) if args.source else require(data / "downloaded/records.jsonl", "records get")
             site_inputs = explicit_path(args, args.destination)
             # Never delete the enclosing site directory: it may be a subdataset.
-            for name in ("metadata/records", "metadata/overlays/annotations"):
+            for name in ("metadata/records", "metadata/overlays/machine-provenance-annotations"):
                 target = site_inputs / name
                 _safe_output(target)
                 if target.exists() and not args.force:

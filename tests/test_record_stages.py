@@ -202,7 +202,7 @@ def test_export_rejects_orphan_companion_before_output(tmp_path):
     source = capture(tmp_path, envelope())
     inputs = tmp_path / "inputs"
     stages.jsonl_to_yaml(source, inputs)
-    companion = inputs / "metadata/overlays/annotations/XYZPublication/orphan.yaml"
+    companion = inputs / "metadata/overlays/machine-provenance-annotations/XYZPublication/orphan.yaml"
     companion.parent.mkdir(parents=True)
     companion.write_text("record: ex:missing\nassertions: []\n")
     output = tmp_path / "joined.jsonl"
@@ -301,7 +301,7 @@ def test_public_roundtrip_preserves_original_pav_forms(tmp_path, monkeypatch, pr
     # Retained original syntax must not contradict the provenance values.
     if prefix != 'pav:' or expanded:
         import yaml
-        companion = next((tmp_path / 'site-specific/metadata/overlays/annotations').rglob('*.yaml'))
+        companion = next((tmp_path / 'site-specific/metadata/overlays/machine-provenance-annotations').rglob('*.yaml'))
         value = yaml.safe_load(companion.read_text())
         value['assertions'][0]['pav:importedBy'] = 'ex:different-adapter'
         companion.write_bytes(snapshot.canonical_yaml_bytes(value))
@@ -389,3 +389,29 @@ def test_forced_conversion_cannot_delete_its_source(tmp_path, monkeypatch):
     assert cli.main(["dev", "records", "jsonl-to-yaml", "--source", str(source),
                      "--destination", "site-specific", "--force"]) == 2
     assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("both", [False, True])
+def test_old_overlay_path_requires_explicit_rename(tmp_path, both):
+    from types import SimpleNamespace
+    from orinoco_lite.annotations import annotation_root
+    from orinoco_lite.errors import ConfigurationError
+    site = tmp_path / "site-specific"
+    metadata = site / "metadata"
+    old = metadata / "overlays/annotations"
+    old.mkdir(parents=True)
+    marker = old / "retained.yaml"
+    marker.write_text("old overlay\n")
+    if both:
+        (metadata / "overlays/machine-provenance-annotations").mkdir()
+    dump = tmp_path / "records.jsonl"
+    snapshot.write_jsonl(dump, [envelope()])
+    workspace = SimpleNamespace(path=lambda name: metadata / "records")
+    for operation in (lambda: annotation_root(workspace),
+                      lambda: stages.yaml_to_jsonl(site, tmp_path / "export.jsonl"),
+                      lambda: stages.jsonl_to_yaml(dump, site)):
+        with pytest.raises(ConfigurationError, match="git mv --"):
+            operation()
+        assert marker.read_text() == "old overlay\n"
+    assert not (metadata / "records").exists()
+    assert not (tmp_path / "export.jsonl").exists()

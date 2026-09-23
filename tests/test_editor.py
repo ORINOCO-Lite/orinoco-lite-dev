@@ -516,7 +516,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_human_replacement_reconciles_companion_in_the_same_apply(self) -> None:
         companion = (
             self.root
-            / "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml"
+            / "site-specific/metadata/overlays/machine-provenance-annotations/XYZPerson/first.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(
@@ -551,7 +551,7 @@ class EditorBundleTests(unittest.TestCase):
         self.assertEqual(
             report["changed_paths"],
             [
-                "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml",
+                "site-specific/metadata/overlays/machine-provenance-annotations/XYZPerson/first.yaml",
                 "site-specific/metadata/records/XYZPerson/first.yaml",
             ],
         )
@@ -575,7 +575,7 @@ class EditorBundleTests(unittest.TestCase):
     def test_dirty_companion_and_bundle_inline_pav_fail_closed(self) -> None:
         companion = (
             self.root
-            / "site-specific/metadata/overlays/annotations/XYZPerson/first.yaml"
+            / "site-specific/metadata/overlays/machine-provenance-annotations/XYZPerson/first.yaml"
         )
         companion.parent.mkdir(parents=True)
         companion.write_text(
@@ -630,7 +630,7 @@ class EditorBundleTests(unittest.TestCase):
             return_value=(InlinePavConverter(), InlinePavConverter()),
         ):
             with self.assertRaisesRegex(
-                ConfigurationError, "configured annotation companion tree"
+                ConfigurationError, "configured overlay file tree"
             ):
                 apply_bundle(self.workspace, self.resources, bundle, write=False)
 

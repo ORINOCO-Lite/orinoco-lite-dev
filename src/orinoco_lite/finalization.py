@@ -285,7 +285,7 @@ def _verify_base_candidate(
             )
     if companion_bytes is not None and expected_companion is not None:
         if record is None:  # pragma: no cover - presence check above
-            raise AssertionError("baseline companion has no baseline record")
+            raise AssertionError("baseline overlay file has no baseline record")
         companion = _load_mapping(
             companion_bytes,
             f"Baseline companion {candidate.companion_repository_path}",

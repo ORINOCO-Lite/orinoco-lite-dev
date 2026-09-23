@@ -29,7 +29,7 @@ from .errors import ConfigurationError
 
 
 RECORD_ROOT = PurePosixPath("metadata/records")
-ANNOTATION_ROOT = PurePosixPath("metadata/overlays/annotations")
+ANNOTATION_ROOT = PurePosixPath("metadata/overlays/machine-provenance-annotations")
 RECORD_SUFFIXES = frozenset({".yaml", ".yml"})
 _GIT_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 
@@ -168,11 +168,11 @@ def _candidate_roots(
             "Candidate record root must match the configured workspace record root"
         )
     annotations = (
-        records.parent / "overlays/annotations"
+        records.parent / "overlays/machine-provenance-annotations"
         if annotation_root is None
         else _repository_directory(annotation_root, "Candidate annotation root")
     )
-    expected = records.parent / "overlays/annotations"
+    expected = records.parent / "overlays/machine-provenance-annotations"
     if annotations != expected:
         raise ConfigurationError(
             "Candidate annotation root must mirror the configured record root"

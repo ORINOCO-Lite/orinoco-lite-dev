@@ -13,6 +13,7 @@ import tempfile
 from typing import Any
 
 from orinoco_lite.annotations import (
+    _check_overlay_path,
     compact_enrichment_view,
     split_enrichment_view,
     validate_annotation_companion,
@@ -33,11 +34,11 @@ def _load_companion(path: Path) -> dict[str, Any]:
     try:
         value = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as error:
-        raise StorageProjectionError(f"invalid annotation companion {path}") from error
+        raise StorageProjectionError(f"invalid overlay file {path}") from error
     if not isinstance(value, dict):
-        raise StorageProjectionError(f"annotation companion is not a mapping: {path}")
+        raise StorageProjectionError(f"overlay file is not a mapping: {path}")
     if path.read_bytes() != upstream_snapshot.canonical_yaml_bytes(value):
-        raise StorageProjectionError(f"annotation companion is not canonical: {path}")
+        raise StorageProjectionError(f"overlay file is not canonical: {path}")
     return value
 
 
@@ -60,9 +61,10 @@ def verify_projection(
 ) -> dict[str, Any]:
     """Verify exact reconstruction of the downloaded records."""
 
+    _check_overlay_path(output / "metadata")
     expected = upstream_snapshot.load_jsonl(source)
     records_root = output / "metadata" / "records"
-    companions_root = output / "metadata" / "overlays" / "annotations"
+    companions_root = output / "metadata" / "overlays" / "machine-provenance-annotations"
     stored = upstream_snapshot.load_records_tree(records_root)
     stored_by_pid = {item.pid: item for item in stored}
     expected_by_pid = {item.pid: item for item in expected}
@@ -76,13 +78,13 @@ def verify_projection(
             record_path = records_root / relative
             if not record_path.is_file():
                 raise StorageProjectionError(
-                    f"annotation companion has no mirrored record: {path}"
+                    f"overlay file has no mirrored record: {path}"
                 )
             companion = _load_companion(path)
             pid = companion.get("record")
             if not isinstance(pid, str) or pid in companions:
                 raise StorageProjectionError(
-                    f"annotation companion has invalid or duplicate PID: {path}"
+                    f"overlay file has invalid or duplicate PID: {path}"
                 )
             companions[pid] = companion
 
@@ -126,6 +128,7 @@ def project(
 ) -> dict[str, Any]:
     """Split supported compact machine PAV and atomically verify the result."""
 
+    _check_overlay_path(output / "metadata")
     expected = upstream_snapshot.load_jsonl(source)
     projected: list[upstream_snapshot.RecordEnvelope] = []
     companions: dict[str, Mapping[str, object]] = {}
@@ -153,7 +156,7 @@ def project(
     )
     try:
         records_root = temporary / "metadata" / "records"
-        companions_root = temporary / "metadata" / "overlays" / "annotations"
+        companions_root = temporary / "metadata" / "overlays" / "machine-provenance-annotations"
         upstream_snapshot.write_records_tree(projected, records_root)
         companions_root.mkdir(parents=True)
         _write_companions(projected, companions, companions_root)

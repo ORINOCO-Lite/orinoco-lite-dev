@@ -139,7 +139,7 @@ site-specific/                         # Downstream-owned declarative site data
   static/                              # Site files published verbatim
   metadata/                            # Metadata describing organization entities
     records/                           # Schema-compliant YAML describing organization entities
-    overlays/annotations/              # Machine provenance kept separate for readability
+    overlays/machine-provenance-annotations/              # Machine provenance kept separate for readability
   curation-records/                    # Current reviewed automated data import decisions
   sources/<adapter>/                   # Inputs, evidence, and mapping policy for metadata automation tools
   overrides/                           # Bounded replacements for framework surfaces

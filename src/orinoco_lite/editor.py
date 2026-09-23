@@ -523,7 +523,7 @@ def validate_bundle(
             companion_relative = companion.path.relative_to(workspace.root).as_posix()
             if companion_relative in dirty:
                 raise DriverError(
-                    "Annotation companion has a conflicting local change: "
+                    "Overlay file has a conflicting local change: "
                     f"{companion_relative}"
                 )
             reconciled = reconcile_annotation_companion(record, companion.value)
