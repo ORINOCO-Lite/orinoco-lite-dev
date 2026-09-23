@@ -40,6 +40,14 @@ class WorkspaceConfigTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_old_appearance_key_requires_explicit_update(self) -> None:
+        path = self.root / "site-specific/site.yaml"
+        path.write_text(SITE_DATA + "presentation: {color_scheme: ocean}\n")
+        with self.assertRaisesRegex(ConfigurationError, "rename presentation to appearance"):
+            load_workspace(self.root)
+        path.write_text(SITE_DATA + "appearance: {color_scheme: ocean}\n")
+        self.assertEqual(load_workspace(self.root).site_data["appearance"]["color_scheme"], "ocean")
+
     def test_defaults_resolve_relative_to_consumer(self) -> None:
         workspace = load_workspace(self.root)
         self.assertEqual(workspace.site_name, "Test Orinoco downstream")

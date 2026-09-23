@@ -13,16 +13,16 @@ from orinoco_lite import upstream_orinoco_records as storage
 from orinoco_lite import upstream_snapshot as snapshot
 
 
-class UpstreamPresentationTests(unittest.TestCase):
+class UpstreamProjectionTests(unittest.TestCase):
     def test_default_projection_keeps_publication_authors_and_issued_date(self):
         from orinoco_lite.projection import _render_record
         import yaml
 
-        presentation = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
+        www_from_model = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Mock()
             workspace.path.return_value = Path(temporary)
-            contract = load_contract(workspace, presentation)
+            contract = load_contract(workspace, www_from_model)
         person = {
             "pid": "xyzrins:persons/example",
             "schema_type": "xyzri:XYZPerson",

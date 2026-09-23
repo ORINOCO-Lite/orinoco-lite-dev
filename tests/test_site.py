@@ -37,8 +37,8 @@ def _write_site_data(
     )
 
 
-def _presentation(root: Path) -> Path:
-    upstream = root / "presentation" / "www-from-model"
+def _www_from_model(root: Path) -> Path:
+    upstream = root / "upstream" / "www-from-model"
     theme = upstream / "themes" / "congo"
     theme.mkdir(parents=True, exist_ok=True)
     (theme / "LICENSE").write_text("Congo MIT\n", encoding="utf-8")
@@ -64,7 +64,7 @@ def _presentation(root: Path) -> Path:
         "print('{\"nodes\": [], \"edges\": []}')\n",
         encoding="utf-8",
     )
-    materialized = root / ".orinoco-lite" / "materialized-presentation"
+    materialized = root / ".orinoco-lite" / "materialized-hugo-assets"
     materialized.mkdir(parents=True, exist_ok=True)
     (materialized / "LICENSE").write_text("Template MIT\n", encoding="utf-8")
     return upstream
@@ -166,7 +166,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             root = Path(temporary)
             (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
-            presentation = _presentation(root)
+            www_from_model = _www_from_model(root)
             for relative, value in (
                 ("content/german.md", "German editorial content\n"),
                 ("layouts/term.html", "upstream layout\n"),
@@ -175,12 +175,12 @@ class HugoCompatibilityTests(unittest.TestCase):
                 ("static/graph.js", "/annex/objects/MD5E-s12--graph.js\n"),
                 ("layouts/.git/config", "must not ship\n"),
             ):
-                path = presentation / relative
+                path = www_from_model / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
             materialized = (
                 root
-                / ".orinoco-lite/materialized-presentation/upstream/static/graph.js"
+                / ".orinoco-lite/materialized-hugo-assets/upstream/static/graph.js"
             )
             materialized.parent.mkdir(parents=True)
             materialized.write_text("const graphClient = true;\n", encoding="utf-8")
@@ -190,7 +190,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 load_config_path(root / "orinoco.yaml"),
                 root / "resources",
                 assembly,
-                presentation=presentation,
+                www_from_model=www_from_model,
             )
 
             self.assertEqual(
@@ -208,13 +208,13 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             materialized.unlink()
             with self.assertRaisesRegex(
-                DriverError, "Materialized presentation assets are missing"
+                DriverError, "Materialized Hugo assets are missing"
             ):
                 site._assemble(
                     load_config_path(root / "orinoco.yaml"),
                     root / "resources",
                     root / "build/unmaterialized",
-                    presentation=presentation,
+                    www_from_model=www_from_model,
                 )
 
     def test_site_data_renders_adapters_and_upstream_section_policy(self) -> None:
@@ -276,7 +276,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "formatted_name: Example Project\n",
                 encoding="utf-8",
             )
-            adapter = root / ".orinoco-lite/presentation"
+            adapter = root / ".orinoco-lite/hugo-adapter"
             (adapter / "config-templates").mkdir(parents=True)
             (adapter / "static-templates").mkdir(parents=True)
             (adapter / "config-templates/hugo.toml.j2").write_text(
@@ -289,8 +289,8 @@ class HugoCompatibilityTests(unittest.TestCase):
             )
             assembly = root / "build/assembly"
             workspace = load_config_path(config)
-            presentation = _presentation(root)
-            section = presentation / "content/section/_index.md"
+            www_from_model = _www_from_model(root)
+            section = www_from_model / "content/section/_index.md"
             section.parent.mkdir(parents=True)
             section.write_text(
                 "---\n"
@@ -306,7 +306,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 workspace,
                 root / "resources",
                 assembly,
-                presentation=presentation,
+                www_from_model=www_from_model,
             )
 
             self.assertEqual(
@@ -365,7 +365,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 "  relationship_fields: []\n",
                 encoding="utf-8",
             )
-            adapter = root / ".orinoco-lite/presentation"
+            adapter = root / ".orinoco-lite/hugo-adapter"
             templates = adapter / "content-templates"
             templates.mkdir(parents=True)
             (templates / "_index.md.j2").write_text("home\n", encoding="utf-8")
@@ -375,7 +375,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 site._render_site_surfaces(
                     workspace,
                     adapter,
-                    _presentation(root),
+                    _www_from_model(root),
                     root / "build/assembly",
                 )
 
@@ -395,7 +395,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 workspace,
                 root / "resources",
                 assembly,
-                presentation=_presentation(root),
+                www_from_model=_www_from_model(root),
             )
             self.assertEqual(
                 (assembly / "static/example.txt").read_text(encoding="utf-8"),
@@ -408,7 +408,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             config = root / "orinoco.yaml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
-            adapter = root / ".orinoco-lite/presentation/layouts"
+            adapter = root / ".orinoco-lite/hugo-adapter/layouts"
             adapter.mkdir(parents=True)
             (adapter / "term.html").write_text("template\n", encoding="utf-8")
             override = root / "site-specific/overrides/layouts/term.html"
@@ -423,7 +423,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 load_config_path(config),
                 root / "resources",
                 assembly,
-                presentation=_presentation(root),
+                www_from_model=_www_from_model(root),
             )
 
             self.assertEqual(

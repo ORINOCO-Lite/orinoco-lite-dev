@@ -9,8 +9,8 @@ Exercise package and template changes through a disposable downstream before ado
 When more than one repository changes, use a downstream deploy preview with exact candidate package and template commits before adopting either component.
 An exact-SHA Netlify preview may write only to its own open same-repository draft pull request after the service verifies GitHub's successful Netlify status for that exact head and origin.
 Do not cut a release merely to discover whether a package or template commit composes with a downstream.
-Reuse the submodule-selected `www-from-model` presentation and projection source and resolve its dependencies through that revision's normal dependency mechanism.
-Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized presentation overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
+Reuse the submodule-selected `www-from-model` Hugo and projection source and resolve its dependencies through that revision's normal dependency mechanism.
+Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized Hugo asset overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
 ## Establish the live scope
 

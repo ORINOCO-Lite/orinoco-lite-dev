@@ -28,7 +28,7 @@ An Orinoco Lite deployment should help an organization:
 - maintain human-readable, schema-conformant metadata under review in Git,
 - prepare automated improvements from external sources for human review through pull requests,
 - publish a static website based on [psychoinformatics.de](https://www.psychoinformatics.de) with GitHub Pages, and
-- customize the site's content, presentation, and organization while continuing to receive Orinoco Lite updates.
+- customize the site's content, appearance, and organization while continuing to receive Orinoco Lite updates.
 
 The deployed site URL includes endpoints for client-side operations:
 
@@ -46,11 +46,11 @@ The system has three layers: development sources, reusable components, and each 
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact presentation source. It also publishes optional releases. | Downstreams do not receive its multi-repository engineering structure. |
-| [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies the website presentation, page templates, graph production, and its exact Congo selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact `www-from-model` revision. It also publishes optional releases. | Downstreams do not receive its multi-repository engineering structure. |
+| [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies Hugo layouts and assets, page templates, the graph producer, and its exact Congo theme selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
 Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
-An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco presentation adaptations belong in the template.
+An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco Hugo adaptations belong in the template.
 Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
 This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
 
@@ -61,8 +61,8 @@ A downstream selects the official repository or a fork and may use an exact comm
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| [`orinoco-lite`](../src/orinoco_lite/) | Contains the code and data that validate metadata, derive projections, and assemble the site. It also adds the static `/edit/` and `/review/` interfaces. | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, and notices. It also records the engineering commit that selects the presentation source. It contains no organization content, organization policy, or copy of the upstream website. |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the Copier source that creates and updates downstream repositories. | It contains the scaffold, thin Orinoco presentation adaptation, bounded licensed assets, workflows, and helper tools. It does not contain a website copy, German content, or site identity. |
+| [`orinoco-lite`](../src/orinoco_lite/) | Contains the code and data that validate metadata, derive projections, and assemble the site. It also adds the static `/edit/` and `/review/` interfaces. | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, and notices. It also records the engineering commit that selects `www-from-model`. It contains no organization content, organization policy, or copy of the upstream website. |
+| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the Copier source that creates and updates downstream repositories. | It contains the scaffold, thin Orinoco Hugo adaptation, bounded licensed assets, workflows, and helper tools. It does not contain a website copy, German content, or site identity. |
 
 ### Deployment
 
@@ -81,7 +81,7 @@ flowchart TB
     curation["Metadata curation components"]
     schema["Schema and validation components"]
     conversion["Graph conversion and query components"]
-    presentation["Presentation components"]
+    projection["Projection components"]
     records["Metadata records"]
     knowledge_graph["Knowledge graph"]
     representations["Downstream representations"]
@@ -90,8 +90,8 @@ flowchart TB
     schema -->|"validate"| records
     records -->|"are converted by"| conversion
     conversion -->|"produces"| knowledge_graph
-    knowledge_graph -->|"is projected by"| presentation
-    presentation -->|"generates"| representations
+    knowledge_graph -->|"is projected by"| projection
+    projection -->|"generates"| representations
   end
 
   subgraph package["Selected Orinoco Lite package revision"]
@@ -133,7 +133,7 @@ Each downstream keeps its declarative site data under `site-specific/`, separate
 
 ```text
 site-specific/                         # Downstream-owned declarative site data
-  site.yaml                            # Site identity, navigation, and presentation settings
+  site.yaml                            # Site identity, navigation, and appearance settings
   assets/                              # Source assets processed by Hugo during the build
   content/                             # Hand-authored editorial pages
   static/                              # Site files published verbatim
@@ -153,7 +153,7 @@ extensions/                            # Downstream-owned executable code for me
 People curate `site-specific/`.
 This directory is the complete source for the organization's site content and appearance.
 It is declarative: it describes what the site should contain and look like without implementing how Orinoco Lite performs the work.
-It holds metadata records, editorial material, identity, and presentation data.
+It holds metadata records, editorial material, identity, and display data.
 It also holds assets, source evidence, policy, current curation decisions, and supported small overrides.
 It does not hold implementation code.
 
@@ -232,7 +232,7 @@ The normative contracts define the precise behavior:
   Reuse upstream terminology and operations where their meanings match to ease collaboration with upstream maintainers.
   Use staged comparisons with upstream to detect unintended differences and keep this adaptation thin and maintainable as upstream evolves.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
-  Each downstream owns its information, presentation choices, review policy, and downstream-defined automations.
+  Each downstream owns its information, appearance choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
   Only signed-in GitHub operations use the curation service.
 - **Preserve GitHub’s security model.** The curation App follows GitHub’s current security guidance, uses least privilege, protects operator credentials, and never trades user authorization or repository protections for a simpler setup.
@@ -246,7 +246,7 @@ The normative contracts define the precise behavior:
   Tasks should expose commands that users can run and modify directly.
   Compose DataLad around operations at the task or caller boundary; avoid commands that invoke DataLad to rerun themselves with recursion-suppression flags.
   Repository owners control DataLad storage policy.
-- **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required presentation assets.
+- **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required Hugo assets.
   DataLad records downstream adapter runs in ordinary Git.
   Downstream builds and adapter runs do not require Git Annex.
 

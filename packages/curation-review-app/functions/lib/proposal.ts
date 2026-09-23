@@ -751,7 +751,7 @@ export async function loadReviewProposal(
     };
   }
   const files = proposalFiles(commitData, proposalSha, review.metadataRoots);
-  const presentation = bundleCandidates(bundle, files, review.metadataRoots);
+  const bundleItems = bundleCandidates(bundle, files, review.metadataRoots);
   const recordPaths = [...files.records.keys()].sort();
   const contents = await github.contents(
     contentRepository,
@@ -768,7 +768,7 @@ export async function loadReviewProposal(
     remainingContentBytes,
   );
   const candidates = recordPaths.map((path, index) => {
-    const item = presentation.get(path);
+    const item = bundleItems.get(path);
     if (item === undefined) throw new Error("candidate alignment was lost");
     const before = contents.get(`before:${index}`) ?? null;
     const proposed = contents.get(`proposed:${index}`) ?? null;

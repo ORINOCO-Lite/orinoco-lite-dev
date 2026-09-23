@@ -15,7 +15,7 @@ Escalate to replay or instrumentation only for a concrete unresolved question; r
 ## Establish the comparison
 
 - Identify whether the question compares upstream with Lite, two revisions, or two input captures.
-  Resolve the selected code, schema, presentation, template, inputs, and environment from Git, gitlinks, declarations, and locks; do not create a second coordinate inventory.
+  Resolve the selected code, schema, www-from-model, template, inputs, and environment from Git, gitlinks, declarations, and locks; do not create a second coordinate inventory.
   Distinguish original upstream from a selected revision that already contains retained Lite commits.
 - Inspect available CLI help and implementation before choosing commands.
   Command names in an active plan may not exist yet.
@@ -38,7 +38,7 @@ In Orinoco, distinguish these boundaries when they participate:
 | JSONL to stored YAML and companions, then joined export | Identity, assertions, attribution, scalar types, list order and multiplicity, null versus missing |
 | Joined records to RDF and any return conversion | Preserved and lost assertions, identifier representation, datatype and collection behavior |
 | Selection and projection | Included/excluded records, generated pages, links, graph nodes and edges |
-| Hugo assembly | Configuration, presentation layers, resources, authored content, and override precedence |
+| Hugo assembly | Configuration, layouts, themes, resources, authored content, and override precedence |
 | Rendering | HTML, routes, assets, and relevant browser behavior |
 
 Do not substitute graph-visualization JSON for the RDF conversion boundary.

@@ -2,10 +2,10 @@
 
 ## Current direction
 
-- Reuse the exact German `www-from-model` revision selected by the controlled submodule gitlink as the presentation and projection source.
+- Reuse the exact German `www-from-model` revision selected by the controlled submodule gitlink as the Hugo and projection source.
   Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in package or downstream configuration.
   The package owns generic source resolution, metadata, projection, and composition operations.
-  Keep the template thin: it contains the Orinoco adaptation, bounded materialized presentation assets, Copier scaffold, workflows, and dependency locks, not a copied website.
+  Keep the template thin: it contains the Orinoco adaptation, bounded materialized Hugo assets, Copier scaffold, workflows, and dependency locks, not a copied website.
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
   It may hydrate and verify Annex-backed content required by the selected upstream functionality before ordinary files are copied into the licensed template overlay.
   `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.

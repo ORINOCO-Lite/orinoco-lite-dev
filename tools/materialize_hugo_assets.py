@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize selected Annex presentation payloads into the thin template."""
+"""Materialize selected Annex Hugo assets into the thin template."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from typing import Callable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 WEBSITE_GITLINK = PurePosixPath("submodules/www-from-model")
-PRESENTATION_SURFACES = frozenset(
+HUGO_SURFACES = frozenset(
     {
         "archetypes",
         "assets",
@@ -33,7 +33,7 @@ GENERATED_OUTPUTS = frozenset({PurePosixPath("static/graph.json")})
 
 
 class MaterializationError(RuntimeError):
-    """Report an unsafe or incomplete presentation materialization."""
+    """Report an unsafe or incomplete Hugo asset materialization."""
 
 
 Runner = Callable[[Sequence[str]], str]
@@ -170,21 +170,21 @@ def _safe_repository_path(raw: str) -> PurePosixPath:
     return path
 
 
-def is_presentation_asset(path: PurePosixPath) -> bool:
-    """Select Annex payloads on generic presentation surfaces."""
+def is_hugo_asset(path: PurePosixPath) -> bool:
+    """Select Annex payloads on generic Hugo directories."""
     return (
         len(path.parts) > 1
-        and path.parts[0] in PRESENTATION_SURFACES
+        and path.parts[0] in HUGO_SURFACES
         and path not in GENERATED_OUTPUTS
     )
 
 
-def discover_presentation_assets(
+def discover_hugo_assets(
     website: Path,
     *,
     runner: Runner = run_command,
 ) -> tuple[PurePosixPath, ...]:
-    """Discover every Annex-managed payload on a presentation surface."""
+    """Discover every Annex-managed payload on a Hugo directory."""
     output = git_annex(
         website,
         "find",
@@ -208,7 +208,7 @@ def discover_presentation_assets(
         if not isinstance(raw_path, str):
             raise MaterializationError("Git Annex discovery omitted a file path")
         path = _safe_repository_path(raw_path)
-        if not is_presentation_asset(path):
+        if not is_hugo_asset(path):
             continue
         assets.add(path)
     return tuple(sorted(assets))
@@ -311,7 +311,7 @@ def materialize(
         selected_commit,
         runner=runner,
     )
-    assets = discover_presentation_assets(website, runner=runner)
+    assets = discover_hugo_assets(website, runner=runner)
     hydrate_and_verify(website, assets, runner=runner)
     if linked_git(
         website,
@@ -330,7 +330,7 @@ def materialize(
             f"Template Copier source is unavailable: {template_source}"
         )
     hidden = template_source / ".orinoco-lite"
-    overlay = hidden / "materialized-presentation"
+    overlay = hidden / "materialized-hugo-assets"
     for path in (hidden, overlay):
         if path.is_symlink():
             raise MaterializationError(
@@ -340,7 +340,7 @@ def materialize(
     license_path = overlay / "LICENSE"
     if license_path.is_symlink() or not license_path.is_file():
         raise MaterializationError(
-            f"Materialized presentation overlay has no LICENSE: {license_path}"
+            f"Materialized Hugo asset overlay has no LICENSE: {license_path}"
         )
 
     staging = Path(tempfile.mkdtemp(prefix=".upstream-stage-", dir=overlay))
@@ -377,9 +377,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.template,
         )
     except MaterializationError as error:
-        parser.exit(1, f"materialize-presentation-assets: {error}\n")
+        parser.exit(1, f"materialize-hugo-assets: {error}\n")
     print(
-        f"Materialized {result.asset_count} presentation assets from "
+        f"Materialized {result.asset_count} Hugo assets from "
         f"{result.selected_commit} into {result.destination}"
     )
     return 0

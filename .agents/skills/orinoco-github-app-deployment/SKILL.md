@@ -17,7 +17,7 @@ Keep the hosting choice separate from the application contract and keep every hu
    The backend provides authentication and verified GitHub transport; the `orinoco-lite` package supplies the static editor, schema, and review shell to downstream builds.
 3. Read [runtime-and-hosting-contract.md](references/runtime-and-hosting-contract.md) and compare every required capability with the proposed provider before provisioning it.
    The checked implementation is Fetch- and Web-Crypto-shaped; a provider may need a thin, reviewed Worker or Functions adapter.
-   Do not deploy a static application or presentation assets.
+   Do not deploy a static application or UI assets.
    If the request is only to evaluate a provider, return the completed capability matrix and unresolved gaps here; do not create an App, secrets, hosting resources, or a deployment.
 4. Read [github-app-configuration.md](references/github-app-configuration.md), then create or update the GitHub App and restrict its installation to the intended repositories.
    Keep the setup URL distinct from the OAuth callback.
@@ -46,9 +46,9 @@ Keep the hosting choice separate from the application contract and keep every hu
 - GitHub is the durable authority.
   Do not introduce a database, object store, artifact cache, queue, candidate store, decision store, metadata service, or analytics-backed curation storage.
 - Preserve the exact external HTTPS service origin in every backend request.
-  The minimal generated protocol response, APIs, and cookies must share that origin; product presentation remains on the downstream origin.
+  The minimal generated protocol response, APIs, and cookies must share that origin; product UI remains on the downstream origin.
 - Do not weaken PKCE, OAuth state, expiring-token, cookie, redirect-host, exact-head, artifact, unchanged-bundle, or handoff origin/window/nonce checks to fit a provider.
-- Do not host a landing page, source-adapter decision interface, receiver, upload fallback, confirmation page, or any static presentation assets.
+- Do not host a landing page, source-adapter decision interface, receiver, upload fallback, confirmation page, or any static UI assets.
   Do not assemble, embed, proxy, or host SHACL Vue, its schema, or its record inputs in this service.
   The downstream static site owns both interfaces and sends only its bounded, unchanged version 2 bundle through the verified request path.
 - Treat secret rotation, an origin change, a GitHub App ownership transfer, installation changes, and write-path verification as distinct external mutations.

@@ -85,7 +85,7 @@ def _git_commit(root: Path) -> str:
 
 def record_catalog(
     workspace: WorkspaceConfig,
-    presentation_root: Path | None = None,
+    www_from_model_root: Path | None = None,
 ) -> dict[str, Any]:
     """Return coordinates for records editable under the projection plan."""
 
@@ -94,7 +94,7 @@ def record_catalog(
     # filesystem category.
     from .projection import load_contract
 
-    contract = load_contract(workspace, presentation_root)
+    contract = load_contract(workspace, www_from_model_root)
     editable_classes = set(contract.pages) | set(contract.graph_node_classes)
 
     records = [
@@ -217,7 +217,7 @@ def _converters(schema: Path):
 def _scoped_rdf(value: str, *, record_pid: str) -> str:
     """Keep every RDF triple while isolating blank nodes between records.
 
-    Editor RDF is transient presentation input. Its blank-node labels do not
+    Editor RDF is transient editor input. Its blank-node labels do not
     identify metadata or bind review bundles, so graph canonicalization is not
     needed and can be prohibitively expensive for large file-part graphs.
     """
@@ -278,7 +278,7 @@ def bind_editor(
     repository: str | None = None,
     service_origin: str | None = None,
 ) -> dict[str, Any]:
-    from .presentation import resolve_presentation
+    from .www_from_model import resolve_www_from_model
     from .projection import load_contract
 
     shell = resources_root / "editor-shell"
@@ -297,12 +297,12 @@ def bind_editor(
             raise DriverError(f"Package editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    presentation_root = None
+    www_from_model_root = None
     if not (workspace.path("site") / "projection.yaml").is_file():
-        presentation_root = resolve_presentation(workspace.root, resources_root)
-    contract = load_contract(workspace, presentation_root)
+        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
+    contract = load_contract(workspace, www_from_model_root)
     all_sources = record_sources(workspace)
-    catalog = record_catalog(workspace, presentation_root)
+    catalog = record_catalog(workspace, www_from_model_root)
     if contract.editor_record_scope == "editable":
         editable_pids = {entry["pid"] for entry in catalog["records"]}
         sources = [source for source in all_sources if source["pid"] in editable_pids]
@@ -446,12 +446,12 @@ def validate_bundle(
     resources_root: Path,
     bundle: Mapping[str, Any],
 ) -> dict[Path, str]:
-    from .presentation import resolve_presentation
+    from .www_from_model import resolve_www_from_model
 
-    presentation_root = None
+    www_from_model_root = None
     if not (workspace.path("site") / "projection.yaml").is_file():
-        presentation_root = resolve_presentation(workspace.root, resources_root)
-    catalog = record_catalog(workspace, presentation_root)
+        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
+    catalog = record_catalog(workspace, www_from_model_root)
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")
     by_pid = {entry["pid"]: entry for entry in catalog["records"]}

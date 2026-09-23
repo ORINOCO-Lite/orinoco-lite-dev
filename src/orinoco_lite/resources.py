@@ -37,7 +37,7 @@ def resolve_resources() -> PackageResources:
 
 
 def source_commit(root: Path) -> str:
-    """Read the source commit whose Gitlink selects the presentation."""
+    """Read the source commit whose Gitlink selects www-from-model."""
 
     try:
         commit = (root / SOURCE_COMMIT_NAME).read_text(encoding="ascii").strip()

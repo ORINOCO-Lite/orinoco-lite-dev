@@ -16,7 +16,7 @@ from .resources import SOURCE_REPOSITORY, source_commit
 
 
 _GIT_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
-_PRESENTATION_GITLINK = "submodules/www-from-model"
+_WWW_FROM_MODEL_GITLINK = "submodules/www-from-model"
 
 
 def _git_environment() -> dict[str, str]:
@@ -104,19 +104,19 @@ def _repository_head(repository: Path, *, label: str) -> str:
     return commit
 
 
-def _selected_presentation_commit(engineering: Path, commit: str) -> str:
+def _selected_www_from_model_commit(engineering: Path, commit: str) -> str:
     output = _git_text(
         engineering,
-        ("ls-tree", "--full-tree", commit, "--", _PRESENTATION_GITLINK),
+        ("ls-tree", "--full-tree", commit, "--", _WWW_FROM_MODEL_GITLINK),
         operation="read the selected www-from-model Gitlink",
     )
     match = re.fullmatch(
-        rf"160000 commit (?P<commit>[0-9a-f]{{40}})\t{re.escape(_PRESENTATION_GITLINK)}",
+        rf"160000 commit (?P<commit>[0-9a-f]{{40}})\t{re.escape(_WWW_FROM_MODEL_GITLINK)}",
         output,
     )
     if match is None:
         raise IntegrityError(
-            f"Engineering commit must select {_PRESENTATION_GITLINK} as one Gitlink"
+            f"Engineering commit must select {_WWW_FROM_MODEL_GITLINK} as one Gitlink"
         )
     return match.group("commit")
 
@@ -127,19 +127,19 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
         raise IntegrityError(
             f"Cached engineering checkout is {actual_commit}, expected {expected_commit}"
         )
-    selected_commit = _selected_presentation_commit(engineering, expected_commit)
-    presentation = engineering / _PRESENTATION_GITLINK
-    if presentation.is_symlink() or not presentation.is_dir():
+    selected_commit = _selected_www_from_model_commit(engineering, expected_commit)
+    www_from_model = engineering / _WWW_FROM_MODEL_GITLINK
+    if www_from_model.is_symlink() or not www_from_model.is_dir():
         raise IntegrityError("Selected www-from-model submodule is not initialized")
     if (
-        _repository_head(presentation, label="Selected www-from-model checkout")
+        _repository_head(www_from_model, label="Selected www-from-model checkout")
         != selected_commit
     ):
         raise IntegrityError("Selected www-from-model checkout does not match its Gitlink")
 
     status = _git(
         engineering,
-        ("submodule", "status", "--recursive", "--", _PRESENTATION_GITLINK),
+        ("submodule", "status", "--recursive", "--", _WWW_FROM_MODEL_GITLINK),
         operation="verify the www-from-model dependency closure",
     ).stdout
     try:
@@ -148,7 +148,7 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
         raise IntegrityError("Git returned non-UTF-8 submodule status") from error
     if not lines or any(not line.startswith(" ") for line in lines):
         raise IntegrityError(
-            "Presentation dependencies are missing or do not match their Gitlinks"
+            "www-from-model dependencies are missing or do not match their Gitlinks"
         )
     dirty = _git(
         engineering,
@@ -163,7 +163,7 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
     ).stdout
     if dirty:
         raise IntegrityError("Cached www-from-model dependency closure is not clean")
-    return presentation.resolve()
+    return www_from_model.resolve()
 
 
 def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
@@ -213,7 +213,7 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
             "--recursive",
             "--checkout",
             "--",
-            _PRESENTATION_GITLINK,
+            _WWW_FROM_MODEL_GITLINK,
         ),
         operation="resolve the www-from-model dependency closure",
     )
@@ -250,8 +250,8 @@ def _ensure_checkout(
     temporary = Path(tempfile.mkdtemp(prefix=".engineering-", dir=cache))
     fresh = temporary / "checkout"
     try:
-        presentation = _clone_checkout(repository, commit, fresh)
-        relative_presentation = presentation.relative_to(fresh)
+        www_from_model = _clone_checkout(repository, commit, fresh)
+        relative_checkout = www_from_model.relative_to(fresh)
         if destination.exists() or destination.is_symlink():
             _remove_cache_path(destination)
         os.replace(fresh, destination)
@@ -267,7 +267,7 @@ def _ensure_checkout(
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
     _verify_checkout(destination, commit)
-    return (destination / relative_presentation).resolve()
+    return (destination / relative_checkout).resolve()
 
 
 def _package_source(resources_root: Path) -> tuple[str, str]:
@@ -282,17 +282,17 @@ def _package_source(resources_root: Path) -> tuple[str, str]:
     return SOURCE_REPOSITORY, commit
 
 
-def resolve_presentation(workspace: Path, resources_root: Path | None = None) -> Path:
+def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) -> Path:
     """Return the www-from-model checkout selected by the package source commit."""
 
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():
-        raise IntegrityError(f"Presentation workspace is not a directory: {workspace}")
+        raise IntegrityError(f"www-from-model workspace is not a directory: {workspace}")
     if resources_root is None:
-        raise IntegrityError("Presentation resolution requires package resources")
+        raise IntegrityError("www-from-model resolution requires package resources")
     engineering_repository, engineering_commit = _package_source(resources_root)
     return _ensure_checkout(
-        workspace / ".orinoco" / "presentation",
+        workspace / ".orinoco" / "www-from-model",
         repository=engineering_repository,
         commit=engineering_commit,
     )

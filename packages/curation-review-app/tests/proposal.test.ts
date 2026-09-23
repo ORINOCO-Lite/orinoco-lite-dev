@@ -565,7 +565,7 @@ describe("artifact-backed GitHub proposal loading", () => {
     expectOnlySiteConfiguration(contentRequests);
   });
 
-  it("rejects incomplete or operation-mismatched presentation bundles", async () => {
+  it("rejects incomplete or operation-mismatched review bundles", async () => {
     const incomplete = reviewBundle();
     incomplete.candidates.pop();
     await expect(
@@ -645,7 +645,7 @@ describe("artifact-backed GitHub proposal loading", () => {
     ).rejects.toThrow("does not match the selected proposal");
   });
 
-  it("rejects a presentation PID mismatch against the initial proposal", async () => {
+  it("rejects a review-bundle PID mismatch against the initial proposal", async () => {
     const wrongPid = reviewBundle();
     const first = wrongPid.candidates[0];
     if (first === undefined) throw new Error("missing fixture candidate");

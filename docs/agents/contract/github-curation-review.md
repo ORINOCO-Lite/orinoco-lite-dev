@@ -8,7 +8,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 1. A trusted workflow runs the adapter with the downstream-selected code and opens a draft pull request containing one proposal commit.
 2. The pull request identifies the adapter, links to the downstream `/review/` route, and places the source coordinate in a closed details block.
 3. The workflow publishes one expiring review artifact derived from the proposal.
-   The artifact is presentation input, not durable authority.
+   The artifact is UI input, not durable authority.
 4. The downstream review page authenticates the curator through the configured GitHub App service and displays the complete proposal.
 5. The curator selects one disposition for every candidate and explicitly submits the decision state.
 6. The service revalidates repository, permission, pull request, proposal, artifact, and current head, then posts one authenticated GitHub comment.
@@ -78,6 +78,6 @@ The central or self-hosted service supplies only OAuth, verified GitHub reads, a
 It MUST NOT host a landing page, review application, editor, upload interface, metadata converter, database, or decision store.
 
 Finalized metadata and the compact decision cache retained on the reviewed default branch, together with the authenticated comment, form the retained review record.
-The proposal branch and its presentation artifact are temporary.
-An expired presentation artifact can be generated again while the proposal remains open.
+The proposal branch and its review artifact are temporary.
+An expired review artifact can be generated again while the proposal remains open.
 Once a curator submits decisions, the authenticated comment and resulting finalized Git change provide the retained review record; submitted decisions MUST NOT depend on continued artifact availability.

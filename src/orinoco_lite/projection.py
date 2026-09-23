@@ -31,7 +31,7 @@ from .annotations import (
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
 from .integrity import canonical_json_bytes, tree_sha256
-from .presentation import resolve_presentation
+from .www_from_model import resolve_www_from_model
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
 
@@ -106,16 +106,20 @@ def _relative(
     workspace: WorkspaceConfig,
     value: object,
     label: str,
-    presentation_root: Path | None = None,
+    www_from_model_root: Path | None = None,
 ) -> Path:
     if not isinstance(value, str) or not value or "\\" in value:
         raise ConfigurationError(f"{label} must be a repository-relative POSIX path")
     if value.startswith("presentation:"):
-        if presentation_root is None:
+        raise ConfigurationError(
+            f"{label}: replace presentation: with www-from-model: in projection.yaml"
+        )
+    if value.startswith("www-from-model:"):
+        if www_from_model_root is None:
             raise ConfigurationError(
-                f"{label} requires the pinned presentation dependency"
+                f"{label} requires the pinned www-from-model checkout"
             )
-        value = value.removeprefix("presentation:")
+        value = value.removeprefix("www-from-model:")
         relative = PurePosixPath(value)
         if (
             relative.is_absolute()
@@ -123,11 +127,11 @@ def _relative(
             or relative.as_posix() != value
         ):
             raise ConfigurationError(f"{label} must be a normalized safe path")
-        path = presentation_root.joinpath(*relative.parts)
-        root = presentation_root.resolve()
+        path = www_from_model_root.joinpath(*relative.parts)
+        root = www_from_model_root.resolve()
         resolved = path.resolve(strict=False)
         if resolved != root and root not in resolved.parents:
-            raise ConfigurationError(f"{label} escapes the presentation root")
+            raise ConfigurationError(f"{label} escapes the www-from-model checkout")
         return path
     relative = PurePosixPath(value)
     if relative.is_absolute() or ".." in relative.parts or relative.as_posix() != value:
@@ -155,7 +159,7 @@ def _contract_document(workspace: WorkspaceConfig) -> tuple[Path, dict[str, Any]
 
 def load_contract(
     workspace: WorkspaceConfig,
-    presentation_root: Path | None = None,
+    www_from_model_root: Path | None = None,
 ) -> ProjectionContract:
     path, value = _contract_document(workspace)
     homepage = value.get("homepage")
@@ -254,7 +258,7 @@ def load_contract(
                 workspace,
                 raw.get("template"),
                 f"{label}.template",
-                presentation_root,
+                www_from_model_root,
             ),
             select=select,
             inline=tuple(inline),
@@ -277,7 +281,7 @@ def load_contract(
             workspace,
             graph.get("producer"),
             "graph.producer",
-            presentation_root,
+            www_from_model_root,
         ),
         graph_node_classes=frozenset(node_classes),
         relationship_fields=tuple(relationships),
@@ -295,7 +299,7 @@ def load_contract(
     return contract
 
 
-def _presentation_root(
+def _www_from_model_root(
     workspace: WorkspaceConfig,
     resources_root: Path,
 ) -> Path | None:
@@ -313,8 +317,8 @@ def _presentation_root(
     ]
     if isinstance(pages, dict):
         paths.extend(policy.get("template") for policy in pages.values() if isinstance(policy, dict))
-    if any(isinstance(path, str) and path.startswith("presentation:") for path in paths):
-        return resolve_presentation(workspace.root, resources_root)
+    if any(isinstance(path, str) and path.startswith("www-from-model:") for path in paths):
+        return resolve_www_from_model(workspace.root, resources_root)
     return None
 
 
@@ -566,11 +570,11 @@ def _records(
 def validate_semantics(
     workspace: WorkspaceConfig,
     resources_root: Path,
-    presentation_root: Path | None = None,
+    www_from_model_root: Path | None = None,
 ) -> dict[str, Any]:
-    if presentation_root is None:
-        presentation_root = _presentation_root(workspace, resources_root)
-    contract = load_contract(workspace, presentation_root)
+    if www_from_model_root is None:
+        www_from_model_root = _www_from_model_root(workspace, resources_root)
+    contract = load_contract(workspace, www_from_model_root)
     schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     records, record_pids = _records(workspace, schema)
     by_pid = {record["pid"]: record for record in records}
@@ -900,9 +904,9 @@ def render_projection(
     resources_root: Path,
     output: Path,
 ) -> dict[str, Any]:
-    presentation_root = _presentation_root(workspace, resources_root)
-    semantic = validate_semantics(workspace, resources_root, presentation_root)
-    contract = load_contract(workspace, presentation_root)
+    www_from_model_root = _www_from_model_root(workspace, resources_root)
+    semantic = validate_semantics(workspace, resources_root, www_from_model_root)
+    contract = load_contract(workspace, www_from_model_root)
     records, record_pids = _records(workspace)
     schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     machine_records, machine_pids = _records(workspace, schema)
@@ -1010,8 +1014,8 @@ def _cached_projection_report(workspace, key):
 
 def validate_inputs(workspace, resources_root, *, no_cache=False):
     """Check semantic inputs without generating a projection or website."""
-    presentation = _presentation_root(workspace, resources_root)
-    contract = load_contract(workspace, presentation)
+    www_from_model = _www_from_model_root(workspace, resources_root)
+    contract = load_contract(workspace, www_from_model)
     if not no_cache:
         report = _cached_projection_report(
             workspace, _projection_cache_key(workspace, contract, resources_root),
@@ -1019,7 +1023,7 @@ def validate_inputs(workspace, resources_root, *, no_cache=False):
         if report is not None:
             print("Reusing unchanged semantic validation", file=sys.stderr)
             return report
-    return validate_semantics(workspace, resources_root, presentation)
+    return validate_semantics(workspace, resources_root, www_from_model)
 
 
 def update_projection(
@@ -1027,7 +1031,7 @@ def update_projection(
 ) -> dict[str, Any]:
     destination = workspace.path("generated") / "projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    contract = load_contract(workspace, _presentation_root(workspace, resources_root))
+    contract = load_contract(workspace, _www_from_model_root(workspace, resources_root))
     key = _projection_cache_key(workspace, contract, resources_root)
     cache = destination.parent / ".projection-cache.json"
     if not no_cache:

@@ -37,7 +37,7 @@ All destination paths in this table are relative to `site-specific/`.
 | `config/_default/languages.en.toml`: `title`, `params.description` | `site.yaml`: `identity.title`, `identity.description` | Copy values |
 | `config/_default/hugo.toml`: `baseURL` | `site.yaml`: `identity.base_url` | Normalize to one trailing slash |
 | `config/_default/menus.en.toml`: `main` | `site.yaml`: `navigation` | Map menu entries, including `pageRef` to `page_ref` and `params.icon` to `icon` |
-| `config/_default/params.toml`: `colorScheme`, `defaultAppearance`, `header.layout` | `site.yaml`: `presentation.color_scheme`, `presentation.default_appearance`, `presentation.header_layout` | Copy values |
+| `config/_default/params.toml`: `colorScheme`, `defaultAppearance`, `header.layout` | `site.yaml`: `appearance.color_scheme`, `appearance.default_appearance`, `appearance.header_layout` | Copy values |
 | `content/`: selected authored pages, section pages and bundle resources, including registered `portrait.*`, `logo.*` and `depiction.*` files | `content/`, at the same relative paths | Copy selected files and retrieve Annex-backed bytes; synchronize with deletions |
 | `assets/img/`: files named `fzj.svg`, `hhu.svg`, `logo.png` | `assets/img/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
 | `static/`: top-level images and `site.webmanifest` | `static/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
@@ -70,7 +70,7 @@ SHACL Vue's configured upload wizard creates these records and links them to the
 Upstream's [Register depictions workflow](../submodules/www-from-model/.forgejo/workflows/register-depictions.yaml) follows their download URLs and retrieves images with Git Annex into page bundles, named `portrait.jpg`, `logo.svg`, or `depiction.jpg`.
 
 The importer retains those resources and authored section pages, while excluding generated entity pages and the homepage.
-The build combines freshly projected entity pages with the upstream presentation, template adaptation, and imported media; Hugo finds depictions beside the regenerated pages.
+The build combines freshly projected entity pages with the upstream Hugo layouts and assets, template adaptation, and imported media; Hugo finds depictions beside the regenerated pages.
 
 Media comes from the pinned website revision, not by downloading every depiction referenced in the records dump.
 A newer dump can therefore refer to images absent from that revision; full-site comparisons should check the rendered depictions as well as metadata.
@@ -78,7 +78,7 @@ A newer dump can therefore refer to images absent from that revision; full-site 
 ## Comparing and following upstream
 
 **Disposable downstreams** let maintainers review a candidate without changing a deployed site.
-Keep the same records dump when comparing package, template, or upstream presentation changes; refresh the dump separately to identify data changes.
+Keep the same records dump when comparing package, template, or `www-from-model` changes; refresh the dump separately to identify data changes.
 Compare the resulting metadata, graph, pages, and rendered site using the [staged validation approach](agents/staged-upstream-validation.md).
 
 **Persistent downstreams**, such as the proposed `ORINOCO-Lite/psychoinformatics-downstream`, retain imported upstream content alongside the explicit deployment settings above.
@@ -86,7 +86,7 @@ GitHub Pages publishes the canonical site; Netlify provides pull-request preview
 Review refreshes in pull requests, including changes within the site-input subdataset, before adopting them.
 Publish referenced subdataset commits along with the parent repository's updates.
 
-Repinning changes the selected upstream presentation; reimport brings its authored inputs and media into the downstream.
+Repinning changes the selected `www-from-model` revision; reimport brings its authored inputs and media into the downstream.
 Review the resulting differences to keep the Orinoco Lite adaptation small.
 
 ## Recovery

@@ -603,17 +603,17 @@ class GenericProjectionContractTests(unittest.TestCase):
             ).is_file()
         )
 
-    def test_custom_policy_reuses_pinned_presentation_inputs(self) -> None:
+    def test_custom_policy_reuses_pinned_www_from_model_inputs(self) -> None:
         config = self.root / "site-specific/projection.yaml"
         config.write_text(
             config.read_text().replace(
-                "template: site-specific/", "template: presentation:site-specific/"
+                "template: site-specific/", "template: www-from-model:site-specific/"
             ).replace(
-                "producer: site-specific/", "producer: presentation:site-specific/"
+                "producer: site-specific/", "producer: www-from-model:site-specific/"
             ).replace("graph:\n", "graph:\n  missing_external_targets: reject\n")
         )
         with (
-            patch("orinoco_lite.projection.resolve_presentation", return_value=self.root) as resolve,
+            patch("orinoco_lite.projection.resolve_www_from_model", return_value=self.root) as resolve,
             patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic),
         ):
             update_projection(self.workspace, self.resources)
@@ -944,10 +944,10 @@ class GenericProjectionContractTests(unittest.TestCase):
 def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypatch):
     root = tmp_path / "site"
     shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
-    presentation = PACKAGE_ROOT / "submodules/www-from-model"
+    www_from_model = PACKAGE_ROOT / "submodules/www-from-model"
     # Use real pinned templates and schema without resolving a network source.
     monkeypatch.setattr(
-        "orinoco_lite.projection.resolve_presentation", lambda *_: presentation
+        "orinoco_lite.projection.resolve_www_from_model", lambda *_: www_from_model
     )
     workspace = load_workspace(root)
     resources = resolve_resources().root
@@ -975,7 +975,7 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
     assert path.read_text(encoding="utf-8") == content
 
     # A local page policy cannot make an unknown schema class valid.
-    contract = load_contract(workspace, presentation)
+    contract = load_contract(workspace, www_from_model)
     policy = yaml.safe_load(contract.path.read_text())
     policy["unrendered_classes"].append("xyzri:Unknown")
     (workspace.path("site") / "projection.yaml").write_text(yaml.safe_dump(policy))
@@ -987,3 +987,10 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_old_checkout_prefix_requires_explicit_update():
+    from orinoco_lite.projection import _relative
+    from orinoco_lite.errors import ConfigurationError
+    with pytest.raises(ConfigurationError, match="replace presentation: with www-from-model:"):
+        _relative(None, "presentation:page_templates/homepage.md.j2", "homepage.template")

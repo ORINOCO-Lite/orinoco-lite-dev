@@ -201,7 +201,7 @@ def publish(context: dict) -> None:
             pull = api(f"/repos/{website}/pulls", {
                 "title": f"chore(curation): propose {context['adapter']} metadata", "head": branch,
                 "base": os.environ["DEFAULT_BRANCH"], "draft": True,
-                "body": NOTICE + f"Review the source-adapter proposal with metadata draft https://github.com/{metadata}/pull/{context['metadata_number']}. The exact proposal review link follows when its presentation artifact is ready." + source_details,
+                "body": NOTICE + f"Review the source-adapter proposal with metadata draft https://github.com/{metadata}/pull/{context['metadata_number']}. The exact proposal review link follows when its review artifact is ready." + source_details,
             })
             context["number"] = pull["number"]
         CONTEXT.write_text(json.dumps(context))
@@ -305,7 +305,7 @@ def complete_run(artifact_id: str) -> None:
             with environment(GH_TOKEN=token, ARTIFACT_ID=artifact_id):
                 announce(json.loads(CONTEXT.read_text()))
         else:
-            print("Review presentation was not uploaded; inspect the published drafts before retrying.")
+            print("Review artifact was not uploaded; inspect the published drafts before retrying.")
     finally:
         revoke(token)
 

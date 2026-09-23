@@ -76,9 +76,9 @@ Refresh tokens are discarded.
 
 ## Cloudflare Pages Functions
 
-The Pages output directory is `service-dist/` and contains only routing configuration; it has no static presentation assets.
+The Pages output directory is `service-dist/` and contains only routing configuration; it has no static UI assets.
 Its manifest sends the exact root and `/api/*` to Functions.
-The root Function returns an empty, hardened, non-cacheable `404` so a superseded Pages asset cannot reappear from static hosting or cache, while every other non-API presentation path remains outside the Functions deployment.
+The root Function returns an empty, hardened, non-cacheable `404` so a superseded Pages asset cannot reappear from static hosting or cache, while every other non-API UI path remains outside the Functions deployment.
 Pages Functions are under `functions/`; `npm run pages:functions:build` verifies their Worker bundle without publishing it.
 The tracked Wrangler configuration is the deployment source of truth for the public GitHub App client ID and production origin.
 Cloudflare stores the client secret, session-sealing key, and optional App signing key separately as encrypted Pages secrets.
@@ -112,7 +112,7 @@ Oversized artifacts, candidate sets, and proposal paths are rejected before reco
 
 The pull-request body is only an accessible fallback and review link.
 The application never parses it for candidate identity, ordering, source coordinates, or completeness.
-It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for presentation facts.
+It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for display facts.
 
 Before releasing proposal data, the central service verifies the requested repository against the live GitHub objects and verifies the downstream base URL and effective default or override service origin from `orinoco.yaml` at the proposal's metadata base.
 A sealed short-lived grant and an exact ready/request handshake bind the repository, pull request, artifact, downstream origin, popup, and one-time nonce.

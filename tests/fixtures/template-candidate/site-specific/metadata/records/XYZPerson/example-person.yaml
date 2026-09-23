@@ -4,4 +4,4 @@ given_name: Example
 family_name: Person
 formatted_name: Example Person
 display_label: Example Person
-description: A neutral person used to prove generic relationship presentation.
+description: A neutral person used to prove generic relationship rendering.

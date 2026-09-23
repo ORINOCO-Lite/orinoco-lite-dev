@@ -53,7 +53,7 @@ class PackageResourceTests(unittest.TestCase):
     def stage(self):
         return stage_package_resources(self.spec, self.destination, source_commit="a" * 40)
 
-    def test_stages_ordinary_resources_and_the_presentation_source_identity(self):
+    def test_stages_ordinary_resources_and_the_www_from_model_source_identity(self):
         self.stage()
         self.assertEqual((self.destination / "data/driver.py").read_text(), "print('driver')\n")
         self.assertEqual(source_commit(self.destination), "a" * 40)

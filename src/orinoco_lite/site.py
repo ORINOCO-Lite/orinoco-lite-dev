@@ -21,12 +21,12 @@ from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
 from .projection import load_contract
-from .presentation import resolve_presentation
+from .www_from_model import resolve_www_from_model
 from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
-PRESENTATION_SURFACES = (
+HUGO_SURFACES = (
     "archetypes",
     "assets",
     "config",
@@ -83,7 +83,7 @@ def _copy_file(source: Path, destination: Path) -> None:
     if not source.exists():
         return
     if source.is_symlink() or not source.is_file():
-        raise DriverError(f"Presentation source is not a regular file: {source}")
+        raise DriverError(f"Hugo source is not a regular file: {source}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
 
@@ -106,7 +106,7 @@ def _reject_annex_pointers(root: Path) -> None:
     ]
     if pointers:
         raise DriverError(
-            "Materialized presentation assets are missing for upstream Annex "
+            "Materialized Hugo assets are missing for upstream Annex "
             "content: " + ", ".join(pointers[:10])
         )
 
@@ -122,7 +122,7 @@ def _remove_upstream_identity_images(static_root: Path) -> None:
 
 
 def _copy_upstream_section_frontmatter(source: Path, destination: Path) -> None:
-    """Retain section presentation parameters without importing editorial bodies."""
+    """Retain section layout parameters without importing editorial bodies."""
 
     if source.is_symlink():
         raise DriverError(f"Upstream content root cannot be a symlink: {source}")
@@ -154,10 +154,10 @@ def _render_template_tree(
     *,
     site_data: dict[str, Any],
 ) -> None:
-    """Render one small presentation-adapter tree from structured site data."""
+    """Render one small Hugo adaptation tree from structured site data."""
 
     if source.is_symlink():
-        raise DriverError(f"Presentation template root cannot be a symlink: {source}")
+        raise DriverError(f"Hugo adaptation template root cannot be a symlink: {source}")
     if not source.is_dir():
         return
     environment = Environment(
@@ -172,12 +172,12 @@ def _render_template_tree(
 
     for path in sorted(source.rglob("*")):
         if path.is_symlink():
-            raise DriverError(f"Presentation template cannot be a symlink: {path}")
+            raise DriverError(f"Hugo adaptation template cannot be a symlink: {path}")
         if path.is_dir():
             continue
         if not path.is_file() or path.suffix != ".j2":
             raise DriverError(
-                f"Presentation template tree contains unsupported content: {path}"
+                f"Hugo adaptation template tree contains unsupported content: {path}"
             )
         relative = path.relative_to(source)
         target = destination / relative.with_suffix("")
@@ -188,7 +188,7 @@ def _render_template_tree(
             )
         except Exception as error:
             raise DriverError(
-                f"Could not render presentation template {path}: {error}"
+                f"Could not render Hugo adaptation template {path}: {error}"
             ) from error
         target.write_text(rendered, encoding="utf-8")
 
@@ -196,11 +196,11 @@ def _render_template_tree(
 def _render_site_surfaces(
     workspace,
     adapter: Path,
-    presentation_root: Path,
+    www_from_model_root: Path,
     assembly: Path,
 ) -> None:
     site_data = workspace.site_data
-    projection = load_contract(workspace, presentation_root)
+    projection = load_contract(workspace, www_from_model_root)
     record_prefix = site_data.get("record_prefix", projection.route_prefix)
     if record_prefix != projection.route_prefix:
         raise ConfigurationError(
@@ -326,20 +326,19 @@ def _assemble(
     resources_root: Path,
     assembly: Path,
     *,
-    presentation: Path | None = None,
+    www_from_model: Path | None = None,
 ) -> None:
-    presentation = presentation or resolve_presentation(workspace.root, resources_root)
-    upstream = presentation
+    upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
-    adapter = workspace.root / ".orinoco-lite" / "presentation"
+    adapter = workspace.root / ".orinoco-lite" / "hugo-adapter"
     materialized = (
         workspace.root
         / ".orinoco-lite"
-        / "materialized-presentation"
+        / "materialized-hugo-assets"
         / "upstream"
     )
 
-    for name in PRESENTATION_SURFACES:
+    for name in HUGO_SURFACES:
         _copy_tree(theme / name, assembly / "themes" / "congo" / name)
     _copy_file(theme / "theme.toml", assembly / "themes" / "congo" / "theme.toml")
     _copy_file(
@@ -347,7 +346,7 @@ def _assemble(
         assembly / "static" / "LICENSES" / "congo-MIT.txt",
     )
 
-    for name in PRESENTATION_SURFACES:
+    for name in HUGO_SURFACES:
         _copy_tree(upstream / name, assembly / name)
         _copy_tree(materialized / name, assembly / name)
         if name == "static":
@@ -360,12 +359,12 @@ def _assemble(
     materialized_license = materialized.parent / "LICENSE"
     if not materialized_license.is_file():
         raise DriverError(
-            "The materialized presentation overlay has no LICENSE: "
+            "The materialized Hugo asset overlay has no LICENSE: "
             f"{materialized_license}"
         )
     _copy_file(
         materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-presentation.txt",
+        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
     )
 
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
@@ -390,7 +389,7 @@ def _assemble(
     )
     _copy_file(
         materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-presentation.txt",
+        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
     )
     _reject_annex_pointers(assembly)
 

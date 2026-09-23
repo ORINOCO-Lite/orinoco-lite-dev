@@ -134,10 +134,10 @@ A downstream may opt into stricter local closure.
 The supported host behavior is defined in [`github-curation-review.md`](github-curation-review.md).
 It presents the proposal diff, records authenticated complete decisions, applies finalization at the current head, and validates the result.
 
-One expiring Actions artifact MAY supply generated presentation data.
+One expiring Actions artifact MAY supply generated display data.
 It is not metadata, a decision store, provenance authority, or recovery mechanism.
 Finalized metadata and the decision cache retained on the reviewed default branch, together with the authenticated submission, form the retained review record.
-The proposal branch and presentation artifact are temporary.
+The proposal branch and review artifact are temporary.
 
 SHACL Vue editing follows [`github-shacl-vue-edit.md`](github-shacl-vue-edit.md).
 It does not change source-adapter candidate or decision semantics.
