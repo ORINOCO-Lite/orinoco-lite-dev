@@ -20,7 +20,7 @@ function centralDirectory(archive: Uint8Array): number {
 }
 
 describe("ephemeral review bundle", () => {
-  it("parses the exact versioned bundle and allows ordinary presentation punctuation", () => {
+  it("parses the exact versioned bundle and allows ordinary display-label punctuation", () => {
     const bundle = reviewBundle();
     const first = bundle.candidates[0];
     if (first === undefined) throw new Error("missing fixture candidate");
@@ -72,7 +72,7 @@ describe("ephemeral review bundle", () => {
     ).toEqual(bundle);
   });
 
-  it("requires exact object fields and rejects duplicate presentation identities", () => {
+  it("requires exact object fields and rejects duplicate candidate identities", () => {
     const extra = { ...reviewBundle(), hidden: true };
     expect(() => parseReviewBundle(reviewBundleArchive(extra))).toThrow(
       "missing or unexpected fields",

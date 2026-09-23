@@ -42,7 +42,7 @@ def make_website(root):
 
 
 @pytest.mark.parametrize("layout", ["directory", "submodule"])
-def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path, layout, monkeypatch):
+def test_populate_and_rerun_with_retained_data_and_changed_www_from_model(tmp_path, layout, monkeypatch):
     for role in ("AUTHOR", "COMMITTER"):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.invalid")
@@ -84,7 +84,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from orinoco_lite import cli, upstream
 upstream.resolve_resources = lambda: SimpleNamespace(root=Path("unused"))
-upstream.resolve_presentation = lambda *args: Path(os.environ["TEST_WWW"])
+upstream.resolve_www_from_model = lambda *args: Path(os.environ["TEST_WWW"])
 raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)

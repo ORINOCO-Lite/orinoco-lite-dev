@@ -11,16 +11,16 @@ controlled www-from-model gitlink
 exact www-from-model checkout
         + upstream-declared dependency closure
         + thin Orinoco template adaptation
-        + bounded materialized presentation overlay
+        + bounded materialized Hugo asset overlay
         + downstream site-specific inputs
         |
         v
 disposable static-site build
 ```
 
-The German `www-from-model` repository and its `page_templates/` are the authoritative presentation and projection source.
+The German `www-from-model` repository and its `page_templates/` are the authoritative Hugo and projection source.
 The package resolves the exact revision and performs generic metadata, projection, and composition operations.
-The template is a lightweight Copier scaffold with the Orinoco adaptation, required materialized presentation assets, workflows, and locks.
+The template is a lightweight Copier scaffold with the Orinoco adaptation, required materialized Hugo assets, workflows, and locks.
 
 This is a replacement implementation, not a migration.
 Do not retain old framework copies, checked rendered trees, legacy paths, updater machinery, or backward compatibility as requirements.
@@ -36,9 +36,9 @@ Do not retain old framework copies, checked rendered trees, legacy paths, update
 - DataLad remains in downstream source-adapter workflows to record run provenance in Git.
   Correct repository configuration keeps adapter inputs and outputs out of Annex, so these workflows do not require Git Annex.
 - The package owns source resolution, integrity verification, metadata validation, projection, composition, and shared behavioral tests.
-- `orinoco-lite-template` owns the small Orinoco adaptation, bounded materialized presentation overlay, Copier scaffold, workflows, and dependency locks.
+- `orinoco-lite-template` owns the small Orinoco adaptation, bounded materialized Hugo asset overlay, Copier scaffold, workflows, and dependency locks.
   It does not own a complete website.
-- `site-specific/` contains declarative downstream metadata, curation records, editorial content, assets, identity, limited presentation choices, source-adapter configuration and evidence, and supported small overrides.
+- `site-specific/` contains declarative downstream metadata, curation records, editorial content, assets, identity, limited appearance choices, source-adapter configuration and evidence, and supported small overrides.
 - `extensions/` contains only site-specific executable metadata acquisition and curation adapters.
   Extension code and its outputs are neither loaded during website composition nor copied into the generated site.
 - Generated projections, static sites, caches, and Copier renderings remain untracked build products.
@@ -70,7 +70,7 @@ Do not remove or replace upstream behavior, import upstream site data, or introd
 ### Keep the template thin
 
 Remove copied upstream layouts, projection templates, configuration, and other website framework files from the Copier source.
-Retain only files that intentionally adapt upstream behavior, materialize a required presentation asset, or create an ordinary downstream repository.
+Retain only files that intentionally adapt upstream behavior, materialize a required Hugo asset, or create an ordinary downstream repository.
 
 Do not keep a rendered Copier result on the source branch.
 Render into temporary or ignored storage for local inspection and tests, then publish that validated ephemeral result directly to the template distribution branch.
@@ -80,9 +80,9 @@ Render into temporary or ignored storage for local inspection and tests, then pu
 Build in this order:
 
 1. resolve and verify the controlled upstream revision and its declared dependency closure;
-2. compose the ordinary upstream presentation and projection surfaces;
+2. compose the ordinary upstream Hugo and projection components;
 3. apply the template adaptation and materialized asset overlay;
-4. project and add declared `site-specific/` metadata, editorial content, assets, identity, and presentation choices; and
+4. project and add declared `site-specific/` metadata, editorial content, assets, identity, and appearance choices; and
 5. apply supported `site-specific/overrides/` with explicit precedence.
 
 Run executable metadata adapters under `extensions/` only through separate metadata acquisition and curation tasks before validation and projection.
@@ -99,7 +99,7 @@ Focused checks cover observable behavior and major failure boundaries rather tha
 
 Milestone 8 is complete when:
 
-- a fresh downstream reuses the exact upstream presentation and projection behavior without copying the website framework;
+- a fresh downstream reuses the exact upstream Hugo and projection behavior without copying the website framework;
 - the template source is a small reviewable adaptation and scaffold containing only required materialized assets rather than a complete website;
 - retained upstream functionality works with its required assets without a feature-specific allowlist;
 - Git and Git Annex tooling can reconstruct materialization provenance without a redundant coordinate inventory;

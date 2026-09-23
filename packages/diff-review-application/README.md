@@ -34,7 +34,7 @@ The website comparisons follow projection, assembly, and rendering:
 flowchart LR
   records[Records] -->|hugo project| projection[Pages and graph data]
   projection -->|hugo assemble| assembly[Hugo input tree]
-  sources[Upstream presentation, template, and site inputs] --> assembly
+  sources[www-from-model, template, and site inputs] --> assembly
   assembly -->|hugo build| website[Website]
   projection -. content diff .-> p[Projection differences]
   assembly -. content diff .-> a[Assembly differences]

@@ -1,4 +1,4 @@
-"""Trusted source-adapter execution and GitHub review presentation.
+"""Trusted source-adapter execution and GitHub review bundles.
 
 Executable adapters come from the trusted website checkout. Candidate plans
 are regenerated from the immutable base and captured source, never loaded

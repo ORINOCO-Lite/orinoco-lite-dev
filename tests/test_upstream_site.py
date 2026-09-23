@@ -35,7 +35,7 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
         "content/persons/_index.md": "Authored section\n",
         "content/persons/person/portrait.svg": "<svg/>\n",
         "assets/img/logo.png": "identity image",
-        "layouts/ignored.html": "presentation framework",
+        "layouts/ignored.html": "Hugo framework",
     }
     for name, text in files.items():
         path = website / name

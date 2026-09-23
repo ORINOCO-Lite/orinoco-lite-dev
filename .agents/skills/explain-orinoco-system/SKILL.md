@@ -78,6 +78,6 @@ After implementation:
 2. Parse every changed Mermaid block with an available Mermaid renderer.
 3. Inspect the rendered image, not only the source.
 4. Check reading order, wrapping, edge crossings, boundary meaning, and whether each arrow forms a sentence with its endpoints.
-5. Remove unsupported HTML and presentation tricks that obscure the label grammar.
+5. Remove unsupported HTML and formatting tricks that obscure the label grammar.
 
 If no renderer is available, report that limitation rather than claiming the diagram renders correctly.

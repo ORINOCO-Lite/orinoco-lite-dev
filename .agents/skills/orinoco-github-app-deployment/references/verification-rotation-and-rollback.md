@@ -9,7 +9,7 @@ Do not record cookies, OAuth codes, access tokens, client secrets, or the sessio
 
 - Confirm the checkout is clean and at the reviewed application commit and tree.
 - Re-run `npm ci --ignore-scripts` and `npm run check` using the declared tools.
-- Confirm the deployment contains the checked Worker, Functions, or equivalent backend adapter and no static presentation application or assets.
+- Confirm the deployment contains the checked Worker, Functions, or equivalent backend adapter and no static UI application or assets.
 - Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available; coordinated submodule materialization also requires `GITHUB_APP_PRIVATE_KEY`.
 - Confirm staged editor files, editor-input artifacts, and durable storage bindings are absent.
 - Confirm there is no token, cookie, or received-bundle logging.
@@ -26,7 +26,7 @@ The `orinoco-lite` package supplies the immutable editor shell and schema used b
 - A callback probe with exactly `code=probe`, `state=probe`, and `iss=https://github.com/login/oauth`, but no OAuth-state cookie, returns HTTP 401 `missing_oauth_state` before any token exchange.
   An `iss`-only probe is malformed and correctly returns HTTP 400 `invalid_oauth_callback`.
 - Authorization starts with a 302 to GitHub containing the exact client ID, callback, state, and PKCE challenge, no OAuth scope, and `Cross-Origin-Opener-Policy: unsafe-none`.
-- A successful callback uses the same opener-preserving policy and redirects to the minimal generated popup-transport protocol response, which has its restrictive CSP and no product presentation.
+- A successful callback uses the same opener-preserving policy and redirects to the minimal generated popup-transport protocol response, which has its restrictive CSP and no product UI.
 - Security and `no-store` response headers are present, and the callback adapter emits two distinct `Set-Cookie` fields in the actual wire or header-list representation, not one comma-joined field.
 
 Do not add a green root page as a health probe.
@@ -92,7 +92,7 @@ Do not disable **Download bundle** while domain work is pending.
 | GitHub 403/404 | App not installed, permission approval pending, user lacks write or admin, or session token expired. |
 | Artifact failure | Egress blocked, redirect auto-followed or rewritten, destination host rejected, or provider size limit exceeded. This applies to the source-adapter review artifact, not SHACL editor input. |
 | Downstream UI works but APIs 404 | The Worker, Functions, or provider backend adapter is absent or routed incorrectly. |
-| A central landing, source-review, receiver, upload, confirmation, or second editor is available | A superseded application revision or stale static build directory was deployed. Rebuild from the reviewed backend-only revision and remove static presentation assets. |
+| A central landing, source-review, receiver, upload, confirmation, or second editor is available | A superseded application revision or stale static build directory was deployed. Rebuild from the reviewed backend-only revision and remove static UI assets. |
 
 Both the successful OAuth callback and logout emit two cookies in one response.
 Exercise both paths when validating an adapter's header behavior.

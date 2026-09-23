@@ -121,15 +121,15 @@ def test_transform_refuses_stale_installed_package(tmp_path, monkeypatch):
 def test_installed_fork_selects_its_own_upstream_pin(tmp_path, monkeypatch):
     import json
     from types import SimpleNamespace
-    from orinoco_lite import presentation
+    from orinoco_lite import www_from_model
     from orinoco_lite.errors import IntegrityError
     commit = 'a' * 40
     (tmp_path / 'source-commit.txt').write_text(commit)
     direct = {'url': 'https://example.org/fork.git', 'vcs_info': {'vcs': 'git', 'commit_id': commit}}
     monkeypatch.setattr(package_update, 'distribution', lambda _: SimpleNamespace(read_text=lambda _: json.dumps(direct)))
-    assert presentation._package_source(tmp_path) == (direct['url'], commit)
+    assert www_from_model._package_source(tmp_path) == (direct['url'], commit)
     direct['vcs_info']['commit_id'] = 'b' * 40
     with pytest.raises(IntegrityError, match='disagree'):
-        presentation._package_source(tmp_path)
+        www_from_model._package_source(tmp_path)
     direct['vcs_info'] = {}
-    assert presentation._package_source(tmp_path) == (presentation.SOURCE_REPOSITORY, commit)
+    assert www_from_model._package_source(tmp_path) == (www_from_model.SOURCE_REPOSITORY, commit)

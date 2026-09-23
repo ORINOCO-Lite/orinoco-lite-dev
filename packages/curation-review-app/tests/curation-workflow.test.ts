@@ -226,7 +226,7 @@ describe("source-adapter workflow access", () => {
   });
 });
 
-describe("authenticated finalization without a presentation artifact", () => {
+describe("authenticated finalization without a review artifact", () => {
   const finalIdentity = { ...identity, event_name: "issue_comment" };
   const finalRequest = {
     ...request,

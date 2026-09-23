@@ -23,7 +23,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | C1 — Downstream preparation | Capture, JSONL → YAML → JSONL, record comparison, site import, and DataLad replay in an immutable package environment. | Verify direct JSONL equality and replay without the original checkouts. Review and merge before RDF. |
 | C2 — RDF comparison | Separate follow-up for RDF generation, comparison, attribution, and the RDF reader adaptation. | Review RDF semantics and failure boundaries independently of preparation. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
-| E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
+| E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned `www-from-model` and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
 | F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
 | G — Hugo input assembly | Separate assembly of Hugo inputs from building the website. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
 | H — Hugo build and comparison | Build the website from the supplied Hugo input tree. Expose HTML, file, and browser checks through the CLI. Use #154's tool evaluation. | Inspect new website differences, then run the complete generation comparison. |
@@ -83,10 +83,10 @@ A bundle may contain failed and skipped stages, but must display failed, skipped
 | Rendering | Same assembled tree through both build operations | Routes, HTML, assets, browser differences, and site-check failures |
 | Complete paths | Each path consumes its own preceding outputs | Integrated effects and interactions absent from isolated comparisons |
 
-Upstream presentation comes from the selected `www-from-model` gitlink and that revision's dependency declarations.
+Hugo layouts, assets, and the Congo theme come from the selected `www-from-model` gitlink and that revision's dependency declarations.
 The template layers its adaptation and bounded assets over it; site-specific settings and overrides apply afterward.
 Authored content overlays generated content.
-Importing site data does not copy the presentation dependency tree into a downstream.
+Importing site data does not copy the Hugo dependency tree into a downstream.
 The upstream side must call the selected upstream operations, not the Lite renderer under another name.
 Label a selected revision containing retained Lite patches accordingly.
 
@@ -301,7 +301,7 @@ Keep unexplained effects and changed values or behavior outside the reviewed sco
 Keep unchanged unresolved findings visible without asking for the same decision again.
 Report failed or unavailable comparisons separately from clean results.
 
-Keep raw captures unchanged when correcting conversion or presentation behavior.
+Keep raw captures unchanged when correcting conversion or rendering behavior.
 Put site-data corrections in site inputs and reusable fixes in the package or upstream dependency.
 Keep each temporary fix beside the code that needs it, with a focused regression test.
 Document its reason, upstream follow-up, and removal condition in that change's PR.

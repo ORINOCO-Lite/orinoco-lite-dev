@@ -138,6 +138,11 @@ def _load_site_data(path: Path) -> dict[str, Any]:
         raise ConfigurationError(
             f"site-specific/site.yaml version must be {SITE_DATA_VERSION}"
         )
+    if "presentation" in value:
+        raise ConfigurationError(
+            "site-specific/site.yaml: rename presentation to appearance "
+            "and update the package and template together"
+        )
     identity = value.get("identity")
     if not isinstance(identity, dict):
         raise ConfigurationError("site-specific/site.yaml requires identity")

@@ -14,7 +14,7 @@ navigation:
   - name: Publications
     page_ref: /publications/
     weight: 30
-presentation:
+appearance:
   color_scheme: fire
   default_appearance: light
   header_layout: hybrid

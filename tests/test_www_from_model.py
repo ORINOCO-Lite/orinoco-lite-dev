@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from orinoco_lite.errors import IntegrityError
-from orinoco_lite.presentation import resolve_presentation
+from orinoco_lite.www_from_model import resolve_www_from_model
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -21,7 +21,7 @@ def _git(repository: Path, *arguments: str) -> str:
     return completed.stdout.strip()
 
 
-class PresentationResolverTests(unittest.TestCase):
+class WwwFromModelResolverTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -45,7 +45,7 @@ class PresentationResolverTests(unittest.TestCase):
             "www-from-model",
             {
                 "content/german.md": "German fixture must remain upstream\n",
-                "page_templates/record.md": "Presentation fixture\n",
+                "page_templates/record.md": "www-from-model fixture\n",
             },
             modules=(("themes/congo", self.congo, self.congo_commit),),
         )
@@ -79,8 +79,8 @@ class PresentationResolverTests(unittest.TestCase):
         repository = self.sources / name
         repository.mkdir()
         _git(repository, "init", "--quiet")
-        _git(repository, "config", "user.name", "Presentation Test")
-        _git(repository, "config", "user.email", "presentation@example.invalid")
+        _git(repository, "config", "user.name", "www-from-model Test")
+        _git(repository, "config", "user.email", "www-from-model@example.invalid")
         for relative, value in files.items():
             path = repository.joinpath(*relative.split("/"))
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -116,23 +116,23 @@ class PresentationResolverTests(unittest.TestCase):
         root.mkdir()
         (root / "source-commit.txt").write_text(self.engineering_commit + "\n")
         self.source_repository = str(repository) if repository else ""
-        source_patch = patch("orinoco_lite.presentation.SOURCE_REPOSITORY", self.source_repository)
+        source_patch = patch("orinoco_lite.www_from_model.SOURCE_REPOSITORY", self.source_repository)
         source_patch.start()
         self.addCleanup(source_patch.stop)
         return root
 
     def test_package_uses_committed_gitlink_and_resolves_recursively(self) -> None:
         (self.engineering / ".gitmodules").write_text(
-            "working-tree tampering must not select the presentation\n",
+            "working-tree tampering must not select www-from-model\n",
             encoding="utf-8",
         )
 
-        with patch("orinoco_lite.presentation._package_source", return_value=(str(self.engineering), self.engineering_commit)):
-            source = resolve_presentation(self.workspace, self.root / "resources")
+        with patch("orinoco_lite.www_from_model._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+            source = resolve_www_from_model(self.workspace, self.root / "resources")
 
         self.assertEqual(
             (source / "page_templates/record.md").read_text(encoding="utf-8"),
-            "Presentation fixture\n",
+            "www-from-model fixture\n",
         )
         self.assertEqual(
             (source / "themes/congo/vendor/leaf/assets/leaf.txt").read_text(
@@ -154,30 +154,30 @@ class PresentationResolverTests(unittest.TestCase):
         _git(self.engineering, "checkout", "--quiet", "-")
 
         with patch(
-            "orinoco_lite.presentation._package_source",
+            "orinoco_lite.www_from_model._package_source",
             return_value=(str(self.engineering), merge_commit),
         ):
-            source = resolve_presentation(self.workspace, self.root / "resources")
+            source = resolve_www_from_model(self.workspace, self.root / "resources")
 
         self.assertEqual(_git(source.parent.parent, "rev-parse", "HEAD"), merge_commit)
         self.assertEqual(_git(source, "rev-parse", "HEAD"), self.website_commit)
         self.assertTrue((source / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
 
     def test_corrupt_cache_is_repaired(self) -> None:
-        with patch("orinoco_lite.presentation._package_source", return_value=(str(self.engineering), self.engineering_commit)):
-            first = resolve_presentation(self.workspace, self.root / "resources")
+        with patch("orinoco_lite.www_from_model._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+            first = resolve_www_from_model(self.workspace, self.root / "resources")
             (first / "page_templates/record.md").write_text(
                 "tampered\n", encoding="utf-8"
             )
-            repaired = resolve_presentation(self.workspace, self.root / "resources")
+            repaired = resolve_www_from_model(self.workspace, self.root / "resources")
             self.assertEqual(
                 (repaired / "page_templates/record.md").read_text(
                     encoding="utf-8"
                 ),
-                "Presentation fixture\n",
+                "www-from-model fixture\n",
             )
 
-    def test_presentation_cache_supports_offline_reuse_and_rejects_tampering(
+    def test_www_from_model_cache_supports_offline_reuse_and_rejects_tampering(
         self,
     ) -> None:
         resources = self._resources(repository=self.engineering)
@@ -186,10 +186,10 @@ class PresentationResolverTests(unittest.TestCase):
             os.environ,
             {},
         ):
-            first = resolve_presentation(self.workspace, resources)
+            first = resolve_www_from_model(self.workspace, resources)
             offline_sources = self.root / "offline-sources"
             self.sources.rename(offline_sources)
-            second = resolve_presentation(self.workspace, resources)
+            second = resolve_www_from_model(self.workspace, resources)
 
             self.assertEqual(first, second)
             self.assertEqual(
@@ -203,7 +203,7 @@ class PresentationResolverTests(unittest.TestCase):
                 "offline tampering\n", encoding="utf-8"
             )
             with self.assertRaisesRegex(IntegrityError, "repair failed"):
-                resolve_presentation(self.workspace, resources)
+                resolve_www_from_model(self.workspace, resources)
 
     def test_missing_package_source_commit_is_rejected(self) -> None:
         resources = self._resources()
@@ -213,7 +213,7 @@ class PresentationResolverTests(unittest.TestCase):
             {},
         ):
             with self.assertRaisesRegex(IntegrityError, "source commit"):
-                resolve_presentation(self.workspace, resources)
+                resolve_www_from_model(self.workspace, resources)
 
 
 if __name__ == "__main__":

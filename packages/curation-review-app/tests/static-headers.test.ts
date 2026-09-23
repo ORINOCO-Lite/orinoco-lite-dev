@@ -18,7 +18,7 @@ describe("backend-only service output", () => {
     });
   });
 
-  it("contains no static presentation assets", async () => {
+  it("contains no static UI assets", async () => {
     const entries = await readdir(SERVICE_DIST, { withFileTypes: true });
 
     expect(entries).toHaveLength(1);

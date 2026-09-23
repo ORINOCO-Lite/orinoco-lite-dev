@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tools import materialize_presentation_assets as materializer
+from tools import materialize_hugo_assets as materializer
 
 
 class FakeGitAnnex:
@@ -93,7 +93,7 @@ class FakeGitAnnex:
         raise AssertionError(f"Unexpected website Git command: {arguments}")
 
 
-class MaterializePresentationAssetsTests(unittest.TestCase):
+class MaterializeHugoAssetsTests(unittest.TestCase):
     def fixture(
         self,
         root: Path,
@@ -108,7 +108,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
         website.mkdir(parents=True)
         copier = template / "copier-template"
         copier.mkdir(parents=True)
-        overlay = copier / ".orinoco-lite/materialized-presentation"
+        overlay = copier / ".orinoco-lite/materialized-hugo-assets"
         overlay.mkdir(parents=True)
         (overlay / "LICENSE").write_text(
             "Licensed overlay fixture.\n", encoding="utf-8"
@@ -126,7 +126,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
         )
         return engineering, website, template, fake
 
-    def test_derives_gitlink_and_materializes_generic_presentation_assets(
+    def test_derives_gitlink_and_materializes_generic_hugo_assets(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -144,7 +144,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
             engineering, _website, template, fake = self.fixture(root, annexed)
             overlay = (
                 template
-                / "copier-template/.orinoco-lite/materialized-presentation"
+                / "copier-template/.orinoco-lite/materialized-hugo-assets"
             )
             old_upstream = overlay / "upstream"
             old_upstream.mkdir(parents=True)
@@ -186,7 +186,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
             engineering, _website, template, fake = self.fixture(root, annexed)
             existing = (
                 template
-                / "copier-template/.orinoco-lite/materialized-presentation"
+                / "copier-template/.orinoco-lite/materialized-hugo-assets"
                 / "upstream/assets/previous.bin"
             )
             existing.parent.mkdir(parents=True)
@@ -212,7 +212,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
             engineering, _website, template, fake = self.fixture(root, annexed)
             existing = (
                 template
-                / "copier-template/.orinoco-lite/materialized-presentation"
+                / "copier-template/.orinoco-lite/materialized-hugo-assets"
                 / "upstream/assets/previous.bin"
             )
             existing.parent.mkdir(parents=True)
@@ -251,7 +251,7 @@ class MaterializePresentationAssetsTests(unittest.TestCase):
             self.assertFalse(
                 (
                     template
-                    / "copier-template/.orinoco-lite/materialized-presentation/upstream"
+                    / "copier-template/.orinoco-lite/materialized-hugo-assets/upstream"
                 ).exists()
             )
 

@@ -1,4 +1,4 @@
-"""Import authored site data without converting records or copying presentation."""
+"""Import authored site data without converting records or copying Hugo layouts or themes."""
 
 from __future__ import annotations
 
@@ -158,7 +158,7 @@ def site_settings(source: Path) -> dict:
             "base_url": config["baseURL"].rstrip("/") + "/",
         },
         "navigation": navigation,
-        "presentation": {
+        "appearance": {
             "color_scheme": theme["colorScheme"],
             "default_appearance": theme["defaultAppearance"],
             "header_layout": theme["header"]["layout"],

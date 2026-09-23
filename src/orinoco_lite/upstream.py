@@ -6,7 +6,7 @@ import subprocess
 from .pool_capture import DEFAULT_API
 from .diagnostics import explicit_path
 from .errors import ConfigurationError
-from .presentation import resolve_presentation
+from .www_from_model import resolve_www_from_model
 from .resources import resolve_resources
 from .site_inputs import import_site_inputs
 
@@ -63,7 +63,7 @@ def execute(args):
             command.extend(["--site-specific", relative(args.site_specific)])
         return subprocess.run(command, cwd=root).returncode
     source = (explicit_path(args, args.source) if args.source else
-              resolve_presentation(root, resolve_resources().root))
+              resolve_www_from_model(root, resolve_resources().root))
     def git(*arguments):
         result = subprocess.run(["git", "-C", str(source), *arguments], capture_output=True, text=True)
         if result.returncode:

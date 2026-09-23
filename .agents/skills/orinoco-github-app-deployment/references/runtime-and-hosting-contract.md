@@ -18,7 +18,7 @@ npm run check
 
 `npm run check` formats, tests, type-checks, and verifies the checked backend and provider adapter.
 Deploy its API handlers, generated protocol response, route and header policy, and public configuration together from the same clean revision.
-Do not deploy `dist/`, a review shell, a landing page, or other static presentation assets with the service.
+Do not deploy `dist/`, a review shell, a landing page, or other static UI assets with the service.
 
 The source-review shell is bundled in the `orinoco-lite` package and included in each downstream static build.
 Verify it through the release and downstream checks, not by deploying it as a second central review page.
@@ -56,7 +56,7 @@ The service independently verifies every browser coordinate against GitHub, the 
 The deployment environment must provide all of these:
 
 - one public HTTPS origin for API routes and the minimal generated OAuth callback/transport response;
-- a checked Worker, Functions, or equivalent backend adapter with no static presentation deployment;
+- a checked Worker, Functions, or equivalent backend adapter with no static UI deployment;
 - Fetch-compatible `Request`, `Response`, headers, streaming bodies, and URL behavior;
 - Web Crypto AES-GCM, SHA-256, and secure random generation;
 - preservation of multiple `Set-Cookie` headers on one response;
