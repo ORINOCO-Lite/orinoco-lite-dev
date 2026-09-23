@@ -15,6 +15,8 @@ def register(commands):
     upstream = commands.add_parser("upstream", help="import and record inputs for upstream comparison")
     groups = upstream.add_subparsers(dest="upstream_command", required=True)
     export = groups.add_parser("import-from-www", description=(
+        "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
+        "and comparison with Orinoco Lite. "
         "Map upstream Hugo settings into site.yaml and copy authored content, identity images, "
         "and site overrides from the installed package's pinned www-from-model revision. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
