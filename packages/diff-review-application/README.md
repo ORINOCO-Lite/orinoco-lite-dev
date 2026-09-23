@@ -1,24 +1,68 @@
 # Diff review application
 
-Planned web interface for understanding what changes as Orinoco metadata becomes a website.
-Build it only after all staged CLI comparisons, complete-path checks, and decision reuse have been implemented and reviewed.
-Until then, maintainers assess each stage through readable reports, intermediate data, and reproducible commands.
-The interface reuses those established reports and matching operations.
-It brings comparisons from each stage into one review, locates where differences first appear, and carries reviewed decisions into the next dependency update.
+Local web interface for understanding what changes as Orinoco metadata becomes a website.
+It reads the staged CLI reports and uses the package's existing matcher to preview scoped decision edits.
+It does not run transformations, modify metadata, or apply repository changes.
 
-The CLI now supplies capture, conversion, RDF and service round-trips, site-data import, projection, assembly, rendering, and comparison commands.
-Start with `orinoco-lite dev --help`.
-`dev review summarize REPORT... --output DIRECTORY` validates evidence and summarizes the findings.
-Add `--decisions FILE` to carry saved decisions into the review.
-For a small terminal review, run `dev review inspect REPORT... --decisions FILE --author NAME`.
-It shows the raw before/after values and evidence, and previews each decision before saving it.
-It does not commit the decision file.
-Summaries validate explicit data-flow links and show complete-path evidence; the reviewer makes the overall integration judgment.
+## Open a review
 
-Summaries show bounded examples and counts; `report.json` and `review.json` retain every raw finding.
-The tested `annotation-representation-v1` rule can be selected explicitly with `dev review decide --equivalence-rule annotation-representation-v1` or the terminal's `rule` command.
-It covers equivalent annotation spelling and structure only when the complete record has unchanged annotation semantics.
-It does not accept resulting page changes or other new consequences.
+After running comparisons, bundle and open them:
+
+```sh
+orinoco-lite dev review bundle
+orinoco-lite dev review serve --open
+```
+
+The commands use `sourcedata/`, like the record and website commands.
+Use `--directory PATH` for another investigation.
+`bundle` copies the existing reports and optional `decisions.json` into `bundle/`; use `--force` to replace an existing bundle.
+It does not run missing stages.
+Create retained record comparisons with `records diff all --report sourcedata/reports`.
+Select particular comparisons by name when needed, such as `review bundle downloaded-vs-yaml-jsonl rdf rdf-records`.
+
+## Draft and apply decisions
+
+A decision records an actual reviewer, disposition (**Intended**, **Tolerated**, or **Undecided**), rationale, and reconsideration condition.
+New decisions use the selected finding's exact scope.
+For changed behavior, explicitly select a prior decision to revise; the matcher preserves its selector and applicability conditions.
+Conflicting prior decisions remain visible until the reviewer resolves them.
+A retirement is an explicit removal with a reason, not a consequence of hiding a finding.
+
+The draft stays in browser memory and is lost on reload or closing the page.
+Previewing recomputes matching through the Python package; the baseline queue still describes the original snapshot.
+Save the exported `decision-edits.json` in your investigation directory, then preview and apply it:
+
+```sh
+orinoco-lite dev review apply
+orinoco-lite dev review apply --write
+```
+
+The changes apply to `decisions.json` in that directory.
+Inspect that file before retaining it in Git or reusing it in another investigation.
+
+The base digest rejects edits against a decision file changed since bundling.
+Rebuild the bundle to review against that newer file.
+The server never writes the repository decision file, commits, posts to GitHub, or changes an upstream patch.
+This engineering review is separate from the downstream website's authenticated curation application.
+
+Use `dev review summarize` for a text summary or `dev review inspect --author NAME` for terminal review.
+Both use the same reports and decisions.
+
+## Design concerns exposed by the reports
+
+- **A raw finding is an observation, not a defect count.** A file-byte change and several structured field changes may describe one cause.
+  Pagination retains every row; links group only demonstrated relationships.
+- **Stage names do not identify experiments.** Several projection, assembly, or rendering runs may coexist.
+  The interface distinguishes their run, mode, and scope; reviewers must choose the intended report collection.
+- **Absence is scoped, not chronological.** The matcher considers coverage across supplied reports, not their order.
+  Do not mix superseded runs into a collection to infer that the newest run resolved an issue.
+  Removing an adaptation still requires evidence from a run without it.
+- **A quiet queue does not establish integration agreement.** Failed/skipped stages, omitted coverage, and interactions between complete paths still require judgment.
+  The application never turns matching decisions into overall approval.
+- **Static preview is not a browser regression result.** Active editors, remote resources, and script behavior need the existing browser-check workflow.
+  The isolated preview deliberately cannot reproduce those behaviors.
+- **An exported draft is not shared review state.** There is no collaborative session, automatic draft recovery, or report-generation scheduler.
+  Reopening a review requires its retained evidence and decision snapshot.
 
 Diagnostic `dev hugo build` covers Hugo rendering and the selected output adapter.
 The ordinary `orinoco-lite build` also binds the editor and review applications, whose inputs include workspace metadata and configuration.
@@ -32,17 +76,18 @@ Arrow labels abbreviate commands under `orinoco-lite dev`; the build specificati
 
 ```mermaid
 flowchart TD
-  pool["Records (Pool API)"] -->|records get| capture["Records (captured JSONL)"]
+  pool["Records (Pool API)"] -->|records get| capture["Records (JSONL)"]
   capture -->|records jsonl-to-yaml| storage["Records (site-specific YAML)"]
-  storage -->|records yaml-to-jsonl| joined["Records (exported JSONL)"]
-  joined -->|records roundtrip| service["Records (service response)"]
-  capture -. records diff .-> storageReport[Storage differences]
-  joined -.-> storageReport
-  joined -. records diff .-> serviceReport[Service differences]
-  service -.-> serviceReport
-  joined -->|records rdf-roundtrip| returned["Records (JSONL after RDF roundtrip)"]
-  joined -. records diff .-> rdfReport[RDF preservation differences]
-  returned -.-> rdfReport
+  storage -->|records yaml-to-jsonl| joined["Records (JSONL)"]
+  capture -->|records jsonl-to-rdf downloaded| directRdf["Graph (RDF)"]
+  joined -->|records jsonl-to-rdf yaml-jsonl| rdf["Graph (RDF)"]
+  capture -->|records roundtrip downloaded| directService["Records (JSONL)"]
+  joined -->|records roundtrip yaml-jsonl| service["Records (JSONL)"]
+  capture -. records diff .-> joined
+  directRdf -. rdf compare .-> rdf
+  capture -. records diff .-> directService
+  joined -. records diff .-> service
+  directService -. records diff .-> service
 ```
 
 RDF preservation is a separate diagnostic check, not an extra website-generation step.
@@ -50,7 +95,7 @@ The website comparisons follow projection, assembly, and rendering:
 
 ```mermaid
 flowchart LR
-  records["Records (jsonl)"] -->|hugo project| projection["Pages and graph data (Markdown and JSON)"]
+  records["Records (JSONL)"] -->|hugo project| projection["Pages and graph data (Markdown and JSON)"]
   projection -->|hugo assemble| assembly["Hugo inputs (file tree)"]
   sources[Upstream presentation, template, and site inputs] --> assembly
   assembly -->|hugo build| website["Website (HTML and assets)"]

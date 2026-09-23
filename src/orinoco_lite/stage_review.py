@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 import uuid
 
@@ -37,6 +38,14 @@ def register(subparsers) -> None:
     apply = commands.add_parser("apply", help="preview or apply decision edits against their original digest")
     options(apply, replace=False)
     apply.add_argument("--write", action="store_true")
+    bundle = commands.add_parser("bundle", help="copy validated reports and decisions into a portable web review")
+    bundle.add_argument("reports", nargs="*", help="comparison names (default: all existing reports)")
+    options(bundle)
+    bundle.add_argument("--title", default="Staged comparison review")
+    serve = commands.add_parser("serve", help="open a portable review on a local web server")
+    options(serve, replace=False)
+    serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument("--open", action="store_true", help="open the local review in your browser")
 
 
 def expected(finding: dict) -> dict:
@@ -391,11 +400,42 @@ def render_summary(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def apply_changes(decisions: dict, changes: dict) -> dict:
+    """Validate an exported edit document and return a new decision snapshot."""
+    validate_decisions(decisions)
+    if (not isinstance(changes, dict) or type(changes.get("schema_version")) is not int
+            or changes["schema_version"] != VERSION or changes.get("base_digest") != json_digest(decisions)):
+        raise ConfigurationError("Decision edits are stale or unsupported; reopen against the current decision file")
+    if not isinstance(changes.get("edits"), list):
+        raise ConfigurationError("Decision edits must be a list")
+    by_id = {d["id"]: deepcopy(d) for d in decisions["decisions"]}
+    touched = set()
+    for edit in changes["edits"]:
+        if not isinstance(edit, dict):
+            raise ConfigurationError("Each decision edit must be an object")
+        key, action = edit.get("id"), edit.get("action")
+        if not isinstance(key, str) or not key.strip() or key in touched:
+            raise ConfigurationError("Each decision edit must have one unique ID")
+        touched.add(key)
+        if action == "remove" and key in by_id:
+            del by_id[key]
+            continue
+        if not ((action == "add" and key not in by_id) or (action == "update" and key in by_id)):
+            raise ConfigurationError(f"Invalid {action} for decision {key}")
+        value = edit.get("decision")
+        if not isinstance(value, dict) or value.get("id") != key:
+            raise ConfigurationError("Edit ID differs from decision ID")
+        by_id[key] = deepcopy(value)
+    updated = {"schema_version": VERSION, "decisions": list(by_id.values())}
+    validate_decisions(updated)
+    return updated
+
+
 def execute(args) -> int:
     from .diagnostics import directory, report_paths, prepare_output, require
     root = directory(args)
     args.decisions = root / "decisions.json"
-    if args.review_command in {"summarize", "inspect"}:
+    if args.review_command in {"summarize", "inspect", "bundle"}:
         args.reports = report_paths(root, args.reports)
     if args.review_command == "summarize":
         args.output = root / "review"
@@ -406,6 +446,19 @@ def execute(args) -> int:
         args.report = report_paths(root, [args.report])[0]
     elif args.review_command == "apply":
         args.changes = require(root / "decision-edits.json", "review")
+    if args.review_command == "bundle":
+        args.output = root / "bundle"
+        if not args.decisions.exists():
+            args.decisions = None
+        prepare_output(args.output, args.force)
+        from .stage_bundle import bundle
+        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title)))
+        print(f"Review bundle: {args.output}. Open it with 'orinoco-lite dev review serve' using the same --directory.")
+        return 0
+    if args.review_command == "serve":
+        from .stage_web import serve
+        serve(require(root / "bundle", "review bundle"), port=args.port, open_browser=args.open)
+        return 0
     if args.review_command == "inspect":
         return inspect_review(args.reports, args.decisions, args.author)
     decisions = load_decisions(args.decisions)
@@ -440,28 +493,7 @@ def execute(args) -> int:
                                 rule=getattr(args, "equivalence_rule", None))
         updated = {"schema_version": VERSION, "decisions": [*decisions["decisions"], decision]}
     else:
-        changes = read_json(args.changes)
-        if changes.get("schema_version") != VERSION or changes.get("base_digest") != json_digest(decisions):
-            raise ConfigurationError("Decision edits are stale or unsupported; reopen against the current decision file")
-        by_id = {d["id"]: d for d in decisions["decisions"]}
-        touched = set()
-        for edit in changes.get("edits", []):
-            key = edit.get("id")
-            action = edit.get("action")
-            if not isinstance(key, str) or key in touched:
-                raise ConfigurationError("Each decision edit must have one unique ID")
-            touched.add(key)
-            if action == "add" and key not in by_id:
-                by_id[key] = edit["decision"]
-            elif action == "update" and key in by_id:
-                by_id[key] = edit["decision"]
-            elif action == "remove" and key in by_id:
-                del by_id[key]
-            else:
-                raise ConfigurationError(f"Invalid {action} for decision {key}")
-            if action != "remove" and by_id[key].get("id") != key:
-                raise ConfigurationError("Edit ID differs from decision ID")
-        updated = {"schema_version": VERSION, "decisions": list(by_id.values())}
+        updated = apply_changes(decisions, read_json(args.changes))
     validate_decisions(updated)
     print(canonical(updated))
     if args.write:
