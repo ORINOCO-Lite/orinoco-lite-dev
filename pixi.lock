@@ -153,6 +153,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/72/b9/313e8f2f2e9517ae050a692ae7b3e4b3f17cc5e6dfea0db51fe14e586580/jinja2_ansible_filters-1.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/73/f7/b1884cb3188ab181fc81fa00c266699dab600f927a964df02ec3d5d1916a/sphinx-9.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/75/45/54bb2d8d4138964a94bef6e9afe48b0be4705ba66ac442ae7d8a8dc4ffef/click_option_group-0.5.9-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/76/72/58d553f050049ef2666abca85bc60ebaf1b4ca972d73e74b80e0a8b6070c/pyoxigraph-0.5.11-cp312-cp312-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/78/ac/5c5b959999b6f09c3026b5dfe171575bc3121c5236ce74f495096f25b203/greenlet-3.5.5-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/7b/24/61844afbf38acf419e01ca2639f7bd079584523d34471acbc4152ee991c5/hbreader-0.9.1-py3-none-any.whl
@@ -300,6 +301,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/15/aa/0aca39a37d3c7eb941ba736ede56d689e7be91cab5d9ca846bde3999eba6/isodate-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/17/c1/3226e6d7f5a4f736f38ac11a6fbb262d701889802595cdb0f53a885ac2e0/pydantic_extra_types-2.11.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/18/fe/23899fc8e17fb6bfa37d606f8afc755c05dd081bd690d360d3754ea7d520/pyoxigraph-0.5.11-cp38-abi3-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/19/95/6195171e385007300f0f5574592e467c568becce2d937a0b6804f218bc49/pydantic_core-2.46.4-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/1a/77/48ce09fce2836856588beb84f434c1f8812d1428326efd993b619d49d949/sparqlslurper-0.5.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
@@ -1548,6 +1550,7 @@ packages:
   - linkml-runtime==1.11.1
   - packaging==26.3
   - pydantic==2.13.4
+  - pyoxigraph==0.5.11
   - pyyaml==6.0.2
   - tomlkit>=0.13,<1
   - rdflib==7.6.0
@@ -1754,6 +1757,11 @@ packages:
   - semver>=3.0.2 ; extra == 'semver'
   - uuid-utils>=0.6.0 ; python_full_version < '3.14' and extra == 'uuid-utils'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/18/fe/23899fc8e17fb6bfa37d606f8afc755c05dd081bd690d360d3754ea7d520/pyoxigraph-0.5.11-cp38-abi3-macosx_11_0_arm64.whl
+  name: pyoxigraph
+  version: 0.5.11
+  sha256: 3b67839b598fc806dbed8e99eb2d75b26b0ded6d52ca8bff1496d6a3cc002036
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/19/95/6195171e385007300f0f5574592e467c568becce2d937a0b6804f218bc49/pydantic_core-2.46.4-cp312-cp312-macosx_11_0_arm64.whl
   name: pydantic-core
   version: 2.46.4
@@ -2656,6 +2664,11 @@ packages:
   - pytest ; extra == 'test-cov'
   - pytest-cov ; extra == 'test-cov'
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/76/72/58d553f050049ef2666abca85bc60ebaf1b4ca972d73e74b80e0a8b6070c/pyoxigraph-0.5.11-cp312-cp312-manylinux_2_28_x86_64.whl
+  name: pyoxigraph
+  version: 0.5.11
+  sha256: e3097d62e4fb903238ef074744ecf54c4328cf20e7787e925e670f6f7d33d345
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl
   name: babel
   version: 2.18.0

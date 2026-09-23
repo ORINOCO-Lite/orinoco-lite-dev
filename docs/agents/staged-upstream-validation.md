@@ -22,7 +22,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | B — Capture and recording | Expose #152's capture operation as `dev records get`. Provide an explicit DataLad acquisition task. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C1 — Downstream preparation | Capture, JSONL → YAML → JSONL, record comparison, site import, and DataLad replay in an immutable package environment. | Verify direct JSONL equality and replay without the original checkouts. Review and merge before RDF. |
 | C2 — RDF comparison | Separate follow-up for RDF generation, comparison, attribution, and the RDF reader adaptation. | Review RDF semantics and failure boundaries independently of preparation. |
-| D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
+| D — Service round-trip | Upload JSONL records to a temporary service and download the returned JSONL. | Compare the input JSONL with the downloaded JSONL, then compare the original capture with that download for the complete path. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned presentation and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
 | F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
 | G — Hugo input assembly | Separate assembly of Hugo inputs from building the website. Apply authored-input fixes from #152 and the site-input PR. | Compare complete Hugo inputs, including page resources and configuration, using the same generated content. |
@@ -74,9 +74,9 @@ A bundle may contain failed and skipped stages, but must display failed, skipped
 | Stage | Inputs and comparison | Required inspection |
 | --- | --- | --- |
 | Capture | Retained API response stream and acquisition information | Source, pagination failures, and limits on capture completeness |
-| Storage | Raw JSONL versus export joining stored records and overlay files | Record/assertion additions, removals, value and attribution changes |
-| RDF conversion | Joined records, selected record-to-RDF conversion, selected inverse conversion | Intermediate RDF, returned records, and field-level preservation failures |
-| Service | Export versus upload/dump from a temporary service | Returned records, service failures, and separate conversion evidence |
+| Storage | Downloaded JSONL versus JSONL produced by JSONL → YAML → JSONL | Record/assertion additions, removals, value and attribution changes |
+| RDF diagnostics | RDF emitted by selected upstream conversion paths; optional source-record attribution | Complete-output equality result, input paths, elapsed time, failure reasons, and separately scoped source IDs with changed emitted RDF |
+| Service | Input JSONL versus JSONL downloaded after temporary-service upload | Returned records, service failures, and separate conversion evidence |
 | Site input import | Selected upstream site data versus imported site inputs | Copied bytes, mapped settings, authored content and resources |
 | Projection | Same record stream through upstream and Lite projection | Selection, front matter, Markdown, links, and visualization graph data |
 | Assembly | Same projected content through both assembly operations | File tree, configuration, overlays, authored replacements, and resources |
@@ -97,11 +97,65 @@ Use schema-defined entity and assertion identities where available.
 The existing annotation path plus assertion digest can identify unchanged assertions; it is not a stable identity for an assertion whose value changed.
 Ambiguous identities produce unmatched items for review, not guessed matches based on array position or a whole-record hash.
 Keep raw changes available when reporting a reviewed representation equivalence.
-RDF comparison must account for blank-node renaming without treating blank-node labels as persistent identities; canonical RDF equality does not establish record-round-trip preservation.
 Reuse existing snapshot and Pool-diff comparison helpers after checking their type, ordering, and multiplicity behavior against these rules.
-For RDF graphs, use the existing RDFLib dependency's `isomorphic` and `graph_diff` operations where applicable; canonical blank-node labels are not cross-run assertion identities.
 File comparison reports added, removed, and changed paths; structured viewers expose front matter and graph fields separately from text and byte differences.
 Rendering adapters may incorporate SiteDiff after the existing tool evaluation; the application contract must also accommodate route, HTML, asset, and screenshot evidence without that dependency.
+
+### RDF purpose, scope, and implementation status
+
+RDF analysis answers whether the downloaded JSONL and the JSONL produced through YAML emit the same RDF through the selected upstream writer.
+Record comparison answers separately whether the JSONL → YAML → JSONL path preserves values, scalar types, missing/null distinctions, order, and duplicate counts.
+Neither RDF equality nor record equality establishes website equivalence.
+Lossless RDF round-tripping is deferred; the [RDF investigation](rdf-comparison.md) records the upstream library, service-patch, and schema changes to test before reconsidering it.
+The reviewer decides whether the RDF evidence justifies the implementation complexity and risk of misleading findings; the behavior to implement is specified below.
+
+#### Operations and required behavior
+
+1. **JSONL → RDF.** Provide an explicit forward transformation for each retained JSONL input, using the selected upstream writer without invoking the RDF → JSONL reader.
+   Inspect the upstream batch/serialization API before composing its per-record output, and state whether the resulting artifact is an RDF graph or dataset.
+   Preserve upstream RDF terms and graph boundaries; do not introduce named graphs solely to support record attribution.
+   Retain the input, emitted RDF, producing operation, and conversion failures in a fresh output directory.
+   Remove RDF → JSONL from the normal comparison path; retain the existing inverse-conversion evidence only as research into the deferred round-trip problem.
+2. **Complete RDF comparison.** Canonicalize the two complete RDF artifacts with the existing native library, preserving their graph boundaries and shared blank-node identity while ignoring serialization order and arbitrary blank-node names.
+   Comparison must run on retained RDF artifacts even when source-record attribution is absent.
+   Report **equal**, **different**, or **not evaluated**, with input paths, scope, elapsed time, and failure reasons.
+   Bound parsing and canonicalization to five seconds and report the full CLI time separately.
+   Keep input formats explicit; loading an RDF graph into a default graph must not silently merge an input dataset's named graphs.
+   Equality is not proof of lossless conversion: both paths may have discarded the same record information.
+3. **Optional record attribution.** An explicit option or command compares corresponding records' emitted RDF only where the retained conversion evidence establishes the source-record association.
+   Report **“RDF emitted for this record differs”**, or identify a record present on only one side, and link its source ID, RDF evidence, and existing JSONL comparison.
+   This locates a difference; it does not establish its cause or identify a minimal set of changed assertions.
+   If provenance, scope, or shared blank nodes prevent independent comparison, report **record attribution unavailable** with the reason; retain the complete RDF result unchanged.
+   Record selection limits only this diagnostic, never the complete-output comparison.
+   Do not present per-record results as a decomposition of the complete result: changes in record contributions can cancel when combined.
+4. **Reports and command integration.** Show the complete result before optional record findings, with separate statuses and scopes in the CLI, saved report, and review application.
+   Label any diagnostic containers as implementation packaging, not upstream graph identities.
+   Canonical blank-node labels are not assertion identities; canonical added/removed counts must not be presented as minimal metadata edits. Update command help, examples, and comparator/scope versions so existing partial per-record reports cannot be interpreted as complete-output evidence.
+   Reuse existing reporting interfaces; do not add causal inference or a parallel RDF matching algorithm.
+
+#### RDF acceptance checks
+
+- JSONL → RDF retains the selected writer's output without requiring inverse conversion, refreshing the live source, modifying curated inputs, or replacing previous evidence.
+- Complete comparison reports equal for renamed blank nodes and reordered statements, including consistent blank-node renaming across named graphs.
+  It reports different for additions/removals, changed literal lexical forms, datatypes or languages, changed named-graph membership, and shared-versus-separate blank nodes.
+  Check graph inventory changes, including empty named graphs; if the selected APIs cannot retain that distinction, report the unsupported scope rather than silently declaring full dataset equality.
+- Invalid input, unsupported scope, or a deadline produces not evaluated with a reason and exit 2.
+  A completed equal/different comparison exits 0/1 respectively.
+  Failed analysis preserves prior evidence and never appears as an empty successful finding list.
+- Missing attribution evidence and a selected record subset do not alter the complete result.
+  A controlled change identifies the correct source record when its emitted RDF can be compared independently.
+  Tests cover added/removed records and record contributions that change while their combined RDF remains equal, without claiming causation.
+- Run the same controls and retained large equal and deliberately unequal examples with explicit time limits through the actual CLI.
+  Report parsing/canonicalization time, complete command time, and any timeout; do not infer a runtime guarantee from one successful run.
+  Inspect one equal report, one unequal report with source-record findings, and one unavailable-attribution report through the existing review interface.
+
+**Implementation:** `records jsonl-to-rdf` calls only the selected writer and combines its Turtle documents into an ordinary RDF graph, renaming document-local blank nodes through the existing parser API.
+`dev rdf compare` compares complete RDF outputs; `--by-record` adds an independently scoped report from retained source records and original Turtle documents.
+Default graphs, blank graph names, and shared blank nodes are supported by whole-dataset canonicalization.
+TriG receives an additional graph-inventory check because quad loaders discard empty named graphs; their presence is reported as not evaluated.
+The five-second deadline includes that check, parsing, and canonicalization.
+Fresh report directories preserve earlier evidence.
+See the [RDF report](rdf-comparison.md) for measured performance, upstream dependencies, and remaining limitations.
 
 ### Report format
 
@@ -205,7 +259,8 @@ Test observable review behavior across multiple schema-valid cases, not just the
 
 - A storage loss is identified before projection; its reviewed, verified page effects group under it while an independent page change remains new.
 - An originating finding that matches a saved decision acquires a new verified consequence; the consequence still requires review.
-- An RDF-only loss appears at the conversion boundary even when JSONL/YAML preservation passes.
+- RDF comparison distinguishes structural differences from serialization order and blank-node renaming; equality is not reported as lossless record conversion.
+- Unavailable record attribution remains separate from the complete RDF comparison result; a selected-record diagnostic cannot stand in for comparison of all outputs.
 - A second run carries unchanged decisions forward; changed values, changed scope, and ambiguous matches reopen review.
 - A tolerated or deferred issue remains visible without asking for the same judgment again.
 - A failed, omitted, or successfully completed but out-of-scope comparison cannot retire a finding or appear clean for that scope.
@@ -222,11 +277,13 @@ Do not make web-interface completion a prerequisite for accepting a command stag
 
 ## Command review examples
 
-Run these proposed commands from the downstream directory after activating its [Pixi environment](../../README.md#command-environment).
-The path names show how one command supplies the next command's input.
-Dependency selection comes from the downstream and package, without repeating upstream pins in command arguments.
+Run commands after activating the [Pixi environment](../../README.md#command-environment).
+Diagnostics use `sourcedata/`; use `--directory PATH` on each command to investigate elsewhere.
+The CLI supplies the filenames and prints result locations.
+These are diagnostic representations and evidence, separate from curated `site-specific/` inputs and disposable website builds.
+Repository owners choose whether to retain diagnostic data in Git or DataLad.
 
-### Capture and record preservation
+### Records
 
 ```console
 orinoco-lite dev records get
@@ -242,22 +299,44 @@ Overlay files preserve machine attribution separately and rejoin it for JSONL re
 Record comparison preserves scalar types, null versus missing values, array order, and duplicates.
 A diff exit code of 1 means differences.
 
-RDF and temporary-service operations belong to subsequent PRs and are not part of the preparation merge.
-The later interfaces below remain design targets.
+RDF diagnostics consume the retained downloaded or exported JSONL.
+
+### RDF diagnostic commands
+
+```console
+orinoco-lite dev records jsonl-to-rdf downloaded
+orinoco-lite dev records jsonl-to-rdf yaml-jsonl
+orinoco-lite dev rdf compare sourcedata/downloaded-rdf/graph.nt sourcedata/yaml-jsonl-rdf/graph.nt --report sourcedata/reports/rdf --by-record
+```
+
+The first report compares complete RDF outputs.
+The optional `rdf-records` report compares each source record's original Turtle document and retains the JSONL and conversion evidence for inspection alongside the record comparison.
+`--record PID` selects only the optional attribution; it never narrows the complete comparison.
+Missing or edited attribution evidence leaves the complete result unchanged and marks attribution as not evaluated.
+RDF comparison accepts Turtle, N-Triples, TriG, and N-Quads; use `--left-format` and `--right-format` when suffixes do not identify them.
+Parsing errors, unsupported empty named graphs, and deadlines remain not evaluated; the complete result controls exit status.
+Both conversion and comparison require fresh output directories.
+RDF does not produce a JSONL return state.
+
+### Service round-trip
+
+The dependent service stage adds `records roundtrip` and the `downloaded-pool-jsonl` and `yaml-jsonl-pool-jsonl` states.
+It must follow the same directory and replacement conventions.
+Website and review commands below are proposed interfaces pending review of their owning stages.
 
 ### Site-data import and Hugo projection
 
 ```console
-orinoco-lite dev upstream import-from-www --destination site-specific
+orinoco-lite dev inputs import site-specific
 orinoco-lite dev inputs diff site-specific
-orinoco-lite dev hugo project upstream build/upstream/projection --records build/records/joined.jsonl
-orinoco-lite dev hugo project lite build/lite/projection --records build/records/joined.jsonl
+orinoco-lite dev hugo project upstream build/upstream/projection --records sourcedata/yaml-jsonl/records.jsonl
+orinoco-lite dev hugo project lite build/lite/projection --records sourcedata/yaml-jsonl/records.jsonl
 orinoco-lite dev content diff build/upstream/projection build/lite/projection
 ```
 
 The import reads selected site data from `www-from-model` and any referenced file sources, preserving required page-resource placement.
 Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `site.yaml`.
-Hugo projection produces pages and graph data from the same joined records on both sides.
+Hugo projection produces pages and graph data from the same JSONL records on both sides.
 The content diff reports page and graph differences separately.
 
 ### Hugo assembly and build
@@ -389,14 +468,18 @@ No comments were present on #142 or #154 during the initial review.
   It writes JSONL from Lite's stored records; upstream `dtc export` and `dtc import` instead transfer service collections to and from their filesystem format.
 - Conversion must update only the records and overlay files it owns.
   Preserve the capture, authored inputs, and repository state in an existing `site-specific` directory.
-  The current converter replaces its output directory, so C must separate that write boundary before reusing it.
+  Explicit `--source` and `--destination` paths let setup and comparisons use the same converter without replacing the enclosing dataset.
 - Implement `dev hugo project upstream` with the selected `query-things` operations, including `render-record`, and the upstream graph producer.
   Expose Lite Hugo projection through the existing projection code, with an explicit record input.
 - Extract shared Hugo input assembly and build functions from `site.py`.
   Ordinary `build` should call them too.
   Its current implementation recreates the assembly before invoking Hugo.
-- Move user-facing operations out of recorded `python -m` calls in `instantiate.py` and `development.py`.
-  Retain internal Python functions for code reuse.
+- `pixi run setup-upstream` selects a remotely fetchable immutable package and switches once into the downstream environment.
+  Package-owned `dev upstream populate` composes recorded Bash operations; individual commands remain independent of DataLad.
+  Generic capture stays at `dev records get`; `dev upstream import-from-www` follows the package's upstream pins.
+  Record conversion and comparison accept explicit paths, and recorded replacement operations permit reruns.
+  Setup stops before projection, builds, comparisons, and deployment.
+  The standalone Python setup implementation and recorded `python -m` calls are removed.
 - Cleanup retains the tested checkout and worktree-preservation helpers.
   It extracts temporary-service configuration and process cleanup beside the existing upload and read-back helpers, with exact record checks against a real filesystem-backed service.
   D can reuse these operations while adding the CLI, retained returned dump, and raw-capture control.

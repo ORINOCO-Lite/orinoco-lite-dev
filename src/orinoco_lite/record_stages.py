@@ -31,6 +31,7 @@ from .annotations import assertion_sha256, _check_overlay_path
 from .errors import ConfigurationError
 
 
+SCHEMA_RELATIVE = Path("schema/demo-research-information/unreleased.yaml")
 _MISSING = object()
 
 
@@ -211,6 +212,20 @@ def compare_records(
 def _safe_output(path: Path) -> None:
     if path.is_symlink():
         raise snapshot.SnapshotError(f"output must not be a symlink: {path}")
+
+
+def _check_record_input(path: Path) -> None:
+    from .stage_reports import operation_receipt, read_json
+
+    operation_receipt(path)
+    # Interruptions can leave evidence before the CLI writes its receipt.
+    if path.name == "returned.partial.jsonl":
+        raise snapshot.SnapshotError(f"Incomplete RDF return cannot be a complete record input: {path}")
+    conversion = path.with_name("conversion.json")
+    if path.name == "records.jsonl" and conversion.is_file():
+        result = read_json(conversion)
+        if not isinstance(result, dict) or result.get("status") != "complete":
+            raise snapshot.SnapshotError(f"RDF conversion did not complete: {conversion}")
 
 
 def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
