@@ -10,7 +10,7 @@ from orinoco_lite.stage_reports import operation_receipt
 
 @pytest.mark.parametrize("failure", [DriverError("Hugo failed"), KeyboardInterrupt()])
 def test_failed_hugo_output_retains_explicit_failure(tmp_path, monkeypatch, failure):
-    assembly, output = tmp_path / "upstream-diffing/isolated/upstream/assembly", tmp_path / "upstream-diffing/isolated/upstream/website"
+    assembly, output = tmp_path / "sourcedata/isolated/upstream/assembly", tmp_path / "sourcedata/isolated/upstream/website"
     assembly.mkdir(parents=True)
     (assembly / "input.txt").write_text("input")
     monkeypatch.setattr(dev_site, "load_workspace", lambda _: SimpleNamespace(root=tmp_path))
@@ -35,7 +35,7 @@ def test_failed_hugo_output_retains_explicit_failure(tmp_path, monkeypatch, fail
 
 
 def test_existing_hugo_output_is_not_relabelled_as_failed(tmp_path, monkeypatch):
-    output = tmp_path / "upstream-diffing/isolated/upstream/website"
+    output = tmp_path / "sourcedata/isolated/upstream/website"
     output.mkdir(parents=True)
     (output / "index.html").write_text("existing")
     monkeypatch.setattr(dev_site, "load_workspace", lambda _: SimpleNamespace(root=tmp_path))
