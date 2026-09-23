@@ -438,7 +438,7 @@ def execute(args: argparse.Namespace) -> int:
                 if str(value) in RECORD_STATES:
                     return record_path(data, str(value))
                 return value
-            left_input = selected_input(args.left, data / "downloaded/records.jsonl")
+            left_input = selected_input(args.left, None) if args.left else record_path(data, "downloaded")
             right_input = selected_input(args.right, "site-specific")
             report = explicit_path(args, args.report) if args.report else None
             if report and report.is_symlink():
