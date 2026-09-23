@@ -20,11 +20,12 @@ def register(commands):
         "Map upstream Hugo settings into site.yaml and copy authored content, identity images, "
         "and site overrides from the installed package's pinned www-from-model revision. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
-        "are synchronized, including deletions; metadata is preserved."))
+        "are synchronized, including deletions; metadata is preserved. Use --force to replace or delete existing imported files."))
     export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected www-from-model checkout)")
     export.add_argument("--media-remote", help="Annex source Git URL (default: upstream host for package-selected www; existing remotes with --source)")
     export.add_argument("--revision", help="require this Git revision at the source checkout's HEAD")
     export.add_argument("--destination", type=Path, help="site-input directory (default: site-specific)")
+    export.add_argument("--force", action="store_true", help="replace existing imported files and delete obsolete files from synchronized surfaces")
     populate = groups.add_parser("populate", description=(
         "Download the public collection of a Dump Things service, convert records, and import site inputs as separate DataLad runs. "
         "Use --dump to retain a supplied dump, or --reuse-dump to transform "
@@ -80,6 +81,6 @@ def execute(args):
         raise ConfigurationError("Site export destination must not overlap the upstream checkout")
     print(f"Upstream site: {source}\nCommit: {revision}\nDestination: {destination}")
     media_remote = args.media_remote or (None if args.source else "https://hub.psychoinformatics.de/www/www-from-model.git")
-    result = import_site_inputs(source, destination, retrieve_media=True, media_remote=media_remote)
+    result = import_site_inputs(source, destination, retrieve_media=True, media_remote=media_remote, force=args.force)
     print(f"Exported {result['files']} site files; metadata was preserved.")
     return 0

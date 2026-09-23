@@ -85,4 +85,4 @@ datalad run --explicit -m "chore: import upstream site inputs" \
   --output "$destination/site.yaml" --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
-  orinoco-lite dev upstream import-from-www --destination "$destination"
+  orinoco-lite dev upstream import-from-www --destination "$destination" --force

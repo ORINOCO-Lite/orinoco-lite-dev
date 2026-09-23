@@ -125,6 +125,7 @@ raise SystemExit(cli.main())
     conversion = next((command, sha) for command, sha in runs.items() if "jsonl-to-yaml" in command)
     imported = next((command, sha) for command, sha in runs.items() if "import-from-www" in command)
     assert "--force" in conversion[0]
+    assert "--force" in imported[0]
     assert "--source" not in imported[0] and "--revision" not in imported[0]
     assert (site / "site-specific/.git").exists() == (layout == "submodule")
     # Identical inputs reproduce the content without acquisition.

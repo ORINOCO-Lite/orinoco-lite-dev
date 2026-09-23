@@ -84,6 +84,16 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
     assert (destination / "assets/img/logo.png").read_text() == "identity image"
     assert not (destination / "layouts").exists()
     assert (destination / "metadata/keep.yaml").read_text() == "authored: true\n"
+    obsolete = destination / "static/obsolete.txt"
+    obsolete.parent.mkdir(parents=True, exist_ok=True)
+    obsolete.write_text("obsolete file\n")
+    before = {p.relative_to(destination): p.read_bytes() for p in destination.rglob("*") if p.is_file()}
+    with pytest.raises(SystemExit, match="2"):
+        cli.main(command)
+    assert {p.relative_to(destination): p.read_bytes() for p in destination.rglob("*") if p.is_file()} == before
+    assert cli.main(command + ["--force"]) == 0
+    assert not obsolete.exists()
+    assert (destination / "metadata/keep.yaml").read_text() == "authored: true\n"
     with pytest.raises(SystemExit, match="2"):
         cli.main(command + ["--destination", str(website)])
 
@@ -107,3 +117,21 @@ def test_missing_annex_payload_does_not_modify_destination(tmp_path):
         import_site_inputs(source, destination, retrieve_media=True)
     assert list(destination.iterdir()) == [destination / "keep"]
     assert (destination / "keep").read_text() == "unchanged"
+
+
+def test_import_refuses_deletion_without_overwrite_conflict(tmp_path, monkeypatch):
+    from orinoco_lite import site_inputs
+    from orinoco_lite.errors import DriverError
+    monkeypatch.setattr(site_inputs, "selected_site_files", lambda *a, **kw: {})
+    monkeypatch.setattr(site_inputs, "site_settings", lambda *a: {})
+    destination = tmp_path / "site-specific"
+    old = destination / "content/obsolete.md"
+    old.parent.mkdir(parents=True)
+    old.write_text("keep until forced\n")
+    with pytest.raises(DriverError, match="--force"):
+        site_inputs.import_site_inputs(tmp_path / "source", destination)
+    assert old.read_text() == "keep until forced\n"
+    assert not (destination / "site.yaml").exists()
+    site_inputs.import_site_inputs(tmp_path / "source", destination, force=True)
+    assert not old.exists()
+    assert (destination / "site.yaml").exists()

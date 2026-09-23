@@ -166,7 +166,7 @@ def site_settings(source: Path) -> dict:
     }
 
 
-def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool = False, media_remote: str | None = None) -> dict:
+def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool = False, media_remote: str | None = None, force: bool = False) -> dict:
     """Synchronize imported site surfaces, preserving metadata and other config."""
     files = selected_site_files(source, retrieve_media=retrieve_media, media_remote=media_remote)
     files[Path("site.yaml")] = yaml.safe_dump(
@@ -218,6 +218,14 @@ def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool 
                 raise DriverError(f"Imported site input must not be a symlink: {target}")
             if target.is_file() and target.relative_to(destination) not in files:
                 stale.append(target)
+    if not force:
+        replaced = [destination / relative for relative in files if (destination / relative).exists()]
+        conflicts = replaced + stale
+        if conflicts:
+            raise DriverError(
+                f"Site import would replace or delete existing files, including {conflicts[0]}; "
+                "use --force to synchronize imported site inputs."
+            )
     print("Convert config/_default/{languages.en,hugo,params,menus.en}.toml -> site.yaml")
     print("  Map title, description, base URL, navigation, color scheme, appearance, and header layout.")
     destination.mkdir(parents=True, exist_ok=True)
