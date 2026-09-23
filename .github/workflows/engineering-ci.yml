@@ -46,10 +46,9 @@ jobs:
         with:
           cache: true
           frozen: true
-          pixi-version: v0.76.2
 
       - name: Check dependency locks
-        run: pixi lock --check
+        run: pixi run --locked --no-install -- true
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files

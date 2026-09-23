@@ -24,7 +24,9 @@ The central curation service, or an optional replacement, provides only GitHub a
 
 ## Command environment
 
-Use the Pixi version range declared in the repository's `pixi.toml`.
+Use the latest Pixi; CI also follows the latest version.
+Older local versions receive best-effort support without a formal version matrix.
+Use `pixi run --locked <command>` to reject stale dependency locks without rewriting them.
 Before running the commands below, enter that repository's environment:
 
 ```console
