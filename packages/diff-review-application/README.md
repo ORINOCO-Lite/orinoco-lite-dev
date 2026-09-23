@@ -14,15 +14,15 @@ Arrow labels abbreviate proposed commands under `orinoco-lite dev`; the build sp
 
 ```mermaid
 flowchart TD
-  pool[Pool API records] -->|records get| capture[Captured records]
-  capture -->|records convert| storage[Stored records and annotations]
-  storage -->|records export| joined[Joined records]
-  joined -->|records roundtrip| service[Records returned by service]
+  pool["Records (Pool API)"] -->|records get| capture["Records (captured JSONL)"]
+  capture -->|records jsonl-to-yaml| storage["Records (site-specific YAML)"]
+  storage -->|records yaml-to-jsonl| joined["Records (exported JSONL)"]
+  joined -->|records roundtrip| service["Records (service response)"]
   capture -. records diff .-> storageReport[Storage differences]
   joined -.-> storageReport
   joined -. records diff .-> serviceReport[Service differences]
   service -.-> serviceReport
-  joined -->|records rdf-roundtrip| returned[Returned records and intermediate RDF]
+  joined -->|records rdf-roundtrip| returned["Records (JSONL after RDF roundtrip)"]
   joined -. records diff .-> rdfReport[RDF preservation differences]
   returned -.-> rdfReport
 ```
