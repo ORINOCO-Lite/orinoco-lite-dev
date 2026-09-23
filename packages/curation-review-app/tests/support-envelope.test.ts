@@ -67,7 +67,7 @@ function recordPath(index: number): string {
 function annotationPath(index: number): string {
   return recordPath(index).replace(
     "site-specific/metadata/records/",
-    "site-specific/metadata/overlays/annotations/",
+    "site-specific/metadata/overlays/machine-provenance-annotations/",
   );
 }
 

@@ -397,7 +397,12 @@ describe("GitHub OIDC cryptographic verification", () => {
 });
 
 describe("completed proposal validation", () => {
-  it("permits only read access to the exact composed replacement", async () => {
+  it.each([
+    ["metadata/records/person.yaml", true],
+    ["metadata/overlays/machine-provenance-annotations/person.yaml", true],
+    ["metadata/overlays/annotations/person.yaml", false],
+    ["metadata/overlays/private/person.yaml", false],
+  ])("checks completed replacement path %s", async (metadataPath, allowed) => {
     const s = await setup();
     const newHead = "e".repeat(40),
       newMetadata = "f".repeat(40);
@@ -425,9 +430,7 @@ describe("completed proposal validation", () => {
             files: [
               {
                 filename:
-                  repo === "owner/site"
-                    ? "site-specific"
-                    : "metadata/records/person.yaml",
+                  repo === "owner/site" ? "site-specific" : metadataPath,
                 status: "modified",
               },
             ],
@@ -448,12 +451,20 @@ describe("completed proposal validation", () => {
           }
         : oldJson(path, ...rest),
     );
-    await workflowAccess(
+    const access = workflowAccess(
       env,
       dispatch,
       { ...request, head: newHead, handoff: head, write: false },
       s.auth,
     );
+    if (!allowed) {
+      await expect(access).rejects.toThrow(
+        "The canonical replacement is outside the authorized metadata operation.",
+      );
+      expect(s.token.mock.calls.every((c) => c[1] !== true)).toBe(true);
+      return;
+    }
+    await access;
     expect(s.token.mock.calls.every((c) => c[1] !== true)).toBe(true);
     await expect(
       workflowAccess(

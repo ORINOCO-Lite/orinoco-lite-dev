@@ -48,7 +48,7 @@ export function reviewBundle(): ReviewBundle {
         operation: "modify",
         paths: [
           "site-specific/metadata/records/example/first.yaml",
-          "site-specific/metadata/overlays/annotations/example/first.yaml",
+          "site-specific/metadata/overlays/machine-provenance-annotations/example/first.yaml",
         ],
         pid: "example:first",
         record_path: "site-specific/metadata/records/example/first.yaml",
@@ -63,7 +63,7 @@ export function reviewBundle(): ReviewBundle {
         operation: "add",
         paths: [
           "site-specific/metadata/records/example/second.yaml",
-          "site-specific/metadata/overlays/annotations/example/second.yaml",
+          "site-specific/metadata/overlays/machine-provenance-annotations/example/second.yaml",
         ],
         pid: "example:second",
         record_path: "site-specific/metadata/records/example/second.yaml",
