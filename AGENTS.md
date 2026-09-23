@@ -18,6 +18,8 @@
   Use the real browser action and verify the resulting pull-request commit and trusted workflow.
   A downstream may select an official release, a release from its own fork, or an exact package commit from any suitable fork.
   An immutable Git commit is a sufficient reproducibility coordinate; do not require a central release or a separate release lock.
+  For adopted dependency pins, use commits reachable from the source repository's maintained default branch or a retained release tag.
+  Pull-request-only commits are temporary test candidates; replace them with retained commits before adoption because deleting a branch can remove their only durable reference.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
 - Prefer one source of truth.

@@ -50,6 +50,9 @@ if name == "orinoco-lite":
     if revision == "refs/heads/main":
         revision = ("b" if "template.git" in repository else "a") * 40
     print(revision)
+elif name == "pixi" and "copier" in args:
+    Path("pixi.toml").write_text('[pypi-dependencies]\\n orinoco-lite = {{git = "https://example.invalid/declared-package.git", rev = "' + "d" * 40 + '"}}\\n')
+    Path("pixi.lock").write_text("template lock\\n")
 elif name == "datalad" and args[0] == "create":
     Path(args[-1]).mkdir()
 '''
@@ -70,27 +73,27 @@ elif name == "datalad" and args[0] == "create":
     return run, engineering, template, destination, package_head, template_head
 
 
-@pytest.mark.parametrize("latest", [False, True])
-def test_selection_summary_and_immutable_handoff(setup, latest):
+@pytest.mark.parametrize("local", [False, True])
+def test_selection_summary_and_immutable_handoff(setup, local):
     run, engineering, template, destination, package_head, template_head = setup
-    result, calls = run(*([] if latest else ["--local-heads"]))
+    result, calls = run(*(["--local-heads"] if local else []))
     assert result.returncode == 0, result.stderr
-    expected_package, expected_template = ("a" * 40, "b" * 40) if latest else (package_head, template_head)
-    assert f"Commit: {expected_package}" in result.stdout
+    expected_package = package_head if local else "d" * 40
+    expected_template = template_head if local else "b" * 40
+    assert f"Revision: {expected_package}" in result.stdout
     assert f"Commit: {expected_template}" in result.stdout
-    assert "https://example.invalid/engineering.git" in result.stdout
-    assert "https://example.invalid/template.git" in result.stdout
-    if latest:
-        assert result.stdout.count("remote branch main") == 2
-        assert all(call[-1] == "refs/heads/main" for call in calls[:2])
-    else:
-        assert "package-candidate" in result.stdout
-        assert "template-candidate" in result.stdout
-    assert calls[2][:2] == ["datalad", "create"]
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[copier.index("--vcs-ref") + 1] == expected_template
-    update = next(call for call in calls if call[:2] == ["datalad", "run"])
-    assert update[update.index("--revision") + 1] == expected_package
+    updates = [call for call in calls if call[:2] == ["datalad", "run"]]
+    if local:
+        assert updates[0][updates[0].index("--revision") + 1] == package_head
+        assert "https://example.invalid/engineering.git" in updates[0]
+    else:
+        assert not updates
+        assert (destination / "pixi.lock").read_text() == "template lock\n"
+        assert "https://example.invalid/declared-package.git" in result.stdout
+        # Package main is deliberately different from the template package pin.
+        assert "a" * 40 not in result.stdout
     assert git(engineering, "rev-parse", "HEAD") == package_head
     assert git(template, "rev-parse", "HEAD") == template_head
     assert git(engineering, "branch", "--show-current") == "package-candidate"
@@ -98,16 +101,20 @@ def test_selection_summary_and_immutable_handoff(setup, latest):
 
 
 @pytest.mark.parametrize("local", [False, True])
-@pytest.mark.parametrize("option", ["--template-ref", "--package-revision"])
-def test_explicit_revision_overrides_only_its_selection(setup, local, option):
+@pytest.mark.parametrize("option", ["--template-ref", "--package-revision", "--package-repository"])
+def test_explicit_override_retains_other_defaults(setup, local, option):
     run, _, _, _, package_head, template_head = setup
-    selected = template_head if option == "--template-ref" else "c" * 40
+    selected = {"--template-ref": template_head, "--package-revision": "c" * 40,
+                "--package-repository": "https://example.invalid/fork.git"}[option]
     result, calls = run(*(["--local-heads"] if local else []), option, selected)
     assert result.returncode == 0, result.stderr
-    expected_package = selected if option == "--package-revision" else package_head if local else "refs/heads/main"
-    expected_template = selected if option == "--template-ref" else template_head if local else "refs/heads/main"
-    assert calls[0][-1] == expected_package
-    assert calls[1][-1] == expected_template
+    expected_package = selected if option == "--package-revision" else package_head if local else "d" * 40
+    expected_template = template_head if local or option == "--template-ref" else "b" * 40
+    assert f"Revision: {expected_package}" in result.stdout
+    assert f"Commit: {expected_template}" in result.stdout
+    expected_repository = selected if option == "--package-repository" else (
+        "https://example.invalid/engineering.git" if local else "https://example.invalid/declared-package.git")
+    assert expected_repository in result.stdout
 
 
 def test_explicit_selections_and_detached_template(setup):
@@ -116,12 +123,12 @@ def test_explicit_selections_and_detached_template(setup):
     result, calls = run("--package-repository", "https://example.invalid/fork.git",
                         "--package-revision", "c" * 40, "--template-ref", template_head)
     assert result.returncode == 0, result.stderr
-    assert "explicit revision " + "c" * 40 in result.stdout
+    assert "Revision: " + "c" * 40 in result.stdout
     assert "detached commit" in result.stdout
-    assert "https://example.invalid/fork.git" in calls[0]
+    assert "https://example.invalid/fork.git" in result.stdout
 
 
-def test_unavailable_remote_main_does_not_create_destination(setup):
+def test_unavailable_template_does_not_create_destination(setup):
     run, _, _, destination, _, _ = setup
     result, calls = run(fail=True)
     assert result.returncode == 2

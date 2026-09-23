@@ -26,6 +26,8 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    A branch name is not an adequate candidate coordinate.
    A downstream may select an official release, a release from its own fork, or an exact commit from any suitable fork.
    Prefer a full Git commit while iterating.
+   Before adopting a candidate, pin the merged commit reachable from the source repository's maintained default branch, or a commit retained by a release tag.
+   A fetchable pull-request-only commit is suitable for temporary tests, but its SHA alone does not guarantee continued availability after branch deletion.
    Do not require a central release or a separate release lock.
    Use the real browser proposal action and inspect its pull-request result; a successful build alone is not evidence that the authenticated path works.
 3. Confirm `gh auth status`, the repository remotes, and the SSH push credential before a long end-to-end run.
@@ -36,6 +38,7 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Exercise a local downstream
 
 Use the engineering `setup-upstream` task to test candidates in a fresh downstream.
+Ordinary setup keeps the selected template's package declaration and lock; coordinated changes merge the package first, then update and test the template's package pin before merging the template.
 Consult its `--help` and the installed CLI help for input selection and individual stages.
 Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
 
