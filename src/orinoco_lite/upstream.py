@@ -47,7 +47,7 @@ def execute(args):
         import os
         def relative(path):
             return os.path.relpath(explicit_path(args, path), root)
-        command = ["orinoco-lite-populate-upstream",
+        command = ["orinoco-lite-populate-upstream.sh",
                    "--directory", relative(args.directory), "--destination", relative(args.destination),
                    "--api", args.api, "--site-layout", args.site_layout]
         if args.snapshot:
