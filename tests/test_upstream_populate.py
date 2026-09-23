@@ -54,7 +54,7 @@ def test_populate_and_rerun_with_retained_data_and_changed_presentation(tmp_path
     run(tmp_path, "datalad", "create", "--no-annex", str(site))
     run(site, "git", "config", "user.name", "Test")
     run(site, "git", "config", "user.email", "test@example.invalid")
-    (site / "pixi.toml").write_text('[workspace]\nname="fixture"\n')
+    (site / "pixi.toml").write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
     (site / "pixi.lock").write_text("fixture version one\n")
     dump = site / "sourcedata/downloaded/records.jsonl"
     dump.parent.mkdir(parents=True)
@@ -172,7 +172,7 @@ def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection)
     run(tmp_path, "git", "config", "user.name", "Test")
     run(tmp_path, "git", "config", "user.email", "test@example.invalid")
     manifest, lock = tmp_path / "pixi.toml", tmp_path / "pixi.lock"
-    manifest.write_text('[workspace]\nname="fixture"\n')
+    manifest.write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
     lock.write_text("saved lock\n")
     tracked = (lock if selection == "untracked-manifest" else
                manifest if selection == "untracked-lock" else None)
@@ -199,7 +199,7 @@ def test_reuse_requires_saved_capture_before_writes(tmp_path, state):
     run(tmp_path, "git", "init", "-q")
     run(tmp_path, "git", "config", "user.name", "Test")
     run(tmp_path, "git", "config", "user.email", "test@example.invalid")
-    (tmp_path / "pixi.toml").write_text('[workspace]\nname="fixture"\n')
+    (tmp_path / "pixi.toml").write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
     (tmp_path / "pixi.lock").write_text("saved lock\n")
     dump = tmp_path / "source data/downloaded/records.jsonl"
     dump.parent.mkdir(parents=True)
@@ -220,3 +220,22 @@ def test_reuse_requires_saved_capture_before_writes(tmp_path, state):
     assert run(tmp_path, "git", "status", "--porcelain") == before
     assert run(tmp_path, "git", "rev-parse", "HEAD") == head
     assert not (tmp_path / "site-specific").exists()
+
+
+@pytest.mark.parametrize("manifest", [
+    '[workspace]\nname="engineering"\n',
+    '[pypi-dependencies]\norinoco-lite={path=".",editable=true}\n',
+    '[pypi-dependencies]\norinoco-lite={path="./",editable=true}\n',
+    'invalid TOML',
+])
+def test_population_rejects_non_downstream_before_writes(tmp_path, manifest):
+    script = Path(__file__).resolve().parents[1] / "scripts/orinoco-lite-populate-upstream.sh"
+    (tmp_path / "pixi.toml").write_text(manifest)
+    (tmp_path / "pixi.lock").write_text("lock\n")
+    before = set(tmp_path.iterdir())
+    result = subprocess.run(["bash", str(script)], cwd=tmp_path,
+                            capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "Populate requires an Orinoco Lite downstream" in result.stderr
+    assert "pixi run setup-upstream" in result.stderr
+    assert set(tmp_path.iterdir()) == before

@@ -21,6 +21,24 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+if ! python - <<'PYTHON'
+from pathlib import Path
+import sys
+import tomllib
+
+try:
+    manifest = tomllib.loads(Path("pixi.toml").read_text())
+    dependency = manifest.get("pypi-dependencies", {}).get("orinoco-lite")
+    is_self = (isinstance(dependency, dict) and "path" in dependency
+               and Path(dependency["path"]).resolve() == Path.cwd())
+    sys.exit(0 if dependency is not None and not is_self else 1)
+except (OSError, ValueError, TypeError):
+    sys.exit(1)
+PYTHON
+then
+  echo 'Populate requires an Orinoco Lite downstream. To create one from the engineering checkout, run `pixi run setup-upstream`.' >&2
+  exit 2
+fi
 dump_path=$directory/downloaded/records.jsonl
 [[ -f pixi.toml && -f pixi.lock ]] || { echo 'Populate requires the downstream Pixi selection and lock.' >&2; exit 2; }
 git ls-files --error-unmatch -- pixi.toml pixi.lock >/dev/null 2>&1 &&
