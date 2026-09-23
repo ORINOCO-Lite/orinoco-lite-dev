@@ -103,6 +103,13 @@ raise SystemExit(cli.main())
     assert note.read_text() == "unfinished note edit\n"
     assert not run(site, "git", "ls-files", "--", "sourcedata/downloaded/scratch.txt")
     assert scratch.read_text() == "untracked work\n"
+    # Reuse accepts unrelated dirty files and still performs site import.
+    (www / "content/contact.md").write_text("Reused capture import\n")
+    commit(www, "test: update site before capture reuse")
+    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-capture", env=env)
+    assert (site / "site-specific/content/contact.md").read_text() == "Reused capture import\n"
+    assert note.read_text() == "unfinished note edit\n"
+    assert scratch.read_text() == "untracked work\n"
     note.write_text("saved note\n")
     scratch.unlink()
     history = run(site, "git", "log", "--format=%H").splitlines()
@@ -184,3 +191,31 @@ def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection)
     assert run(tmp_path, "git", "status", "--porcelain") == before
     assert not (tmp_path / "site-specific").exists()
     assert not (tmp_path / "sourcedata").exists()
+
+
+@pytest.mark.parametrize("state", ["untracked", "modified", "staged", "staged-new", "staged-restored"])
+def test_reuse_requires_saved_capture_before_writes(tmp_path, state):
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Test")
+    run(tmp_path, "git", "config", "user.email", "test@example.invalid")
+    (tmp_path / "pixi.toml").write_text('[workspace]\nname="fixture"\n')
+    (tmp_path / "pixi.lock").write_text("saved lock\n")
+    capture = tmp_path / "source data/downloaded/records.jsonl"
+    capture.parent.mkdir(parents=True)
+    if state not in {"untracked", "staged-new"}:
+        capture.write_text("saved capture\n")
+    commit(tmp_path, "test: saved inputs")
+    capture.write_text("unsaved capture\n")
+    if state.startswith("staged"):
+        run(tmp_path, "git", "add", str(capture))
+    if state == "staged-restored":
+        capture.write_text("saved capture\n")
+    before = run(tmp_path, "git", "status", "--porcelain")
+    head = run(tmp_path, "git", "rev-parse", "HEAD")
+    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-capture",
+                             "--directory", "source data"], cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert 'datalad save -m "chore: retain pool capture" -- source\\ data/downloaded/records.jsonl' in result.stderr
+    assert run(tmp_path, "git", "status", "--porcelain") == before
+    assert run(tmp_path, "git", "rev-parse", "HEAD") == head
+    assert not (tmp_path / "site-specific").exists()

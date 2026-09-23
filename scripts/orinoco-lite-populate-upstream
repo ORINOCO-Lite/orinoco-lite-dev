@@ -30,6 +30,11 @@ git ls-files --error-unmatch -- pixi.toml pixi.lock >/dev/null 2>&1 &&
 [[ -z $snapshot || -f $snapshot ]] || { echo "Missing capture: $snapshot" >&2; exit 2; }
 if $reuse_capture; then
   [[ -f $capture ]] || { echo "Missing retained capture: $capture" >&2; exit 2; }
+  if ! git ls-files --error-unmatch -- "$capture" >/dev/null 2>&1 ||
+      [[ -n $(git status --porcelain -- "$capture") ]]; then
+    printf 'Save the retained capture before reusing it:\n  datalad save -m "chore: retain pool capture" -- %q\n' "$capture" >&2
+    exit 2
+  fi
 fi
 set -x
 if [[ -n $site_specific ]]; then

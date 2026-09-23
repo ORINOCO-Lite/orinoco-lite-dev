@@ -32,7 +32,7 @@ def register(commands):
     populate.add_argument("--destination", type=Path, default=Path("site-specific"), help="site-input directory (default: site-specific)")
     acquisition = populate.add_mutually_exclusive_group()
     acquisition.add_argument("--snapshot", type=Path, help="retain this JSONL capture instead of fetching")
-    acquisition.add_argument("--reuse-capture", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl without refetching Pool records; still import site files")
+    acquisition.add_argument("--reuse-capture", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl (must be committed and unchanged) without refetching Pool records; still import site files")
     populate.add_argument("--api", default=DEFAULT_API, help="public Dump Things API for acquisition")
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
     populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip capture and imports")
