@@ -230,7 +230,10 @@ The normative contracts define the precise behavior:
   Inspect the selected upstream API or CLI before implementing overlapping functionality, reuse it where applicable, and add only project-specific behavior around it.
   A parallel implementation requires a demonstrated gap, an explanation of why composition cannot address it, and explicit user agreement before implementation; convenience or assumed upstream limitations are insufficient.
   Reuse upstream terminology and operations where their meanings match to ease collaboration with upstream maintainers.
-  Use staged comparisons with upstream to detect unintended differences and keep this adaptation thin and maintainable as upstream evolves.
+  Use staged comparisons to explain every meaningful difference from upstream and minimize unnecessary local behavior; reducing the reported difference count is not the objective.
+  Classify findings as required, human-agreed Orinoco adaptations, upstream defects, local defects, or unexplained differences.
+  Keep check outcomes (`PASS`, `FAIL`, `XFAIL`, `XPASS`, `ERROR`, `SKIP`) separate from these classifications; passing checks or expected failures do not justify retaining an adaptation.
+  Keep any workaround tied to its original defect, propagated effects, and removal condition in existing issues, tests, and reports; an unexpected pass prompts review of that condition.
 - **Separate shared behavior from site policy.** Orinoco Lite owns reusable operations and the pinned Things Schema contract.
   Each downstream owns its information, appearance choices, review policy, and downstream-defined automations.
 - **Publish a static product.** The website, `/edit/`, and `/review/` are static files.
