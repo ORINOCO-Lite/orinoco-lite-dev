@@ -186,9 +186,9 @@ Upon a merge into the default branch, a GitHub Action deploys the website:
 Canonical metadata, editorial content, configuration, and accepted review decisions remain on the downstream's reviewed default branch.
 Generated Hugo projection and website output must not accumulate there.
 
-The latest successful deployment retains its Hugo projection, including a machine-readable normalized record stream, and deployed static files outside the default branch.
-The accepted source commit identifies their source.
-A longer publication history may be retained for diagnosis and recovery.
+A DataLad run records the Hugo projection, including normalized records, in a commit based on the accepted source.
+After deployment succeeds, `latest-hugo-projection` retains that commit and an orphan `gh-pages` branch retains the latest three website snapshots by default.
+The downstream can configure how many successful publications to keep.
 Other generated operational data is temporary and is neither canonical metadata nor a recovery source.
 This retention does not require byte-identical rebuilds or additional manifests, attestations, ledgers, or validation machinery.
 
