@@ -1,11 +1,13 @@
-"""Retain one successfully deployed build outside the source branch."""
+"""Retain successful deployments outside the source branch."""
 
 from __future__ import annotations
 
 import argparse
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import subprocess
+import sys
 import tempfile
 
 from .errors import OrinocoError
@@ -73,7 +75,7 @@ def _commit_tree(
     root: Path,
     tree: str,
     *,
-    parent: str,
+    parent: str | None,
     message: str,
     date: str,
 ) -> str:
@@ -86,27 +88,50 @@ def _commit_tree(
         "GIT_COMMITTER_DATE": date,
     }
     return _run(
-        ["git", "commit-tree", tree, "-p", parent],
+        ["git", "commit-tree", tree, *(["-p", parent] if parent else [])],
         cwd=root,
         env=identity,
         input_text=message,
     )
 
 
-def _tree_with_projection(
-    root: Path,
-    projection_relative: str,
-    source: str,
-    index: Path,
-) -> str:
-    env = {"GIT_INDEX_FILE": str(index)}
-    _run(["git", "read-tree", source], cwd=root, env=env)
-    _run(
-        ["git", "add", "--force", "--all", "--", projection_relative],
-        cwd=root,
-        env=env,
-    )
-    return _run(["git", "write-tree"], cwd=root, env=env)
+def _clone_inputs(source: Path, destination: Path, revision: str) -> None:
+    """Reuse the checked-out input repositories, including private submodules."""
+    _run(["git", "clone", "--quiet", "--shared", "--no-checkout", source, destination], cwd=source)
+    _run(["git", "checkout", "--quiet", "--detach", revision], cwd=destination)
+    for entry in _run(["git", "ls-files", "--stage", "-z"], cwd=destination).split("\0"):
+        if entry.startswith("160000 "):
+            metadata, path = entry.split("\t", 1)
+            _clone_inputs(source / path, destination / path, metadata.split()[1])
+
+
+def record_projection(repository: Path) -> str:
+    """Run the projection once in an isolated source checkout and retain its commit."""
+    root = repository.resolve()
+    source = require_clean_source(root)
+    with tempfile.TemporaryDirectory(prefix="orinoco-projection-run-") as temporary:
+        checkout = Path(temporary) / "source"
+        _clone_inputs(root, checkout, source)
+        identity = {"GIT_AUTHOR_NAME": BOT_NAME, "GIT_AUTHOR_EMAIL": BOT_EMAIL,
+                    "GIT_COMMITTER_NAME": BOT_NAME, "GIT_COMMITTER_EMAIL": BOT_EMAIL}
+        datalad = str(Path(sys.executable).with_name("datalad"))
+        _run([datalad, "status"], cwd=checkout, env=identity)
+        # Generated files are ignored in the source checkout. Stage precisely
+        # this output so DataLad saves it together with the actual run record.
+        _run([datalad, "run", "--explicit", "--input", ".",
+              "--output", "generated/projection", "--sidecar", "no",
+              "-m", "chore(pages): record Hugo projection", "--", "sh", "-c",
+              "orinoco-lite projection update --no-cache && "
+              "git add --force --all -- generated/projection"], cwd=checkout, env=identity)
+        commit = _run(["git", "rev-parse", "HEAD"], cwd=checkout)
+        if commit == source:
+            raise PublicationError("Projection run did not create a DataLad commit")
+        _run(["git", "fetch", "--quiet", checkout, commit], cwd=root)
+        projection = root / "generated/projection"
+        if projection.exists():
+            shutil.rmtree(projection)
+        shutil.copytree(checkout / "generated/projection", projection)
+        return commit
 
 
 def _tree_from_directory(root: Path, source: Path, index: Path) -> str:
@@ -140,14 +165,14 @@ def require_clean_source(root: Path) -> str:
 
 def prepare(
     repository: Path,
-    projection_relative: str,
+    projection_commit: str,
     site_relative: str,
     bundle_relative: str,
 ) -> None:
     root = repository.resolve()
     if not (root / ".git").exists():
         raise PublicationError(f"Not a Git worktree: {root}")
-    projection = _relative_directory(root, projection_relative, "projection")
+    projection = _relative_directory(root, "generated/projection", "projection")
     site = _relative_directory(root, site_relative, "site")
     projection_files = _files(projection)
     site_files = _files(site)
@@ -161,28 +186,14 @@ def prepare(
         raise PublicationError("Site is incomplete; missing index.html")
 
     source = require_clean_source(root)
+    if _run(["git", "rev-parse", f"{projection_commit}^"], cwd=root) != source:
+        raise PublicationError("Projection does not belong to this source commit")
     date = _run(["git", "show", "-s", "--format=%cI", source], cwd=root)
     bundle = root.joinpath(*PurePosixPath(bundle_relative).parts)
     bundle.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="orinoco-pages-publication-") as temporary:
         temporary_root = Path(temporary)
-        projection_tree = _tree_with_projection(
-            root,
-            projection_relative,
-            source,
-            temporary_root / "projection.index",
-        )
-        projection_commit = _commit_tree(
-            root,
-            projection_tree,
-            parent=source,
-            message=(
-                "chore(pages): record Hugo projection\n\n"
-                f"Source-Commit: {source}\n"
-            ),
-            date=date,
-        )
         pages_tree = _tree_from_directory(
             root,
             site,
@@ -191,7 +202,7 @@ def prepare(
         pages_commit = _commit_tree(
             root,
             pages_tree,
-            parent=projection_commit,
+            parent=None,
             message=(
                 "chore(pages): publish generated site\n\n"
                 f"Source-Commit: {source}\n"
@@ -220,26 +231,66 @@ def prepare(
         _run(["git", "update-ref", "-d", PROJECTION_REF], cwd=root)
         _run(["git", "update-ref", "-d", PAGES_REF], cwd=root)
 
-def publish(root: Path, bundle_name: str) -> None:
-    """Record the deployed output without changing the source branch."""
+def _bounded_pages(root: Path, latest: str, previous: str | None, limit: int) -> str:
+    commits = [latest]
+    while previous and len(commits) < limit:
+        # The old publication format has a website -> projection -> source
+        # chain. Stop at the projection instead of retaining source history.
+        message = _run(["git", "show", "-s", "--format=%B", previous], cwd=root)
+        if not any(line.startswith("Projection-Commit: ") for line in message.splitlines()):
+            break
+        commits.append(previous)
+        parents = _run(["git", "show", "-s", "--format=%P", previous], cwd=root).split()
+        previous = parents[0] if parents else None
+    parent = None
+    for commit in reversed(commits):
+        tree = _run(["git", "rev-parse", f"{commit}^{{tree}}"], cwd=root)
+        message = _run(["git", "show", "-s", "--format=%B", commit], cwd=root)
+        date = _run(["git", "show", "-s", "--format=%cI", commit], cwd=root)
+        parent = _commit_tree(root, tree, parent=parent, message=message + "\n", date=date)
+    return parent
 
+
+def publish(root: Path, bundle_name: str, history_limit: int = 3) -> None:
+    """Record the deployed output without changing the source branch."""
+    if history_limit < 1:
+        raise PublicationError("History limit must be at least 1")
     root = root.resolve()
     bundle = root / bundle_name
     source = _run(["git", "rev-parse", "HEAD"], cwd=root)
     _run(["git", "bundle", "verify", bundle], cwd=root)
-    projection = "refs/remotes/orinoco-publication/latest-hugo-projection"
-    pages = "refs/remotes/orinoco-publication/gh-pages"
-    _run(["git", "fetch", bundle, f"{PROJECTION_REF}:{projection}",
-          f"{PAGES_REF}:{pages}"], cwd=root)
+    projection_ref = "refs/remotes/orinoco-publication/latest-hugo-projection"
+    pages_ref = "refs/remotes/orinoco-publication/gh-pages"
+    _run(["git", "fetch", bundle, f"+{PROJECTION_REF}:{projection_ref}",
+          f"+{PAGES_REF}:{pages_ref}"], cwd=root)
+    projection = _run(["git", "rev-parse", projection_ref], cwd=root)
+    pages = _run(["git", "rev-parse", pages_ref], cwd=root)
     if _run(["git", "rev-parse", f"{projection}^"], cwd=root) != source:
         raise PublicationError("Publication bundle does not belong to this source commit")
-    if _run(["git", "rev-parse", f"{pages}^"], cwd=root) != _run(
-        ["git", "rev-parse", projection], cwd=root
-    ):
+    message = _run(["git", "show", "-s", "--format=%B", pages], cwd=root).splitlines()
+    if (f"Projection-Commit: {projection}" not in message
+            or f"Source-Commit: {source}" not in message
+            or _run(["git", "show", "-s", "--format=%P", pages], cwd=root)):
         raise PublicationError("Pages commit does not belong to this projection")
-    _run(["git", "push", "--atomic", "--force", "origin",
-          f"{projection}:refs/heads/latest-hugo-projection",
-          f"{pages}:refs/heads/gh-pages"], cwd=root)
+
+    branches = ("refs/heads/latest-hugo-projection", "refs/heads/gh-pages")
+    remote = dict(line.split()[::-1] for line in
+                  _run(["git", "ls-remote", "--heads", "origin", *branches], cwd=root).splitlines())
+    previous = remote.get(branches[1])
+    if previous:
+        _run(["git", "fetch", "--quiet", "origin", previous], cwd=root)
+        # Retrying the record job must not count the same deployment twice.
+        previous_message = _run(["git", "show", "-s", "--format=%B", previous], cwd=root)
+        if (previous_message.splitlines() == message
+                and remote.get(branches[0]) == projection
+                and _run(["git", "rev-parse", f"{previous}^{{tree}}"], cwd=root)
+                == _run(["git", "rev-parse", f"{pages}^{{tree}}"], cwd=root)):
+            parents = _run(["git", "show", "-s", "--format=%P", previous], cwd=root).split()
+            previous = parents[0] if parents else None
+    pages = _bounded_pages(root, pages, previous, history_limit)
+    _run(["git", "push", "--atomic",
+          *(f"--force-with-lease={branch}:{remote.get(branch, '')}" for branch in branches),
+          "origin", f"{projection}:{branches[0]}", f"{pages}:{branches[1]}"], cwd=root)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -254,12 +305,14 @@ def parser() -> argparse.ArgumentParser:
     parser.add_argument("publication_command", choices=("record",), help="save the deployed build in Git")
     parser.add_argument("--repository", type=Path, default=Path.cwd(), help="website repository (default: current directory)")
     parser.add_argument("--bundle", default="build/pages-publication.bundle", help="build bundle, relative to the repository (default: build/pages-publication.bundle)")
+    parser.add_argument("--history-limit", type=int, default=3, metavar="N",
+                        help="maximum successful publications retained on gh-pages, including the current publication (default: 3)")
     return parser
 
 
 def execute(args: argparse.Namespace) -> int:
     try:
-        publish(args.repository, args.bundle)
+        publish(args.repository, args.bundle, args.history_limit)
     except PublicationError as error:
         raise SystemExit(f"publication: {error}")
     return 0

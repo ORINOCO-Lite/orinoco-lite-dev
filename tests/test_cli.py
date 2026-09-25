@@ -173,13 +173,14 @@ def test_build_bundle_is_optional_and_only_created_after_success(tmp_path, statu
     with (
         patch.object(cli, "_resolve", return_value=(workspace, "resources")),
         patch.object(cli, "validate_workspace"),
-        patch.object(cli, "invoke_driver", side_effect=[0, status]),
+        patch.object(cli, "invoke_driver", return_value=status),
         patch("orinoco_lite.publication.require_clean_source") as clean,
+        patch("orinoco_lite.publication.record_projection", return_value="projection-commit"),
         patch("orinoco_lite.publication.prepare") as prepare,
     ):
         assert cli._build(args) == status
     clean.assert_called_once_with(tmp_path)
     if status == 0:
-        prepare.assert_called_once_with(tmp_path, "generated/projection", "build/site", "build/publication.bundle")
+        prepare.assert_called_once_with(tmp_path, "projection-commit", "build/site", "build/publication.bundle")
     else:
         prepare.assert_not_called()
