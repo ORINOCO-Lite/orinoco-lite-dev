@@ -39,6 +39,11 @@ GIN is one tested storage service, not an Orinoco dependency.
 The GitHub browser curation flow still uses a GitHub metadata repository; an Annex sibling supplies its media.
 Private storage and build-time credential setup are outside this feature’s scope.
 
+For Netlify’s cached, disposable build checkout, prefix the build command with `git -C site-specific config core.hooksPath /dev/null &&`.
+Netlify checks out cached submodules before installing Pixi; Annex’s checkout hook otherwise calls an executable that is not yet available.
+Keep normal hooks enabled in development checkouts.
+If an earlier Netlify build already cached the hook, clear its build cache once when applying this setting.
+
 `orinoco-lite build` retrieves required media, verifies it with Annex, and copies regular files into the disposable Hugo assembly.
 The tracked pointers, source branch, and parent gitlink remain unchanged.
 Use `orinoco-lite prepare-media` to retrieve and verify media separately without building.
