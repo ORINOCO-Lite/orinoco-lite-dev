@@ -39,7 +39,40 @@ DataLad’s `siblings configure --as-common-datasrc` can register a public Git r
 The GitHub browser curation flow still uses a GitHub metadata repository; an Annex sibling supplies its media.
 Private storage and build-time credential setup are outside this feature’s scope.
 
+## Public aneksajo repository
+
+Use a public repository on [DataLad Hub](https://hub.datalad.org/) as the media sibling.
+Keep the browser-curated metadata repository on GitHub.
+The hub advertises Annex’s HTTPS transfer protocol; maintainer Git pushes and Annex uploads use a repository read/write token through a local Git credential helper.
+Create the token under Settings → Applications → Access Tokens, with the `repository` permission set to Read and Write.
+Ensure the credential helper is available to the Git executable used by Annex as well as the Git executable used for pushes.
+Do not put the token in remote URLs or build environments.
+
+Create an empty public hub repository and set `ANEKSAJO_URL` to its HTTPS clone URL.
+Publish the committed input branch and Annex state, then register its public URL for other clones:
+
+```bash
+git -C site-specific remote add hub "$ANEKSAJO_URL"
+git -C site-specific push hub HEAD git-annex
+pixi run git -C site-specific annex copy --to hub -- assets static
+pixi run datalad siblings configure -d site-specific \
+  --name hub --as-common-datasrc hub-storage
+git -C site-specific fetch hub git-annex
+pixi run git -C site-specific annex merge
+git -C site-specific push hub HEAD git-annex
+git -C site-specific push origin HEAD git-annex
+```
+
+The fetch and Annex merge incorporate location records written by the hub during upload before pushing the shared Annex branch.
+Commit and push the parent’s updated gitlink through the usual downstream workflow.
+The `hub-storage` configuration is recorded in the `git-annex` branch and automatically enabled in new clones.
+Builds retrieve public content without the maintainer’s token.
+Apply the same native sibling configuration directly to an upstream Annex repository for repinning and media import.
+
 ## Cloudflare R2
+
+R2 is an optional alternative or additional copy.
+Configuring it alongside the hub does not automatically synchronize their content; copy new media to each desired remote explicitly.
 
 Create an R2 bucket and connect a public custom domain in Cloudflare.
 The managed `r2.dev` URL can be used for an initial test, but Cloudflare rate-limits it and designates it for development.
