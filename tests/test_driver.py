@@ -17,7 +17,7 @@ class DriverEnvironmentTests(unittest.TestCase):
             root = Path(temporary)
             workspace = WorkspaceConfig(
                 root=root,
-                config_path=root / "orinoco.yaml",
+                config_path=root / "pyproject.toml",
 
                 site_name="fixture",
                 base_url="https://example.invalid/",
@@ -33,7 +33,7 @@ class DriverEnvironmentTests(unittest.TestCase):
         root = Path("/tmp/site")
         workspace = WorkspaceConfig(
             root=root,
-            config_path=root / "orinoco.yaml",
+            config_path=root / "pyproject.toml",
             site_name="fixture",
             base_url="https://example.invalid/",
             paths={"build": "build"},
@@ -54,7 +54,7 @@ class DriverEnvironmentTests(unittest.TestCase):
     def test_driver_runs_the_installed_module_without_a_shell(self) -> None:
         root = Path("/tmp/site")
         workspace = WorkspaceConfig(
-            root=root, config_path=root / "orinoco.yaml",
+            root=root, config_path=root / "pyproject.toml",
             site_name="fixture", base_url="https://example.invalid/",
             paths={"build": "build"}, raw={},
         )

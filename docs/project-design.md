@@ -129,11 +129,11 @@ flowchart TB
 
 ## Downstream data boundary
 
-Each downstream keeps its declarative site data under `site-specific/`, separate from site-specific executable adapters:
+Each downstream keeps runtime settings in root `pyproject.toml` and declarative site inputs under `site-specific/`, separate from site-specific executable adapters.
+[Configuration files](configuration-files.md) defines their ownership.
 
 ```text
 site-specific/                         # Downstream-owned declarative site data
-  site.yaml                            # Site identity, navigation, and appearance settings
   assets/                              # Source assets processed by Hugo during the build
   content/                             # Hand-authored editorial pages
   static/                              # Site files published verbatim

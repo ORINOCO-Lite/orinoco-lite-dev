@@ -122,7 +122,7 @@ def test_duplicate_json_keys_fail_before_comparison(tmp_path):
 def test_convert_and_export_preserve_authored_inputs_capture_and_source_marker(tmp_path):
     inputs = tmp_path / "site-specific"
     inputs.mkdir()
-    (inputs / "site.yaml").write_text("title: Authored\n")
+    (inputs / "authored.txt").write_text("title: Authored\n")
     (inputs / "content").mkdir()
     (inputs / "content/index.md").write_bytes(b"Authored page\n")
     source_dir = inputs / "sources/pool"
@@ -138,7 +138,7 @@ def test_convert_and_export_preserve_authored_inputs_capture_and_source_marker(t
     report = stages.jsonl_to_yaml(source, inputs)
     exported = stages.yaml_to_jsonl(inputs, tmp_path / "joined.jsonl")
     assert source.read_bytes() == original
-    assert (inputs / "site.yaml").read_text() == "title: Authored\n"
+    assert (inputs / "authored.txt").read_text() == "title: Authored\n"
     assert (inputs / "content/index.md").read_bytes() == b"Authored page\n"
     assert not (inputs / "manifest.json").exists()
     assert report["annotation_companions"] == 1
@@ -358,14 +358,14 @@ def test_explicit_paths_roundtrip_downstream_and_preserve_unrelated_files(tmp_pa
     source = capture(tmp_path, envelope(title="Explicit inputs"))
     inputs = tmp_path / "site-specific"
     inputs.mkdir()
-    (inputs / "site.yaml").write_text("authored: true\n")
+    (inputs / "authored.txt").write_text("authored: true\n")
     (inputs / ".git").write_text("gitdir: ../subdataset.git\n")
     command = ["dev", "records", "jsonl-to-yaml", "--source", source.name,
                "--destination", "site-specific"]
     assert cli.main(command) == 0
     assert cli.main(command) == 2
     assert cli.main(command + ["--force"]) == 0
-    assert (inputs / "site.yaml").read_text() == "authored: true\n"
+    assert (inputs / "authored.txt").read_text() == "authored: true\n"
     assert (inputs / ".git").read_text() == "gitdir: ../subdataset.git\n"
     export = ["dev", "records", "yaml-to-jsonl", "--source", "site-specific",
               "--output", "inspection/roundtrip.jsonl"]

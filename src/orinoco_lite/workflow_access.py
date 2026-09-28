@@ -13,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .config import DEFAULT_CURATION_SERVICE, _curation_service_origin, _load_mapping
+from .config import DEFAULT_CURATION_SERVICE, _curation_service_origin, read_configuration
 from .errors import ConfigurationError
 
 
@@ -47,15 +47,12 @@ def obtain(body: dict, *, curation: bool = False) -> dict:
     """Request and mask installation credentials without exporting them to Actions."""
     # Metadata may be a private, not-yet-initialized submodule. Only the
     # trusted website configuration is needed to obtain its checkout token.
-    raw = _load_mapping(Path.cwd() / "orinoco.yaml", "Workspace configuration")
-    site = raw.get("site", {})
-    if not isinstance(site, dict):
-        raise ConfigurationError("orinoco.yaml site must be a mapping")
-    service = site.get("curation_service")
+    raw = read_configuration(Path.cwd() / "pyproject.toml")
+    service = raw.get("service", {})
+    if not isinstance(service, dict):
+        raise ConfigurationError("tool.orinoco.service must be a table")
     origin = _curation_service_origin(
-        DEFAULT_CURATION_SERVICE if service is None else service,
-        "orinoco.yaml site.curation_service",
-    )
+        service.get("url", DEFAULT_CURATION_SERVICE), "tool.orinoco.service.url")
     endpoint = f"{origin}/api/{"curation" if curation else "shacl"}/workflow-access"
     identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
     parsed = urllib.parse.urlsplit(identity_url)

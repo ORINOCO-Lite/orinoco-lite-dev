@@ -56,6 +56,7 @@ def test_populate_and_rerun_with_retained_data_and_changed_www_from_model(tmp_pa
     run(site, "git", "config", "user.email", "test@example.invalid")
     (site / "pixi.toml").write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
     (site / "pixi.lock").write_text("fixture version one\n")
+    (site / "pyproject.toml").write_text("# Preserved policy\n[tool.orinoco.operations]\ntemplate_updates = true\n")
     dump = site / "sourcedata/downloaded/records.jsonl"
     dump.parent.mkdir(parents=True)
     dump.write_text(json.dumps({"pid": "ex:person", "schema_type": "xyzri:XYZPerson", "name": "One"}) + "\n")
@@ -88,6 +89,9 @@ upstream.resolve_www_from_model = lambda *args: Path(os.environ["TEST_WWW"])
 raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)
+    workflow = commands / "orinoco-lite-populate-upstream.sh"
+    shutil.copyfile(Path(__file__).resolve().parents[1] / "scripts/orinoco-lite-populate-upstream.sh", workflow)
+    workflow.chmod(0o755)
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], TEST_WWW=str(www))
     run(site, "orinoco-lite", "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, env=env)
     supplied.unlink()
@@ -122,9 +126,14 @@ raise SystemExit(cli.main())
             assert str(tmp_path) not in record["cmd"]
             assert "pixi.lock" in record["inputs"]
             assert not record["cmd"].startswith("cp ")
+            if "import-from-www" in record["cmd"]:
+                assert "pyproject.toml" in record["inputs"]
+                assert "pyproject.toml" in record["outputs"]
     conversion = next((command, sha) for command, sha in runs.items() if "jsonl-to-yaml" in command)
     imported = next((command, sha) for command, sha in runs.items() if "import-from-www" in command)
     assert "--force" in conversion[0]
+    assert "# Preserved policy" in (site / "pyproject.toml").read_text()
+    assert "template_updates = true" in (site / "pyproject.toml").read_text()
     assert "--force" in imported[0]
     assert "--source" not in imported[0] and "--revision" not in imported[0]
     assert (site / "site-specific/.git").exists() == (layout == "submodule")

@@ -10,7 +10,6 @@ import tomllib
 
 import tomlkit
 
-import yaml
 
 from .errors import DriverError
 
@@ -110,7 +109,7 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
     files = {path: _source_bytes(source, path, retrieve_media=retrieve_media) for path in paths}
     # These source-owned values are deliberately cleared by the generic
     # template. Keep their real upstream settings as site overrides; fields
-    # already mapped into site.yaml remain owned only by that document.
+    # already mapped into tool.orinoco.site remain owned only by that document.
     theme = tomllib.loads(_source_bytes(source, Path("config/_default/params.toml")).decode())
     language = tomllib.loads(_source_bytes(source, Path("config/_default/languages.en.toml")).decode())
     header = {key: value for key, value in theme.get("header", {}).items()
@@ -150,7 +149,6 @@ def site_settings(source: Path) -> dict:
             item["icon"] = entry["params"]["icon"]
         navigation.append(item)
     return {
-        "version": 1,
         "record_prefix": "xyzrins:",
         "identity": {
             "title": language["title"],
@@ -166,12 +164,35 @@ def site_settings(source: Path) -> dict:
     }
 
 
-def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool = False, media_remote: str | None = None, force: bool = False) -> dict:
+def import_site_inputs(source: Path, destination: Path, *, config_path: Path, retrieve_media: bool = False, media_remote: str | None = None, force: bool = False) -> dict:
     """Synchronize imported site surfaces, preserving metadata and other config."""
     files = selected_site_files(source, retrieve_media=retrieve_media, media_remote=media_remote)
-    files[Path("site.yaml")] = yaml.safe_dump(
-        site_settings(source), sort_keys=False, allow_unicode=True,
-    ).encode()
+    if config_path.is_symlink() or not config_path.is_file():
+        raise DriverError(f"Import requires the downstream pyproject.toml: {config_path}")
+    try:
+        document = tomlkit.parse(config_path.read_text())
+    except (OSError, ValueError) as error:
+        raise DriverError(f"Cannot read TOML configuration: {config_path}") from error
+    tool = document.setdefault("tool", tomlkit.table())
+    if not isinstance(tool, Mapping):
+        raise DriverError("pyproject.toml tool must be a table")
+    orinoco = tool.setdefault("orinoco", tomlkit.table())
+    if not isinstance(orinoco, Mapping):
+        raise DriverError("pyproject.toml tool.orinoco must be a table")
+    site = orinoco.setdefault("site", tomlkit.table())
+    if not isinstance(site, Mapping):
+        raise DriverError("pyproject.toml tool.orinoco.site must be a table")
+    imported = site_settings(source)
+    for key, setting in imported.items():
+        if isinstance(setting, dict):
+            section = site.setdefault(key, tomlkit.table())
+            if not isinstance(section, Mapping):
+                raise DriverError(f"tool.orinoco.site.{key} must be a table")
+            for field, value in setting.items():
+                section[field] = value
+        else:
+            site[key] = setting
+    manifest = tomlkit.dumps(document)
     # Read all sources before writing, so an unavailable resource leaves the
     # existing downstream untouched.
     for relative in files:
@@ -226,8 +247,9 @@ def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool 
                 f"Site import would replace or delete existing files, including {conflicts[0]}; "
                 "use --force to synchronize imported site inputs."
             )
-    print("Convert config/_default/{languages.en,hugo,params,menus.en}.toml -> site.yaml")
+    print("Convert config/_default/{languages.en,hugo,params,menus.en}.toml -> tool.orinoco.site in pyproject.toml")
     print("  Map title, description, base URL, navigation, color scheme, appearance, and header layout.")
+    config_path.write_text(manifest)
     destination.mkdir(parents=True, exist_ok=True)
     for relative, value in files.items():
         target = destination / relative
@@ -237,4 +259,4 @@ def import_site_inputs(source: Path, destination: Path, *, retrieve_media: bool 
     for target in stale:
         print(f"  Delete {target}")
         target.unlink()
-    return {"files": len(files), "source": str(source), "output": str(destination)}
+    return {"files": len(files) + 1, "source": str(source), "output": str(destination)}

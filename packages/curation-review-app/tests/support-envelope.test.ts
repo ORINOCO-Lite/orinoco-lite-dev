@@ -200,14 +200,9 @@ describe("hosted service-resource envelope", () => {
             .filter(([key]) => key.startsWith("expression"))
             .forEach(([key, expression]) => {
               const alias = `blob${key.slice("expression".length)}`;
-              if (
-                [
-                  `${BASE_SHA}:orinoco.yaml`,
-                  `${BASE_SHA}:site-specific/site.yaml`,
-                ].includes(expression)
-              ) {
+              if ([`${BASE_SHA}:pyproject.toml`].includes(expression)) {
                 const text =
-                  expression === `${BASE_SHA}:orinoco.yaml`
+                  expression === `${BASE_SHA}:pyproject.toml`
                     ? ORINOCO_CONFIG
                     : SITE_DATA;
                 repository[alias] = {
@@ -274,8 +269,8 @@ describe("hosted service-resource envelope", () => {
     const graphRequests = Math.ceil(
       (MAX_REVIEW_CANDIDATES * 3) / BLOBS_PER_GRAPHQL_REQUEST,
     );
-    const expectedRequests = 10 + commitPages + graphRequests;
-    expect(expectedRequests).toBe(49);
+    const expectedRequests = 9 + commitPages + graphRequests;
+    expect(expectedRequests).toBe(48);
     expect(fetchMock).toHaveBeenCalledTimes(expectedRequests);
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(
       CLOUDFLARE_FREE_SUBREQUEST_LIMIT,

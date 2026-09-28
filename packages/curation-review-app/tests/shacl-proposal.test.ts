@@ -112,7 +112,11 @@ function commitResponse(branch: string): Response {
   });
 }
 
-function commonResponse(url: string): Response | null {
+function commonResponse(url: string, defaultHead = BASE): Response | null {
+  if (url === "https://api.github.com/repos/example/site")
+    return Response.json({ full_name: "example/site", default_branch: "main" });
+  if (url.endsWith("/branches/main"))
+    return Response.json({ name: "main", commit: { sha: defaultHead } });
   if (url.includes("/git/trees/"))
     return Response.json({ tree: [], truncated: false });
   if (url.endsWith("/user")) {
@@ -166,12 +170,11 @@ describe("attributed existing-PR SHACL handoff", () => {
             variables: Record<string, unknown>;
           };
           if (graphql.query.includes("query ReviewRecords")) {
-            expect([
-              `${BASE}:orinoco.yaml`,
-              `${BASE}:site-specific/site.yaml`,
-            ]).toContain(graphql.variables.expression0);
+            expect([`${BASE}:pyproject.toml`]).toContain(
+              graphql.variables.expression0,
+            );
             return siteConfigResponse(
-              graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+              graphql.variables.expression0 === `${BASE}:pyproject.toml`
                 ? ORINOCO_CONFIG
                 : SITE_DATA,
             );
@@ -261,7 +264,7 @@ describe("attributed existing-PR SHACL handoff", () => {
             variables: Record<string, unknown>;
           };
           return siteConfigResponse(
-            graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+            graphql.variables.expression0 === `${BASE}:pyproject.toml`
               ? ORINOCO_CONFIG
               : SITE_DATA,
           );
@@ -358,7 +361,7 @@ describe("attributed existing-PR SHACL handoff", () => {
         };
         if (graphql.query.includes("query ReviewRecords")) {
           return siteConfigResponse(
-            graphql.variables.expression0 === `${BASE}:orinoco.yaml`
+            graphql.variables.expression0 === `${BASE}:pyproject.toml`
               ? ORINOCO_CONFIG
               : SITE_DATA,
           );
@@ -378,7 +381,7 @@ describe("attributed existing-PR SHACL handoff", () => {
         }),
       ),
     ).rejects.toMatchObject({ code: "shacl_handoff_pending", status: 409 });
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });
 
@@ -404,7 +407,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
       let body: unknown = null;
       if (typeof init?.body === "string") body = JSON.parse(init.body);
       requests.push({ body, method: init?.method ?? "GET", url });
-      const common = commonResponse(url);
+      const common = commonResponse(url, HEAD);
       if (common !== null) return common;
       if (url === "https://api.github.com/repos/example/site") {
         return Response.json({
@@ -421,12 +424,11 @@ function standaloneFetch(options: StandaloneOptions = {}): {
           variables: Record<string, unknown>;
         };
         if (graphql.query.includes("query ReviewRecords")) {
-          expect([
-            `${HEAD}:orinoco.yaml`,
-            `${HEAD}:site-specific/site.yaml`,
-          ]).toContain(graphql.variables.expression0);
+          expect([`${HEAD}:pyproject.toml`]).toContain(
+            graphql.variables.expression0,
+          );
           return siteConfigResponse(
-            graphql.variables.expression0 === `${HEAD}:orinoco.yaml`
+            graphql.variables.expression0 === `${HEAD}:pyproject.toml`
               ? ORINOCO_CONFIG
               : SITE_DATA,
           );
@@ -599,6 +601,7 @@ describe("standalone SHACL proposal", () => {
 describe("site-specific submodule handoff", () => {
   function client() {
     const github = new GitHubClient("ghu_curator");
+    vi.spyOn(github, "json").mockResolvedValue({ default_branch: "main" });
     vi.spyOn(github, "currentUser").mockResolvedValue({
       id: 1,
       login: "octocat",
@@ -622,7 +625,7 @@ describe("site-specific submodule handoff", () => {
         new Map(
           requests.map((item) => [
             item.key,
-            item.path === "orinoco.yaml" ? ORINOCO_CONFIG : SITE_DATA,
+            item.path === "pyproject.toml" ? ORINOCO_CONFIG : SITE_DATA,
           ]),
         ),
     );

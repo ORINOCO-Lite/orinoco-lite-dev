@@ -33,7 +33,7 @@ Repository identity is derived by the trusted build.
 Downstreams do not repeat it in curation-specific configuration.
 
 The released central service is the default.
-A downstream may set one `site.curation_service` HTTPS origin to use a compatible self-hosted service.
+A downstream may set one `tool.orinoco.service.url` HTTPS origin to use a compatible self-hosted service.
 Browser-supplied values are hints; the service verifies the effective origin and repository from trusted base configuration before a write.
 
 ## Browser trust

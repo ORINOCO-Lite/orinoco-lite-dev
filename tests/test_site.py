@@ -12,9 +12,7 @@ from orinoco_lite.config import load_config_path
 from orinoco_lite.errors import ConfigurationError, DriverError, IntegrityError
 
 
-CONFIG = """\
-contract_version: 2
-"""
+CONFIG = '[tool.orinoco]\n'
 
 
 def _write_site_data(
@@ -26,13 +24,14 @@ def _write_site_data(
 ) -> None:
     site_root = root / "site-specific"
     site_root.mkdir(exist_ok=True)
-    (site_root / "site.yaml").write_text(
-        "version: 1\n"
-        f"record_prefix: {prefix!r}\n"
-        "identity:\n"
-        f"  title: {title}\n"
-        "  description: A site-build fixture.\n"
-        f"  base_url: {base_url}\n",
+    (root / "pyproject.toml").write_text(
+        (root / "pyproject.toml").read_text() +
+        "[tool.orinoco.site]\n"
+        f"record_prefix = {prefix!r}\n"
+        "[tool.orinoco.site.identity]\n"
+        f'title = {json.dumps(title)}\n'
+        'description = "A site-build fixture."\n'
+        f'base_url = {json.dumps(base_url)}\n',
         encoding="utf-8",
     )
 
@@ -164,7 +163,7 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_composition_uses_overlay_and_excludes_upstream_content_and_git(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
             www_from_model = _www_from_model(root)
             for relative, value in (
@@ -187,7 +186,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             assembly = root / "build/assembly"
 
             site._assemble(
-                load_config_path(root / "orinoco.yaml"),
+                load_config_path(root / "pyproject.toml"),
                 root / "resources",
                 assembly,
                 www_from_model=www_from_model,
@@ -211,7 +210,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 DriverError, "Materialized Hugo assets are missing"
             ):
                 site._assemble(
-                    load_config_path(root / "orinoco.yaml"),
+                    load_config_path(root / "pyproject.toml"),
                     root / "resources",
                     root / "build/unmaterialized",
                     www_from_model=www_from_model,
@@ -220,23 +219,19 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_site_data_renders_adapters_and_upstream_section_policy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(
                 CONFIG
-                + "paths:\n"
-                + "  editorial: site-specific/content/pages\n"
-                + "  records: site-specific/metadata/records\n",
+                + "[tool.orinoco.paths]\n"
+                + 'editorial = "site-specific/content/pages"\n'
+                + 'records = "site-specific/metadata/records"\n',
                 encoding="utf-8",
             )
             site_root = root / "site-specific"
             site_root.mkdir()
-            (site_root / "site.yaml").write_text(
-                "version: 1\n"
-                "record_prefix: 'example:'\n"
-                "identity:\n"
-                "  title: Example Site\n"
-                "  description: Structured example\n"
-                "  base_url: https://example.invalid/example/\n",
+            (root / "pyproject.toml").write_text(
+                (root / "pyproject.toml").read_text() +
+                '[tool.orinoco.site]\nrecord_prefix = "example:"\n\n[tool.orinoco.site.identity]\ntitle = "Example Site"\ndescription = "Structured example"\nbase_url = "https://example.invalid/example/"\n',
                 encoding="utf-8",
             )
             (site_root / "projection-templates").mkdir()
@@ -326,19 +321,15 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_structured_site_prefix_must_match_projection_routing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             site_root = root / "site-specific"
             (site_root / "metadata/records").mkdir(parents=True)
             (site_root / "projection-templates").mkdir()
             (site_root / "projection-tools").mkdir()
-            (site_root / "site.yaml").write_text(
-                "version: 1\n"
-                "record_prefix: 'wrong:'\n"
-                "identity:\n"
-                "  title: Example Site\n"
-                "  description: Structured example\n"
-                "  base_url: https://example.invalid/example/\n",
+            (root / "pyproject.toml").write_text(
+                (root / "pyproject.toml").read_text() +
+                '[tool.orinoco.site]\nrecord_prefix = "wrong:"\n\n[tool.orinoco.site.identity]\ntitle = "Example Site"\ndescription = "Structured example"\nbase_url = "https://example.invalid/example/"\n',
                 encoding="utf-8",
             )
             for relative in ("homepage.md.j2", "project.md.j2"):
@@ -382,7 +373,7 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_assembly_copies_site_static_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             source = root / "site-specific/static/example.txt"
             source.parent.mkdir(parents=True)
@@ -405,7 +396,7 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_layout_override_applies_only_from_site_specific(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
             adapter = root / ".orinoco-lite/hugo-adapter/layouts"
@@ -466,7 +457,7 @@ class HugoCompatibilityTests(unittest.TestCase):
     def test_build_passes_host_neutral_and_public_urls_without_rewriting(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
             resources = root / "resources"

@@ -29,17 +29,9 @@ from orinoco_lite.editor import (
 from orinoco_lite.errors import ConfigurationError, DriverError
 
 
-CONFIG = """\
-contract_version: 2
-"""
+CONFIG = '[tool.orinoco]\n'
 
-SITE_DATA = """\
-version: 1
-identity:
-  title: Editor fixture
-  description: An editor fixture.
-  base_url: https://example.invalid/editor/
-"""
+SITE_DATA = '[tool.orinoco.site.identity]\ntitle = "Editor fixture"\ndescription = "An editor fixture."\nbase_url = "https://example.invalid/editor/"\n'
 
 
 def display_label_assertion(value: str) -> dict[str, str]:
@@ -54,7 +46,7 @@ class EditorBundleTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+        (self.root / "pyproject.toml").write_text(CONFIG, encoding="utf-8")
         for relative in (
             "site-specific/metadata/records/XYZPerson",
             "site-specific/metadata/records/XYZAgentRole",
@@ -68,8 +60,8 @@ class EditorBundleTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
-        (self.root / "site-specific/site.yaml").write_text(
-            SITE_DATA, encoding="utf-8"
+        (self.root / "pyproject.toml").write_text(
+            CONFIG + SITE_DATA, encoding="utf-8"
         )
         (self.root / "site-specific/projection-templates/person.md.j2").write_text(
             "{{ display_label }}\n", encoding="utf-8"

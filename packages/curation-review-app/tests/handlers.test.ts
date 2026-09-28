@@ -205,10 +205,10 @@ function proposalApi(
       .filter(([key]) => key.startsWith("expression"))
       .forEach(([key, expression]) => {
         const index = key.slice("expression".length);
-        if (expression === `${BASE_SHA}:orinoco.yaml`) {
-          repository[`blob${index}`] = blob(siteConfig);
-        } else if (expression === `${BASE_SHA}:site-specific/site.yaml`) {
-          repository[`blob${index}`] = blob(siteData);
+        if (expression === `${BASE_SHA}:pyproject.toml`) {
+          repository[`blob${index}`] = blob(
+            siteConfig.replace(SITE_DATA, siteData),
+          );
         } else if (
           expression ===
           `${BASE_SHA}:site-specific/metadata/records/example/first.yaml`
@@ -651,7 +651,7 @@ describe("curator authorization and exact-head submission handlers", () => {
       fetchMock.mock.calls.some(
         ([input, init]) =>
           String(input) === "https://api.github.com/graphql" &&
-          String(init?.body).includes(`${BASE_SHA}:orinoco.yaml`),
+          String(init?.body).includes(`${BASE_SHA}:pyproject.toml`),
       ),
     ).toBe(true);
   });

@@ -21,7 +21,7 @@ def downstream(tmp_path, remote, monkeypatch):
     url, package_commit = remote
     source = tmp_path / "published"
     (source / "copier.yml").write_text(yaml.safe_dump({
-        "_subdirectory": "template", "_skip_if_exists": ["site-specific/**", "extensions/**", "orinoco.yaml"],
+        "_subdirectory": "template", "_skip_if_exists": ["site-specific/**", "extensions/**", "pyproject.toml"],
         "package_repository": {"type": "str", "default": url},
         "package_revision": {"type": "str", "default": package_commit},
         "project_name": {"type": "str", "default": "Example"},
@@ -35,7 +35,7 @@ def downstream(tmp_path, remote, monkeypatch):
     (scaffold / "pixi.lock").write_text("initial lock\n")
     (scaffold / "scaffold.txt").write_text("initial\n")
     (scaffold / "obsolete.txt").write_text("remove me\n")
-    (scaffold / "orinoco.yaml").write_text("site configuration\n")
+    (scaffold / "pyproject.toml").write_text("site configuration\n")
     git(source, "add", ".")
     git(source, "commit", "-qm", "test: first template")
     git(source, "tag", "v1.0.0")
@@ -44,7 +44,7 @@ def downstream(tmp_path, remote, monkeypatch):
     subprocess.run(["datalad", "create", "--no-annex", str(root)], check=True)
     run_copy(url, root, vcs_ref=old, defaults=True, data={"project_name": "Retained"})
     git(root, "-c", "protocol.file.allow=always", "submodule", "add", str(source), "site-specific")
-    (root / "orinoco.yaml").write_text("custom site configuration\n")
+    (root / "pyproject.toml").write_text("custom site configuration\n")
     git(root, "add", ".")
     git(root, "commit", "-qm", "test: downstream")
     (scaffold / "scaffold.txt").write_text("updated\n")
@@ -75,7 +75,7 @@ def test_update_records_actual_copier_operation_preserves_submodule_and_replays(
     assert (root / "scaffold.txt").read_text() == "updated\n"
     assert (root / "added.txt").exists()
     assert not (root / "obsolete.txt").exists()
-    assert (root / "orinoco.yaml").read_text() == "custom site configuration\n"
+    assert (root / "pyproject.toml").read_text() == "custom site configuration\n"
     assert git(root, "ls-tree", "HEAD", "site-specific") == site
     assert yaml.safe_load((root / ".copier-answers.yml").read_text())["project_name"] == "Retained"
     message = git(root, "log", "-1", "--format=%B")
@@ -133,7 +133,7 @@ def test_git_revert_restores_the_update_without_reverting_site_edits(downstream)
     before = (root / ".copier-answers.yml").read_bytes()
     assert template_update.update(root, new) == 0
     update_commit = git(root, "rev-parse", "HEAD")
-    (root / "orinoco.yaml").write_text("later site change\n")
+    (root / "pyproject.toml").write_text("later site change\n")
     git(root, "add", ".")
     git(root, "commit", "-qm", "test: later site change")
     git(root, "revert", "--no-edit", update_commit)
@@ -141,7 +141,7 @@ def test_git_revert_restores_the_update_without_reverting_site_edits(downstream)
     assert (root / "scaffold.txt").read_text() == "initial\n"
     assert (root / "obsolete.txt").exists()
     assert not (root / "added.txt").exists()
-    assert (root / "orinoco.yaml").read_text() == "later site change\n"
+    assert (root / "pyproject.toml").read_text() == "later site change\n"
 
 
 def test_latest_release_uses_copier_tags_not_unreleased_head(downstream):

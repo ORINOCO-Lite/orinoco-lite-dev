@@ -256,7 +256,7 @@ orinoco-lite dev content diff build/upstream/projection build/lite/projection
 ```
 
 The import reads selected site data from `www-from-model` and any referenced file sources, preserving required page-resource placement.
-Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `site.yaml`.
+Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `pyproject.toml` (`tool.orinoco.site`).
 Hugo projection produces pages and graph data from the same joined records on both sides.
 The content diff reports page and graph differences separately.
 

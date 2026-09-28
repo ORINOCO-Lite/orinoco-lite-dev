@@ -13,7 +13,8 @@ Uses template origin/main and the package version and lock supplied by that temp
 
 Inputs:
   --dump PATH               Import an existing JSONL dump and upstream site files
-  --site-specific PATH      Use an existing dataset as a submodule instead of importing
+  --site-specific PATH      Use an existing dataset as a submodule instead of importing;
+                            root site settings use the template defaults
   --api URL                 Fetch a dump when neither input above is supplied
                             (default: https://pool.psychoinformatics.de/api)
   --site-layout MODE        Store imported inputs as submodule (default) or directory;

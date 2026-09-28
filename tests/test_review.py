@@ -13,26 +13,21 @@ from orinoco_lite.errors import DriverError
 from orinoco_lite.review import bind_review
 
 
-CONFIG = """\
-contract_version: 2
-"""
+CONFIG = '[tool.orinoco]\n'
 
-CONFIGURED_SITE = """\
-contract_version: 2
-site:
-  curation_service: HTTPS://Review.Example.Test:443/
-"""
+CONFIGURED_SITE = '[tool.orinoco.service]\nurl = "HTTPS://Review.Example.Test:443/"\n'
 
 
 def _write_site_data(root: Path, *, title: str = "Review fixture") -> None:
     site_root = root / "site-specific"
     site_root.mkdir()
-    (site_root / "site.yaml").write_text(
-        "version: 1\n"
-        "identity:\n"
-        f"  title: {title}\n"
-        "  description: A review fixture.\n"
-        "  base_url: https://example.invalid/orinoco/\n",
+    (root / "pyproject.toml").write_text(
+        (root / "pyproject.toml").read_text() +
+        "[tool.orinoco.site]\n"
+        "[tool.orinoco.site.identity]\n"
+        f'title = {json.dumps(title)}\n'
+        'description = "A review fixture."\n'
+        'base_url = "https://example.invalid/orinoco/"\n',
         encoding="utf-8",
     )
 
@@ -51,7 +46,7 @@ class StaticReviewBindingTests(unittest.TestCase):
     def test_disabled_binding_removes_the_reserved_review_route(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
             destination = root / "build/site/review"
             destination.mkdir(parents=True)
@@ -69,7 +64,7 @@ class StaticReviewBindingTests(unittest.TestCase):
     def test_configured_binding_copies_shell_and_writes_strict_config(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
             shell = root / "resources/review-shell"
             (shell / "assets").mkdir(parents=True)
@@ -128,7 +123,7 @@ class StaticReviewBindingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             site_name = "r" * 233
-            (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root, title=site_name)
             shell = root / "resources/review-shell"
             shell.mkdir(parents=True)
@@ -170,7 +165,7 @@ class StaticReviewBindingTests(unittest.TestCase):
     def test_configured_binding_requires_the_resources_shell(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIGURED_SITE, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
 
             with self.assertRaisesRegex(DriverError, "source-review shell"):
@@ -184,7 +179,7 @@ class StaticReviewBindingTests(unittest.TestCase):
     def test_trusted_repository_uses_the_default_central_service(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+            (root / "pyproject.toml").write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
             shell = root / "resources/review-shell"
             shell.mkdir(parents=True)
@@ -209,7 +204,7 @@ class StaticReviewBindingTests(unittest.TestCase):
     def test_site_build_binds_review_before_hashing_the_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            config = root / "orinoco.yaml"
+            config = root / "pyproject.toml"
             config.write_text(CONFIGURED_SITE, encoding="utf-8")
             _write_site_data(root)
             resources = root / "resources"

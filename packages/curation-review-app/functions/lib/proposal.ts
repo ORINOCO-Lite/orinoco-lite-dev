@@ -1,3 +1,5 @@
+import { parse as parseToml } from "smol-toml";
+import { parseOperations } from "./operation-policy";
 import { parseDocument } from "yaml";
 import type {
   CandidateOperation,
@@ -444,15 +446,7 @@ function configurationMapping(
   }
   let parsed: unknown;
   try {
-    const document = parseDocument(value, {
-      prettyErrors: false,
-      schema: "core",
-      uniqueKeys: true,
-    });
-    if (document.errors.length > 0 || document.warnings.length > 0) {
-      throw new Error("invalid YAML");
-    }
-    parsed = document.toJS({ maxAliasCount: 0 }) as unknown;
+    parsed = (parseToml(value) as any).tool?.orinoco;
   } catch {
     invalid(`The proposal metadata-base ${path} is invalid.`);
   }
@@ -468,29 +462,24 @@ export async function loadSiteCoordinates(
   baseSha: string,
 ): Promise<{ coordinates: SiteCoordinates; contentBytes: number }> {
   const configContents = await github.contents(repository, [
-    { key: "site-config", path: "orinoco.yaml", ref: baseSha },
+    { key: "site-config", path: "pyproject.toml", ref: baseSha },
   ]);
   const configText = configContents.get("site-config") ?? null;
-  const config = configurationMapping(configText, "orinoco.yaml");
-  if (config.contract_version !== 2) {
-    invalid("The proposal metadata-base orinoco.yaml contract is unsupported.");
+  const config = configurationMapping(configText, "pyproject.toml");
+  const site = config.site as Record<string, unknown> | undefined;
+  if (!site || typeof site !== "object" || Array.isArray(site)) {
+    invalid("The proposal metadata-base tool.orinoco.site is not a table.");
   }
-  const site = config.site === undefined ? {} : config.site;
-  if (site === null || typeof site !== "object" || Array.isArray(site)) {
-    invalid("The proposal metadata-base orinoco.yaml site is not a mapping.");
-  }
-  const serviceConfig = site as Record<string, unknown>;
+  const serviceConfig = (config.service ?? {}) as Record<string, unknown>;
   if (
-    Object.keys(serviceConfig).some(
-      (key) => !["repository", "curation_service"].includes(key),
-    )
+    !serviceConfig ||
+    typeof serviceConfig !== "object" ||
+    Array.isArray(serviceConfig)
   ) {
-    invalid(
-      "The proposal metadata-base orinoco.yaml contains unsupported site fields.",
-    );
+    invalid("The proposal metadata-base tool.orinoco.service is not a table.");
   }
+  parseOperations(config.operations);
   let recordRoot = DEFAULT_RECORD_ROOT;
-  let siteRoot = "site-specific";
   if (config.paths !== undefined) {
     if (
       config.paths === null ||
@@ -498,7 +487,7 @@ export async function loadSiteCoordinates(
       Array.isArray(config.paths)
     ) {
       invalid(
-        "The proposal metadata-base orinoco.yaml paths is not a mapping.",
+        "The proposal metadata-base pyproject.toml paths is not a mapping.",
       );
     }
     const paths = config.paths as Record<string, unknown>;
@@ -509,16 +498,8 @@ export async function loadSiteCoordinates(
       }
       recordRoot = configured;
     }
-    if (paths.site !== undefined) {
-      const configured = normalizedRepositoryDirectory(paths.site);
-      if (configured === null) {
-        invalid("The proposal metadata-base paths.site is unsafe.");
-      }
-      siteRoot = configured;
-    }
   }
-  const serviceValue =
-    serviceConfig.curation_service ?? DEFAULT_CURATION_SERVICE_ORIGIN;
+  const serviceValue = serviceConfig.url ?? DEFAULT_CURATION_SERVICE_ORIGIN;
   const serviceUrl = safeSiteUrl(serviceValue);
   if (
     serviceUrl === null ||
@@ -527,41 +508,20 @@ export async function loadSiteCoordinates(
       serviceValue !== `${serviceUrl.origin}/`)
   ) {
     invalid(
-      "The proposal metadata-base site.curation_service is not an origin.",
+      "The proposal metadata-base tool.orinoco.service.url is not an origin.",
     );
   }
   const configBytes = new TextEncoder().encode(configText ?? "").byteLength;
-  const sitePath = `${siteRoot}/site.yaml`;
-  let siteContents = await github.contents(
-    repository,
-    [{ key: "site-data", path: sitePath, ref: baseSha }],
-    MAX_REVIEW_BYTES - configBytes,
-  );
-  if (siteRoot === "site-specific" && siteContents.get("site-data") === null) {
-    const submodule = await github.siteSubmodule(repository, baseSha);
-    if (submodule !== null) {
-      siteContents = await github.contents(
-        submodule.repository,
-        [{ key: "site-data", path: "site.yaml", ref: submodule.sha }],
-        MAX_REVIEW_BYTES - configBytes,
-      );
-    }
-  }
-  const siteText = siteContents.get("site-data") ?? null;
-  const siteData = configurationMapping(siteText, sitePath);
-  if (siteData.version !== 1) {
-    invalid(`The proposal metadata-base ${sitePath} version is unsupported.`);
-  }
   if (
-    siteData.identity === null ||
-    typeof siteData.identity !== "object" ||
-    Array.isArray(siteData.identity)
+    !site.identity ||
+    typeof site.identity !== "object" ||
+    Array.isArray(site.identity)
   ) {
     invalid(
-      `The proposal metadata-base ${sitePath} identity is not a mapping.`,
+      "The proposal metadata-base tool.orinoco.site.identity is not a table.",
     );
   }
-  const identity = siteData.identity as Record<string, unknown>;
+  const identity = site.identity as Record<string, unknown>;
   const baseUrl = safeSiteUrl(identity.base_url);
   if (baseUrl === null) {
     invalid("The proposal metadata-base identity.base_url is unsafe.");
@@ -574,8 +534,7 @@ export async function loadSiteCoordinates(
       reviewServiceOrigin: serviceUrl.origin,
       reviewSiteUrl: new URL("review/", baseUrl).toString(),
     },
-    contentBytes:
-      configBytes + new TextEncoder().encode(siteText ?? "").byteLength,
+    contentBytes: configBytes,
   };
 }
 
