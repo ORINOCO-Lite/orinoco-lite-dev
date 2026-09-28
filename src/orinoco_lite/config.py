@@ -402,7 +402,7 @@ def load_workspace(
     media = raw.get("media", {})
     if (not isinstance(media, dict) or set(media) - {"annex"}
             or not isinstance(media.get("annex", False), bool)):
-        raise ConfigurationError("orinoco.yaml media accepts only annex: true or false")
+        raise ConfigurationError("pyproject.toml tool.orinoco.media accepts only annex = true or false")
 
     workspace = WorkspaceConfig(
         root=resolved_root,

@@ -4,11 +4,11 @@ A downstream can store images and other media in Git Annex under its `site-speci
 Records, configuration, editorial content, and source-adapter outputs must remain ordinary Git files.
 Directories without a submodule do not support this option.
 
-Set the following in `orinoco.yaml`:
+Set the following in `pyproject.toml`:
 
-```yaml
-media:
-  annex: true
+```toml
+[tool.orinoco.media]
+annex = true
 ```
 
 Install Git Annex in the downstream’s Pixi environment and commit the manifest and lock.
@@ -28,6 +28,7 @@ Ensure that saves keep records and configuration in Git, for example with these 
 metadata/** annex.largefiles=nothing
 *.yaml annex.largefiles=nothing
 *.yml annex.largefiles=nothing
+*.toml annex.largefiles=nothing
 ```
 
 Orinoco does not overwrite that policy and rejects Annex-managed files outside the media directories, including unlocked files.
@@ -35,7 +36,6 @@ Orinoco does not overwrite that policy and rejects Annex-managed files outside t
 Configure publicly readable storage using native Git Annex remotes.
 Keep their configuration in the Annex repository so new clones can discover the content.
 DataLad’s `siblings configure --as-common-datasrc` can register a public Git remote as a discoverable content source.
-GIN is one tested storage service, not an Orinoco dependency.
 The GitHub browser curation flow still uses a GitHub metadata repository; an Annex sibling supplies its media.
 Private storage and build-time credential setup are outside this feature’s scope.
 

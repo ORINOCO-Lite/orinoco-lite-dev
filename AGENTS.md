@@ -9,7 +9,7 @@
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
   It may hydrate and verify Annex-backed content required by the selected upstream functionality before ordinary files are copied into the licensed template overlay.
   `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.
-  Downstreams without `media.annex: true` must not invoke or depend on Git Annex.
+  Downstreams without `tool.orinoco.media.annex = true` must not invoke or depend on Git Annex.
   Opted-in `site-specific` submodules may use Annex only for `assets/` and `static/`; builds copy verified content into ordinary output files.
   DataLad remains a downstream dependency for recording source-adapter run provenance; records and other structured inputs always remain in Git.
   DataLad operations in opted-in Annex submodules require the Annex executable even when saving ordinary Git records.

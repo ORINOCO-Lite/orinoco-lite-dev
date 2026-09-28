@@ -31,13 +31,17 @@ def workspace(tmp_path, monkeypatch):
     for path in ('metadata/records', 'content', 'assets', 'static'):
         (site / path).mkdir(parents=True)
     (root / 'extensions').mkdir()
-    (root / 'orinoco.yaml').write_text('contract_version: 2\nmedia:\n  annex: true\n')
-    (site / 'site.yaml').write_text('version: 1\nidentity:\n  title: Media test\n  description: Media fixture\n  base_url: https://example.org/\n')
+    (root / 'pyproject.toml').write_text(
+        '[tool.orinoco.media]\nannex = true\n'
+        '[tool.orinoco.site.identity]\ntitle = "Media test"\n'
+        'description = "Media fixture"\nbase_url = "https://example.org/"\n'
+    )
+    (site / 'content/example.md').write_text('Editorial content stays in Git.\n')
     (site / 'metadata/records/person.yaml').write_text('pid: ex:person\nschema_type: dlthings:Person\nname: Person\n')
     (site / 'static/image.png').write_bytes(b'fixture image bytes')
     git(site, 'annex', 'add', 'static/image.png')
     (site / '.gitattributes').write_text('metadata/** annex.largefiles=nothing\n*.yaml annex.largefiles=nothing\n*.yml annex.largefiles=nothing\n')
-    git(site, 'add', 'metadata', 'site.yaml', '.gitattributes')
+    git(site, 'add', 'metadata', 'content', '.gitattributes')
     git(site, 'commit', '-m', 'test: add media and Git metadata')
     (root / '.gitmodules').write_text('[submodule "site-specific"]\npath = site-specific\nurl = https://example.org/metadata.git\n')
     git(root, 'add', '.')
@@ -107,10 +111,10 @@ def test_unlocked_media_is_verified_and_prohibited_inputs_still_rejected(workspa
     media = prepare_media(workspace)
     _copy_tree(site / 'static', tmp_path / 'output', media=media)
     assert (tmp_path / 'output/image.png').read_bytes() == b'fixture image bytes'
-    git(site, 'rm', '--cached', 'site.yaml')
-    git(site, 'annex', 'add', '--force-large', 'site.yaml')
-    git(site, 'annex', 'unlock', 'site.yaml')
-    with pytest.raises(ConfigurationError, match='site.yaml'):
+    git(site, 'rm', '--cached', 'content/example.md')
+    git(site, 'annex', 'add', '--force-large', 'content/example.md')
+    git(site, 'annex', 'unlock', 'content/example.md')
+    with pytest.raises(ConfigurationError, match='content/example.md'):
         workspace_annex_files(workspace)
 
 
