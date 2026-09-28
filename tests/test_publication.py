@@ -121,17 +121,23 @@ def test_latest_successful_snapshots_are_bounded_and_keep_their_trees(repository
     assert git(remote, "rev-list", "--count", "gh-pages") == "1"
 
 
-def test_old_source_linked_history_is_detached(repository):
+def test_source_linked_history_is_replaced_by_a_fresh_root(repository):
     root, remote = repository
     projection = prepare_build(root)
     tree = git(root, "rev-parse", f"{projection}^{{tree}}")
     old = git(root, "commit-tree", tree, "-p", projection, "-m",
               f"chore(pages): publish generated site\n\nProjection-Commit: {projection}")
-    git(root, "push", "origin", f"{old}:refs/heads/gh-pages")
+    git(root, "push", "origin", f"{old}:refs/heads/gh-pages",
+        f"{projection}:refs/heads/latest-hugo-projection")
+    prepare_build(root)
+    publish(root, BUNDLE)
+    assert git(remote, "rev-list", "--count", "gh-pages") == "1"
+    assert git(remote, "show", "gh-pages:index.html") == "first"
+    advance(root, "second")
     prepare_build(root)
     publish(root, BUNDLE)
     assert git(remote, "rev-list", "--count", "gh-pages") == "2"
-    assert git(remote, "rev-parse", "gh-pages~1^{tree}") == tree
+    assert git(remote, "show", "gh-pages~1:index.html") == "first"
     assert not git(remote, "merge-base", "main", "gh-pages", check=False)
 
 

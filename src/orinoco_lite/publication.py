@@ -233,15 +233,11 @@ def prepare(
 
 def _bounded_pages(root: Path, latest: str, previous: str | None, limit: int) -> str:
     commits = [latest]
-    while previous and len(commits) < limit:
-        # The old publication format has a website -> projection -> source
-        # chain. Stop at the projection instead of retaining source history.
-        message = _run(["git", "show", "-s", "--format=%B", previous], cwd=root)
-        if not any(line.startswith("Projection-Commit: ") for line in message.splitlines()):
-            break
-        commits.append(previous)
-        parents = _run(["git", "show", "-s", "--format=%P", previous], cwd=root).split()
-        previous = parents[0] if parents else None
+    if previous and limit > 1:
+        commits.extend(_run(
+            ["git", "rev-list", "--first-parent", f"--max-count={limit - 1}", previous],
+            cwd=root,
+        ).splitlines())
     parent = None
     for commit in reversed(commits):
         tree = _run(["git", "rev-parse", f"{commit}^{{tree}}"], cwd=root)
@@ -279,6 +275,10 @@ def publish(root: Path, bundle_name: str, history_limit: int = 3) -> None:
     previous = remote.get(branches[1])
     if previous:
         _run(["git", "fetch", "--quiet", "origin", previous], cwd=root)
+        # Start fresh when the existing website is attached to its projection.
+        if _run(["git", "show", "-s", "--format=%P", previous], cwd=root) == remote.get(branches[0]):
+            previous = None
+    if previous:
         # Retrying the record job must not count the same deployment twice.
         previous_message = _run(["git", "show", "-s", "--format=%B", previous], cwd=root)
         if (previous_message.splitlines() == message
