@@ -16,7 +16,7 @@ For the template’s supported platforms, the engineering environment uses these
 
 ```console
 env -u PIXI_LOCKED pixi add --platform linux-64 'git-annex==10.20260601'
-env -u PIXI_LOCKED pixi add --platform osx-arm64 --pypi 'git-annex==10.20260601'
+env -u PIXI_LOCKED pixi add --platform osx-arm64-macos-14-0 --pypi 'git-annex==10.20260601'
 ```
 
 This executable is also required when DataLad saves ordinary Git records in an Annex-enabled submodule.
