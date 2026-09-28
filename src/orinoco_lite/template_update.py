@@ -67,6 +67,7 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
     # The lock is derived from the merged manifest. Merging generated lock text
     # would manufacture conflicts unrelated to the maintainer's dependency choices.
     run_update(root, vcs_ref=revision, defaults=True, overwrite=True, conflict="inline",
+               exclude=["site-specific/**", "extensions/**"],
                data={"package_repository": package_repository, "package_revision": package_revision},
                skip_if_exists=["pixi.lock"])
     unmerged = git(root, "diff", "--name-only", "--diff-filter=U").splitlines()
