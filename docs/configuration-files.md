@@ -1,6 +1,6 @@
 # Downstream configuration files
 
-This is the configuration boundary for downstream websites, guiding [#181](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/181) before [#182](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/182).
+This document defines configuration ownership for downstream websites.
 
 | File | Owns |
 | --- | --- |
