@@ -57,6 +57,10 @@ Failures are retried before a write, inspected after an uncertain write, or repa
 ## App credentials and automated completion
 
 Downstreams MUST need only the same curation App installed on each participating repository, with no additional App, personal access token, or private key.
+This product requirement includes template maintenance as well as metadata proposals.
+Reuse the existing Actions OIDC verification, App signing key, installation-token issuance, and revocation; add only the authorization checks required by the operation.
+When a product operation needs additional GitHub permissions or backend support, extend the same App and service.
+Automated pull requests and messages use the App's bot identity; interactive curator actions retain the authenticated user's identity.
 Installation alone MUST NOT authorize cross-repository access.
 The operator MUST protect signing keys in backend secret storage with restricted access, rotation, and revocation; keys MUST NOT enter source, browsers, downstream secrets, artifacts, or logs.
 
@@ -70,3 +74,81 @@ Proposal content MUST remain data; untrusted code MUST NOT receive credentials o
 Installation tokens MUST be limited to required repositories and permissions, exposed only to trusted transport steps, and revoked when finished.
 Because tokens are not path- or branch-scoped, the trusted workflow MUST enforce allowed paths and exact-head leases.
 The App MUST NOT acquire bypass permissions, modify repository protections, or merge proposals to complete materialization.
+
+## Functionality and permissions
+
+This mapping is the normative permission requirement for each operation, not a separate runtime registry.
+Read access is included in write access; Metadata read is the GitHub-required baseline.
+Permissions used for verification need not be included in the later write token.
+
+| Functionality | App repository permissions used | Purpose |
+| --- | --- | --- |
+| App installation | Metadata: read | GitHub-required repository identity baseline |
+| Review source proposals | Contents: read; Pull requests: read; Actions: read | Read proposed records, pull requests, and workflow artifacts/results |
+| Submit edits and curation decisions | Contents: write; Pull requests: write | Record authorized changes and create or comment on proposals |
+| Automated SHACL proposal materialization | Actions: read; Contents: write; Pull requests: read | Verify the authorized handoff and record its materialized metadata |
+| Automated curation completion | Actions: read; Contents: write; Pull requests: write | Verify the originating workflow and publish its authorized result |
+| Template updates | Actions: read; Contents: write; Pull requests: write; Workflows: write | Verify the run, push the Copier update including `.github/workflows/`, and open a bot-owned draft |
+| Editing from a development deploy preview | Commit statuses: read, in addition to edit permissions | Verify the successful preview for the exact draft head before allowing edits |
+
+An App registration requests the union of permissions needed by the features its operator supports.
+A self-hosted service may use its own App registration with a smaller permission set.
+GitHub grants requested repository permissions together; existing installation owners may decline additions and retain their previous grants.
+Per-operation installation tokens MUST request only the repositories and permissions needed for that stage, within the installation's grants.
+See [GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app) and [installation-token restrictions](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation).
+
+### Downstream operation choices
+
+The downstream owner MUST be able to opt into automated operations independently of the App's installed permission set.
+
+`tool.orinoco.operations` in `pyproject.toml` contains independent boolean choices:
+
+```toml
+[tool.orinoco.operations]
+shacl_materialization = false
+automated_curation = false
+template_updates = false
+preview_editing = false
+```
+
+These respectively enable automated SHACL proposal materialization, automated curation completion, template-update proposals, and editing from verified development previews.
+Missing choices are disabled; unknown names and nonboolean values are invalid.
+Local editing, bundle downloads, and read-only review do not opt into automation or preview editing.
+Creating a SHACL handoff for automated materialization requires `shacl_materialization`; preview-origin proposals additionally require `preview_editing`.
+The single-repository SHACL workflow also checks current default-branch policy before publishing with its workflow token.
+
+Copier initializes public site settings but MUST NOT ask operation-permission questions.
+The App post-install setup page explains the operations and required permissions and directs owners to edit `[tool.orinoco.operations]` in root `pyproject.toml`.
+That site-owned configuration is authoritative at runtime, not Copier's answer history.
+The configuration boundary is defined in [Downstream configuration files](../../configuration-files.md).
+The configuration schema and user-facing controls MUST expose the operation, required permissions, and purpose from this mapping.
+Template updates MUST NOT silently enable additional operations or broaden an existing choice.
+
+Before issuing write access or performing a write, the service MUST read the current downstream policy from its trusted default branch and require the operation to be enabled.
+The operation's required permissions MUST fit both the downstream's enabled choices and the App installation's actual grants; otherwise the service MUST reject it with the missing choice or permission identified.
+A workflow input, proposed configuration change, update branch, or browser request MUST NOT authorize itself or broaden that policy.
+Changing a workflow file alone MUST NOT bypass the service's decision.
+A disabled operation MUST NOT be authorized merely because the App has the corresponding GitHub permission.
+These controls govern this service's use of its authority; they do not revoke GitHub-level grants or prevent independent repository collaborators from making changes.
+
+Authorization tests MUST exercise allowed operations, disabled operations despite sufficient App permissions, missing GitHub grants, and attempted opt-in through untrusted request or proposed-branch configuration.
+Test observable grants and rejections rather than maintaining another permission inventory or checking documentation text.
+
+## Development credentials
+
+A scoped development token may be used to isolate a test or unblock development.
+State which behavior it tests and which central-App behavior remains unverified; a successful PAT-based write does not verify App authorization or bot attribution.
+When requesting a token, provide a creation link with the required permissions, the repository selection and expiry, and `gh secret set SECRET_NAME --repo OWNER/REPO` so the user can enter the value interactively.
+Keep temporary test credentials out of the downstream product requirements.
+
+## Template update automation
+
+Template updates reuse the installed curation App and Actions OIDC authentication.
+The service verifies the dispatch actor’s repository write permission, immutable repository identity, current update base, active run, and workflow content against the default branch.
+Only the separate publishing job may receive a repository-scoped installation token after update preparation completes.
+Package installation, Copier, and candidate validation run without write credentials or OIDC access in the preparation job.
+The publishing job transports recorded commits, opens the bot-owned draft, reports the result, and revokes access without executing updated code.
+Its token requires contents, pull request, and workflow write permissions; it never merges the update.
+Workflow files under `.github/workflows/` are part of the Copier scaffold, so a template update can change them along with other template-owned files.
+GitHub's workflow write permission authorizes those file changes; merely running an existing workflow or posting a pull-request description does not require it.
+The template authorization route is part of the existing central service and shares its credentials; deploying that code and approving the App's additional GitHub permission are separate operator actions.

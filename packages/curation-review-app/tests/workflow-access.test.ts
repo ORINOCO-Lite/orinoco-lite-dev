@@ -86,10 +86,21 @@ function draft(repo: string, sha: string, branch: string, base: string) {
 }
 async function setup() {
   const github = new GitHubClient("user-token");
+  vi.spyOn(GitHubClient.prototype, "branchHead").mockResolvedValue({
+    name: "main",
+    sha: source,
+  });
+  const policy = "[tool.orinoco.operations]\nshacl_materialization = true";
+  const initialContents = vi
+    .spyOn(github, "contents")
+    .mockResolvedValue(new Map([["operation-policy", policy]]));
   const spy = vi
     .spyOn(github, "json")
-    .mockResolvedValueOnce({ id: 1 })
-    .mockResolvedValueOnce({ id: 2 });
+    .mockImplementation(async (path) =>
+      path === "/repos/owner/site"
+        ? { id: 1, default_branch: "main" }
+        : { id: 2 },
+    );
   const authorization = await authorizeWorkflow(github, env, {
     repository: "owner/site",
     branch: "curation/site",
@@ -98,6 +109,7 @@ async function setup() {
     handoff: unsigned,
   });
   spy.mockRestore();
+  initialContents.mockRestore();
   const handoff = { ...unsigned, authorization };
   const token = vi.fn(async (_repo: string, _write = false) => ({
     token: "scoped-test-token",
@@ -112,7 +124,10 @@ async function setup() {
       async (repo) =>
         new Map(
           repo === "owner/site"
-            ? [["handoff", JSON.stringify(handoff)]]
+            ? [
+                ["handoff", JSON.stringify(handoff)],
+                ["operation-policy", policy],
+              ]
             : [["bundle", JSON.stringify(bundle)]],
         ),
     );
@@ -271,6 +286,7 @@ describe("proposal-bound workflow authority", () => {
     ).rejects.toThrow();
   });
   it.each([
+    "operation disabled",
     "website head",
     "metadata head",
     "permission",
@@ -282,6 +298,14 @@ describe("proposal-bound workflow authority", () => {
     "closed draft",
   ])("denies %s changes without issuing write access", async (boundary) => {
     const s = await setup();
+    if (boundary === "operation disabled") {
+      const original = s.contents.getMockImplementation()!;
+      s.contents.mockImplementation(async (repo, requests, limit) => {
+        const result = await original(repo, requests, limit);
+        result.set("operation-policy", "[tool.orinoco]");
+        return result;
+      });
+    }
     if (boundary === "website head")
       s.pull.mockResolvedValue(
         draft("owner/site", "e".repeat(40), "curation/site", source),
@@ -317,7 +341,13 @@ describe("proposal-bound workflow authority", () => {
         async (repo) =>
           new Map(
             repo === "owner/site"
-              ? [["handoff", JSON.stringify(s.handoff)]]
+              ? [
+                  ["handoff", JSON.stringify(s.handoff)],
+                  [
+                    "operation-policy",
+                    "[tool.orinoco.operations]\nshacl_materialization = true",
+                  ],
+                ]
               : [
                   [
                     "bundle",
@@ -493,7 +523,16 @@ describe("App installation token boundaries", () => {
         JSON.stringify(
           init?.method === "POST"
             ? { token: "scoped", expires_at: "later" }
-            : { id: 8, suspended_at: null },
+            : {
+                id: 8,
+                suspended_at: null,
+                permissions: {
+                  contents: "write",
+                  pull_requests: "write",
+                  actions: "read",
+                  workflows: "write",
+                },
+              },
         ),
         { status: 200 },
       );
@@ -512,6 +551,30 @@ describe("App installation token boundaries", () => {
       repositories: ["site"],
       permissions: { contents: "read", pull_requests: "read", actions: "read" },
     });
+    await app.token("owner/site", true, false, true, true);
+    expect(JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body))).toEqual({
+      repositories: ["site"],
+      permissions: {
+        contents: "write",
+        pull_requests: "write",
+        workflows: "write",
+      },
+    });
+    fetcher.mockImplementation(async () =>
+      Response.json({
+        id: 8,
+        suspended_at: null,
+        permissions: { contents: "write", pull_requests: "write" },
+      }),
+    );
+    const previousCalls = fetcher.mock.calls.length;
+    await expect(
+      app.token("owner/site", true, false, true, true),
+    ).rejects.toMatchObject({
+      code: "app_permission_required",
+      message: expect.stringContaining("workflows: write"),
+    });
+    expect(fetcher.mock.calls.length - previousCalls).toBe(1);
     fetcher.mockImplementation(
       async () => new Response(JSON.stringify({ id: 8, suspended_at: "now" })),
     );

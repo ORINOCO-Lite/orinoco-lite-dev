@@ -44,11 +44,11 @@ No persistent installation token, webhook secret, database credential, or storag
 The trusted downstream build derives the exact GitHub `owner/repository` from `GITHUB_REPOSITORY` or its equivalent general project identity and emits it into the generated `/edit/` and `/review/` configuration.
 Repository identity is not a separate curation setting.
 
-`site.curation_service` is optional.
+`tool.orinoco.service.url` is optional.
 When absent, the released integration uses the Orinoco Lite central-service origin.
 When present, it is the credential-free HTTPS origin of a compatible independently hosted backend, with no path, query, fragment, or credentials.
 It is not a service secret, OAuth state, or a substitute for the App's selected-repository installation.
-The site's `site.base_url` owns the canonical `edit/` and `review/` routes.
+The site's `tool.orinoco.site.identity.base_url` owns the canonical `edit/` and `review/` routes.
 The service independently verifies every browser coordinate against GitHub, the App installation, trusted repository content, and the exact operation.
 
 ## Provider capability gate
@@ -128,7 +128,7 @@ The downstream static `review/` route generates a fresh 256-bit nonce and opens 
 OAuth remains in the popup, so the main browser and all review state remain on the downstream route.
 The sealed session grant binds all coordinates.
 
-Before sending proposal data, the backend reads `orinoco.yaml` at the verified proposal metadata base, derives the trusted repository from the GitHub objects, resolves the central-service default or verifies an explicit `site.curation_service` override, and derives the exact downstream `site.base_url` plus `review/`.
+Before sending proposal data, the backend reads `pyproject.toml` at the verified proposal metadata base, derives the trusted repository from the GitHub objects, resolves the central-service default or verifies an explicit `tool.orinoco.service.url` override, and derives the exact downstream `tool.orinoco.site.identity.base_url` plus `review/`.
 The minimal generated callback/transport response and downstream complete a typed ready/request handshake and require exact opener window, origin, operation, nonce, repository, pull request, and artifact matches.
 Never send a token or CSRF value through browser messaging and never use `*` as a message target.
 
@@ -149,7 +149,7 @@ The static site opens the backend SHACL authorization route with its repository,
 The bundle remains in the static editor's memory through OAuth.
 The editor sends it only after the exact popup at the effective service origin signals readiness with the matching repository, operation, and nonce.
 The backend transport accepts it only from the exact opener at the declared HTTPS editor origin with the same coordinates.
-The backend independently reads `orinoco.yaml` at the trusted base commit before a SHACL write and requires its `site.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
+The backend independently reads `pyproject.toml` at the trusted base commit before a SHACL write and requires its `tool.orinoco.site.identity.base_url` editor origin and effective curation-service origin to match the sealed grant and current deployment.
 Successful writes consume the relevant grant; standalone SHACL branches are deterministic for the source commit and handoff nonce so GitHub ref creation rejects a concurrent replay.
 
 The URL and OAuth state must not contain the bundle.

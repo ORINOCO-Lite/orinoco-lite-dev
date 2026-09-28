@@ -1,3 +1,4 @@
+import { requireOperation } from "./operation-policy";
 import type { AuthorizationInput } from "./workflow-access";
 import type {
   ShaclGrant,
@@ -129,6 +130,7 @@ async function prepareHandoff(
   const source = proposal.bundle.source_commit;
   const submodule = await github.siteSubmodule(proposal.repository, source);
   const bytes = serializeShaclReviewBundle(proposal.bundle);
+  await requireOperation(github, proposal.repository, "shacl_materialization");
   if (submodule === null) return { bytes, metadataPull: null };
   authorization.requireAutomation?.();
   if (
@@ -245,6 +247,7 @@ async function requireTrustedEditorDeployment(
   }
   if (new URL(site.editorSiteUrl).origin === grant.editor_origin) return site;
   if (pull !== null) {
+    await requireOperation(github, repository, "preview_editing");
     const value = await github.commitStatus(repository, pull.headSha);
     if (
       value !== null &&

@@ -22,6 +22,7 @@ const identity = {
 };
 function authentication(
   options: {
+    enabled?: boolean;
     stale?: boolean;
     permission?: string;
     validated?: boolean;
@@ -39,7 +40,23 @@ function authentication(
           ? "f".repeat(40)
           : meta;
     let result: unknown;
-    if (path.endsWith("/permission"))
+    if (path === "/graphql")
+      result = {
+        data: {
+          repository: {
+            blob0: {
+              __typename: "Blob",
+              byteSize: new TextEncoder().encode(
+                `[tool.orinoco.operations]\nautomated_curation = ${options.enabled !== false}`,
+              ).byteLength,
+              isBinary: false,
+              isTruncated: false,
+              text: `[tool.orinoco.operations]\nautomated_curation = ${options.enabled !== false}`,
+            },
+          },
+        },
+      };
+    else if (path.endsWith("/permission"))
       result = {
         permission: options.permission ?? "write",
         user: { id: 2, login: "curator" },
@@ -191,6 +208,7 @@ describe("source-adapter workflow access", () => {
     );
   });
   it.each([
+    [{ enabled: false }, "Enable tool.orinoco.operations.automated_curation"],
     [{ stale: true }, "default branch differs"],
     [{ permission: "read" }, "permission is required"],
     [{}, "Composed validation"],

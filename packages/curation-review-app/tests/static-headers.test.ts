@@ -8,12 +8,12 @@ const SERVICE_DIST = resolve("service-dist");
 const ROUTES = resolve("service-dist/_routes.json");
 
 describe("backend-only service output", () => {
-  it("routes only the root tombstone and API requests to functions", async () => {
+  it("routes only the root tombstone, installation setup, and API requests to functions", async () => {
     const routes = JSON.parse(await readFile(ROUTES, "utf8")) as unknown;
 
     expect(routes).toEqual({
       exclude: [],
-      include: ["/", "/api/*"],
+      include: ["/", "/setup", "/api/*"],
       version: 1,
     });
   });

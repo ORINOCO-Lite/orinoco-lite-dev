@@ -34,7 +34,7 @@ Keep the hosting choice separate from the application contract and keep every hu
    Use Git and the hosting provider's deployment history for recovery; do not create a separate deployment ledger or coordinate inventory.
 8. Follow [verification-rotation-and-rollback.md](references/verification-rotation-and-rollback.md): run non-mutating probes first, then a real authenticated read-only browser flow.
    Require explicit authorization before any comment, branch, commit, or pull-request write, and use only a disposable or designated integration repository for that proof.
-9. Only after the deployment and App installation pass verification, set `site.curation_service` in a downstream when it should override the released central default.
+9. Only after the deployment and App installation pass verification, set `tool.orinoco.service.url` in a downstream when it should override the released central default.
    Do not add a curation-specific repository setting; verify that the trusted build derives repository identity from its general project coordinate.
 10. Guide downstream maintainers through the custom-domain and shared-origin checks in [verification-rotation-and-rollback.md](references/verification-rotation-and-rollback.md).
     A custom or otherwise unique origin receives the normal flow; shared `github.io` deployments show the warning and remediation link without gating direct submission, while **Download bundle** remains credential-free.

@@ -74,7 +74,7 @@ For an authorized downstream:
 2. Configure that exact domain for the downstream Pages site using GitHub's current [custom-domain procedure](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
    Follow the current provider-displayed DNS targets; do not copy historical IP addresses from logs or documentation.
 3. Wait for GitHub's domain and certificate checks, then enable and verify HTTPS using its [HTTPS guidance](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https).
-4. Confirm that the origin of `site.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
+4. Confirm that the origin of `tool.orinoco.site.identity.base_url`, the generated editor and review configuration, and the actual `window.location.origin` all identify the final HTTPS custom origin with no unexpected redirect back to `github.io`.
 5. Load `/edit/` and `/review/` from the final deployment, confirm the custom-domain flow omits the shared-origin warning, and complete the read-only OAuth proof before authorizing a write proof.
 
 If the custom domain is unavailable or not yet verified, retain the ordinary `github.io` deployment and its informational warning and remediation link.
@@ -122,7 +122,7 @@ Never attempt to preserve or decrypt old cookies.
 
 ### Origin
 
-Coordinate TLS or provider routing, `PUBLIC_ORIGIN`, GitHub callbacks, the released central-service default, and only those downstreams with an explicit `site.curation_service` override.
+Coordinate TLS or provider routing, `PUBLIC_ORIGIN`, GitHub callbacks, the released central-service default, and only those downstreams with an explicit `tool.orinoco.service.url` override.
 Existing cookies are origin-bound; require a fresh sign-in.
 During a migration, temporarily retain the old exact callback and add the new exact callback with wildcard matching disabled.
 Deploy and verify the new origin read-only, update the released default and any explicit downstream overrides that should move, disable writes through the old origin, then remove the old callback.

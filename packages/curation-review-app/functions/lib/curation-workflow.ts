@@ -1,3 +1,4 @@
+import { requireOperation } from "./operation-policy";
 import type { JWTPayload } from "jose";
 import { GitHubClient } from "./github";
 import { HttpError, requireExactKeys } from "./http";
@@ -49,6 +50,7 @@ export async function curationWorkflowAccess(
   let metadataToken: { token: string; expires_at: string } | undefined;
   try {
     const website = new GitHubClient(token.token, auth.fetcher);
+    await requireOperation(website, repository, "automated_curation");
     const repo = object(await website.json(`/repos/${repository}`));
     const trusted = (await website.branchHead(repository, repo.default_branch))
       .sha;
