@@ -105,6 +105,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("arguments", nargs=argparse.REMAINDER)
     from . import package_update
     package_update.register(commands)
+    from . import template_update
+    template_update.register(commands)
     dev = commands.add_parser("dev", help="development-only commands")
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
@@ -344,6 +346,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             from . import package_update
             package_update.update(args.root or Path.cwd(), args.revision, args.repository, check=args.check)
             return 0
+        if args.command == "template":
+            from . import template_update
+            return template_update.execute(args)
         if args.command == "dev" and args.dev_command == "records":
             from . import pool_capture, record_stages
             if args.records_command == "get":
