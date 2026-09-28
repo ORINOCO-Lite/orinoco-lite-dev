@@ -50,6 +50,10 @@ def downstream(tmp_path, remote, monkeypatch):
     (scaffold / "scaffold.txt").write_text("updated\n")
     (scaffold / "obsolete.txt").unlink()
     (scaffold / "added.txt").write_text("new\n")
+    # A later template must not write through the downstream's site-specific
+    # submodule during an update.
+    (scaffold / "site-specific").mkdir()
+    (scaffold / "site-specific" / "site.yaml").write_text("template content\n")
     git(source, "add", ".")
     git(source, "commit", "-qm", "test: next template")
     git(source, "tag", "v2.0.0")
