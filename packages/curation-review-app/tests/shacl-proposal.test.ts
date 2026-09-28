@@ -235,66 +235,77 @@ describe("attributed existing-PR SHACL handoff", () => {
     }
   });
 
-  it("rejects a noncanonical editor without the exact successful preview", async () => {
-    const fetchMock = vi.fn(
-      async (input: string | URL | Request, init?: RequestInit) => {
-        const url = String(input);
-        const common = commonResponse(url);
-        if (common !== null) return common;
-        if (url.endsWith("/pulls/42")) {
-          return Response.json({
-            base: {
-              ref: "main",
-              repo: { full_name: "example/site" },
-              sha: BASE,
-            },
-            draft: true,
-            head: {
-              ref: "curation/edit",
-              repo: { full_name: "example/site" },
-              sha: HEAD,
-            },
-            html_url: "https://github.com/example/site/pull/42",
-            number: 42,
-            state: "open",
-          });
-        }
-        if (url === "https://api.github.com/graphql") {
-          const graphql = JSON.parse(String(init?.body)) as {
-            variables: Record<string, unknown>;
-          };
-          return siteConfigResponse(
-            graphql.variables.expression0 === `${BASE}:pyproject.toml`
-              ? ORINOCO_CONFIG
-              : SITE_DATA,
-          );
-        }
-        if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
-          return Response.json({
-            statuses: [
-              {
-                context: "netlify/example/deploy-preview",
-                state: "success",
-                target_url: "https://deploy-preview-43--example.netlify.app/",
+  it.each([true, false])(
+    "rejects an unauthorized preview (enabled=%s)",
+    async (enabled) => {
+      const fetchMock = vi.fn(
+        async (input: string | URL | Request, init?: RequestInit) => {
+          const url = String(input);
+          const common = commonResponse(url);
+          if (common !== null) return common;
+          if (url.endsWith("/pulls/42")) {
+            return Response.json({
+              base: {
+                ref: "main",
+                repo: { full_name: "example/site" },
+                sha: BASE,
               },
-            ],
-          });
-        }
-        throw new Error(`Unexpected request: ${url}`);
-      },
-    );
-    await expect(
-      createProposal(
-        new GitHubClient("ghu_curator", fetchMock),
-        request({
-          expected_head_sha: HEAD,
-          kind: "pull_request",
-          pull_request: 42,
-        }),
-        PREVIEW_ORIGIN,
-      ),
-    ).rejects.toMatchObject({ code: "shacl_transport_mismatch", status: 403 });
-  });
+              draft: true,
+              head: {
+                ref: "curation/edit",
+                repo: { full_name: "example/site" },
+                sha: HEAD,
+              },
+              html_url: "https://github.com/example/site/pull/42",
+              number: 42,
+              state: "open",
+            });
+          }
+          if (url === "https://api.github.com/graphql") {
+            const graphql = JSON.parse(String(init?.body)) as {
+              variables: Record<string, unknown>;
+            };
+            return siteConfigResponse(
+              graphql.variables.expression0 === `${BASE}:pyproject.toml`
+                ? ORINOCO_CONFIG.replace(
+                    "preview_editing = true",
+                    `preview_editing = ${enabled}`,
+                  )
+                : SITE_DATA,
+            );
+          }
+          if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
+            return Response.json({
+              statuses: [
+                {
+                  context: "netlify/example/deploy-preview",
+                  state: "success",
+                  target_url: enabled
+                    ? "https://deploy-preview-43--example.netlify.app/"
+                    : PREVIEW_ORIGIN + "/",
+                },
+              ],
+            });
+          }
+          throw new Error(`Unexpected request: ${url}`);
+        },
+      );
+      await expect(
+        createProposal(
+          new GitHubClient("ghu_curator", fetchMock),
+          request({
+            expected_head_sha: HEAD,
+            kind: "pull_request",
+            pull_request: 42,
+          }),
+          PREVIEW_ORIGIN,
+        ),
+      ).rejects.toMatchObject({
+        code: enabled ? "shacl_transport_mismatch" : "operation_disabled",
+        status: 403,
+      });
+    },
+  );
 
   it("rejects a changed PR head before creating a commit", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -678,6 +689,24 @@ describe("site-specific submodule handoff", () => {
         pull_request: 43,
       },
     });
+  });
+
+  it("stops before either write when downstream materialization is disabled", async () => {
+    const github = client();
+    const original = vi.mocked(github.contents).getMockImplementation()!;
+    vi.mocked(github.contents).mockImplementation(
+      async (repo, requests, limit) => {
+        const result = await original(repo, requests, limit);
+        if (result.has("operation-policy"))
+          result.set("operation-policy", "[tool.orinoco]");
+        return result;
+      },
+    );
+    await expect(
+      createProposal(github, request({ kind: "standalone" })),
+    ).rejects.toMatchObject({ code: "operation_disabled" });
+    expect(github.createBranch).not.toHaveBeenCalled();
+    expect(github.commitFileAtHead).not.toHaveBeenCalled();
   });
 
   it("stops before either write when service automation is not configured", async () => {

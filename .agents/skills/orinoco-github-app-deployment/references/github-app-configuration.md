@@ -14,7 +14,8 @@ App registration, ownership transfer, permission changes, secret creation/deleti
 - For a stable deployment, set the callback URL to exactly `PUBLIC_ORIGIN/api/auth/callback`.
 - Disable callback-URL wildcard matching.
   Every accepted callback must be the one exact production URL.
-- If using a post-install setup URL, keep it separate from the callback.
+- Set the post-install setup URL to `PUBLIC_ORIGIN/setup`, separate from the OAuth callback.
+  This page explains permitted operations and directs owners to `[tool.orinoco.operations]` in root `pyproject.toml`.
   The setup URL must never send GitHub's installation callback fields into OAuth.
 - Grant repository permissions:
   - Metadata: read;
@@ -58,7 +59,7 @@ A GitHub App's owner controls its settings, client secrets, and signing keys.
 Transferring the App does not by itself:
 
 - move or reconfigure the hosting project;
-- change `PUBLIC_ORIGIN`, the released central-service default, or a downstream's optional `site.curation_service` override;
+- change `PUBLIC_ORIGIN`, the released central-service default, or a downstream's optional `tool.orinoco.service.url` override;
 - install the App on the new owner's repositories;
 - approve newly requested permissions on existing installations; or
 - rotate the client secret already configured at the host.
@@ -78,12 +79,12 @@ Each downstream must have:
 - a trusted default-branch workflow that produces the exact source-adapter review artifact;
 - trusted default-branch SHACL handoff replacement and validation behavior;
 - a static site built from its exact source commit with the released editor and schema, including both **Download bundle** and **Propose via GitHub**;
-- the released static source-review shell bound at `site.base_url/review/` with workflow links pointing there rather than to the central service;
+- the released static source-review shell bound at the `review/` route beneath `tool.orinoco.site.identity.base_url` with workflow links pointing there rather than to the central service;
 - a curator with repository `write` or `admin`;
 - its exact GitHub `owner/repository` derived by the trusted build from `GITHUB_REPOSITORY` or the equivalent general project identity; and
-- either an omitted `site.curation_service`, which selects the released central default, or an explicit credential-free compatible backend origin with no path, query, fragment, or credentials.
+- either an omitted `tool.orinoco.service.url`, which selects the released central default, or an explicit credential-free compatible backend origin with no path, query, fragment, or credentials.
 
-For a downstream on a custom domain, verify the domain for the GitHub account or organization, configure it for the Pages site, verify its DNS and TLS, and confirm that the actual browser origin matches `site.base_url` before treating it as a unique origin.
+For a downstream on a custom domain, verify the domain for the GitHub account or organization, configure it for the Pages site, verify its DNS and TLS, and confirm that the actual browser origin matches `tool.orinoco.site.identity.base_url` before treating it as a unique origin.
 Use GitHub's current [domain-verification](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages), [custom-domain](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site), and [HTTPS](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https) instructions rather than copying mutable DNS targets into this skill.
 A downstream that remains on a shared `github.io` origin must expose the accepted explanation and custom-domain remediation link.
 That warning does not gate SHACL submission; the separate source-adapter `/review/` policy is unchanged, and **Download bundle** remains credential-free.
@@ -104,6 +105,6 @@ Ask for only values that cannot be discovered safely:
 4. the downstream repositories that may be installed; and
 5. whether a write-path test is authorized in a named integration repository.
 
-When the operator also asks to configure a downstream custom domain, ask only for the intended domain and discover its repository, Pages state, current DNS, verified-domain state, and `site.base_url` before requesting another value.
+When the operator also asks to configure a downstream custom domain, ask only for the intended domain and discover its repository, Pages state, current DNS, verified-domain state, and `tool.orinoco.site.identity.base_url` before requesting another value.
 
 Discover the application commit, current settings, repository identities, and provider capabilities read-only before asking the operator to repeat them.

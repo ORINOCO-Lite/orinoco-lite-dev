@@ -44,19 +44,12 @@ Package assembly includes the shell and its dependencies; the trusted site build
 
 Register a GitHub App with expiring user-to-server tokens enabled.
 Leave **Request user authorization (OAuth) during installation** and Device Flow disabled; the application starts its own state- and PKCE-bound browser authorization flow.
-Disable callback-URL wildcard matching and webhooks, configure the exact callback URL as `PUBLIC_ORIGIN/api/auth/callback`, install it only on selected repositories, and grant these repository permissions:
+Set the App **Setup URL** to `PUBLIC_ORIGIN/setup` to explain downstream operation opt-ins after installation.
+Disable callback-URL wildcard matching and webhooks, configure the exact callback URL as `PUBLIC_ORIGIN/api/auth/callback`, and install it only on selected repositories.
 
-- Metadata: read (the GitHub-required baseline permission)
-- Actions: read
-- Commit statuses: read
-- Contents: write
-- Pull requests: write
-
-`Pull requests: write` supports authenticated decision comments and creation of an explicit standalone draft proposal.
-Contents write includes the read access needed by both profiles and supports the exact, fixed-path SHACL Vue handoff requested by the curator and verified, proposal-bound workflow materialization.
-Commit-status read access verifies an exact successful Netlify deploy preview before that preview may update its own draft pull request.
-The source-adapter decision path never writes repository contents through the service.
-The service separately requires the signed-in user to have `write` or `admin` collaborator permission.
+The [authentication contract](../../docs/agents/contract/curation-service-authentication-options.md#functionality-and-permissions) defines the feature-to-permission mapping and downstream authorization requirements.
+Configure the App for the supported features of this deployment; downstream operation choices cannot expand its GitHub grants.
+The service reads `tool.orinoco.operations` from the current default branch before authorizing automation or preview editing; absent choices are disabled.
 
 If the editor reports a GitHub 401, 403, or 404, confirm that the App is installed for the target repository, approve any pending organization or SSO authorization, and sign in as a collaborator with `write` or `admin` permission.
 
@@ -114,7 +107,7 @@ The pull-request body is only an accessible fallback and review link.
 The application never parses it for candidate identity, ordering, source coordinates, or completeness.
 It derives candidate membership and operations from the proposal commit metadata diff, verifies initial candidate identity from base and proposal blobs, presents current-head record data, and uses the expiring bundle only for display facts.
 
-Before releasing proposal data, the central service verifies the requested repository against the live GitHub objects and verifies the downstream base URL and effective default or override service origin from `orinoco.yaml` at the proposal's metadata base.
+Before releasing proposal data, the central service verifies the requested repository against the live GitHub objects and verifies the downstream base URL and effective default or override service origin from `pyproject.toml` at the proposal's metadata base.
 A sealed short-lived grant and an exact ready/request handshake bind the repository, pull request, artifact, downstream origin, popup, and one-time nonce.
 The downstream keeps all decisions in browser memory.
 The downstream displays every path and disposition and requires the final user click before instructing the popup to post.
@@ -152,5 +145,5 @@ The service operator configures `GITHUB_APP_PRIVATE_KEY` once per service, not p
 It is a runtime signing credential distinct from the OAuth client secret; downstreams need no additional App or secret.
 
 An independently hosted service uses its own App and credentials with the settings above.
-Set `site.curation_service` in its downstreams to that service's HTTPS origin.
+Set `tool.orinoco.service.url` in its downstreams to that service's HTTPS origin.
 See the [deployment skill](../../.agents/skills/orinoco-github-app-deployment/SKILL.md) for setup and rotation, and the [authentication contract](../../docs/agents/contract/curation-service-authentication-options.md#app-credentials-and-automated-completion) for security constraints.

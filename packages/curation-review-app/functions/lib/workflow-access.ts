@@ -1,3 +1,4 @@
+import { requireOperation } from "./operation-policy";
 import {
   createRemoteJWKSet,
   importPKCS8,
@@ -58,6 +59,7 @@ export async function authorizeWorkflow(
       "automation_unavailable",
       "The curation service operator must configure this App's signing key for submodule materialization. No downstream App or secret is required.",
     );
+  await requireOperation(github, input.repository, "shacl_materialization");
   const repo = object(await github.json(`/repos/${input.repository}`));
   const metadata = object(input.handoff.metadata);
   const meta = object(await github.json(`/repos/${metadata.repository}`));
@@ -169,6 +171,7 @@ export class AppAuthentication {
     write = false,
     actions = false,
     pullRequestsWrite = false,
+    workflowsWrite = false,
   ): Promise<{ token: string; expires_at: string }> {
     if (!REPO.test(repository)) deny("Invalid repository.");
     if (!this.env.GITHUB_APP_PRIVATE_KEY)
@@ -193,16 +196,31 @@ export class AppAuthentication {
       installation.suspended_at !== null
     )
       deny("The App installation is unavailable or suspended.");
+    const permissions: Record<string, string> = {
+      contents: write ? "write" : "read",
+      pull_requests: pullRequestsWrite ? "write" : "read",
+      ...(actions ? { actions: "read" } : {}),
+      ...(workflowsWrite ? { workflows: "write" } : {}),
+    };
+    const granted = installation.permissions ?? {};
+    for (const [permission, level] of Object.entries(permissions)) {
+      if (
+        granted[permission] !== "write" &&
+        granted[permission] !== "admin" &&
+        !(level === "read" && granted[permission] === "read")
+      )
+        throw new HttpError(
+          403,
+          "app_permission_required",
+          `The GitHub App installation requires ${permission}: ${level}. Approve this permission for the installed App.`,
+        );
+    }
     const result = object(
       await app.json(`/app/installations/${installation.id}/access_tokens`, {
         method: "POST",
         body: JSON.stringify({
           repositories: [repository.split("/")[1]],
-          permissions: {
-            contents: write ? "write" : "read",
-            pull_requests: pullRequestsWrite ? "write" : "read",
-            ...(actions ? { actions: "read" } : {}),
-          },
+          permissions,
         }),
       }),
     );
@@ -319,6 +337,11 @@ export async function workflowAccess(
   let metadataToken: { token: string; expires_at: string } | undefined;
   try {
     const website = new GitHubClient(websiteToken.token, auth.fetcher);
+    await requireOperation(
+      website,
+      request.repository,
+      "shacl_materialization",
+    );
     const values = await website.contents(request.repository, [
       { key: "handoff", path: SHACL_BUNDLE_PATH, ref: handoffSha },
     ]);

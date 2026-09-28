@@ -6,6 +6,7 @@ only the explicitly selected transport step receives the output token.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .config import DEFAULT_CURATION_SERVICE, _curation_service_origin, read_configuration
+from .config import DEFAULT_CURATION_SERVICE, _curation_service_origin, read_configuration, parse_configuration, validate_operations
 from .errors import ConfigurationError
 
 
@@ -43,7 +44,7 @@ def request_json(url: str, token: str, body: dict | None = None) -> dict:
     return result
 
 
-def obtain(body: dict, *, curation: bool = False) -> dict:
+def obtain(body: dict, *, curation: bool = False, template: bool = False) -> dict:
     """Request and mask installation credentials without exporting them to Actions."""
     # Metadata may be a private, not-yet-initialized submodule. Only the
     # trusted website configuration is needed to obtain its checkout token.
@@ -53,7 +54,8 @@ def obtain(body: dict, *, curation: bool = False) -> dict:
         raise ConfigurationError("tool.orinoco.service must be a table")
     origin = _curation_service_origin(
         service.get("url", DEFAULT_CURATION_SERVICE), "tool.orinoco.service.url")
-    endpoint = f"{origin}/api/{"curation" if curation else "shacl"}/workflow-access"
+    operation = "template" if template else "curation" if curation else "shacl"
+    endpoint = f"{origin}/api/{operation}/workflow-access"
     identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
     parsed = urllib.parse.urlsplit(identity_url)
     if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".actions.githubusercontent.com"):
@@ -97,23 +99,43 @@ def revoke(token: str) -> None:
             raise RuntimeError(f"Installation token revocation failed (HTTP {error.code})") from None
 
 
+def require_operation(repository: str, operation: str, token: str) -> None:
+    """Check current default-branch policy for transport using a workflow token."""
+    validate_operations({operation: True})
+    api = f"https://api.github.com/repos/{repository}"
+    repo = request_json(api, token)
+    branch = urllib.parse.quote(repo["default_branch"], safe="")
+    head = request_json(f"{api}/branches/{branch}", token)["commit"]["sha"]
+    content = request_json(f"{api}/contents/pyproject.toml?ref={head}", token)
+    config = parse_configuration(base64.b64decode(content["content"]).decode("utf-8"))
+    if validate_operations(config.get("operations", {})).get(operation) is not True:
+        raise ConfigurationError(f"Enable tool.orinoco.operations.{operation} in pyproject.toml on the repository default branch before using this operation")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--curation", action="store_true")
+    parser.add_argument("--template", action="store_true")
+    parser.add_argument("--check-operation")
     args = parser.parse_args()
+    if args.check_operation:
+        require_operation(os.environ["GITHUB_REPOSITORY"], args.check_operation, os.environ["GH_TOKEN"])
+        return
     body = {
         "repository": os.environ["GITHUB_REPOSITORY"],
-        "pull_request": int(os.environ["PROPOSAL_NUMBER"]),
-        "head": os.environ["PROPOSAL_HEAD"],
+        "pull_request": int(os.environ.get("PROPOSAL_NUMBER", "0")),
+        "head": os.environ["GITHUB_SHA"] if args.template else os.environ["PROPOSAL_HEAD"],
         "write": args.write,
     }
     if args.curation:
         body.pop("pull_request")
         body["comment_id"] = int(os.environ["CURATION_COMMENT_ID"]) if os.environ.get("CURATION_COMMENT_ID") else None
+    if args.template:
+        body = {"repository": os.environ["GITHUB_REPOSITORY"], "head": os.environ["GITHUB_SHA"]}
     if os.environ.get("PROPOSAL_HANDOFF") and not args.curation:
         body["handoff"] = os.environ["PROPOSAL_HANDOFF"]
-    result = obtain(body, curation=args.curation)
+    result = obtain(body, curation=args.curation, template=args.template)
     keys = ["token"]
     if args.curation:
         keys += ["repository", "head"]
