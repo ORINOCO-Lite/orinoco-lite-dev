@@ -39,6 +39,36 @@ DataLad’s `siblings configure --as-common-datasrc` can register a public Git r
 The GitHub browser curation flow still uses a GitHub metadata repository; an Annex sibling supplies its media.
 Private storage and build-time credential setup are outside this feature’s scope.
 
+## Cloudflare R2
+
+Create an R2 bucket and connect a public custom domain in Cloudflare.
+The managed `r2.dev` URL can be used for an initial test, but Cloudflare rate-limits it and designates it for development.
+Create an R2 API token with Object Read & Write access limited to that bucket.
+On the maintainer’s machine, supply its S3 credentials as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+Never commit credentials or provide them to website builds.
+
+From the downstream root, initialize the native Annex S3 remote:
+
+```bash
+pixi run git -C site-specific annex initremote r2 \
+  type=S3 encryption=none embedcreds=no \
+  bucket="$R2_BUCKET" \
+  host="$R2_ACCOUNT_ID.r2.cloudflarestorage.com" \
+  region=auto protocol=https signature=v4 requeststyle=path \
+  publicurl="$R2_PUBLIC_URL" autoenable=true
+pixi run git -C site-specific annex copy --to r2 -- assets static
+git -C site-specific push origin HEAD git-annex
+```
+
+Set `R2_PUBLIC_URL` to the bucket’s public HTTPS base URL.
+The `git-annex` branch records the remote configuration and content locations; push it alongside the branch containing the media pointers.
+New clones use the public URL without S3 credentials.
+For upstream repinning, configure the same native remote in the selected upstream Annex repository; the shared preparation operation uses it without a provider-specific setting in Orinoco.
+
+See [Annex’s S3 remote](https://git-annex.branchable.com/special_remotes/S3/) and [R2 public buckets](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+
+## Builds
+
 For Netlify’s cached, disposable build checkout, prefix the build command with `git -C site-specific config core.hooksPath /dev/null &&`.
 Netlify checks out cached submodules before installing Pixi; Annex’s checkout hook otherwise calls an executable that is not yet available.
 Keep normal hooks enabled in development checkouts.
