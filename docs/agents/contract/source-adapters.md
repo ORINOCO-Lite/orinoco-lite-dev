@@ -60,7 +60,8 @@ Formatting, unused source fields, and PAV alone MUST NOT reopen review.
 
 Programmatic metadata proposals and finalization changes use the project Pixi task and its DataLad recording path.
 DataLad records the run and resulting commits in Git, including changes to a `site-specific` subdataset.
-The repository MUST be configured so those paths remain ordinary Git content; source-adapter execution MUST NOT require Git Annex or annex adapter outputs.
+The repository MUST be configured so those paths remain ordinary Git content; adapter outputs MUST NOT be annexed.
+DataLad operations in a submodule opted into Annex media require Git Annex, but metadata-only operations MUST NOT retrieve media.
 Direct human edits are ordinary Git commits.
 
 ## Candidate decisions

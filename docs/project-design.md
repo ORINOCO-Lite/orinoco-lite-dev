@@ -246,9 +246,11 @@ The normative contracts define the precise behavior:
   Tasks should expose commands that users can run and modify directly.
   Compose DataLad around operations at the task or caller boundary; avoid commands that invoke DataLad to rerun themselves with recursion-suppression flags.
   Repository owners control DataLad storage policy.
-- **Give provenance tools distinct jobs.** Git Annex is maintainer-only tooling for selecting and materializing required Hugo assets.
+- **Give provenance tools distinct jobs.** Git Annex retrieves and verifies required upstream assets and optional downstream media.
   DataLad records downstream adapter runs in ordinary Git.
-  Downstream builds and adapter runs do not require Git Annex.
+  Downstreams may opt in for media under a `site-specific` submodule’s `assets/` and `static/`.
+  Records, configuration, and editorial content remain ordinary Git files; builds materialize media as ordinary output files.
+  Native Annex remotes own storage configuration, independently of the hosting provider.
 
 ## Documentation and change control
 

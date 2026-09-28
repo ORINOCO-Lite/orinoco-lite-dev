@@ -28,13 +28,17 @@ def canonical_json_bytes(value: Any) -> bytes:
     ).encode("utf-8")
 
 
-def tree_sha256(root: Path) -> str:
+def tree_sha256(root: Path, *, annex_keys: dict[Path, str] | None = None) -> str:
     """Hash an exact regular-file tree including names and file digests."""
 
     digest = hashlib.sha256()
-    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+    annex_keys = annex_keys or {}
+    for path in sorted(candidate for candidate in root.rglob("*")
+                       if ".git" not in candidate.relative_to(root).parts
+                       and (candidate.is_file() or candidate in annex_keys)):
         relative = path.relative_to(root).as_posix()
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")
-        digest.update(bytes.fromhex(sha256_file(path)))
+        digest.update(hashlib.sha256(annex_keys[path].encode()).digest()
+                      if path in annex_keys else bytes.fromhex(sha256_file(path)))
     return digest.hexdigest()

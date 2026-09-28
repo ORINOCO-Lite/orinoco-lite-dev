@@ -48,8 +48,13 @@ FORBIDDEN_EXTENSION_SUFFIXES = {
 }
 
 
-def _files(root: Path) -> Iterator[Path]:
+def _files(root: Path, annex_keys: dict[Path, str] | None = None) -> Iterator[Path]:
     for candidate in sorted(root.rglob("*")):
+        if ".git" in candidate.relative_to(root).parts:
+            continue
+        if annex_keys and candidate in annex_keys:
+            yield candidate
+            continue
         if candidate.is_symlink():
             raise ConfigurationError(
                 f"Site-owned paths cannot contain symlinks: {candidate}"
@@ -203,6 +208,10 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
         path = workspace.path(name)
         if not path.is_dir():
             raise ConfigurationError(f"Required site-owned directory is missing: {path}")
+    from .annex_media import workspace_annex_files
+
+    annex_keys = {workspace.path("site") / path: key
+                  for path, key in workspace_annex_files(workspace).items()}
     _validate_metadata_boundary(workspace)
     _validate_extension_boundary(workspace)
 
@@ -224,13 +233,13 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     companions = companion_sources(workspace)
 
     file_counts = {
-        name: sum(1 for _ in _files(workspace.path(name)))
+        name: sum(1 for _ in _files(workspace.path(name), annex_keys))
         for name in REQUIRED_INPUT_PATHS
     }
     file_counts["annotations"] = len(companions)
     assertion_count = sum(source.assertion_count for source in companions)
     tree_hashes = {
-        name: tree_sha256(workspace.path(name)) for name in REQUIRED_INPUT_PATHS
+        name: tree_sha256(workspace.path(name), annex_keys=annex_keys) for name in REQUIRED_INPUT_PATHS
     }
     tree_hashes["annotations"] = tree_sha256(annotation_root(workspace))
     return {

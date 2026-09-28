@@ -120,7 +120,7 @@ def test_missing_annex_payload_does_not_modify_destination(tmp_path):
     destination = tmp_path / "destination"
     destination.mkdir()
     (destination / "keep").write_text("unchanged")
-    with pytest.raises(DriverError, match="retrieval failed"):
+    with pytest.raises(DriverError, match="Annex media operation failed"):
         import_site_inputs(source, destination, config_path=tmp_path / "pyproject.toml", retrieve_media=True)
     assert list(destination.iterdir()) == [destination / "keep"]
     assert (destination / "keep").read_text() == "unchanged"

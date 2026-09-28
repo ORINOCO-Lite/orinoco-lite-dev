@@ -9,8 +9,10 @@
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
   It may hydrate and verify Annex-backed content required by the selected upstream functionality before ordinary files are copied into the licensed template overlay.
   `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.
-  Ordinary downstream website builds and template tasks must not invoke or depend on Git Annex.
-  DataLad remains a downstream dependency for recording source-adapter run provenance; correctly configured downstream repositories keep those records in Git without requiring Git Annex.
+  Downstreams without `media.annex: true` must not invoke or depend on Git Annex.
+  Opted-in `site-specific` submodules may use Annex only for `assets/` and `static/`; builds copy verified content into ordinary output files.
+  DataLad remains a downstream dependency for recording source-adapter run provenance; records and other structured inputs always remain in Git.
+  DataLad operations in opted-in Annex submodules require the Annex executable even when saving ordinary Git records.
 - Test unreleased package and template work together by applying a selected downstream's declared inputs to a fresh disposable template instance with `pixi run setup-upstream` when practical.
   Setup stops before projection and building; run those explicitly only when they are part of the requested validation.
   When multi-repository rendering remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.
