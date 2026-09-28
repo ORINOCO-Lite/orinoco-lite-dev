@@ -227,10 +227,13 @@ def hydrate_and_verify(
     from orinoco_lite.errors import DriverError
 
     def run(*arguments):
-        return git_annex(website, *arguments, runner=runner)
+        try:
+            return git_annex(website, *arguments, runner=runner)
+        except MaterializationError as error:
+            raise DriverError(str(error)) from error
 
-    files = {Path(asset): run("lookupkey", "--", asset.as_posix()) for asset in assets}
     try:
+        files = {Path(asset): run("lookupkey", "--", asset.as_posix()) for asset in assets}
         retrieve_and_verify(website, files, run_annex=run)
     except DriverError as error:
         raise MaterializationError(str(error)) from error

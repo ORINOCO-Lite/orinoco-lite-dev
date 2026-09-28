@@ -242,6 +242,11 @@ def _build(args: argparse.Namespace) -> int:
     validate_workspace(workspace)
     if bundle is not None:
         from .publication import record_projection
+        from .annex_media import prepare_media
+
+        # DataLad prepares inputs in its isolated checkout. Populate its local
+        # origin first so assembly and the run reuse one upstream retrieval.
+        prepare_media(workspace)
         projection_commit = record_projection(workspace.root)
     else:
         projection_status = _update_projection(args, workspace, resources)

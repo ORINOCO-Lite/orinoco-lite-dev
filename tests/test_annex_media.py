@@ -136,14 +136,26 @@ def test_metadata_save_keeps_yaml_in_git_without_retrieving_media(workspace):
     assert 'Updated person' in git(site, 'show', 'HEAD:metadata/records/person.yaml')
 
 
-def test_shallow_clone_discovers_annex_storage(workspace, tmp_path):
+def test_shallow_clone_discovers_annex_storage(workspace, tmp_path, monkeypatch):
     source = workspace.path('site')
     clone = tmp_path / 'shallow'
     subprocess.run(['git', 'clone', '--depth', '1', source.as_uri(), str(clone)], check=True)
     assert not git(clone, 'branch', '-r', '--list', '*/git-annex')
     before = git(clone, 'rev-parse', 'HEAD')
+    for role in ('AUTHOR', 'COMMITTER'):
+        for field in ('NAME', 'EMAIL'):
+            monkeypatch.delenv(f'GIT_{role}_{field}', raising=False)
+    monkeypatch.setenv('GIT_CONFIG_GLOBAL', '/dev/null')
+    monkeypatch.setenv('GIT_CONFIG_NOSYSTEM', '1')
     files = annex_files(clone, initialize=True)
     media = retrieve_and_verify(clone, files)
     assert media[Path('static/image.png')].read_bytes() == b'fixture image bytes'
     assert git(clone, 'rev-parse', 'HEAD') == before
     assert git(clone, 'status', '--porcelain') == ''
+
+
+def test_missing_submodule_repository_never_initializes_parent_annex(workspace, tmp_path):
+    (workspace.path('site') / '.git').rename(tmp_path / 'child-git')
+    with pytest.raises(ConfigurationError, match='initialized'):
+        prepare_media(workspace)
+    assert not (workspace.root / '.git/annex').exists()

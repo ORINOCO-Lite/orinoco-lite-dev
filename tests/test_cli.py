@@ -168,7 +168,7 @@ def test_validate_checks_inputs_without_generating_projection():
 
 @pytest.mark.parametrize("status", [0, 1])
 def test_build_bundle_is_optional_and_only_created_after_success(tmp_path, status):
-    workspace = SimpleNamespace(root=tmp_path, base_url="/", path=lambda name: tmp_path / name)
+    workspace = SimpleNamespace(root=tmp_path, base_url="/", annex_media=False, path=lambda name: tmp_path / name)
     args = cli._parser().parse_args(["build", "--publication-bundle", "build/publication.bundle"])
     with (
         patch.object(cli, "_resolve", return_value=(workspace, "resources")),

@@ -19,7 +19,11 @@ def _git(repository: Path, *arguments: str) -> subprocess.CompletedProcess:
 
 
 def annex(repository: Path, *arguments: str, remote: str | None = None) -> str:
-    config = ["-c", f"remote.orinoco-media.url={remote}"] if remote else []
+    # Annex records local availability on its own branch, including in CI
+    # clones without a configured human Git identity.
+    config = ["-c", "user.name=Orinoco Lite", "-c", "user.email=orinoco-lite@example.invalid"]
+    if remote:
+        config.extend(["-c", f"remote.orinoco-media.url={remote}"])
     result = _git(repository, *config, "annex", *arguments)
     if result.returncode:
         raise DriverError(
@@ -97,6 +101,9 @@ def workspace_annex_files(workspace) -> dict[Path, str]:
     entry = _git(workspace.root, "ls-files", "--stage", "--", "site-specific")
     if not entry.stdout.startswith("160000 ") or site.is_symlink():
         raise ConfigurationError("media.annex requires a site-specific Git submodule")
+    root = _git(site, "rev-parse", "--show-toplevel")
+    if root.returncode or Path(root.stdout.strip()).resolve() != site.resolve():
+        raise ConfigurationError("media.annex requires an initialized site-specific submodule")
     files = annex_files(site, initialize=True)
     forbidden = [str(path) for path in files
                  if len(path.parts) < 2 or path.parts[0] not in {"assets", "static"}]
