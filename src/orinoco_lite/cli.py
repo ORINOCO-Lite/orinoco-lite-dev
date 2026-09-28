@@ -236,9 +236,13 @@ def _build(args: argparse.Namespace) -> int:
             raise ConfigurationError("Publication bundle must be outside the website destination")
         require_clean_source(workspace.root)
     validate_workspace(workspace)
-    projection_status = _update_projection(args, workspace, resources)
-    if projection_status:
-        return projection_status
+    if bundle is not None:
+        from .publication import record_projection
+        projection_commit = record_projection(workspace.root)
+    else:
+        projection_status = _update_projection(args, workspace, resources)
+        if projection_status:
+            return projection_status
     base_url = args.base_url or workspace.base_url
     build_timestamp = getattr(args, "build_timestamp", None)
     if build_timestamp is None and urlsplit(base_url).scheme in {"http", "https"}:
@@ -265,7 +269,7 @@ def _build(args: argparse.Namespace) -> int:
     )
     if status == 0 and bundle is not None:
         from .publication import prepare
-        prepare(workspace.root, "generated/projection",
+        prepare(workspace.root, projection_commit,
                 destination.relative_to(workspace.root).as_posix(),
                 bundle.relative_to(workspace.root).as_posix())
     return status
