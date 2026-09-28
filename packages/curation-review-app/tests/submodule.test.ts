@@ -79,23 +79,20 @@ describe("exact site-specific Git resolution", () => {
       "matching repository URL",
     );
   });
-  it("reads trusted site origins from site.yaml at the pinned metadata commit", async () => {
+  it("reads trusted site origins from the root manifest without following metadata", async () => {
     const github = new GitHubClient("token");
-    vi.spyOn(github, "siteSubmodule").mockResolvedValue({
-      repository: "example/metadata",
-      sha: METADATA,
-    });
+    const submodule = vi.spyOn(github, "siteSubmodule");
     const contents = vi
       .spyOn(github, "contents")
-      .mockResolvedValueOnce(new Map([["site-config", ORINOCO_CONFIG]]))
-      .mockResolvedValueOnce(new Map([["site-data", null]]))
-      .mockResolvedValueOnce(new Map([["site-data", SITE_DATA]]));
+      .mockResolvedValueOnce(new Map([["site-config", ORINOCO_CONFIG]]));
     const result = await loadSiteCoordinates(github, "example/site", SOURCE);
     expect(result.coordinates.editorSiteUrl).toContain("https://site.example");
-    expect(contents.mock.calls[2]?.slice(0, 2)).toEqual([
-      "example/metadata",
-      [{ key: "site-data", path: "site.yaml", ref: METADATA }],
+    expect(contents).toHaveBeenCalledOnce();
+    expect(contents.mock.calls[0]?.slice(0, 2)).toEqual([
+      "example/site",
+      [{ key: "site-config", path: "pyproject.toml", ref: SOURCE }],
     ]);
+    expect(submodule).not.toHaveBeenCalled();
   });
 });
 

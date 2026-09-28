@@ -17,7 +17,7 @@ def register(commands):
     export = groups.add_parser("import-from-www", description=(
         "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
         "and comparison with Orinoco Lite. "
-        "Map upstream Hugo settings into site.yaml and copy authored content, identity images, "
+        "Map upstream Hugo settings into root pyproject.toml and copy authored content, identity images, "
         "and site overrides from the installed package's pinned www-from-model revision. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
         "are synchronized, including deletions; metadata is preserved. Use --force to replace or delete existing imported files."))
@@ -58,6 +58,8 @@ def execute(args):
         if args.reuse_dump:
             command.append("--reuse-dump")
         if args.site_specific:
+            from .config import load_workspace
+            load_workspace(root)
             if args.dump or args.reuse_dump:
                 raise ConfigurationError("Choose --site-specific or a dump input, not both.")
             command.extend(["--site-specific", relative(args.site_specific)])
@@ -81,6 +83,6 @@ def execute(args):
         raise ConfigurationError("Site export destination must not overlap the upstream checkout")
     print(f"Upstream site: {source}\nCommit: {revision}\nDestination: {destination}")
     media_remote = args.media_remote or (None if args.source else "https://hub.psychoinformatics.de/www/www-from-model.git")
-    result = import_site_inputs(source, destination, retrieve_media=True, media_remote=media_remote, force=args.force)
+    result = import_site_inputs(source, destination, config_path=root / "pyproject.toml", retrieve_media=True, media_remote=media_remote, force=args.force)
     print(f"Exported {result['files']} site files; metadata was preserved.")
     return 0

@@ -9,13 +9,11 @@ import re
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
-import yaml
+import tomllib
 
 from .errors import ConfigurationError
 
 
-CONFIG_CONTRACT_VERSION = 2
-SITE_DATA_VERSION = 1
 GITHUB_REPOSITORY = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})/[A-Za-z0-9_.-]{1,100}$"
 )
@@ -44,20 +42,27 @@ DIRECTORY_PATHS = {
 }
 
 
-def _load_mapping(path: Path, label: str) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file():
-        raise ConfigurationError(f"{label} is missing or is not a regular file: {path}")
-    if path.stat().st_size > 2 * 1024 * 1024:
-        raise ConfigurationError(f"{label} is unexpectedly large: {path}")
+def parse_configuration(text: str) -> dict[str, Any]:
+    """Read the downstream tool table without interpreting other TOML sections."""
     try:
-        value = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
-        raise ConfigurationError(f"{label} is not valid UTF-8 YAML: {path}") from error
-    if not isinstance(value, dict) or not all(
-        isinstance(key, str) for key in value
-    ):
-        raise ConfigurationError(f"{label} must be a YAML mapping: {path}")
+        document = tomllib.loads(text)
+        value = document.get("tool", {}).get("orinoco")
+    except (ValueError, AttributeError) as error:
+        raise ConfigurationError("pyproject.toml must contain valid TOML configuration") from error
+    if not isinstance(value, dict):
+        raise ConfigurationError("pyproject.toml requires [tool.orinoco] configuration")
     return value
+
+
+def read_configuration(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ConfigurationError(f"Configuration is missing or is not a regular file: {path}")
+    if path.stat().st_size > 2 * 1024 * 1024:
+        raise ConfigurationError(f"Configuration is unexpectedly large: {path}")
+    try:
+        return parse_configuration(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as error:
+        raise ConfigurationError(f"Configuration is not readable UTF-8: {path}") from error
 
 
 def _relative_path(value: object, label: str) -> str:
@@ -115,7 +120,7 @@ def _review_app_name(site_name: str) -> str:
 
     if not site_name or site_name != site_name.strip():
         raise ConfigurationError(
-            "site-specific/site.yaml identity.title must be a non-empty "
+            "pyproject.toml tool.orinoco.site.identity.title must be a non-empty "
             "unpadded string"
         )
     value = f"{site_name}{REVIEW_APP_NAME_SUFFIX}"
@@ -124,28 +129,19 @@ def _review_app_name(site_name: str) -> str:
         or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
     ):
         raise ConfigurationError(
-            "site-specific/site.yaml identity.title must produce a one-line "
+            "pyproject.toml tool.orinoco.site.identity.title must produce a one-line "
             "source-review application name of at most 256 browser characters"
         )
     return value
 
 
-def _load_site_data(path: Path) -> dict[str, Any]:
-    """Load the declarative authority for public site identity."""
-
-    value = _load_mapping(path, "Site-specific data")
-    if value.get("version") != SITE_DATA_VERSION:
-        raise ConfigurationError(
-            f"site-specific/site.yaml version must be {SITE_DATA_VERSION}"
-        )
-    if "presentation" in value:
-        raise ConfigurationError(
-            "site-specific/site.yaml: rename presentation to appearance "
-            "and update the package and template together"
-        )
+def _load_site_data(value: object) -> dict[str, Any]:
+    """Validate the public site settings from the runtime manifest."""
+    if not isinstance(value, dict):
+        raise ConfigurationError("pyproject.toml requires [tool.orinoco.site]")
     identity = value.get("identity")
     if not isinstance(identity, dict):
-        raise ConfigurationError("site-specific/site.yaml requires identity")
+        raise ConfigurationError("pyproject.toml tool.orinoco.site requires identity")
     normalized_identity = dict(identity)
     for field in ("title", "description"):
         item = identity.get(field)
@@ -156,19 +152,19 @@ def _load_site_data(path: Path) -> dict[str, Any]:
             or any(ord(character) < 0x20 or ord(character) == 0x7F for character in item)
         ):
             raise ConfigurationError(
-                f"site-specific/site.yaml identity.{field} must be a non-empty "
+                f"pyproject.toml tool.orinoco.site.identity.{field} must be a non-empty "
                 "one-line string"
             )
         _browser_text_length(item)
         normalized_identity[field] = item
     base_url = _absolute_http_url(
         identity.get("base_url"),
-        "site-specific/site.yaml identity.base_url",
+        "pyproject.toml tool.orinoco.site.identity.base_url",
         https_only=False,
     )
     if urlsplit(base_url).query:
         raise ConfigurationError(
-            "site-specific/site.yaml identity.base_url cannot contain a query"
+            "pyproject.toml tool.orinoco.site.identity.base_url cannot contain a query"
         )
     normalized_identity["base_url"] = base_url.rstrip("/") + "/"
     normalized = dict(value)
@@ -312,51 +308,63 @@ class WorkspaceConfig:
 
 
 def find_workspace_root(start: Path | None = None) -> Path:
-    """Find the nearest ancestor containing ``orinoco.yaml``."""
+    """Find the nearest ancestor with a downstream ``tool.orinoco`` table."""
 
     current = (start or Path.cwd()).resolve()
     if current.is_file():
         current = current.parent
     for candidate in (current, *current.parents):
-        if (candidate / "orinoco.yaml").is_file():
-            return candidate
+        manifest = candidate / "pyproject.toml"
+        if manifest.is_file():
+            try:
+                document = tomllib.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, ValueError) as error:
+                raise ConfigurationError(f"Cannot read TOML configuration: {manifest}") from error
+            tool = document.get("tool", {})
+            if isinstance(tool, dict) and "orinoco" in tool:
+                return candidate
     raise ConfigurationError(
-        f"Could not find orinoco.yaml at or above {current}; pass --root explicitly"
+        f"Could not find tool.orinoco in pyproject.toml at or above {current}; pass --root explicitly"
     )
+
+
+def validate_operations(operations: object) -> dict[str, bool]:
+    """Validate explicit operation opt-ins; missing keys remain disabled."""
+    allowed = {"shacl_materialization", "automated_curation", "template_updates", "preview_editing"}
+    if (not isinstance(operations, dict) or
+            any(key not in allowed or type(value) is not bool for key, value in operations.items())):
+        raise ConfigurationError("pyproject.toml tool.orinoco.operations must map known operation names to true or false")
+    return operations
 
 
 def load_workspace(
     root: Path | None = None,
     *,
-    config_name: str = "orinoco.yaml",
+    config_name: str = "pyproject.toml",
 ) -> WorkspaceConfig:
-    """Load and resolve a version-2 downstream workspace."""
+    """Load and resolve a downstream workspace."""
 
     resolved_root = find_workspace_root(root) if root is None else root.resolve()
     if not resolved_root.is_dir():
         raise ConfigurationError(f"Workspace root is not a directory: {resolved_root}")
     config_relative = _relative_path(config_name, "configuration path")
     config_path = _inside(resolved_root, config_relative, "configuration path")
-    raw = _load_mapping(config_path, "Orinoco configuration")
-    if raw.get("contract_version") != CONFIG_CONTRACT_VERSION:
-        raise ConfigurationError(
-            f"orinoco.yaml contract_version must be {CONFIG_CONTRACT_VERSION}"
-        )
+    raw = read_configuration(config_path)
 
     path_values = raw.get("paths", {})
     if not isinstance(path_values, dict) or not all(
         isinstance(key, str) for key in path_values
     ):
-        raise ConfigurationError("orinoco.yaml paths must be a mapping")
+        raise ConfigurationError("pyproject.toml paths must be a mapping")
     unknown_paths = sorted(set(path_values) - set(DEFAULT_PATHS))
     if unknown_paths:
         raise ConfigurationError(
-            f"orinoco.yaml has unknown path keys: {', '.join(unknown_paths)}"
+            f"pyproject.toml has unknown path keys: {', '.join(unknown_paths)}"
         )
     fixed_paths = sorted(set(path_values) & FIXED_PATHS)
     if fixed_paths:
         raise ConfigurationError(
-            "orinoco.yaml cannot override package-owned paths: "
+            "pyproject.toml cannot override package-owned paths: "
             + ", ".join(fixed_paths)
         )
     paths = {
@@ -369,40 +377,26 @@ def load_workspace(
     collisions = [names for names in duplicates.values() if len(names) > 1]
     if collisions:
         raise ConfigurationError(
-            "orinoco.yaml paths must be distinct: "
+            "pyproject.toml paths must be distinct: "
             + "; ".join(", ".join(names) for names in collisions)
         )
     for name, value in paths.items():
         _inside(resolved_root, value, f"paths.{name}")
 
-    site_data = _load_site_data(
-        _inside(resolved_root, paths["site"], "paths.site") / "site.yaml"
-    )
+    site_data = _load_site_data(raw.get("site"))
     identity = site_data["identity"]
     site_name = identity["title"]
     base_url = identity["base_url"]
-
-    site = raw.get("site", {})
-    if not isinstance(site, dict):
-        raise ConfigurationError("orinoco.yaml site must be a mapping")
-    unknown_site = sorted(set(site) - {"repository", "curation_service"})
-    if unknown_site:
-        raise ConfigurationError(
-            "orinoco.yaml contains public site identity; move these site fields to "
-            "site-specific/site.yaml: " + ", ".join(unknown_site)
-        )
-    repository_value = site.get("repository")
-    service_value = site.get("curation_service")
-    repository: str | None = None
+    validate_operations(raw.get("operations", {}))
+    service = raw.get("service", {})
+    github = raw.get("github", {})
+    if not isinstance(service, dict) or not isinstance(github, dict):
+        raise ConfigurationError("tool.orinoco.service and tool.orinoco.github must be tables")
+    repository_value = github.get("repository")
+    repository = None if repository_value is None else github_repository(
+        repository_value, "tool.orinoco.github.repository")
     curation_service = _curation_service_origin(
-        service_value if service_value is not None else DEFAULT_CURATION_SERVICE,
-        "orinoco.yaml site.curation_service",
-    )
-    if repository_value is not None:
-        repository = github_repository(
-            repository_value,
-            "orinoco.yaml site.repository",
-        )
+        service.get("url", DEFAULT_CURATION_SERVICE), "tool.orinoco.service.url")
 
     workspace = WorkspaceConfig(
         root=resolved_root,

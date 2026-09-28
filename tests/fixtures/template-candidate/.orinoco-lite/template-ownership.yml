@@ -4,8 +4,7 @@ classes:
   site_specific:
     behavior: site-owned-input
     paths:
-      - orinoco.yaml
-      - site-specific/site.yaml
+      - pyproject.toml
       - site-specific/metadata/records/**
       - site-specific/content/**
       - site-specific/assets/**

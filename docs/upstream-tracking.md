@@ -30,21 +30,21 @@ See CLI help for input and candidate selection.
 ## Imported inputs and persistent settings
 
 The importer maps the selected `www-from-model` checkout into the downstream paths below.
-All destination paths in this table are relative to `site-specific/`.
+`pyproject.toml` is at the downstream root; other destination paths in this table are relative to `site-specific/`.
 
 | Defined upstream | Stored downstream | Mapping on import |
 | --- | --- | --- |
-| `config/_default/languages.en.toml`: `title`, `params.description` | `site.yaml`: `identity.title`, `identity.description` | Copy values |
-| `config/_default/hugo.toml`: `baseURL` | `site.yaml`: `identity.base_url` | Normalize to one trailing slash |
-| `config/_default/menus.en.toml`: `main` | `site.yaml`: `navigation` | Map menu entries, including `pageRef` to `page_ref` and `params.icon` to `icon` |
-| `config/_default/params.toml`: `colorScheme`, `defaultAppearance`, `header.layout` | `site.yaml`: `appearance.color_scheme`, `appearance.default_appearance`, `appearance.header_layout` | Copy values |
+| `config/_default/languages.en.toml`: `title`, `params.description` | `pyproject.toml` (`tool.orinoco.site`): `identity.title`, `identity.description` | Copy values |
+| `config/_default/hugo.toml`: `baseURL` | `pyproject.toml` (`tool.orinoco.site`): `identity.base_url` | Normalize to one trailing slash |
+| `config/_default/menus.en.toml`: `main` | `pyproject.toml` (`tool.orinoco.site`): `navigation` | Map menu entries, including `pageRef` to `page_ref` and `params.icon` to `icon` |
+| `config/_default/params.toml`: `colorScheme`, `defaultAppearance`, `header.layout` | `pyproject.toml` (`tool.orinoco.site`): `appearance.color_scheme`, `appearance.default_appearance`, `appearance.header_layout` | Copy values |
 | `content/`: selected authored pages, section pages and bundle resources, including registered `portrait.*`, `logo.*` and `depiction.*` files | `content/`, at the same relative paths | Copy selected files and retrieve Annex-backed bytes; synchronize with deletions |
 | `assets/img/`: files named `fzj.svg`, `hhu.svg`, `logo.png` | `assets/img/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
 | `static/`: top-level images and `site.webmanifest` | `static/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
 | `config/_default/params.toml`: `header.logo`, `header.logoDark`, `footer.showCopyright` | `overrides/config/params.toml`: same fields | Replace these fields; remove them when absent upstream |
 | `config/_default/languages.en.toml`: `copyright` | `overrides/config/languages.en.toml`: `copyright` | Replace this field; remove it when absent upstream |
 
-Refresh replaces `site.yaml` and synchronizes `content/`, `assets/`, and `static/`, including deletions.
+Refresh updates only imported fields in `tool.orinoco.site`, preserving unrelated TOML and operational policy, and synchronizes `content/`, `assets/`, and `static/`, including deletions.
 Local edits in those imported surfaces do not persist; keep downstream choices in the separate settings below.
 Site import leaves metadata to the record-conversion stage.
 
@@ -52,8 +52,8 @@ These explicitly separate settings persist through `populate` and site reimport:
 
 | Downstream setting or override | Where it is stored | Why it persists |
 | --- | --- | --- |
-| GitHub repository and optional curation service | `orinoco.yaml`: `site.repository`, `site.curation_service` | Outside the imported inputs |
-| Deployment URL | Build command `--base-url`, or `ORINOCO_BASE_URL` in deployment configuration | Supplied at build time; does not edit regenerated `site.yaml` |
+| GitHub repository and optional curation service | `pyproject.toml`: `tool.orinoco.github.repository`, `tool.orinoco.service.url` | Outside the imported inputs |
+| Deployment URL | Build command `--base-url`, or `ORINOCO_BASE_URL` in deployment configuration | Supplied at build time; does not edit imported `tool.orinoco.site` settings |
 | GitHub Pages publication and Netlify pull-request previews | Downstream `.github/workflows/` and `netlify.toml` | Outside the imported inputs |
 | Additional theme parameters | `site-specific/overrides/config/params.toml` | Fields other than the three importer-owned logo/footer fields are preserved |
 | Additional English language settings | `site-specific/overrides/config/languages.en.toml` | Fields other than `copyright` are preserved |

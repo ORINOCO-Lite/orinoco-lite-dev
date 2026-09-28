@@ -66,7 +66,7 @@
 - In `docs/project-design.md`, name concrete actors, artifacts, and Git operations.
   Prefer terms such as commit, comment, pull request, and merge over abstract workflow language when they describe the actual action, and omit conclusions already evident from the flow.
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
-- Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, or authentication behavior.
+- Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, authentication, or automated GitHub writes.
 - Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
   Retire them at milestone boundaries.
 - Delete retired documents from the active tree after promoting any lasting guidance.

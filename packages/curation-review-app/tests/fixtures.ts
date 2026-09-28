@@ -9,19 +9,21 @@ export const CLAIM_ONE = `sha256:${"1".repeat(64)}`;
 export const CLAIM_TWO = `sha256:${"2".repeat(64)}`;
 export const ARTIFACT_ID = 123456789;
 export const WORKFLOW_RUN_ID = 987654321;
-export const ORINOCO_CONFIG = `contract_version: 2
-site:
-  repository: example/site
-  curation_service: https://review.example/
-paths:
-  records: site-specific/metadata/records
+export const SITE_DATA = `[tool.orinoco.site.identity]
+title = "Example site"
+description = "A research site"
+base_url = "https://site.example/"
 `;
-export const SITE_DATA = `version: 1
-identity:
-  title: Example site
-  description: A research site
-  base_url: https://site.example/
-`;
+export const ORINOCO_CONFIG = `[tool.orinoco.github]
+repository = "example/site"
+[tool.orinoco.service]
+url = "https://review.example/"
+[tool.orinoco.operations]
+preview_editing = true
+shacl_materialization = true
+[tool.orinoco.paths]
+records = "site-specific/metadata/records"
+${SITE_DATA}`;
 
 export function proposalCommitMessage(): string {
   return `[DATALAD RUNCMD] chore(curation): propose zotero metadata

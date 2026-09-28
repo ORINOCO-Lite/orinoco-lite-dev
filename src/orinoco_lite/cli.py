@@ -32,7 +32,7 @@ def _parser() -> argparse.ArgumentParser:
                 "followed by 'orinoco-lite serve'. Use COMMAND --help for options and "
                 "'orinoco-lite dev --help' when contributing package or template changes."),
     )
-    parser.add_argument("--root", type=Path, help="directory containing orinoco.yaml")
+    parser.add_argument("--root", type=Path, help="directory containing pyproject.toml")
     parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 

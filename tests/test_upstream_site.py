@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
-import yaml
+import tomllib
 
 from orinoco_lite import cli
 
@@ -63,7 +63,9 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
     destination.mkdir()
     (destination / "metadata").mkdir()
     (destination / "metadata/keep.yaml").write_text("authored: true\n")
-    command = ["dev", "upstream", "import-from-www", "--source", str(website),
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_text("# Keep this comment\n[tool.other]\nanswer = 42\n[tool.orinoco.operations]\ntemplate_updates = true\n[tool.orinoco.site.identity]\ncustom = 'preserved'\n")
+    command = ["--root", str(tmp_path), "dev", "upstream", "import-from-www", "--source", str(website),
                "--revision", revision, "--destination", str(destination)]
     if annexed:
         command += ["--media-remote", str(media_remote)]
@@ -73,7 +75,12 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
     assert not (destination / "site.yaml").exists()
     git(website, "checkout", "--", "content/contact.md")
     assert cli.main(command) == 0
-    site = yaml.safe_load((destination / "site.yaml").read_text())
+    document = tomllib.loads(manifest.read_text())
+    site = document["tool"]["orinoco"]["site"]
+    assert document["tool"]["orinoco"]["operations"]["template_updates"] is True
+    assert document["tool"]["other"]["answer"] == 42
+    assert site["identity"]["custom"] == "preserved"
+    assert "# Keep this comment" in manifest.read_text()
     assert site["identity"]["title"] == "Captured site"
     assert (destination / "content/contact.md").read_text() == "Committed editorial content\n"
     assert not (destination / "content/_index.md").exists()
@@ -114,7 +121,7 @@ def test_missing_annex_payload_does_not_modify_destination(tmp_path):
     destination.mkdir()
     (destination / "keep").write_text("unchanged")
     with pytest.raises(DriverError, match="retrieval failed"):
-        import_site_inputs(source, destination, retrieve_media=True)
+        import_site_inputs(source, destination, config_path=tmp_path / "pyproject.toml", retrieve_media=True)
     assert list(destination.iterdir()) == [destination / "keep"]
     assert (destination / "keep").read_text() == "unchanged"
 
@@ -128,10 +135,12 @@ def test_import_refuses_deletion_without_overwrite_conflict(tmp_path, monkeypatc
     old = destination / "content/obsolete.md"
     old.parent.mkdir(parents=True)
     old.write_text("keep until forced\n")
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_text("[tool.orinoco]\n")
     with pytest.raises(DriverError, match="--force"):
-        site_inputs.import_site_inputs(tmp_path / "source", destination)
+        site_inputs.import_site_inputs(tmp_path / "source", destination, config_path=manifest)
     assert old.read_text() == "keep until forced\n"
     assert not (destination / "site.yaml").exists()
-    site_inputs.import_site_inputs(tmp_path / "source", destination, force=True)
+    site_inputs.import_site_inputs(tmp_path / "source", destination, config_path=manifest, force=True)
     assert not old.exists()
-    assert (destination / "site.yaml").exists()
+    assert "site" in tomllib.loads(manifest.read_text())["tool"]["orinoco"]

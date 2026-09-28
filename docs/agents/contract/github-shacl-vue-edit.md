@@ -16,7 +16,7 @@ The editor exposes:
 - **Propose via GitHub**, which uses the configured curation service.
 
 Repository identity comes from the trusted build.
-`site.curation_service` is an optional service override; the central Orinoco Lite service is the default.
+`tool.orinoco.service.url` is an optional service override; the central Orinoco Lite service is the default.
 
 ## Browser handoff
 

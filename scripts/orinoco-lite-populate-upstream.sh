@@ -100,7 +100,7 @@ datalad run --explicit -m "chore: convert records dump" \
 
 datalad run --explicit -m "chore: import upstream site inputs" \
   --input pixi.toml --input pixi.lock \
-  --output "$destination/site.yaml" --output "$destination/content" \
+  --input pyproject.toml --output pyproject.toml --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
   orinoco-lite dev upstream import-from-www --destination "$destination" --force

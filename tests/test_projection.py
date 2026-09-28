@@ -542,7 +542,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         imported.write_text("id: https://example.invalid/base\n", encoding="utf-8")
         self.workspace = WorkspaceConfig(
             root=self.root,
-            config_path=self.root / "orinoco.yaml",
+            config_path=self.root / "pyproject.toml",
 
             site_name="Generic fixture",
             base_url="https://example.invalid/",
@@ -903,7 +903,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             editorial = self.workspace.path("editorial") / "about.md"
             editorial.parent.mkdir(parents=True, exist_ok=True)
             editorial.write_text("New editorial content")
-            (self.workspace.path("site") / "site.yaml").write_text("identity:\n  base_url: https://new.example/\n")
+            (self.root / "pyproject.toml").write_text('[tool.orinoco.site.identity]\nbase_url = "https://new.example/"\n')
             assert update_projection(self.workspace, self.resources) == first
             assert semantic.call_count == 1
             update_projection(self.workspace, self.resources, no_cache=True)

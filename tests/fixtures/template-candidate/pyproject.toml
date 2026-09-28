@@ -1,0 +1,27 @@
+[tool.orinoco.site]
+record_prefix = "xyzrins:"
+
+[tool.orinoco.site.identity]
+title = "Architecture Proof"
+description = "A compact forward-looking Orinoco Lite site."
+base_url = "https://example.invalid/architecture-proof/"
+
+[[tool.orinoco.site.navigation]]
+name = "Projects"
+page_ref = "/projects/"
+weight = 10
+
+[[tool.orinoco.site.navigation]]
+name = "People"
+page_ref = "/persons/"
+weight = 20
+
+[[tool.orinoco.site.navigation]]
+name = "Publications"
+page_ref = "/publications/"
+weight = 30
+
+[tool.orinoco.site.appearance]
+color_scheme = "fire"
+default_appearance = "light"
+header_layout = "hybrid"

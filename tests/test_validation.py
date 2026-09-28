@@ -16,17 +16,9 @@ from orinoco_lite.errors import ConfigurationError
 from orinoco_lite.validation import validate_workspace
 
 
-CONFIG = """\
-contract_version: 2
-"""
+CONFIG = '[tool.orinoco]\n'
 
-SITE_DATA = """\
-version: 1
-identity:
-  title: Complete fixture
-  description: A validation fixture.
-  base_url: https://example.invalid/complete/
-"""
+SITE_DATA = '[tool.orinoco.site.identity]\ntitle = "Complete fixture"\ndescription = "A validation fixture."\nbase_url = "https://example.invalid/complete/"\n'
 
 
 DISPLAY_LABEL_ASSERTION = {
@@ -47,7 +39,7 @@ class DownstreamValidationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        (self.root / "orinoco.yaml").write_text(CONFIG, encoding="utf-8")
+        (self.root / "pyproject.toml").write_text(CONFIG, encoding="utf-8")
         for relative in (
             "site-specific/metadata/records/XYZPerson",
             "site-specific/metadata/records/XYZAgentRole",
@@ -59,8 +51,8 @@ class DownstreamValidationTests(unittest.TestCase):
             "build",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
-        (self.root / "site-specific/site.yaml").write_text(
-            SITE_DATA, encoding="utf-8"
+        (self.root / "pyproject.toml").write_text(
+            CONFIG + SITE_DATA, encoding="utf-8"
         )
         (self.root / "site-specific/metadata/records/XYZPerson/person.yaml").write_text(
             "pid: xyzrins:persons/test\n"
@@ -185,11 +177,11 @@ class DownstreamValidationTests(unittest.TestCase):
             validate_workspace(load_workspace(self.root))
 
     def test_configured_site_specific_metadata_boundary_fails_closed(self) -> None:
-        config = self.root / "orinoco.yaml"
+        config = self.root / "pyproject.toml"
         config.write_text(
-            CONFIG
-            + "paths:\n"
-            + "  records: declared/metadata/records\n",
+            CONFIG + SITE_DATA
+            + "[tool.orinoco.paths]\n"
+            + 'records = "declared/metadata/records"\n',
             encoding="utf-8",
         )
         destination = self.root / "declared/metadata/records"
@@ -203,11 +195,11 @@ class DownstreamValidationTests(unittest.TestCase):
             validate_workspace(load_workspace(self.root))
 
     def test_configured_annotation_diagnostic_names_derived_root(self) -> None:
-        config = self.root / "orinoco.yaml"
+        config = self.root / "pyproject.toml"
         config.write_text(
-            CONFIG
-            + "paths:\n"
-            + "  records: site-specific/metadata/records\n",
+            CONFIG + SITE_DATA
+            + "[tool.orinoco.paths]\n"
+            + 'records = "site-specific/metadata/records"\n',
             encoding="utf-8",
         )
         unsupported = (
@@ -224,9 +216,9 @@ class DownstreamValidationTests(unittest.TestCase):
             annotation_files(load_workspace(self.root))
 
     def test_one_component_record_root_does_not_claim_the_repository_root(self) -> None:
-        config = self.root / "orinoco.yaml"
+        config = self.root / "pyproject.toml"
         config.write_text(
-            CONFIG + "paths:\n  records: records\n",
+            CONFIG + SITE_DATA + '[tool.orinoco.paths]\nrecords = "records"\n',
             encoding="utf-8",
         )
         (self.root / "site-specific/metadata/records").rename(self.root / "records")
@@ -236,9 +228,9 @@ class DownstreamValidationTests(unittest.TestCase):
         self.assertEqual(report["records"], 2)
 
     def test_one_component_record_root_keeps_derived_overlays_strict(self) -> None:
-        config = self.root / "orinoco.yaml"
+        config = self.root / "pyproject.toml"
         config.write_text(
-            CONFIG + "paths:\n  records: records\n",
+            CONFIG + SITE_DATA + '[tool.orinoco.paths]\nrecords = "records"\n',
             encoding="utf-8",
         )
         (self.root / "site-specific/metadata/records").rename(self.root / "records")

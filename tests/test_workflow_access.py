@@ -11,8 +11,8 @@ from orinoco_lite import workflow_access
 def test_workflow_access_without_metadata_uses_exact_service_audience_and_masks_credentials(tmp_path, monkeypatch, capsys, configured):
     output = tmp_path / "output"
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "orinoco.yaml").write_text(
-        "contract_version: 2\n" + ("site:\n  curation_service: https://review.example\n" if configured else "")
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.orinoco]\n" + ("[tool.orinoco.service]\nurl = 'https://review.example'\n" if configured else "")
     )
     origin = "https://review.example" if configured else workflow_access.DEFAULT_CURATION_SERVICE
     for key, value in {
@@ -56,7 +56,7 @@ def test_transport_failure_does_not_print_credentials_or_untrusted_body():
 
 def test_curation_write_access_masks_both_repository_tokens(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "orinoco.yaml").write_text("contract_version: 2\n")
+    (tmp_path / "pyproject.toml").write_text("[tool.orinoco]\n")
     output = tmp_path / "output"
     for key, value in {
         "ACTIONS_ID_TOKEN_REQUEST_URL": "https://example.actions.githubusercontent.com/token?api-version=2",
