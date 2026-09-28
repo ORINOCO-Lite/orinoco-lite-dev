@@ -50,6 +50,8 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--json", action="store_true", help="print the report as JSON")
     validate.add_argument("--no-cache", action="store_true", help="repeat schema and relationship checks even when a previous build validated the same inputs")
 
+    commands.add_parser("prepare-media", help="retrieve and verify opted-in Annex site media without building")
+
     build = commands.add_parser(
         "build", help="build your website from its metadata and content",
         description=("Validate your inputs and generate a static website in build/site. "
@@ -240,6 +242,11 @@ def _build(args: argparse.Namespace) -> int:
     validate_workspace(workspace)
     if bundle is not None:
         from .publication import record_projection
+        from .annex_media import prepare_media
+
+        # DataLad prepares inputs in its isolated checkout. Populate its local
+        # origin first so assembly and the run reuse one upstream retrieval.
+        prepare_media(workspace)
         projection_commit = record_projection(workspace.root)
     else:
         projection_status = _update_projection(args, workspace, resources)
@@ -371,6 +378,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "dev" and args.dev_command == "prepare-resources":
             from .prepare_resources import main as prepare_resources
             prepare_resources()
+            return 0
+        if args.command == "prepare-media":
+            from .annex_media import prepare_media
+            paths = prepare_media(_workspace(args))
+            print(f"Prepared {len(paths)} Annex media files")
             return 0
         if args.command == "validate":
             return _validate(args)

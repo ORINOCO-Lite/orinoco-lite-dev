@@ -17,7 +17,8 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 1. Read the instructions, dependency state, active milestone, and relevant tests in every selected working tree.
    Git Annex is permitted for engineering repinning and explicit upstream-site media retrieval.
    Site-specific media go into downstream site inputs, not the generic template.
-   Downstream source-adapter tasks use DataLad for commit provenance without requiring Git Annex.
+   Downstream records stay in Git.
+   Only submodules opted into Annex media require Git Annex for builds and DataLad operations; metadata-only operations do not retrieve media.
 2. Identify the package and template candidates and any downstream inputs to inject.
    Local candidate testing is the default.
    When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.

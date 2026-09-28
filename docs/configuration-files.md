@@ -6,7 +6,7 @@ This document defines configuration ownership for downstream websites.
 | --- | --- |
 | `pixi.toml` | All environment dependencies, package selections, and executable tasks. |
 | `pixi.lock` | Generated dependency resolutions. |
-| `pyproject.toml` | Tool configuration. `[tool.orinoco.site]` holds website identity, navigation, and appearance. Separate `paths`, `service`, `github`, and `operations` tables under `[tool.orinoco]` hold path overrides, service selection, repository fallback, and permitted operations. No downstream dependency declarations or tasks belong here. |
+| `pyproject.toml` | Tool configuration. `[tool.orinoco.site]` holds website identity, navigation, and appearance. Separate `paths`, `media`, `service`, `github`, and `operations` tables under `[tool.orinoco]` hold path overrides, Annex media opt-in, service selection, repository fallback, and permitted operations. No downstream dependency declarations or tasks belong here. |
 | `.copier-answers.yml` | Template source, revision, and answers used for scaffold generation and updates. |
 
 The downstream root's `pyproject.toml` is the sole runtime configuration authority.

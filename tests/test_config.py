@@ -107,3 +107,16 @@ def test_invalid_manifest(tmp_path, text):
     (tmp_path / "pyproject.toml").write_text(text)
     with pytest.raises(ConfigurationError):
         load_workspace(tmp_path)
+
+
+@pytest.mark.parametrize("media,enabled", [({}, False), ({"annex": True}, True), ({"annex": False}, False)])
+def test_annex_media_configuration(tmp_path, media, enabled):
+    write(tmp_path, media=media)
+    assert load_workspace(tmp_path).annex_media is enabled
+
+
+@pytest.mark.parametrize("media", [[], {"annex": "true"}, {"annex": 1}, {"unknown": True}])
+def test_invalid_annex_media_configuration(tmp_path, media):
+    write(tmp_path, media=media)
+    with pytest.raises(ConfigurationError, match="tool.orinoco.media"):
+        load_workspace(tmp_path)

@@ -285,6 +285,7 @@ class WorkspaceConfig:
     raw: Mapping[str, Any]
     site_data: Mapping[str, Any] = field(default_factory=dict)
     repository: str | None = None
+    annex_media: bool = False
     curation_service: str = DEFAULT_CURATION_SERVICE
 
     def path(self, name: str) -> Path:
@@ -398,6 +399,11 @@ def load_workspace(
     curation_service = _curation_service_origin(
         service.get("url", DEFAULT_CURATION_SERVICE), "tool.orinoco.service.url")
 
+    media = raw.get("media", {})
+    if (not isinstance(media, dict) or set(media) - {"annex"}
+            or not isinstance(media.get("annex", False), bool)):
+        raise ConfigurationError("pyproject.toml tool.orinoco.media accepts only annex = true or false")
+
     workspace = WorkspaceConfig(
         root=resolved_root,
         config_path=config_path,
@@ -407,6 +413,7 @@ def load_workspace(
         paths=paths,
         raw=raw,
         repository=repository,
+        annex_media=media.get("annex", False),
         curation_service=curation_service,
     )
     from .annotations import annotation_root

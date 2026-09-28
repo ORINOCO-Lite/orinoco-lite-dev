@@ -5,34 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 from collections.abc import Mapping
 import subprocess
-import shlex
 import tomllib
 
 import tomlkit
 
 
 from .errors import DriverError
+from .annex_media import annex_files, retrieve_and_verify
 
 ENTITY_SECTIONS = frozenset({
     "datasets", "instruments", "objectives", "persons", "projects",
     "publications", "topics",
 })
 IDENTITY_IMAGES = frozenset({"fzj.svg", "hhu.svg", "logo.png"})
-
-
-def _annex(source: Path, *arguments: str, media_remote: str | None = None) -> str:
-    # Only upstream preparation uses Annex. Keep it out of the site's dependencies.
-    command = ["pixi", "exec", "--spec", "uv", "--", "uvx", "--from",
-               "git-annex==10.20260601", "git-annex"]
-    command.append(arguments[0])
-    if media_remote:
-        command.extend(["-c", f"remote.orinoco-media.url={media_remote}"])
-    command.extend(arguments[1:])
-    print(f"  In {source}: {shlex.join(command)}", flush=True)
-    result = subprocess.run(command, cwd=source, capture_output=True, text=True)
-    if result.returncode:
-        raise DriverError(f"Upstream media retrieval failed: {result.stdout}{result.stderr}")
-    return result.stdout.strip()
 
 
 def _annex_key(path: Path) -> str | None:
@@ -52,16 +37,13 @@ def _annex_key(path: Path) -> str | None:
     return None
 
 
-def _source_bytes(source: Path, relative: Path, *, retrieve_media: bool = False) -> bytes:
+def _source_bytes(source: Path, relative: Path, *, media: dict[Path, Path] | None = None) -> bytes:
     path = source / relative
+    if media and relative in media:
+        return media[relative].read_bytes()
     key = _annex_key(path)
     if key:
-        if not retrieve_media:
-            raise DriverError(f"Site input contains an Annex pointer, not file bytes: {path}. Use dev upstream import-from-www to retrieve media.")
-        location = _annex(source, "contentlocation", key)
-        if not location:
-            raise DriverError(f"Upstream media is unavailable after retrieval: {relative}")
-        path = source / location
+        raise DriverError(f"Site input contains an Annex pointer, not file bytes: {path}. Use dev upstream import-from-www to retrieve media.")
     return path.read_bytes()
 
 
@@ -99,14 +81,12 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
         })):
             continue
         paths.append(relative)
+    media = {}
     if retrieve_media:
-        annexed = [path.as_posix() for path in paths if _annex_key(source / path)]
-        if annexed:
-            _annex(source, "init")
-            source_option = ("--from", "orinoco-media") if media_remote else ()
-            _annex(source, "get", *source_option, "--", *annexed, media_remote=media_remote)
-            _annex(source, "fsck", "--", *annexed, media_remote=media_remote)
-    files = {path: _source_bytes(source, path, retrieve_media=retrieve_media) for path in paths}
+        managed = annex_files(source, initialize=any(_annex_key(source / path) for path in paths))
+        selected = {path: managed[path] for path in paths if path in managed}
+        media = retrieve_and_verify(source, selected, remote=media_remote)
+    files = {path: _source_bytes(source, path, media=media) for path in paths}
     # These source-owned values are deliberately cleared by the generic
     # template. Keep their real upstream settings as site overrides; fields
     # already mapped into tool.orinoco.site remain owned only by that document.

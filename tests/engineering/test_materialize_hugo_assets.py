@@ -82,6 +82,10 @@ class FakeGitAnnex:
             return "\n".join(
                 json.dumps({"file": path}) for path in self.annexed
             )
+        if arguments[0:2] == ("annex", "lookupkey"):
+            return arguments[-1]
+        if arguments[0:2] == ("annex", "contentlocation"):
+            return arguments[-1]
         if arguments[0:2] == ("annex", "get"):
             if self.fail_operation == "get":
                 raise materializer.MaterializationError("mock get failure")

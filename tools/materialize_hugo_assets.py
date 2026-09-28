@@ -223,21 +223,20 @@ def hydrate_and_verify(
     """Hydrate and checksum every required payload with Git Annex."""
     if not assets:
         return
-    paths = [asset.as_posix() for asset in assets]
-    git_annex(
-        website,
-        "get",
-        "--",
-        *paths,
-        runner=runner,
-    )
-    git_annex(
-        website,
-        "fsck",
-        "--",
-        *paths,
-        runner=runner,
-    )
+    from orinoco_lite.annex_media import retrieve_and_verify
+    from orinoco_lite.errors import DriverError
+
+    def run(*arguments):
+        try:
+            return git_annex(website, *arguments, runner=runner)
+        except MaterializationError as error:
+            raise DriverError(str(error)) from error
+
+    try:
+        files = {Path(asset): run("lookupkey", "--", asset.as_posix()) for asset in assets}
+        retrieve_and_verify(website, files, run_annex=run)
+    except DriverError as error:
+        raise MaterializationError(str(error)) from error
 
 
 def _verify_copied_payload(path: Path) -> None:

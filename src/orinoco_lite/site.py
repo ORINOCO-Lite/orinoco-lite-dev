@@ -60,7 +60,7 @@ FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
 """
 
 
-def _copy_tree(source: Path, destination: Path) -> None:
+def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | None = None) -> None:
     if source.is_symlink():
         raise DriverError(f"Static source cannot be a symlink: {source}")
     if not source.is_dir():
@@ -70,6 +70,10 @@ def _copy_tree(source: Path, destination: Path) -> None:
         if ".git" in relative.parts:
             continue
         target = destination / relative
+        if media and candidate in media:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(media[candidate], target)
+            continue
         if candidate.is_symlink():
             raise DriverError(f"Static source cannot contain symlinks: {candidate}")
         if candidate.is_dir():
@@ -328,6 +332,9 @@ def _assemble(
     *,
     www_from_model: Path | None = None,
 ) -> None:
+    from .annex_media import prepare_media
+
+    media = prepare_media(workspace)
     upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
     adapter = workspace.root / ".orinoco-lite" / "hugo-adapter"
@@ -377,8 +384,8 @@ def _assemble(
     _copy_tree(overrides / "config", assembly / "config" / "con")
     _copy_tree(overrides / "layouts", assembly / "layouts")
     _copy_tree(overrides / "static", assembly / "static")
-    _copy_tree(workspace.path("site") / "assets", assembly / "assets")
-    _copy_tree(workspace.path("site") / "static", assembly / "static")
+    _copy_tree(workspace.path("site") / "assets", assembly / "assets", media=media)
+    _copy_tree(workspace.path("site") / "static", assembly / "static", media=media)
     projection = workspace.path("generated") / "projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
