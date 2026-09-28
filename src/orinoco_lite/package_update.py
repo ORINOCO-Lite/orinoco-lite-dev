@@ -118,7 +118,10 @@ def update(root: Path, revision: str, repository: str | None = None, *, check: b
     try:
         document["pypi-dependencies"]["orinoco-lite"] = replacement
         manifest.write_text(tomlkit.dumps(document))
-        subprocess.run(["pixi", "lock", "--manifest-path", "pixi.toml"], cwd=root, check=True)
+        environment = dict(os.environ)
+        environment.pop("PIXI_LOCKED", None)
+        subprocess.run(["pixi", "lock", "--manifest-path", "pixi.toml"],
+                       cwd=root, env=environment, check=True)
     except BaseException:
         for path, content in before.items():
             if content is None:

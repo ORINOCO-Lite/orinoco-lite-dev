@@ -31,8 +31,20 @@ effort=$(jq -r '.reasoning_effort // .effort // empty' <<<"$turn_context")
 app_path='/Applications/ChatGPT.app'
 desktop_version=$(defaults read "$app_path/Contents/Info" \
   CFBundleShortVersionString 2>/dev/null || true)
-runtime_version=$("$app_path/Contents/Resources/codex" --version 2>/dev/null \
-  | awk 'NR == 1 { print $2 }')
+runtime_path=''
+for candidate in \
+  "$app_path/Contents/Resources/codex-cli/bin/codex" \
+  "$app_path/Contents/Resources/codex"; do
+  if [ -x "$candidate" ]; then
+    runtime_path=$candidate
+    break
+  fi
+done
+[ -n "$runtime_path" ] || fail 'cannot find bundled Codex runtime executable'
+runtime_output=$("$runtime_path" --version 2>/dev/null) \
+  || fail "cannot execute bundled Codex runtime: $runtime_path"
+runtime_version=$(printf '%s\n' "$runtime_output" \
+  | awk 'NR == 1 && $1 == "codex-cli" && NF == 2 { print $2 }')
 [ -n "$desktop_version" ] || fail 'cannot identify Codex Desktop version'
 [ -n "$runtime_version" ] || fail 'cannot identify bundled Codex runtime version'
 

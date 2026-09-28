@@ -52,6 +52,10 @@ orinoco-lite serve
 ```
 
 The downstream selects its Orinoco Lite package and template versions and chooses when to update either one.
+`orinoco-lite template update` selects the latest tagged release (including release candidates) and applies a Copier update recorded through DataLad, using the selected template’s package declaration by default.
+Use `--revision main` or an exact commit to select development work.
+Explicit `--package-revision` and `--package-repository` overrides are recorded separately.
+The template’s **Update downstream template** GitHub workflow calls this command and opens a draft pull request; see the [downstream update guide](https://github.com/ORINOCO-Lite/orinoco-lite-template/blob/main/copier-template/docs/template-updates.md).
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 Source-adapter tasks use DataLad to record run provenance in Git.
 They do not require Git Annex, and ordinary website builds never invoke it.
