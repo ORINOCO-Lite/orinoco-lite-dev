@@ -382,7 +382,16 @@ class DownstreamValidationTests(unittest.TestCase):
             ],
             check=True,
         )
-        with self.assertRaisesRegex(ConfigurationError, "gitmodules"):
+        with self.assertRaisesRegex(ConfigurationError, "gitlinks"):
+            validate_workspace(load_workspace(self.root))
+
+    def test_retained_source_subdataset_does_not_enter_build_inputs(self) -> None:
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        for path in ("sourcedata/www-from-model", "site-specific"):
+            subprocess.run(["git", "-C", str(self.root), "update-index", "--add",
+                            "--cacheinfo", f"160000,0123456789012345678901234567890123456789,{path}"], check=True)
+            (self.root / ".gitmodules").write_text(f'[submodule "{path}"]\npath = {path}\nurl = https://example.invalid/input.git\n')
+            # The retained source need not be installed for a normal build.
             validate_workspace(load_workspace(self.root))
 
 

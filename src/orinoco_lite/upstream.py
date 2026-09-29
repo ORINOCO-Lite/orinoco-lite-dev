@@ -14,6 +14,9 @@ from .site_inputs import import_site_inputs
 def register(commands):
     upstream = commands.add_parser("upstream", help="import and record inputs for upstream comparison")
     groups = upstream.add_subparsers(dest="upstream_command", required=True)
+    groups.add_parser("checkout", description=(
+        "Create or update sourcedata/www-from-model at the package-selected commit. "
+        "The caller records the gitlink with DataLad; this command does not import site files."))
     export = groups.add_parser("import-from-www", description=(
         "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
         "and comparison with Orinoco Lite. "
@@ -26,6 +29,8 @@ def register(commands):
     export.add_argument("--revision", help="require this Git revision at the source checkout's HEAD")
     export.add_argument("--destination", type=Path, help="site-input directory (default: site-specific)")
     export.add_argument("--force", action="store_true", help="replace existing imported files and delete obsolete files from synchronized surfaces")
+    export.add_argument("--include-homepage", action="store_true",
+                        help="also import content/_index.md as a whole-file homepage override; use only for an intentionally authored homepage")
     populate = groups.add_parser("populate", description=(
         "Download the public collection of a Dump Things service, convert records, and import site inputs as separate DataLad runs. "
         "Use --dump to retain a supplied dump, or --reuse-dump to transform "
@@ -44,12 +49,15 @@ def register(commands):
 
 def execute(args):
     root = (args.root or Path.cwd()).resolve()
+    if args.upstream_command == "checkout":
+        return checkout_upstream(root)
     if args.upstream_command == "populate":
         # Public operations are recorded by the shared Bash workflow, not here.
         # Store paths relative to the dataset, even when callers supply absolutes.
         import os
         def relative(path):
-            return os.path.relpath(explicit_path(args, path), root)
+            target = explicit_path(args, path)
+            return os.path.relpath(target.parent.resolve() / target.name, root)
         command = ["orinoco-lite-populate-upstream.sh",
                    "--directory", relative(args.directory), "--destination", relative(args.destination),
                    "--api", args.api, "--site-layout", args.site_layout]
@@ -57,6 +65,11 @@ def execute(args):
             command.extend(["--dump", relative(args.dump)])
         if args.reuse_dump:
             command.append("--reuse-dump")
+        if not args.site_specific:
+            source = (root / "sourcedata/www-from-model").resolve()
+            destination = explicit_path(args, args.destination).resolve()
+            if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
+                raise ConfigurationError("Upstream submodule and site-input destination must not overlap.")
         if args.site_specific:
             from .config import load_workspace
             load_workspace(root)
@@ -83,6 +96,45 @@ def execute(args):
         raise ConfigurationError("Site export destination must not overlap the upstream checkout")
     print(f"Upstream site: {source}\nCommit: {revision}\nDestination: {destination}")
     media_remote = args.media_remote or (None if args.source else "https://hub.psychoinformatics.de/www/www-from-model.git")
-    result = import_site_inputs(source, destination, config_path=root / "pyproject.toml", retrieve_media=True, media_remote=media_remote, force=args.force)
+    result = import_site_inputs(source, destination, config_path=root / "pyproject.toml", retrieve_media=True,
+                                media_remote=media_remote, force=args.force, include_homepage=args.include_homepage)
     print(f"Exported {result['files']} site files; metadata was preserved.")
+    return 0
+
+
+def checkout_upstream(root: Path) -> int:
+    """Use Git's submodule registration and the package's existing resolver."""
+    destination = root / "sourcedata/www-from-model"
+    if (destination.is_symlink() or not destination.resolve().is_relative_to(root)
+            or destination.resolve() == root or ".git" in destination.relative_to(root).parts):
+        raise ConfigurationError("Upstream submodule must be a path inside the downstream.")
+    relative = destination.relative_to(root).as_posix()
+    source = resolve_www_from_model(root, resolve_resources().root)
+
+    def git(repository, *arguments):
+        result = subprocess.run(["git", "-C", str(repository), *arguments], text=True, capture_output=True)
+        if result.returncode:
+            raise ConfigurationError(f"Cannot select upstream submodule: {result.stderr.strip()}")
+        return result.stdout.strip()
+
+    revision = git(source, "rev-parse", "HEAD")
+    repository = git(source, "remote", "get-url", "origin")
+    entry = git(root, "ls-files", "--stage", "--", relative)
+    if entry:
+        if not entry.startswith("160000 ") or "\n" in entry:
+            raise ConfigurationError("Upstream destination is already tracked and is not one submodule.")
+        git(root, "submodule", "update", "--init", "--", relative)
+        if git(destination, "status", "--porcelain"):
+            raise ConfigurationError("Commit upstream submodule changes before selecting another revision.")
+        registered = git(root, "config", "--file", ".gitmodules", "--get", f"submodule.{relative}.url")
+        if registered != repository:
+            raise ConfigurationError("Existing upstream submodule has a different source URL.")
+    else:
+        if destination.exists():
+            raise ConfigurationError("Upstream destination already exists without a submodule gitlink.")
+        git(root, "submodule", "add", "--", repository, relative)
+    git(destination, "fetch", "origin", revision)
+    git(destination, "checkout", "--detach", revision)
+    git(destination, "submodule", "update", "--init", "--recursive")
+    print(f"Upstream submodule: {relative}\nCommit: {revision}")
     return 0

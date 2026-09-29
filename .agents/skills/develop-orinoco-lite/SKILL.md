@@ -39,7 +39,9 @@ Keep generic source resolution, metadata, projection, and composition in the pac
 ## Exercise a local downstream
 
 Use the engineering `setup-upstream` task to test candidates in a fresh downstream.
-Ordinary setup keeps the selected template's package declaration and lock; coordinated changes merge the package first, then update and test the template's package pin before merging the template.
+Setup selects the engineering checkout’s committed package HEAD and template `origin/main`; publish the package commit first.
+Explicit package revisions override that default, and `--local-heads` also selects the local template HEAD.
+For release adoption, merge the package first, then update and test the template’s package pin before merging the template.
 Consult its `--help` and the installed CLI help for input selection and individual stages.
 Do not push a candidate as a side effect of setup or overwrite a developer's downstream.
 

@@ -64,8 +64,8 @@ elif name == "datalad" and args[0] == "create":
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log))
     destination = tmp_path / "downstream"
 
-    def run(*args, fail=False):
-        result = subprocess.run(["bash", str(SCRIPT), str(destination), "--template", str(template), *args],
+    def run(*args, fail=False, destination_path=None):
+        result = subprocess.run(["bash", str(SCRIPT), str(destination_path or destination), "--template", str(template), *args],
                                 cwd=engineering, env={**env, **({"SETUP_TEST_FAIL": "1"} if fail else {})},
                                 text=True, capture_output=True)
         calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
@@ -78,22 +78,16 @@ def test_selection_summary_and_immutable_handoff(setup, local):
     run, engineering, template, destination, package_head, template_head = setup
     result, calls = run(*(["--local-heads"] if local else []))
     assert result.returncode == 0, result.stderr
-    expected_package = package_head if local else "d" * 40
+    expected_package = package_head
     expected_template = template_head if local else "b" * 40
     assert f"Revision: {expected_package}" in result.stdout
     assert f"Commit: {expected_template}" in result.stdout
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[copier.index("--vcs-ref") + 1] == expected_template
     updates = [call for call in calls if call[:2] == ["datalad", "run"]]
-    if local:
-        assert updates[0][updates[0].index("--revision") + 1] == package_head
-        assert "https://example.invalid/engineering.git" in updates[0]
-    else:
-        assert not updates
-        assert (destination / "pixi.lock").read_text() == "template lock\n"
-        assert "https://example.invalid/declared-package.git" in result.stdout
-        # Package main is deliberately different from the template package pin.
-        assert "a" * 40 not in result.stdout
+    assert updates[0][updates[0].index("--revision") + 1] == package_head
+    assert "https://example.invalid/engineering.git" in updates[0]
+    assert "d" * 40 not in result.stdout
     assert git(engineering, "rev-parse", "HEAD") == package_head
     assert git(template, "rev-parse", "HEAD") == template_head
     assert git(engineering, "branch", "--show-current") == "package-candidate"
@@ -108,12 +102,11 @@ def test_explicit_override_retains_other_defaults(setup, local, option):
                 "--package-repository": "https://example.invalid/fork.git"}[option]
     result, calls = run(*(["--local-heads"] if local else []), option, selected)
     assert result.returncode == 0, result.stderr
-    expected_package = selected if option == "--package-revision" else package_head if local else "d" * 40
+    expected_package = selected if option == "--package-revision" else package_head
     expected_template = template_head if local or option == "--template-ref" else "b" * 40
     assert f"Revision: {expected_package}" in result.stdout
     assert f"Commit: {expected_template}" in result.stdout
-    expected_repository = selected if option == "--package-repository" else (
-        "https://example.invalid/engineering.git" if local else "https://example.invalid/declared-package.git")
+    expected_repository = selected if option == "--package-repository" else "https://example.invalid/engineering.git"
     assert expected_repository in result.stdout
 
 
@@ -134,3 +127,41 @@ def test_unavailable_template_does_not_create_destination(setup):
     assert result.returncode == 2
     assert not destination.exists()
     assert all(call[0] == "orinoco-lite" for call in calls)
+
+
+def test_optional_build_uses_existing_recorded_publication_path(setup):
+    run, _, _, _, _, _ = setup
+    result, calls = run("--build")
+    assert result.returncode == 0, result.stderr
+    populate = next(call for call in calls if "populate" in call)
+    build = next(call for call in calls if "build" in call)
+    assert build[-2:] == ["--publication-bundle", "build/pages-publication.bundle"]
+    assert calls.index(populate) < calls.index(build)
+    assert not any("publication" in call for call in calls)
+    assert "Setup and build complete" in result.stdout
+
+
+def test_setup_input_paths_resolve_from_physical_destination(setup, tmp_path):
+    run, _, _, _, _, _ = setup
+    physical = tmp_path / "deeper/physical"
+    physical.mkdir(parents=True)
+    alias = tmp_path / "alias"
+    alias.symlink_to(physical, target_is_directory=True)
+    supplied = tmp_path / "capture.jsonl"
+    supplied.write_text('{}\n')
+    result, calls = run("--dump", str(supplied), destination_path=alias / "site")
+    assert result.returncode == 0, result.stderr
+    populate = next(call for call in calls if "populate" in call)
+    retained_input = populate[populate.index("--dump") + 1]
+    assert (physical / "site" / retained_input).resolve() == supplied.resolve()
+
+
+@pytest.mark.parametrize("remote", ["git@github.com:example/package.git", "ssh://git@github.com/example/package.git"])
+def test_github_ssh_origin_uses_public_read_url(setup, remote):
+    run, engineering, _, _, package_head, _ = setup
+    git(engineering, "remote", "set-url", "origin", remote)
+    result, calls = run("--build")
+    assert result.returncode == 0, result.stderr
+    update = next(call for call in calls if call[:2] == ["datalad", "run"])
+    assert update[update.index("--repository") + 1] == "https://github.com/example/package.git"
+    assert update[update.index("--revision") + 1] == package_head

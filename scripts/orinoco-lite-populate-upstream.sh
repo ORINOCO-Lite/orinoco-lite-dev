@@ -9,6 +9,7 @@ site_layout=submodule
 supplied_dump=
 site_specific=
 reuse_dump=false
+upstream_submodule=sourcedata/www-from-model
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --directory) directory=$2; shift 2 ;;
@@ -98,9 +99,15 @@ datalad run --explicit -m "chore: convert records dump" \
   orinoco-lite dev records jsonl-to-yaml \
     --source "$dump_path" --destination "$destination" --force
 
+orinoco-lite dev upstream checkout
+# Save the selection of existing upstream history, then record its transformation.
+datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upstream_submodule"
+# The importer retrieves and verifies selected Annex media; do not get the whole site.
 datalad run --explicit -m "chore: import upstream site inputs" \
+  --input "$upstream_submodule" --assume-ready inputs \
   --input pixi.toml --input pixi.lock \
   --input pyproject.toml --output pyproject.toml --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
-  orinoco-lite dev upstream import-from-www --destination "$destination" --force
+  orinoco-lite dev upstream import-from-www --source "$upstream_submodule" \
+    --media-remote https://hub.psychoinformatics.de/www/www-from-model.git --destination "$destination" --force
