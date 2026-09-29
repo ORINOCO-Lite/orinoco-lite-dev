@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 from dump_things_pyclient import communicate
 from requests import RequestException
 
+from .progress import progress
 from .errors import OrinocoError
 
 
@@ -29,6 +30,7 @@ class CaptureError(OrinocoError):
     """The dump or live Dump Things response cannot be safely used."""
 
 
+@progress("Reading the records capture")
 def load_capture(path: Path) -> tuple[dict[str, dict[str, object]], str]:
     from .upstream_snapshot import SnapshotError, load_jsonl
 
@@ -42,6 +44,7 @@ def load_capture(path: Path) -> tuple[dict[str, dict[str, object]], str]:
     return {item.pid: item.record for item in records}, digest
 
 
+@progress("Downloading Pool records")
 def fetch_live(api: str) -> tuple[dict[str, dict[str, object]], dict[str, object]]:
     """Use the pinned upstream reader; verify the returned stream before saving."""
     records = {}

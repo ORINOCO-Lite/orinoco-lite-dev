@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 import subprocess
 
+from .progress import progress
 from .errors import ConfigurationError, DriverError
 
 
@@ -66,6 +67,7 @@ def annex_files(repository: Path, *, initialize: bool = False) -> dict[Path, str
     return files
 
 
+@progress("Retrieving and verifying Annex media")
 def retrieve_and_verify(
     repository: Path, files: dict[Path, str], *, remote: str | None = None,
     run_annex: Callable[..., str] | None = None,

@@ -94,7 +94,7 @@ def execute(args):
             or destination.resolve().is_relative_to(source.resolve())
             or source.resolve().is_relative_to(destination.resolve())):
         raise ConfigurationError("Site export destination must not overlap the upstream checkout")
-    print(f"Upstream site: {source}\nCommit: {revision}\nDestination: {destination}")
+    print(f"Upstream site: {source}\nCommit: {revision}\nDestination: {destination}", flush=True)
     media_remote = args.media_remote or (None if args.source else "https://hub.psychoinformatics.de/www/www-from-model.git")
     result = import_site_inputs(source, destination, config_path=root / "pyproject.toml", retrieve_media=True,
                                 media_remote=media_remote, force=args.force, include_homepage=args.include_homepage)
