@@ -10,6 +10,7 @@ from typing import Sequence
 
 import yaml
 
+from .progress import progress
 from .errors import ConfigurationError, IntegrityError, OrinocoError
 
 
@@ -45,6 +46,7 @@ def _copy(source: Path, destination: Path) -> None:
         raise IntegrityError(f"Package source is missing or not regular: {source}")
 
 
+@progress("Staging package resources")
 def stage_package_resources(
     spec_path: Path,
     destination: Path,

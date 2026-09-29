@@ -8,6 +8,7 @@ import tempfile
 import yaml
 
 from .errors import DriverError
+from .progress import progress
 from .release_editor import build_editor
 from .release_review import build_review_shell
 from .release_schema import localize_schema
@@ -46,7 +47,8 @@ def build_resources(checkout: Path, destination: Path) -> None:
             ".env*", ".dev.vars*", "__pycache__",
         )
         editor_source = scratch / "editor-source"
-        shutil.copytree(pool, editor_source, ignore=ignore)
+        with progress("Copying editor build inputs"):
+            shutil.copytree(pool, editor_source, ignore=ignore)
         build_editor(
             editor_source, checkout / "release/editor-v2",
             build / "resources-editor-shell", build / "resources-editor-licenses",
@@ -56,7 +58,8 @@ def build_resources(checkout: Path, destination: Path) -> None:
             build / "resources-schema",
         )
         application = scratch / "review-source"
-        shutil.copytree(checkout / "packages/curation-review-app", application, ignore=ignore)
+        with progress("Copying source-review build inputs"):
+            shutil.copytree(checkout / "packages/curation-review-app", application, ignore=ignore)
         build_review_shell(
             application, build / "resources-review-shell", build / "resources-review-licenses",
         )

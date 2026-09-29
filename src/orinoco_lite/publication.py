@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 
+from .progress import progress
 from .errors import OrinocoError
 
 
@@ -105,6 +106,7 @@ def _clone_inputs(source: Path, destination: Path, revision: str) -> None:
             _clone_inputs(source / path, destination / path, metadata.split()[1])
 
 
+@progress("Recording the projection with DataLad")
 def record_projection(repository: Path) -> str:
     """Run the projection once in an isolated source checkout and retain its commit."""
     root = repository.resolve()
@@ -163,6 +165,7 @@ def require_clean_source(root: Path) -> str:
     return source
 
 
+@progress("Preparing the publication bundle")
 def prepare(
     repository: Path,
     projection_commit: str,
@@ -247,6 +250,7 @@ def _bounded_pages(root: Path, latest: str, previous: str | None, limit: int) ->
     return parent
 
 
+@progress("Publishing generated-output branches")
 def publish(root: Path, bundle_name: str, history_limit: int = 3) -> None:
     """Record the deployed output without changing the source branch."""
     if history_limit < 1:

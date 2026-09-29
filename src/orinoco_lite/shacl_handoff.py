@@ -12,6 +12,8 @@ import subprocess
 import sys
 from typing import Sequence
 
+from .progress import progress
+
 
 HANDOFF_PATH = ".orinoco-lite/shacl-vue-review-bundle.json"
 BUNDLE_FORMAT = "orinoco-shacl-review-bundle"
@@ -646,6 +648,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return execute(_parser().parse_args(argv))
 
 
+@progress("Checking the GitHub editor handoff")
 def execute(args: argparse.Namespace) -> int:
     try:
         if args.handoff_command == "inspect":

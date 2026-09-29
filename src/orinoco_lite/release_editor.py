@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from typing import Any, Mapping, Sequence
 
+from .progress import progress
 from .errors import DriverError
 
 
@@ -290,6 +291,7 @@ def _dependency_inventory(
     return inventory
 
 
+@progress("Building the site editor")
 def build_editor(
     pool_ui: Path,
     overlay: Path,

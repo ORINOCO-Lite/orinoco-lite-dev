@@ -11,9 +11,11 @@ import tarfile
 import tempfile
 from typing import Sequence
 
+from .progress import progress
 from .errors import DriverError
 
 
+@progress("Normalizing the source archive")
 def normalize_sdist(path: Path, *, epoch: int = 0) -> None:
     """Replace a setuptools sdist with a canonical tar+gzip representation."""
 

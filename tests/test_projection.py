@@ -80,7 +80,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
                 "orinoco_lite.projection._records",
                 return_value=([record], {str(record["pid"])}),
             ),
-            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
+            patch("linkml_runtime.SchemaView", return_value=schema_view),
             patch(
                 "orinoco_lite.projection.build_format_converters",
                 return_value=(to_ttl,),
@@ -571,7 +571,7 @@ class GenericProjectionContractTests(unittest.TestCase):
                 "orinoco_lite.projection._records",
                 return_value=(records, {str(item["pid"]) for item in records}),
             ),
-            patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
+            patch("linkml_runtime.SchemaView", return_value=schema_view),
             patch(
                 "orinoco_lite.projection.build_format_converters",
                 return_value=(IdentityConverter(),),

@@ -24,6 +24,7 @@ from .annotations import (
 )
 from .canonical import canonical_yaml
 from .config import WorkspaceConfig, load_config_path
+from .progress import progress
 from .errors import ConfigurationError, DriverError
 from .records import record_sources
 from .schema_conversion import build_format_converters
@@ -583,6 +584,7 @@ def _atomic_apply(updates: Mapping[Path, str]) -> None:
             temporary.unlink(missing_ok=True)
 
 
+@progress("Processing the editor review bundle")
 def apply_bundle_report(
     workspace: WorkspaceConfig,
     resources_root: Path,

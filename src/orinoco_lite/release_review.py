@@ -8,10 +8,12 @@ from pathlib import Path
 import shutil
 from typing import Any, Sequence
 
+from .progress import progress
 from .errors import DriverError
 from .release_editor import _dependency_inventory, _run
 
 
+@progress("Building the source-review pages")
 def build_review_shell(
     application: Path,
     shell: Path,

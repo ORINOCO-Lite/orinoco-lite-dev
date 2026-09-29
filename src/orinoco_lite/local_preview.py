@@ -16,6 +16,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
 
+from .progress import progress
+
 
 LOOPBACK_ORIGIN = re.compile(
     rb"https?://(?:127\.0\.0\.1|localhost|\[::1\])"
@@ -49,6 +51,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         del format, args
 
 
+@progress("Checking built site files")
 def audit_host_neutral(site: Path) -> int:
     """Reject symlinks and every baked loopback origin in the artifact."""
 
@@ -89,6 +92,7 @@ def fetch(url: str) -> bytes:
         raise LocalPreviewError(f"local preview request failed: {url}: {error}") from error
 
 
+@progress("Checking local HTTP references")
 def verify_origin(origin: str) -> int:
     """Fetch the entry point and every same-origin reference it declares."""
 

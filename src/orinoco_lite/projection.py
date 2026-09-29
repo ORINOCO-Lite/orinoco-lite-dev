@@ -18,7 +18,6 @@ from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import unquote
 
 from jinja2 import Environment, FileSystemLoader
-from linkml_runtime import SchemaView
 import yaml
 
 from .progress import progress
@@ -403,6 +402,8 @@ def validate_semantics(
     resources_root: Path,
     www_from_model_root: Path | None = None,
 ) -> dict[str, Any]:
+    from linkml_runtime import SchemaView
+
     if www_from_model_root is None:
         www_from_model_root = _www_from_model_root(workspace, resources_root)
     contract = load_contract(workspace, www_from_model_root)
