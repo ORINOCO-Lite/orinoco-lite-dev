@@ -1,13 +1,94 @@
 # Staged upstream validation specification
 
 Active build specification for maintainers implementing the comparison commands and diff review application.
-Updated 18 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
+Updated 28 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
 The [application README](../../packages/diff-review-application/README.md) describes the later web interface for reviewers.
 The [design charter](../project-design.md) supplies project constraints; this document specifies the planned interfaces, behavior, and delivery sequence.
 The commands and application described here are implementation targets.
 The [exploration](provenance-comparison-exploration.md) records the research behind the [investigation procedure](../../.agents/skills/compare-orinoco-provenance/SKILL.md).
 
-## Implementation sequence
+## Psychoinformatics downstream update plan
+
+The next integration target is [psychoinformatics-downstream](https://github.com/ORINOCO-Lite/psychoinformatics-downstream).
+Prepare updates as a sequence of DataLad-recorded operations and propose their commits in a draft pull request.
+John may use the comparison commands locally when a change warrants investigation; comparison reports and the review application are not prerequisites for every update.
+This section plans the integration work; it does not authorize resetting downstream history, adopting mirror refs, merging pull requests, or deploying a site.
+
+### Prerequisites and order
+
+1. Apply the review principles proposed in [#190](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/190): explain meaningful differences and justify retained adaptations independently of passing checks.
+   Keep findings and check outcomes separate, with existing issues and commits providing the explanation.
+   No new decision registry or mandatory comparison pipeline is needed.
+2. Resolve [#180](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/180) while rebasing [#170](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/170) onto current `main`.
+   Remove the date-marker reader workaround and use the selected upstream converter directly, as decided below.
+   The current projection round-trip guard rejects the captured marker with the unadapted reader; removing the workaround alone will not make the build succeed.
+   Inspect the upstream conversion and projection path, then remove any unsupported Lite preservation requirement at that boundary without broadly suppressing conversion errors or changing retained source records.
+   Verify ordinary projection and editor readback separately, retaining evidence of upstream's omission.
+3. Address [#182](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/182) and [#189](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/189).
+   For #182, exercise minimal second-lab inputs and same-path authored overrides, then fix only demonstrated gaps in defaults, import, or media placement.
+   For #189, make the exact imported `www-from-model` revision available as a Git submodule/DataLad input and pass that checkout explicitly to import.
+   Derive its revision from the package's controlled upstream selection; the downstream gitlink records the input used rather than introducing an independently selected upstream version.
+   Verify retrieval from a fresh clone, including required Annex content, and include the subdataset among the run's declared inputs.
+4. Complete [#188](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/188) using the existing preparation, projection, build, and publication operations.
+   Preserve preparation-only setup as the default and add an explicit way to continue through projection and a complete build.
+   Reuse [#191](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/191)'s recorded projection and publication bundle where applicable; preparing a bundle must not itself deploy or push publication refs.
+   Verify the full retained-input path after the #180, #182, and #189 changes.
+   The prerequisite implementation uses `--build` and a fixed `sourcedata/www-from-model` subdataset; it does not add a stage dispatcher.
+5. Rebase the unique changes in [#171](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171), [#172](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/172), and [#173](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/173) in order.
+   Keep RDF, service, website, and local review functionality separately reviewable.
+   Reuse the useful behavior and review findings from the predecessor PRs listed below; do not resurrect their separate renderer or deployment harness.
+   Repeat affected checks on the rebased commits; earlier successful runs do not validate the new stack.
+
+### Initial dataset and recurring updates
+
+Use a disposable dataset to prove setup and one subsequent update before replacing the existing downstream history.
+Use `setup-upstream` with exact, recoverable package and template selections, retained capture bytes or a recorded acquisition, and the explicit upstream input from #189.
+Keep acquisition, record conversion, authored-site import, and generated projection separately identifiable in DataLad history.
+Dataset creation, saved supplied inputs, and human conflict resolutions may be ordinary DataLad saves; do not fabricate run records for commands that were not executed.
+
+The recurring downstream operation should compose existing commands:
+
+1. Start an update branch from the accepted downstream commit and resolve the requested template and package selections to immutable commits.
+2. Use [#192](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/192)'s `orinoco-lite template update` to record the Copier transformation and any package override.
+   Preserve the site-owned settings, content, extensions, and submodule selections protected by [#198](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/198).
+   Start a fresh locked Pixi invocation before running the selected package.
+3. When an upstream-input refresh is requested, record that subdataset's new selection and rerun the relevant import and conversion operations.
+   A template-only update must not implicitly refetch live Pool data or replace site inputs.
+   Recompute against retained captures by default for this comparison site; a live refresh is a separate acquisition with its own recorded outputs.
+4. Validate and build the candidate, then publish the existing DataLad commits in a draft PR using the template-update workflow's separation between candidate execution and trusted publishing.
+   Resolve how changed `site-specific` child commits are published before proposing the parent gitlink: both must be retrievable from their configured remotes.
+   The current template updater preserves submodule selections; coordinated input publication is additional work, not an existing updater capability.
+   Leave conflicts and failed checks visible, skip empty updates, and leave acceptance and deployment to their existing review workflows.
+5. When useful, inspect the candidate locally with #170–#173's comparisons.
+   Record conclusions with the relevant change; keep generated diagnostic reports outside tracked state by default.
+
+Reserve **mirror rebase** for replaying retained Orinoco commits onto an accepted upstream base under the existing `main`, `latest-upstream`, and `orinoco-lite-diff` convention.
+That operation produces candidate dependency commits before downstream repinning; it must not rewrite accepted downstream DataLad history.
+An automated observer advances `latest-upstream` only; adopting a rebased mirror layer remains a reviewed operation.
+Validate nested pins and required content before downstream adoption, and retain adopted commits on maintained default branches or release tags.
+PR-only commits remain temporary test candidates.
+
+Use `datalad rerun --report` before replaying a selected range.
+Historical reproduction restores the recorded environment and subdataset revisions; updated recomputation selects and records the new versions first.
+Do not replay template selection or live acquisition accidentally as part of a transformation range.
+Installed DataLad help warns that `rerun --onto` does not reset subdataset worktrees, so restore those explicitly.
+
+### Acceptance and history choices
+
+Before rollout, demonstrate a fresh setup, one template update, one retained-input recomputation, and replay from a fresh clone at another location without the original workspace.
+Inspect the run commands, environment selections, declared inputs and outputs, child commits, and parent gitlinks.
+Exercise unchanged selections and a real conflict or failed-build boundary; the workflow must report each honestly and retain reviewable commits.
+Inspect the draft PR to verify that the recorded commits survived publication and that no build or publishing step silently added unrelated source changes.
+
+Preserve individual DataLad run commits when accepting update PRs; squash merging collapses the replayable sequence.
+A merge commit can retain those records but does not produce a strictly linear history.
+If a strictly linear chain is required, agree on and test an acceptance method that retains the run records and any referenced commit identities.
+Keep generated projection and website publication refs under the existing #191 lifecycle rather than adding built files to the source branch merely to show completion.
+
+Decide the downstream reset, preservation of its existing PRs and input repositories, and the final acceptance method after the disposable rehearsal.
+The present request expresses an intention to consider a reset, not permission to perform it.
+
+## Earlier comparison implementation sequence
 
 The letters identify proposed PRs, not GitHub PR numbers.
 Cleanup #160 and the upstream comparison charter principle in #162 are merged.
@@ -21,7 +102,7 @@ Then rebase their unique changes onto `main` and repeat the affected checks.
 | A — Cleanup | Retain reusable checkout, service, and worktree-preservation operations. Remove the coupled preview orchestration and its wiring tests. | Helper behavior tests, temporary-service record checks, and CLI help. |
 | B — Capture and recording | Expose #152's capture operation as `dev records get`. Provide an explicit DataLad acquisition task. | Capture records, inspect their source information, reuse them, and inspect the portable DataLad command. |
 | C1 — Downstream preparation | Capture, JSONL → YAML → JSONL, record comparison, site import, and DataLad replay in an immutable package environment. | Verify direct JSONL equality and replay without the original checkouts. Review and merge before RDF. |
-| C2 — RDF comparison | Separate follow-up for RDF generation, comparison, attribution, and the RDF reader adaptation. | Review RDF semantics and failure boundaries independently of preparation. |
+| C2 — RDF comparison | Separate follow-up for RDF generation, comparison, and attribution using the selected upstream converter. | Review RDF semantics and failure boundaries independently of preparation. |
 | D — Service round-trip | Upload the exported records to a temporary service and capture the returned records. | Compare export with returned dump, then original capture with returned dump for the complete round-trip. Use a raw-capture service run as a diagnostic control if needed. |
 | E — Site-data import | Separate import of psychoinformatics site settings, authored pages, and site-owned files from record conversion. Reuse the pinned `www-from-model` and template layers. | Inspect copied bytes, transformed settings, and page-resource placement against their sources. |
 | F — Hugo projection | Expose upstream and Lite Hugo projection from an explicit record stream. Extract #152's selection and annotation-rendering fixes. | Compare selected pages, front matter, Markdown, links, and graph data before the Hugo build. |
@@ -329,15 +410,14 @@ When upstream appears to fix an adaptation, test without that adaptation against
 Review retained Git patches separately: agreement between paths using the same patched upstream does not establish that its local patches remain necessary.
 Use existing Git history, tests, and PR evidence for this review, not a second maintenance inventory.
 
-### Decision: preserve the source date marker
+### Decision: use upstream date-marker conversion
 
-Preserve `at_time: "-"`.
-Keep the adaptation and its regression tests in one commit while deciding how to align with upstream without that commit.
-Preserve that commit when merging C instead of squashing it with the new CLI operations.
-
-The adaptation belongs at record conversion in C. #152 preserves the value in storage and adapts the RDF reader where it otherwise disappears.
-Investigate the upstream conversion behavior before choosing its permanent correction.
-Remove the adaptation when the selected upstream code handles this case and both storage and RDF preservation checks pass without it.
+John's 28 September direction supersedes the earlier decision to retain the RDF reader workaround for `at_time: "-"`.
+Remove that workaround from #170 and align conversion with the selected upstream behavior.
+Keep the original capture and lossless stored record representations intact; this decision concerns derived RDF readback and does not authorize editing source assertions.
+Show the upstream omission as a known conversion limitation, without claiming that the marker is a valid datetime or that RDF round-tripping preserves it.
+Adjust the projection checks and affected editor expectations to the intended upstream contract, and verify the build without the workaround as part of #180/#188.
+Do not substitute another marker-specific normalization or invent a missing-date meaning.
 
 ## DataLad recording
 

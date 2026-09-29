@@ -39,10 +39,12 @@ def make_website(root):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(value)
     commit(root, "test: upstream one")
+    run(root, "git", "remote", "add", "origin", root.as_uri())
 
 
 @pytest.mark.parametrize("layout", ["directory", "submodule"])
 def test_populate_and_rerun_with_retained_data_and_changed_www_from_model(tmp_path, layout, monkeypatch):
+    monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file:https:http:ssh")
     for role in ("AUTHOR", "COMMITTER"):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.invalid")
@@ -93,7 +95,9 @@ raise SystemExit(cli.main())
     shutil.copyfile(Path(__file__).resolve().parents[1] / "scripts/orinoco-lite-populate-upstream.sh", workflow)
     workflow.chmod(0o755)
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], TEST_WWW=str(www))
-    run(site, "orinoco-lite", "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, env=env)
+    alias = tmp_path / "site-alias"
+    alias.symlink_to(site, target_is_directory=True)
+    run(tmp_path, "orinoco-lite", "--root", str(alias), "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, env=env)
     supplied.unlink()
     ingestion = run(site, "git", "log", "--format=%B", "--grep=retain supplied records dump")
     assert ingestion
@@ -135,7 +139,10 @@ raise SystemExit(cli.main())
     assert "# Preserved policy" in (site / "pyproject.toml").read_text()
     assert "template_updates = true" in (site / "pyproject.toml").read_text()
     assert "--force" in imported[0]
-    assert "--source" not in imported[0] and "--revision" not in imported[0]
+    assert "--source sourcedata/www-from-model" in imported[0]
+    body = run(site, "git", "show", "-s", "--format=%B", imported[1])
+    assert '"sourcedata/www-from-model"' in body
+    assert run(site / "sourcedata/www-from-model", "git", "rev-parse", "HEAD") == run(www, "git", "rev-parse", "HEAD")
     assert (site / "site-specific/.git").exists() == (layout == "submodule")
     # Identical inputs reproduce the content without acquisition.
     run(site, "datalad", "rerun", conversion[1], env=env)
@@ -146,6 +153,8 @@ raise SystemExit(cli.main())
     commit(www, "test: upstream two")
     (site / "pixi.lock").write_text("fixture version two\n")
     commit(site, "test: select second environment")
+    run(site, "orinoco-lite", "dev", "upstream", "checkout", env=env)
+    run(site, "datalad", "save", "-m", "test: select upstream revision", "--", ".gitmodules", "sourcedata/www-from-model", env=env)
     run(site, "datalad", "rerun", imported[1], env=env)
     assert (site / "site-specific/content/contact.md").read_text() == "Version two\n"
     assert not (site / "site-specific/content/persons/example/photo.png").exists()
@@ -156,6 +165,15 @@ raise SystemExit(cli.main())
     rows = list((site / "site-specific/metadata/records").rglob("*.yaml"))
     assert len(rows) == 1 and "Two" in rows[0].read_text()
     assert not run(site, "git", "status", "--porcelain")
+    # A fresh clone installs the recorded input without consulting the package
+    # resolver or the original working checkout at import time.
+    clone = tmp_path / "relocated"
+    run(tmp_path, "git", "clone", str(site), str(clone), env=env)
+    run(clone, "git", "submodule", "update", "--init", "--recursive", env=env)
+    replay_env = dict(env, TEST_WWW=str(tmp_path / "unavailable"))
+    run(clone, "datalad", "rerun", imported[1], env=replay_env)
+    assert (clone / "site-specific/content/contact.md").read_text() == "Version two\n"
+    assert not run(clone, "git", "status", "--porcelain")
 
 
 def test_setup_refuses_unpublished_candidate_before_creating_destination(tmp_path):
