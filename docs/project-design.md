@@ -64,6 +64,12 @@ A downstream selects the official repository or a fork and may use an exact comm
 | [`orinoco-lite`](../src/orinoco_lite/) | Contains the code and data that validate metadata, derive projections, and assemble the site. It also adds the static `/edit/` and `/review/` interfaces. | It includes the pinned Things Schema, generic drivers, static interface shells, licenses, and notices. It also records the engineering commit that selects `www-from-model`. It contains no organization content, organization policy, or copy of the upstream website. |
 | [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/) | Provides the Copier source that creates and updates downstream repositories. | It contains the scaffold, thin Orinoco Hugo adaptation, bounded licensed assets, workflows, and helper tools. It does not contain a website copy, German content, or site identity. |
 
+The template creates a working site with the selected upstream's structure, without requiring downstream-authored pages or layout overrides.
+Its starter metadata demonstrates the records and relationships needed to understand and replace the example with downstream content, with no more complexity than that requires.
+The structure must also accommodate upstream data and site inputs so that a rebuild can largely match the upstream deployment.
+Keep adaptations small and consistent enough to update upstream sources and data and compare rebuilt output programmatically; that fidelity comparison is separate from starter-site testing.
+Exercise replacement records through the ordinary build path, and check the selected upstream's support before treating a sparse setup as a failure that needs another test or adaptation.
+
 ### Deployment
 
 | Part | Role | Boundary |
