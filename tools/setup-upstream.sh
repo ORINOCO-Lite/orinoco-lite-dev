@@ -6,7 +6,7 @@ usage() {
   cat <<'HELP'
 Usage: pixi run setup-upstream [DESTINATION] [OPTIONS]
 
-Create and populate a downstream; optionally continue through a recorded build.
+Create a downstream from upstream inputs.
 Uses template origin/main and the current engineering package commit.
 
   DESTINATION               New directory (default: ../orinoco-lite-test-downstream)
@@ -19,11 +19,9 @@ Inputs:
                             (default: https://pool.psychoinformatics.de/api)
   --site-layout MODE        Store imported inputs as submodule (default) or directory;
                             ignored with --site-specific
-  --build                   Build and retain a publication bundle after preparation;
-                            does not publish or deploy
-  --force                   Delete an existing destination, including local changes,
-                            after reviewing the selections
-  --non-interactive         Print the summary and continue without a keypress (for CI)
+  --build                   Also build the site and publication bundle
+  --force                   Replace the destination, including local changes
+  --non-interactive         Skip the review pause
 
 Version overrides (optional):
   --local-heads             Also use the committed local template HEAD
@@ -36,19 +34,9 @@ Version overrides (optional):
 
   -h, --help                Show this help
 
-Paths are relative to the engineering directory. Selected commits must be
-available from their remotes so DataLad-recorded setup can be reproduced.
-Publish the engineering commit before running setup. Uncommitted changes
-are not included in the installed downstream package; a dirty checkout
-appears in the review summary. Setup waits for any key before changing the
-destination; Ctrl-C cancels. Without terminal input, pass --non-interactive
-explicitly. --force is still required to replace an existing destination.
-The summary includes commit subjects and dates for the package, template,
-and selected www-from-model; local Git changes; inputs; and build choices.
-
-To test local edits, run `pixi run orinoco-lite dev enable PATH` in an
-existing downstream, where PATH is the engineering checkout. Start a fresh
-`pixi run` to use it. `dev disable` restores the preceding package selection.
+Paths are relative to the engineering directory. Publish selected commits
+before setup. For uncommitted edits, use `pixi run orinoco-lite dev enable PATH`
+in an existing downstream; `dev disable` restores its previous package.
 
 HELP
 }
@@ -113,7 +101,7 @@ if [[ -z $package_repository ]]; then
     ssh://git@github.com/*) package_repository="https://github.com/${package_repository#ssh://git@github.com/}" ;;
   esac
 fi
-package_selection=${package_revision:-"engineering HEAD ($(git symbolic-ref --quiet --short HEAD || printf detached))"}
+package_selection=${package_revision:-"$(git symbolic-ref --quiet --short HEAD || printf detached), engineering HEAD"}
 package_revision=${package_revision:-$(git rev-parse HEAD)}
 if $explicit_template_ref || $local_heads; then
   if [[ $template_ref == HEAD ]]; then
@@ -206,8 +194,6 @@ datalad run --explicit -m "chore: select Orinoco Lite package candidate" \
   --output pixi.toml --output pixi.lock -- \
   orinoco-lite package update \
     --repository "$package_repository" --revision "$package_commit"
-printf '\nSelected package: %s\n  Revision: %s\n' \
-  "$package_repository" "$package_commit"
 
 populate=(orinoco-lite dev upstream populate --api "$api" --site-layout "$site_layout")
 if [[ -n $dump ]]; then populate+=(--dump "$dump_relative"); fi

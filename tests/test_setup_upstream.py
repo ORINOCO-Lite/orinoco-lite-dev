@@ -3,6 +3,7 @@ import fcntl
 import json
 import os
 import pty
+import re
 import select
 import time
 import termios
@@ -85,7 +86,7 @@ elif name == "datalad" and args[0] == "create":
         executable.write_text(stub)
         executable.chmod(0o755)
     log = tmp_path / "calls.jsonl"
-    env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log))
+    env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log), COLUMNS="240")
     destination = tmp_path / "downstream"
 
     def run(*args, fail=False, destination_path=None, interactive=False):
@@ -105,8 +106,8 @@ def test_selection_summary_and_immutable_handoff(setup, local):
     assert result.returncode == 0, result.stderr
     expected_package = package_head
     expected_template = template_head if local else git(template, "rev-parse", "main")
-    assert f"Revision: {expected_package}" in result.stdout
-    assert f"Commit: {expected_template}" in result.stdout
+    assert f"({expected_package[:7]}" in result.stdout
+    assert f"({expected_template[:7]}" in result.stdout
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[copier.index("--vcs-ref") + 1] == expected_template
     updates = [call for call in calls if call[:2] == ["datalad", "run"]]
@@ -129,8 +130,8 @@ def test_explicit_override_retains_other_defaults(setup, local, option):
     assert result.returncode == 0, result.stderr
     expected_package = selected if option == "--package-revision" else package_head
     expected_template = template_head if local or option == "--template-ref" else git(template, "rev-parse", "main")
-    assert f"Revision: {expected_package}" in result.stdout
-    assert f"Commit: {expected_template}" in result.stdout
+    assert f"({expected_package[:7]}" in result.stdout
+    assert f"({expected_template[:7]}" in result.stdout
     expected_repository = selected if option == "--package-repository" else "https://example.invalid/engineering.git"
     assert expected_repository in result.stdout
 
@@ -141,7 +142,7 @@ def test_explicit_selections_and_detached_template(setup):
     result, calls = run("--package-repository", "https://example.invalid/fork.git",
                         "--package-revision", git(engineering, "rev-parse", "alternate"), "--template-ref", template_head)
     assert result.returncode == 0, result.stderr
-    assert "Revision: " + git(engineering, "rev-parse", "alternate") in result.stdout
+    assert "(" + git(engineering, "rev-parse", "alternate")[:7] in result.stdout
     assert "detached commit" in result.stdout
     assert "https://example.invalid/fork.git" in result.stdout
 
@@ -246,11 +247,13 @@ def test_summary_includes_versions_changes_inputs_and_build_hint(setup, tmp_path
     assert result.returncode == 0, result.stderr
     assert "test: package candidate" in result.stdout
     assert "test: remote template" in result.stdout
-    assert "Selected www-from-model:" in result.stdout
-    assert git(engineering / "submodules/www-from-model", "rev-parse", "HEAD") in result.stdout
-    assert "1 changed, 1 untracked" in result.stdout
+    assert "• www-from-model:" in result.stdout
+    assert git(engineering / "submodules/www-from-model", "rev-parse", "HEAD")[:7] in result.stdout
+    assert "Engineering changed (1):" in result.stdout
+    assert "Engineering untracked (1):" in result.stdout
+    assert result.stdout.index("Warning:") < result.stdout.index("Engineering changed")
     assert " M .gitmodules" in result.stdout
-    assert "?? untracked.txt" in result.stdout
+    assert "Template untracked (1): untracked.txt" in result.stdout
     assert str(dump) in result.stdout
     assert "site layout: directory" in result.stdout
     assert "Build: skipped" in result.stdout
@@ -271,15 +274,20 @@ def test_redirected_input_requires_explicit_noninteractive_flag(setup):
 
 
 @pytest.mark.parametrize("key", [b"x", b"\x03"])
-def test_terminal_pause_precedes_force_replacement(setup, key):
+@pytest.mark.parametrize("no_color", [False, True])
+def test_terminal_pause_precedes_force_replacement(setup, key, no_color):
     run, engineering, template, destination, _, _ = setup
     destination.mkdir()
     sentinel = destination / "sentinel"
     sentinel.write_text("keep")
+    terminal_env = {**run.env, "TERM": "xterm-256color", "COLUMNS": "80"}
+    terminal_env.pop("NO_COLOR", None)
+    if no_color:
+        terminal_env["NO_COLOR"] = "1"
     master, slave = pty.openpty()
     process = subprocess.Popen(
         ["bash", str(SCRIPT), str(destination), "--template", str(template), "--force"],
-        cwd=engineering, env=run.env, stdin=slave, stdout=slave, stderr=slave,
+        cwd=engineering, env=terminal_env, stdin=slave, stdout=slave, stderr=slave,
         start_new_session=True, preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0))
     os.close(slave)
     output = b""
@@ -289,7 +297,11 @@ def test_terminal_pause_precedes_force_replacement(setup, key):
             if select.select([master], [], [], 0.1)[0]:
                 output += os.read(master, 65536)
         assert b"Press any key to continue" in output, output.decode()
-        assert b"Selected www-from-model" in output
+        assert b"www-from-model:" in output
+        assert (b"\x1b[" in output) is not no_color
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", output.decode()).splitlines()
+        assert len(plain) <= 20
+        assert all(len(row) <= 80 for row in plain)
         assert b"REPLACE (--force)" in output
         assert sentinel.read_text() == "keep"
         assert process.poll() is None
@@ -323,7 +335,7 @@ def test_summary_uses_selected_gitlink_instead_of_upstream_checkout_head(setup):
         "-c", "commit.gpgsign=false", "commit", "--no-verify", "--allow-empty", "-qm", "test: unselected upstream")
     result, _ = run()
     assert result.returncode == 0, result.stderr
-    assert f"Commit: {selected}" in result.stdout
+    assert f"({selected[:7]}" in result.stdout
     assert "test: unselected upstream" not in result.stdout
 
 
@@ -348,8 +360,31 @@ def test_summary_fetches_commit_metadata_without_modifying_checkouts(setup, tmp_
         "--site-layout", "submodule", "--build", "true"], text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     assert ("test: relative upstream URL" if relative_url else "test: package candidate") in result.stdout
-    assert "Selected www-from-model:" in result.stdout
-    assert "Build: projection, validation, site and publication bundle" in result.stdout
+    assert "• www-from-model:" in result.stdout
+    assert "Build: site + publication bundle" in result.stdout
     assert not destination.exists()
     assert not missing.exists()
     assert git(engineering, "rev-parse", "HEAD") == package_head
+
+
+def test_review_stays_under_twenty_lines_with_many_local_changes(setup):
+    run, engineering, template, destination, _, _ = setup
+    repository(destination, "main")
+    roots = [engineering, template, engineering / "submodules/www-from-model", destination]
+    for root in roots:
+        (root / "tracked.txt").write_text("before")
+        git(root, "add", "tracked.txt")
+        for number in range(30):
+            directory = root / f"new-directory-{number:02d}"
+            directory.mkdir()
+            (directory / "file").write_text("untracked")
+    result, _ = run("--force", interactive=True)
+    assert result.returncode == 2
+    rows = result.stdout.splitlines()
+    assert len(rows) + 2 <= 20  # Include the blank line and terminal prompt.
+    assert all(len(row) <= 240 for row in rows)
+    assert "..." in result.stdout
+    assert result.stdout.index("Warning:") < result.stdout.index("Engineering changed")
+    assert "\x1b[" not in result.stdout
+    assert "dev enable" not in result.stdout
+    assert "DataLad" not in result.stdout

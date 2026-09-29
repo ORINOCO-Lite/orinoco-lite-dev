@@ -4,7 +4,9 @@ import argparse
 from contextlib import ExitStack
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import tempfile
 
 
@@ -26,25 +28,43 @@ def commit_checkout(stack, local, repository, commit):
     return root
 
 
+def shorten(text, width):
+    text = " ".join(text.split())
+    return text if len(text) <= width else text[:max(0, width - 3)] + "..."
+
+
+def line(text, color=None):
+    text = shorten(text, shutil.get_terminal_size(fallback=(120, 24)).columns)
+    if color and sys.stdout.isatty() and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb":
+        text = f"\033[{color}m{text}\033[0m"
+    print(text)
+
+
 def show_commit(label, repository, commit, root, selection):
     message = git(root, "show", "-s", "--format=%cs %s", commit).stdout.strip()
-    print(f"\nSelected {label}: {repository}\n  Source: {selection}\n  Commit: {commit}\n  {message}")
+    coordinates = commit[:7] + (f", {selection}" if selection != commit else "")
+    prefix, suffix = f"• {label}: ", f" ({coordinates})"
+    width = shutil.get_terminal_size(fallback=(120, 24)).columns
+    repository = shorten(repository, max(16, width - len(prefix) - len(suffix)))
+    line(prefix + repository + suffix, "36")
+    line(f"  Commit: {message}", "2")
 
 
-def show_changes(label, root):
+def changes(root):
     result = git(root, "status", "--porcelain=v1", "--untracked-files=normal",
                  "--ignore-submodules=none", check=False)
-    if result.returncode:
-        print(f"  {label}: Git status unavailable ({root})")
-        return False
-    lines = result.stdout.splitlines()
-    untracked = sum(line.startswith("??") for line in lines)
-    print(f"  {label}: {len(lines) - untracked} changed, {untracked} untracked entries ({root})")
-    for line in lines[:12]:
-        print(f"    {line}")
-    if len(lines) > 12:
-        print(f"    ... {len(lines) - 12} more; use git status in this checkout")
-    return bool(lines)
+    return result.stdout.splitlines() if result.returncode == 0 else None
+
+
+def show_changes(label, entries):
+    if entries is None:
+        line(f"  {label}: Git status unavailable")
+        return
+    tracked = [entry.strip() for entry in entries if not entry.startswith("??")]
+    untracked = [entry[3:] for entry in entries if entry.startswith("??")]
+    for kind, paths in (("changed", tracked), ("untracked", untracked)):
+        if paths:
+            line(f"  {label} {kind} ({len(paths)}): {', '.join(paths)}")
 
 
 def main():
@@ -89,37 +109,27 @@ def main():
             upstream_repository = git(scratch, "config", "--get", key).stdout.strip()
         upstream_root = commit_checkout(stack, Path(engineering) / upstream_path,
                                         upstream_repository, upstream_commit)
-        print("\nSetup review")
-        show_commit("package", package_repository, package_commit, package_root, args.package_selection)
-        show_commit("template", template_repository, template_commit, template_root, args.template_selection)
-        show_commit("www-from-model", upstream_repository, upstream_commit, upstream_root,
-                    "selected package gitlink; retained as sourcedata/www-from-model")
-        print("\nLocal checkout changes (Git status codes; untracked directories grouped):")
-        dirty = show_changes("Engineering", Path(engineering).resolve())
-        show_changes("Template", Path(template).resolve())
+        show_commit("Package", package_repository, package_commit, package_root, args.package_selection)
+        show_commit("Template", template_repository, template_commit, template_root, args.template_selection)
+        show_commit("www-from-model", upstream_repository, upstream_commit, upstream_root, "package gitlink")
+        local_changes = [("Engineering", changes(engineering)), ("Template", changes(template))]
         if (Path(engineering) / upstream_path / ".git").exists():
-            show_changes("www-from-model", Path(engineering) / upstream_path)
-        print("  Selected commits exclude local edits in these checkouts.")
-        if dirty:
-            print("  Warning: the engineering checkout has uncommitted changes.")
-            print("  To test local edits, run `pixi run orinoco-lite dev enable PATH` in an existing downstream.")
+            local_changes.append(("www-from-model", changes(Path(engineering) / upstream_path)))
         destination = args.destination.resolve()
-        print(f"\nDestination: {destination}")
-        if destination.exists():
-            print("  REPLACE (--force): delete ALL existing contents, including local changes.")
-            if (destination / ".git").exists():
-                show_changes("Destination", destination)
-        else:
-            print("  Create a new downstream.")
+        if (destination / ".git").exists():
+            local_changes.append(("Destination", changes(destination)))
+        if any(entries for _, entries in local_changes):
+            line("Warning: uncommitted changes.", "33")
+        for label, entries in local_changes:
+            show_changes(label, entries)
+        action = "REPLACE (--force)" if destination.exists() else "Create"
+        line(f"{action}: {destination}", "31" if destination.exists() else None)
         if args.site_specific:
-            print(f"Inputs: existing site-specific dataset {Path(args.site_specific).resolve()}")
-            print("  Install as a submodule; skip import; use template root site settings.")
+            line(f"Inputs: {Path(args.site_specific).resolve()} (site-specific submodule)")
         else:
-            source = f"dump {Path(args.dump).resolve()}" if args.dump else f"fetch Pool dump from {args.api}"
-            print(f"Inputs: {source}\n  Import upstream site files; site layout: {args.site_layout}.")
-        print("Build: projection, validation, site and publication bundle; no deployment." if args.build == "true"
-              else "Build: skipped; setup stops after preparation.")
-        print("Setup records DataLad commits; selected commits must remain available from their remotes.")
+            source = f"dump {Path(args.dump).resolve()}" if args.dump else args.api
+            line(f"Inputs: {source} (site layout: {args.site_layout})")
+        line("Build: site + publication bundle" if args.build == "true" else "Build: skipped")
 
 
 if __name__ == "__main__":

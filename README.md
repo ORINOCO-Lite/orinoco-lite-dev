@@ -91,17 +91,10 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-Setup selects the template remote's `main` commit and the engineering checkout's committed package revision.
-It shows the selected commits and local changes, then waits for a keypress before modifying the destination; use `--non-interactive` for unattended runs.
-For development with both checkouts' current commits, use `pixi run setup-upstream --local-heads`; explicit overrides are also available independently.
+Setup uses the template's remote `main` and the engineering checkout's committed package version.
+Use `pixi run setup-upstream --help` for options.
+See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
-See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.
-Setup stops before projection and building by default; use `--build` to continue, or run `pixi run build` in the downstream when ready.
-
-Use `pixi run setup-upstream --help` for candidate and input selection, and `pixi run orinoco-lite dev upstream --help` or `dev records --help` for individual stages.
-CLI help is the reference for options and defaults.
-
-`dev enable [PATH]` and `dev disable` remain explicit editable-development conveniences; normal setup does not use them.
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
