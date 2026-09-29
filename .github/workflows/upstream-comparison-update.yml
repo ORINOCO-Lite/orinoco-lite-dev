@@ -237,23 +237,12 @@ jobs:
           fi
           [[ "$(git -C site-specific rev-parse HEAD)" == "$(git rev-parse HEAD:site-specific)" ]] || { echo 'Child bundle does not match the parent gitlink.'; exit 1; }
           [[ -z "$(git status --porcelain)" ]] || { echo 'Unrecorded changes remain.'; exit 1; }
-      - name: Obtain site-specific publication access
-        id: site_access
-        if: needs.prepare.outputs.site_changed == 'true'
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ vars.UPSTREAM_UPDATE_APP_ID }}
-          private-key: ${{ secrets.UPSTREAM_UPDATE_APP_PRIVATE_KEY }}
-          owner: ORINOCO-Lite
-          repositories: psychoinformatics-site-specific
-          permission-contents: write
-          permission-pull-requests: write
       - name: Open site-specific draft pull request
         id: site_pull
         if: needs.prepare.outputs.site_changed == 'true'
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
-          token: ${{ steps.site_access.outputs.token }}
+          token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
           path: site-specific
           base: main
           branch: automation/upstream-update-${{ github.run_id }}
@@ -277,22 +266,11 @@ jobs:
           git -C site-specific checkout --detach "$SITE_PULL_HEAD"
           [[ -z "$(git status --porcelain)" ]] || { echo 'Unrecorded changes remain.'; exit 1; }
           echo "[Review site-specific changes]($SITE_PULL_URL)" >> "$GITHUB_STEP_SUMMARY"
-      - name: Obtain parent publication access
-        id: parent_access
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ vars.UPSTREAM_UPDATE_APP_ID }}
-          private-key: ${{ secrets.UPSTREAM_UPDATE_APP_PRIVATE_KEY }}
-          owner: ORINOCO-Lite
-          repositories: psychoinformatics-downstream
-          permission-contents: write
-          permission-pull-requests: write
-          permission-workflows: write
       - name: Open parent draft pull request
         id: pull
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
-          token: ${{ steps.parent_access.outputs.token }}
+          token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
           base: main
           branch: automation/upstream-update-${{ github.run_id }}
           title: 'chore: update upstream comparison'

@@ -21,13 +21,10 @@ Preserve those child commits when merging before accepting the parent gitlinks.
 
 ## Publication setup
 
-Use a GitHub App installed on the two target repositories with **Contents** and **Pull requests** write permissions, plus **Workflows** write permission for template updates in the parent.
-In the engineering repository's `upstream-comparison` environment, configure:
+Set the organization secret `UPSTREAM_UPDATE_TOKEN`, available to `orinoco-lite-dev`.
+Use a fine-grained PAT scoped to the two target repositories with **Contents**, **Pull requests**, and **Workflows** write permissions.
+Workflow permission allows template updates to change the parent's workflow files.
 
-- Variable `UPSTREAM_UPDATE_APP_ID`.
-- Secret `UPSTREAM_UPDATE_APP_PRIVATE_KEY`.
-- Deployment branch restriction to `main`, with any required reviewers.
-
-Only the separate publishing job receives these credentials.
-It requests a token for each target repository; child publication does not request workflow access.
+Restrict the engineering repository's `upstream-comparison` environment to `main`, with any required reviewers.
+Only the separate publishing job uses the token; pull requests are opened as its owner.
 The generic downstream template and curation service require no changes.
