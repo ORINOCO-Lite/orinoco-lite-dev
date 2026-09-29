@@ -6,7 +6,7 @@ usage() {
   cat <<'HELP'
 Usage: pixi run setup-upstream [DESTINATION] [OPTIONS]
 
-Create and populate a downstream; stop before projection and building.
+Create and populate a downstream; optionally continue through a recorded build.
 Uses template origin/main and the package version and lock supplied by that template.
 
   DESTINATION               New directory (default: ../orinoco-lite-test-downstream)
@@ -19,6 +19,10 @@ Inputs:
                             (default: https://pool.psychoinformatics.de/api)
   --site-layout MODE        Store imported inputs as submodule (default) or directory;
                             ignored with --site-specific
+  --upstream-submodule PATH Record the package-selected website as a downstream submodule
+                            (PATH is relative to the new downstream; requires import)
+  --build                   Build and retain a publication bundle after preparation;
+                            does not publish or deploy
 
 Version overrides (optional):
   --local-heads             Use committed template and package HEADs from local checkouts
@@ -55,12 +59,15 @@ site_layout=submodule
 api=https://pool.psychoinformatics.de/api
 package_repository=
 package_revision=
+upstream_submodule=
+build=false
 if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --local-heads) local_heads=true; shift ;;
-    --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
+    --build) build=true; shift ;;
+    --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision|--upstream-submodule)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
         --template) template=$2 ;;
@@ -71,6 +78,7 @@ while [[ $# -gt 0 ]]; do
         --site-layout) site_layout=$2 ;;
         --package-repository) package_repository=$2 ;;
         --package-revision) package_revision=$2; explicit_package_revision=true ;;
+        --upstream-submodule) upstream_submodule=$2 ;;
       esac
       shift 2 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -83,6 +91,7 @@ done
 [[ -z $dump || -f $dump ]] || { echo "Missing dump: $dump" >&2; exit 2; }
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
+[[ -z $upstream_submodule || -z $site_specific ]] || { echo '--upstream-submodule requires import, not --site-specific.' >&2; exit 2; }
 
 template_repository=$(git -C "$template" remote get-url origin)
 if $local_heads; then
@@ -166,8 +175,17 @@ printf '\nSelected package: %s\n  Source: %s\n  Revision: %s\n' \
 populate=(orinoco-lite dev upstream populate --api "$api" --site-layout "$site_layout")
 if [[ -n $dump ]]; then populate+=(--dump "$dump_relative"); fi
 if [[ -n $site_specific ]]; then populate+=(--site-specific "$site_relative"); fi
+if [[ -n $upstream_submodule ]]; then populate+=(--upstream-submodule "$upstream_submodule"); fi
 # Switch once. The installed package owns the workflow, and all its commands
 # inherit this downstream environment. No workflow files are copied into the site.
 pixi run --manifest-path pixi.toml "${populate[@]}"
+if $build; then
+  pixi run --manifest-path pixi.toml orinoco-lite build --destination build/site \
+    --publication-bundle build/pages-publication.bundle
+fi
 set +x
-printf '\nSetup complete in %s. Build separately with pixi run build.\n' "$PWD"
+if $build; then
+  printf '\nSetup and build complete in %s. Publication bundle: build/pages-publication.bundle\n' "$PWD"
+else
+  printf '\nSetup complete in %s. Build separately with pixi run build.\n' "$PWD"
+fi

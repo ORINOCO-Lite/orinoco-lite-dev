@@ -9,6 +9,7 @@ site_layout=submodule
 supplied_dump=
 site_specific=
 reuse_dump=false
+upstream_submodule=
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --directory) directory=$2; shift 2 ;;
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
     --dump) supplied_dump=$2; shift 2 ;;
     --site-specific) site_specific=$2; shift 2 ;;
     --reuse-dump) reuse_dump=true; shift ;;
+    --upstream-submodule) upstream_submodule=$2; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -98,9 +100,22 @@ datalad run --explicit -m "chore: convert records dump" \
   orinoco-lite dev records jsonl-to-yaml \
     --source "$dump_path" --destination "$destination" --force
 
+import_source=()
+import_inputs=()
+if [[ -n $upstream_submodule ]]; then
+  orinoco-lite dev upstream checkout --destination "$upstream_submodule"
+  # The source already has versioned history. Save its selected gitlink rather
+  # than treating an upstream checkout as a new transformation inside the child.
+  datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upstream_submodule"
+  import_source=(--source "$upstream_submodule" --media-remote https://hub.psychoinformatics.de/www/www-from-model.git)
+  # The checkout above installs the versioned input. The importer retrieves and
+  # verifies only its selected Annex media; DataLad must not retrieve the whole site.
+  import_inputs=(--input "$upstream_submodule" --assume-ready inputs)
+fi
 datalad run --explicit -m "chore: import upstream site inputs" \
+  "${import_inputs[@]}" \
   --input pixi.toml --input pixi.lock \
   --input pyproject.toml --output pyproject.toml --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
-  orinoco-lite dev upstream import-from-www --destination "$destination" --force
+  orinoco-lite dev upstream import-from-www "${import_source[@]}" --destination "$destination" --force

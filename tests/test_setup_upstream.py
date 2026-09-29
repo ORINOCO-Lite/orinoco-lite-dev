@@ -134,3 +134,24 @@ def test_unavailable_template_does_not_create_destination(setup):
     assert result.returncode == 2
     assert not destination.exists()
     assert all(call[0] == "orinoco-lite" for call in calls)
+
+
+def test_optional_build_uses_existing_recorded_publication_path(setup):
+    run, _, _, _, _, _ = setup
+    result, calls = run("--build", "--upstream-submodule", "sourcedata/www-from-model")
+    assert result.returncode == 0, result.stderr
+    populate = next(call for call in calls if "populate" in call)
+    assert populate[-2:] == ["--upstream-submodule", "sourcedata/www-from-model"]
+    build = next(call for call in calls if "build" in call)
+    assert build[-2:] == ["--publication-bundle", "build/pages-publication.bundle"]
+    assert calls.index(populate) < calls.index(build)
+    assert not any("publication" in call for call in calls)
+    assert "Setup and build complete" in result.stdout
+
+
+def test_existing_site_inputs_reject_upstream_import_option_before_writes(setup):
+    run, _, template, destination, _, _ = setup
+    result, calls = run("--site-specific", str(template), "--upstream-submodule", "sourcedata/www")
+    assert result.returncode == 2
+    assert not destination.exists()
+    assert not calls

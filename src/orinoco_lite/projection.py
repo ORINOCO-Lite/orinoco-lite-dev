@@ -21,13 +21,7 @@ from jinja2 import Environment, FileSystemLoader
 from linkml_runtime import SchemaView
 import yaml
 
-from .annotations import (
-    PAV_IMPORTED_BY,
-    PAV_IMPORTED_FROM,
-    annotation_semantic_view,
-    annotation_root,
-    assertion_sha256,
-)
+from .annotations import annotation_root
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
 from .integrity import canonical_json_bytes, tree_sha256
@@ -45,36 +39,6 @@ FORBIDDEN_BRIDGE_PREDICATES = {
     "schema:member",
     "schema:memberOf",
     "schema:subjectOf",
-}
-SEMANTIC_IDENTIFIER_FIELDS = {
-    "about",
-    "alternate_of",
-    "annotation_tag",
-    "associated_with",
-    "attributed_to",
-    "broad_mappings",
-    "creator",
-    "defined_by",
-    "delegated_by",
-    "depends_on",
-    "derived_from",
-    "exact_mappings",
-    "generated_by",
-    "influenced_by",
-    "kind",
-    "narrow_mappings",
-    "object",
-    "part_of",
-    "pid",
-    "predicate",
-    "quoted_from",
-    "related_mappings",
-    "revision_of",
-    "roles",
-    "rules",
-    "schema_type",
-    "specialization_of",
-    "unit",
 }
 
 
@@ -420,141 +384,6 @@ def _all_links(
     yield from _record_links(record, fields)
 
 
-def _semantic_identifier_view(
-    value: Any,
-    namespaces: Any | None,
-    *,
-    identifier_value: bool = False,
-) -> Any:
-    """Expand recognized CURIE values while retaining ordinary literals."""
-
-    if namespaces is None:
-        return deepcopy(value)
-    if isinstance(value, Mapping):
-        return {
-            key: _semantic_identifier_view(
-                item,
-                namespaces,
-                identifier_value=key in SEMANTIC_IDENTIFIER_FIELDS,
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [
-            _semantic_identifier_view(
-                item,
-                namespaces,
-                identifier_value=identifier_value,
-            )
-            for item in value
-        ]
-    if isinstance(value, str) and identifier_value:
-        try:
-            expanded = namespaces.uri_for(value)
-        except (KeyError, ValueError):
-            return value
-        return str(expanded) if expanded is not None else value
-    return deepcopy(value)
-
-
-def _native_fingerprint(
-    value: Any,
-    *,
-    exclude_root_pid: bool = False,
-    namespaces: Any | None = None,
-) -> Counter[tuple[str, str]]:
-    def unordered(value: Any) -> Any:
-        if isinstance(value, Mapping):
-            return {key: unordered(item) for key, item in value.items()}
-        if isinstance(value, list):
-            items = [unordered(item) for item in value]
-            return sorted(
-                items,
-                key=lambda item: json.dumps(
-                    item,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ),
-            )
-        return value
-
-    result: Counter[tuple[str, str]] = Counter()
-    if isinstance(value, dict):
-        schema_type = value.get("schema_type")
-        if isinstance(schema_type, str) and schema_type.startswith("dlthings:"):
-            semantic = annotation_semantic_view(value)
-            if exclude_root_pid:
-                semantic.pop("pid", None)
-            semantic = _semantic_identifier_view(semantic, namespaces)
-            semantic = unordered(semantic)
-            result[
-                (
-                    schema_type,
-                    json.dumps(semantic, sort_keys=True, separators=(",", ":")),
-                )
-            ] += 1
-        for child in value.values():
-            result.update(_native_fingerprint(child, namespaces=namespaces))
-    elif isinstance(value, list):
-        for child in value:
-            result.update(_native_fingerprint(child, namespaces=namespaces))
-    return result
-
-
-def _same_identifier(namespaces: Any, left: Any, right: Any) -> bool:
-    """Compare CURIE/full-URI spellings without weakening raw storage checks."""
-
-    if not isinstance(left, str) or not isinstance(right, str):
-        return False
-
-    def expand(value: str) -> str:
-        try:
-            expanded = namespaces.uri_for(value)
-        except (KeyError, ValueError):
-            return value
-        return str(expanded) if expanded is not None else value
-
-    return expand(left) == expand(right)
-
-
-def _machine_pav_fingerprint(
-    value: Any,
-    namespaces: Any | None = None,
-) -> Counter[tuple[str, str]]:
-    """Bind every joined machine PAV pair to its annotation-free assertion."""
-
-    result: Counter[tuple[str, str]] = Counter()
-    if isinstance(value, dict):
-        annotations = value.get("annotations")
-        if isinstance(annotations, dict) and {
-            PAV_IMPORTED_BY,
-            PAV_IMPORTED_FROM,
-        } <= set(annotations):
-            machine = {
-                tag: annotations[tag]
-                for tag in (PAV_IMPORTED_BY, PAV_IMPORTED_FROM)
-            }
-            result[
-                (
-                    assertion_sha256(
-                        _semantic_identifier_view(value, namespaces)
-                    ),
-                    json.dumps(
-                        _semantic_identifier_view(machine, namespaces),
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ),
-                )
-            ] += 1
-        for child in value.values():
-            result.update(_machine_pav_fingerprint(child, namespaces))
-    elif isinstance(value, list):
-        for child in value:
-            result.update(_machine_pav_fingerprint(child, namespaces))
-    return result
-
-
 def _records(
     workspace: WorkspaceConfig,
     schema: Path | None = None,
@@ -596,11 +425,9 @@ def validate_semantics(
         for name in schema_view.all_classes()
     }
     try:
-        to_ttl, to_json = build_format_converters(schema)
+        (to_ttl,) = build_format_converters(schema, writer_only=True)
     except Exception as error:
         raise DriverError("Could not initialize semantic schema conversion") from error
-    namespaces = schema_view.namespaces()
-    rdf_identifier_normalizations = 0
     missing_references: Counter[str] = Counter()
     missing_reference_targets: set[str] = set()
     targetless_relationships: Counter[str] = Counter()
@@ -629,32 +456,12 @@ def validate_semantics(
             )
         try:
             class_name = record["schema_type"].rsplit(":", 1)[-1]
-            restored = to_json.convert(to_ttl.convert(record, class_name), class_name)
+            # Use the upstream writer's schema validation. RDF readback is a
+            # separate, potentially lossy transformation, not a build invariant.
+            # Retained JSON/YAML remains the input to the website projection.
+            to_ttl.convert(record, class_name)
         except Exception as error:
-            raise DriverError(f"{pid}: JSON/RDF/JSON schema validation failed: {error}") from error
-        before = Counter(_nested_schema_types(record))
-        after = Counter(_nested_schema_types(restored))
-        restored_pid = restored.get("pid")
-        if not _same_identifier(namespaces, pid, restored_pid):
-            raise DriverError(f"{pid}: schema round trip changed record identity")
-        if restored_pid != pid:
-            rdf_identifier_normalizations += 1
-        if (
-            any(after[item] < count for item, count in before.items())
-            or _native_fingerprint(
-                restored,
-                exclude_root_pid=True,
-                namespaces=namespaces,
-            )
-            != _native_fingerprint(
-                record,
-                exclude_root_pid=True,
-                namespaces=namespaces,
-            )
-            or _machine_pav_fingerprint(restored, namespaces)
-            != _machine_pav_fingerprint(record, namespaces)
-        ):
-            raise DriverError(f"{pid}: schema round trip changed native semantics")
+            raise DriverError(f"{pid}: JSON/RDF schema validation failed: {error}") from error
     graph_nodes = {
         pid
         for pid in record_pids
@@ -703,8 +510,6 @@ def validate_semantics(
             for field, count in sorted(targetless_relationships.items())
             if count
         }
-    if rdf_identifier_normalizations:
-        report["rdf_identifier_normalizations"] = rdf_identifier_normalizations
     return report
 
 

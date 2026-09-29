@@ -27,6 +27,20 @@ The template supplies the thin Orinoco Lite adaptation and downstream scaffold.
 Git and DataLad record the software selection, retained records, and preparation steps so changes can be inspected and repeated.
 See CLI help for input and candidate selection.
 
+To retain the imported website revision directly and build the complete candidate:
+
+```console
+pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --upstream-submodule sourcedata/www-from-model --build
+```
+
+`--upstream-submodule` is relative to the new downstream.
+It installs the package-selected revision, saves its gitlink with DataLad, and declares that checkout as input to the recorded site import.
+It does not introduce a separate choice of upstream version.
+`--build` uses the ordinary build command and retains its recorded projection and website in `build/pages-publication.bundle`; it does not deploy or push publication refs.
+Without `--build`, setup ends after preparation.
+Without `--upstream-submodule`, import resolves the upstream revision through the package as before.
+The option requires import and cannot be combined with `--site-specific`.
+
 ## Imported inputs and persistent settings
 
 The importer maps the selected `www-from-model` checkout into the downstream paths below.
@@ -47,6 +61,19 @@ The importer maps the selected `www-from-model` checkout into the downstream pat
 Refresh updates only imported fields in `tool.orinoco.site`, preserving unrelated TOML and operational policy, and synchronizes `content/`, `assets/`, and `static/`, including deletions.
 Local edits in those imported surfaces do not persist; keep downstream choices in the separate settings below.
 Site import leaves metadata to the record-conversion stage.
+
+### Generated defaults and authored overrides
+
+An ordinary lab site needs metadata and site settings, not imported upstream Markdown scaffolding.
+Assembly applies shared presentation and section front matter, then fresh metadata projection, then optional authored content at the same Hugo paths.
+`site-specific/content/_index.md` replaces the complete generated homepage, including its front matter and body; it does not append an introduction to the generated page.
+Section overrides such as `content/persons/_index.md` use the same rule.
+Entity pages continue to come from metadata unless deliberately replaced at their exact content path.
+
+Upstream reproduction imports authored sections and page-bundle resources while regenerating the homepage and entity pages.
+If a selected source has an intentionally authored homepage, explicitly request `dev upstream import-from-www --include-homepage` to copy it as an override.
+This option never enables importing generated entity pages.
+The ordinary import still excludes the homepage, and hard synchronization removes earlier imported or authored files absent from the selected import, including a homepage override when the option is omitted.
 
 These explicitly separate settings persist through `populate` and site reimport:
 
@@ -74,6 +101,7 @@ The build combines freshly projected entity pages with the upstream Hugo layouts
 
 Media comes from the pinned website revision, not by downloading every depiction referenced in the records dump.
 A newer dump can therefore refer to images absent from that revision; full-site comparisons should check the rendered depictions as well as metadata.
+Other labs must supply the corresponding local page-bundle resources through their site inputs or arrange their own acquisition; a depiction URL alone does not make a local Hugo resource available.
 
 ## Comparing and following upstream
 
@@ -88,6 +116,22 @@ Publish referenced subdataset commits along with the parent repository's updates
 
 Repinning changes the selected `www-from-model` revision; reimport brings its authored inputs and media into the downstream.
 Review the resulting differences to keep the Orinoco Lite adaptation small.
+
+After selecting and activating a new package, refresh retained upstream inputs with:
+
+```console
+pixi run orinoco-lite dev upstream populate --reuse-dump --upstream-submodule sourcedata/www-from-model
+```
+
+This reuses the saved capture, records the new upstream gitlink, and records conversion and import separately.
+Template updates remain independent and preserve site-owned inputs and submodule selections.
+For historical import replay, restore the parent dataset and subdataset revisions and the recorded Pixi environment first.
+Inspect `datalad rerun --report COMMIT`, then use `datalad rerun --assume-ready inputs COMMIT` when the recorded upstream checkout is installed: the importer retrieves and verifies only its selected Annex media.
+The assumption skips DataLad's broad content retrieval; it does not replace installing the pinned input subdataset.
+
+The normal projection uses the selected upstream JSON-to-RDF validation without requiring a lossless inverse conversion.
+In particular, upstream RDF readback omits the captured invalid `at_time: "-"` value; original captures and stored records remain intact.
+Build success does not establish RDF round-trip preservation; use the optional comparison commands to assess it.
 
 ## Recovery
 

@@ -47,10 +47,11 @@ def _source_bytes(source: Path, relative: Path, *, media: dict[Path, Path] | Non
     return path.read_bytes()
 
 
-def selected_site_files(source: Path, *, retrieve_media: bool = False, media_remote: str | None = None) -> dict[Path, bytes]:
+def selected_site_files(source: Path, *, retrieve_media: bool = False, media_remote: str | None = None,
+                        include_homepage: bool = False) -> dict[Path, bytes]:
     """Return the explicitly owned site-input paths and source bytes.
 
-    Generated record pages and the homepage are omitted. Section pages,
+    Generated record pages are omitted; importing the homepage requires an explicit choice. Section pages,
     authored pages outside record sections, and page-bundle resources remain
     at their original content-relative paths.
     """
@@ -68,7 +69,7 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
         if relative.parts[0] == "content":
             local = relative.relative_to("content")
             if local.name == "_index.md" and (
-                len(local.parts) == 1 or
+                (len(local.parts) == 1 and not include_homepage) or
                 (local.parts[0] in ENTITY_SECTIONS and len(local.parts) > 2)
             ):
                 continue
@@ -144,9 +145,11 @@ def site_settings(source: Path) -> dict:
     }
 
 
-def import_site_inputs(source: Path, destination: Path, *, config_path: Path, retrieve_media: bool = False, media_remote: str | None = None, force: bool = False) -> dict:
+def import_site_inputs(source: Path, destination: Path, *, config_path: Path, retrieve_media: bool = False,
+                       media_remote: str | None = None, force: bool = False, include_homepage: bool = False) -> dict:
     """Synchronize imported site surfaces, preserving metadata and other config."""
-    files = selected_site_files(source, retrieve_media=retrieve_media, media_remote=media_remote)
+    files = selected_site_files(source, retrieve_media=retrieve_media, media_remote=media_remote,
+                                include_homepage=include_homepage)
     if config_path.is_symlink() or not config_path.is_file():
         raise DriverError(f"Import requires the downstream pyproject.toml: {config_path}")
     try:
