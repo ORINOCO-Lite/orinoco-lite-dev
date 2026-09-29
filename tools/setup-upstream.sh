@@ -36,7 +36,14 @@ Version overrides (optional):
   -h, --help                Show this help
 
 Paths are relative to the engineering directory. Selected commits must be
-available from their remotes; uncommitted changes are not included.
+available from their remotes so DataLad-recorded setup can be reproduced.
+Publish the engineering commit before running setup. Uncommitted changes
+are not included in the installed downstream package; a dirty checkout
+produces a warning but does not stop setup.
+
+To test local edits, run `pixi run orinoco-lite dev enable PATH` in an
+existing downstream, where PATH is the engineering checkout. Start a fresh
+`pixi run` to use it. `dev disable` restores the preceding package selection.
 
 HELP
 }
@@ -89,6 +96,14 @@ done
 [[ -z $dump || -f $dump ]] || { echo "Missing dump: $dump" >&2; exit 2; }
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
+
+if [[ -n $(git status --porcelain --untracked-files=normal --ignore-submodules=none) ]]; then
+  cat >&2 <<'WARNING'
+Warning: the engineering checkout has uncommitted changes.
+The downstream package uses the selected published commit, without those changes.
+To test local edits, run `pixi run orinoco-lite dev enable PATH` in an existing downstream.
+WARNING
+fi
 
 template_repository=$(git -C "$template" remote get-url origin)
 if [[ -z $package_repository ]]; then
