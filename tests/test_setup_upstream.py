@@ -129,6 +129,50 @@ def test_unavailable_template_does_not_create_destination(setup):
     assert all(call[0] == "orinoco-lite" for call in calls)
 
 
+def test_existing_destination_requires_force(setup):
+    run, _, _, destination, _, _ = setup
+    destination.mkdir()
+    (destination / "sentinel").write_text("keep\n")
+    result, calls = run()
+    assert result.returncode == 2
+    assert "use --force" in result.stderr
+    assert (destination / "sentinel").read_text() == "keep\n"
+    assert all(call[0] == "orinoco-lite" for call in calls)
+
+
+def test_force_replaces_existing_destination_after_selection(setup):
+    run, _, _, destination, _, _ = setup
+    destination.mkdir()
+    (destination / "sentinel").write_text("replace\n")
+    objects = destination / ".git/annex/objects/key"
+    objects.mkdir(parents=True)
+    payload = objects / "key"
+    payload.write_bytes(b"annex content")
+    payload.chmod(0o444)
+    objects.chmod(0o555)
+    result, _ = run("--force")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / "sentinel").exists()
+    assert (destination / "pixi.toml").exists()
+
+
+def test_force_keeps_destination_when_selection_fails(setup):
+    run, _, _, destination, _, _ = setup
+    destination.mkdir()
+    (destination / "sentinel").write_text("keep\n")
+    result, _ = run("--force", fail=True)
+    assert result.returncode != 0
+    assert (destination / "sentinel").read_text() == "keep\n"
+
+
+def test_force_refuses_engineering_checkout(setup):
+    run, engineering, _, _, _, _ = setup
+    result, _ = run("--force", destination_path=engineering)
+    assert result.returncode != 0
+    assert "protected path" in result.stderr
+    assert (engineering / "release/package-resources.yaml").exists()
+
+
 def test_optional_build_uses_existing_recorded_publication_path(setup):
     run, _, _, _, _, _ = setup
     result, calls = run("--build")

@@ -21,6 +21,8 @@ Inputs:
                             ignored with --site-specific
   --build                   Build and retain a publication bundle after preparation;
                             does not publish or deploy
+  --force                   Delete an existing destination, including local changes,
+                            after selections resolve
 
 Version overrides (optional):
   --local-heads             Also use the committed local template HEAD
@@ -57,12 +59,14 @@ api=https://pool.psychoinformatics.de/api
 package_repository=
 package_revision=
 build=false
+force=false
 if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --local-heads) local_heads=true; shift ;;
     --build) build=true; shift ;;
+    --force) force=true; shift ;;
     --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
@@ -80,7 +84,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -f release/package-resources.yaml ]] || { echo 'Run through the engineering Pixi task.' >&2; exit 2; }
-[[ ! -e $destination && ! -L $destination ]] || { echo "Destination already exists: $destination" >&2; exit 2; }
 [[ -d $template ]] || { echo "Missing template: $template" >&2; exit 2; }
 [[ $site_layout == submodule || $site_layout == directory ]] || { echo 'Use --site-layout submodule or directory.' >&2; exit 2; }
 [[ -z $dump || -f $dump ]] || { echo "Missing dump: $dump" >&2; exit 2; }
@@ -116,6 +119,29 @@ template_commit=$(orinoco-lite package update --check \
   --repository "$template_repository" --revision "$template_ref")
 package_commit=$(orinoco-lite package update --check \
   --repository "$package_repository" --revision "$package_revision")
+if [[ -e $destination || -L $destination ]]; then
+  if ! $force; then
+    echo "Destination already exists: $destination (use --force to replace it)" >&2
+    exit 2
+  fi
+  # Refuse paths containing this checkout or any selected local input.
+  python - "$destination" "$engineering" "$HOME" "$template" "$dump" "$site_specific" <<'PY'
+from pathlib import Path
+import sys
+
+target = Path(sys.argv[1])
+if target.is_symlink():
+    sys.exit("Refusing to replace a symlink destination")
+target = target.resolve()
+for value in sys.argv[2:]:
+    if value and Path(value).resolve().is_relative_to(target):
+        sys.exit(f"Refusing to remove destination containing a protected path: {target}")
+PY
+  # Annex object directories are read-only. Only directories need write
+  # permission for deletion; do not follow Annex symlinks or chmod file bytes.
+  find "$destination" -type d -exec chmod u+w {} +
+  rm -rf -- "$destination"
+fi
 printf '\nSelected template: %s\n  Source: %s\n  Commit: %s\n' \
   "$template_repository" "$template_selection" "$template_commit"
 if [[ -n $dump ]]; then dump_relative=$(relative_to "$dump" "$destination"); fi
