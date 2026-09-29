@@ -14,10 +14,9 @@ from .site_inputs import import_site_inputs
 def register(commands):
     upstream = commands.add_parser("upstream", help="import and record inputs for upstream comparison")
     groups = upstream.add_subparsers(dest="upstream_command", required=True)
-    checkout = groups.add_parser("checkout", description=(
-        "Create or update a downstream submodule at the package-selected www-from-model commit. "
+    groups.add_parser("checkout", description=(
+        "Create or update sourcedata/www-from-model at the package-selected commit. "
         "The caller records the gitlink with DataLad; this command does not import site files."))
-    checkout.add_argument("--destination", type=Path, required=True, help="downstream submodule path below sourcedata/")
     export = groups.add_parser("import-from-www", description=(
         "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
         "and comparison with Orinoco Lite. "
@@ -45,15 +44,13 @@ def register(commands):
     populate.add_argument("--api", default=DEFAULT_API, help="public Dump Things API for acquisition")
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
     populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip dump and imports")
-    populate.add_argument("--upstream-submodule", type=Path,
-                          help="record the package-selected website at this path below sourcedata/ before importing")
 
 
 
 def execute(args):
     root = (args.root or Path.cwd()).resolve()
     if args.upstream_command == "checkout":
-        return checkout_upstream(root, explicit_path(args, args.destination))
+        return checkout_upstream(root)
     if args.upstream_command == "populate":
         # Public operations are recorded by the shared Bash workflow, not here.
         # Store paths relative to the dataset, even when callers supply absolutes.
@@ -68,14 +65,11 @@ def execute(args):
             command.extend(["--dump", relative(args.dump)])
         if args.reuse_dump:
             command.append("--reuse-dump")
-        if args.upstream_submodule:
-            if args.site_specific:
-                raise ConfigurationError("--upstream-submodule requires site import, not --site-specific.")
-            source = explicit_path(args, args.upstream_submodule).resolve()
+        if not args.site_specific:
+            source = (root / "sourcedata/www-from-model").resolve()
             destination = explicit_path(args, args.destination).resolve()
             if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
                 raise ConfigurationError("Upstream submodule and site-input destination must not overlap.")
-            command.extend(["--upstream-submodule", relative(args.upstream_submodule)])
         if args.site_specific:
             from .config import load_workspace
             load_workspace(root)
@@ -108,15 +102,13 @@ def execute(args):
     return 0
 
 
-def checkout_upstream(root: Path, destination: Path) -> int:
+def checkout_upstream(root: Path) -> int:
     """Use Git's submodule registration and the package's existing resolver."""
-    destination = destination.parent.resolve() / destination.name
+    destination = root / "sourcedata/www-from-model"
     if (destination.is_symlink() or not destination.resolve().is_relative_to(root)
             or destination.resolve() == root or ".git" in destination.relative_to(root).parts):
         raise ConfigurationError("Upstream submodule must be a path inside the downstream.")
     relative = destination.relative_to(root).as_posix()
-    if not relative.startswith("sourcedata/"):
-        raise ConfigurationError("Upstream submodule must be below sourcedata/.")
     source = resolve_www_from_model(root, resolve_resources().root)
 
     def git(repository, *arguments):

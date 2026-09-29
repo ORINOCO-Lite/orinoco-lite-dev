@@ -33,7 +33,7 @@ This section plans the integration work; it does not authorize resetting downstr
    Preserve preparation-only setup as the default and add an explicit way to continue through projection and a complete build.
    Reuse [#191](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/191)'s recorded projection and publication bundle where applicable; preparing a bundle must not itself deploy or push publication refs.
    Verify the full retained-input path after the #180, #182, and #189 changes.
-   The prerequisite implementation uses `--build` and `--upstream-submodule PATH`; it does not add a stage dispatcher.
+   The prerequisite implementation uses `--build` and a fixed `sourcedata/www-from-model` subdataset; it does not add a stage dispatcher.
 5. Rebase the unique changes in [#171](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171), [#172](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/172), and [#173](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/173) in order.
    Keep RDF, service, website, and local review functionality separately reviewable.
    Reuse the useful behavior and review findings from the predecessor PRs listed below; do not resurrect their separate renderer or deployment harness.

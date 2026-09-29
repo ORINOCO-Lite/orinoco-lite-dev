@@ -196,15 +196,15 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
 
     links = _gitlinks(workspace.root)
     allowed_links = [link for link in links
-                     if link == "site-specific" or link.startswith("sourcedata/")]
+                     if link in ("site-specific", "sourcedata/www-from-model")]
     if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
-            "Downstream .gitmodules requires site-specific or sourcedata subdatasets"
+            "Downstream .gitmodules requires site-specific or www-from-model subdatasets"
         )
     forbidden_links = sorted(set(links) - set(allowed_links))
     if forbidden_links:
         raise ConfigurationError(
-            f"Downstream gitlinks must be site-specific or below sourcedata/: {forbidden_links}"
+            f"Downstream gitlinks must be site-specific or sourcedata/www-from-model: {forbidden_links}"
         )
     for name in REQUIRED_INPUT_PATHS:
         path = workspace.path(name)

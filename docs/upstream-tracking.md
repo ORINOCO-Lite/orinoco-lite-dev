@@ -27,20 +27,24 @@ The template supplies the thin Orinoco Lite adaptation and downstream scaffold.
 Git and DataLad record the software selection, retained records, and preparation steps so changes can be inspected and repeated.
 See CLI help for input and candidate selection.
 
-To retain the imported website revision directly and build the complete candidate:
+To prepare upstream inputs and build the complete candidate:
 
 ```console
-pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --upstream-submodule sourcedata/www-from-model --build
+pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --build
 ```
 
-`--upstream-submodule` selects a path below `sourcedata/` in the new downstream.
+`populate` always tracks `sourcedata/www-from-model` in the downstream.
 Normal builds use the imported site files and do not require this source subdataset to be installed.
 It installs the package-selected revision, saves its gitlink with DataLad, and declares that checkout as input to the recorded site import.
 It does not introduce a separate choice of upstream version.
 `--build` uses the ordinary build command and retains its recorded projection and website in `build/pages-publication.bundle`; it does not deploy or push publication refs.
 Without `--build`, setup ends after preparation.
-Without `--upstream-submodule`, import resolves the upstream revision through the package as before.
-The option requires import and cannot be combined with `--site-specific`.
+`--site-specific` installs existing site inputs and skips upstream import.
+
+Setup selects the engineering checkout’s current commit and template `origin/main`.
+Publish the package commit first; setup verifies both selections before creating the downstream.
+Use `--package-revision FULL_SHA` to test another package revision, or `--local-heads` to include the local template commit.
+For an existing downstream, record `orinoco-lite package update --revision FULL_SHA` with DataLad, then start a fresh `pixi run` for the build.
 
 ## Imported inputs and persistent settings
 
@@ -121,7 +125,7 @@ Review the resulting differences to keep the Orinoco Lite adaptation small.
 After selecting and activating a new package, refresh retained upstream inputs with:
 
 ```console
-pixi run orinoco-lite dev upstream populate --reuse-dump --upstream-submodule sourcedata/www-from-model
+pixi run orinoco-lite dev upstream populate --reuse-dump
 ```
 
 This reuses the saved capture, records the new upstream gitlink, and records conversion and import separately.

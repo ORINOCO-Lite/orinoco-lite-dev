@@ -7,7 +7,7 @@ usage() {
 Usage: pixi run setup-upstream [DESTINATION] [OPTIONS]
 
 Create and populate a downstream; optionally continue through a recorded build.
-Uses template origin/main and the package version and lock supplied by that template.
+Uses template origin/main and the current engineering package commit.
 
   DESTINATION               New directory (default: ../orinoco-lite-test-downstream)
 
@@ -19,14 +19,12 @@ Inputs:
                             (default: https://pool.psychoinformatics.de/api)
   --site-layout MODE        Store imported inputs as submodule (default) or directory;
                             ignored with --site-specific
-  --upstream-submodule PATH Record the package-selected website as a downstream submodule
-                            (PATH is below sourcedata/ in the new downstream; requires import)
   --build                   Build and retain a publication bundle after preparation;
                             does not publish or deploy
 
 Version overrides (optional):
-  --local-heads             Use committed template and package HEADs from local checkouts
-                            (package remote: engineering origin; explicit overrides win)
+  --local-heads             Also use the committed local template HEAD
+                            (explicit overrides win)
   --template PATH           Checkout whose origin supplies the template
                             (default: ../orinoco-lite-template)
   --template-ref REV        Use a template revision from that checkout
@@ -52,14 +50,12 @@ template=../orinoco-lite-template
 template_ref=HEAD
 local_heads=false
 explicit_template_ref=false
-explicit_package_revision=false
 dump=
 site_specific=
 site_layout=submodule
 api=https://pool.psychoinformatics.de/api
 package_repository=
 package_revision=
-upstream_submodule=
 build=false
 if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
@@ -67,7 +63,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     --local-heads) local_heads=true; shift ;;
     --build) build=true; shift ;;
-    --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision|--upstream-submodule)
+    --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
         --template) template=$2 ;;
@@ -77,8 +73,7 @@ while [[ $# -gt 0 ]]; do
         --site-specific) site_specific=$2 ;;
         --site-layout) site_layout=$2 ;;
         --package-repository) package_repository=$2 ;;
-        --package-revision) package_revision=$2; explicit_package_revision=true ;;
-        --upstream-submodule) upstream_submodule=$2 ;;
+        --package-revision) package_revision=$2 ;;
       esac
       shift 2 ;;
     *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -91,15 +86,10 @@ done
 [[ -z $dump || -f $dump ]] || { echo "Missing dump: $dump" >&2; exit 2; }
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
-[[ -z $upstream_submodule || -z $site_specific ]] || { echo '--upstream-submodule requires import, not --site-specific.' >&2; exit 2; }
 
 template_repository=$(git -C "$template" remote get-url origin)
-if $local_heads; then
-  package_repository=${package_repository:-$(git remote get-url origin)}
-  if ! $explicit_package_revision; then
-    package_revision=$(git rev-parse HEAD)
-  fi
-fi
+package_repository=${package_repository:-$(git remote get-url origin)}
+package_revision=${package_revision:-$(git rev-parse HEAD)}
 if $explicit_template_ref || $local_heads; then
   if [[ $template_ref == HEAD ]]; then
     template_branch=$(git -C "$template" symbolic-ref --quiet --short HEAD || true)
@@ -113,10 +103,12 @@ else
   template_selection='remote branch main'
 fi
 
-# Freeze the template selection before Copier runs. Its generated dependency
-# declaration owns the package default, including when template main advances.
+# Resolve both selections before creating a downstream. Unpublished package
+# commits must fail here rather than leaving a partially populated dataset.
 template_commit=$(orinoco-lite package update --check \
   --repository "$template_repository" --revision "$template_ref")
+package_commit=$(orinoco-lite package update --check \
+  --repository "$package_repository" --revision "$package_revision")
 printf '\nSelected template: %s\n  Source: %s\n  Commit: %s\n' \
   "$template_repository" "$template_selection" "$template_commit"
 if [[ -n $dump ]]; then dump_relative=$(relative_to "$dump" "$destination"); fi
@@ -137,45 +129,18 @@ DataLad records the Copier command; this note records its Pixi bootstrap." -- \
   copier copy --defaults --vcs-ref "$template_commit" \
     -d include_site_specific=false "$template_repository" .
 
-# Read the dependency produced by the selected template, not the local template
-# checkout or its answers file. Preserve the bundled lock unless overridden.
-package_defaults=$(python - <<'PYTHON'
-import tomllib
-from pathlib import Path
-selection = tomllib.loads(Path("pixi.toml").read_text())["pypi-dependencies"]["orinoco-lite"]
-for key in ("git", "rev"):
-    value = selection[key]
-    if not isinstance(value, str) or not value or any(c.isspace() for c in value):
-        raise SystemExit(f"Template package {key} must be a non-empty value without whitespace")
-    print(value)
-PYTHON
-)
-template_package_repository=$(printf '%s\n' "$package_defaults" | sed -n '1p')
-template_package_revision=$(printf '%s\n' "$package_defaults" | sed -n '2p')
-if [[ -n $package_repository || -n $package_revision ]]; then
-  package_repository=${package_repository:-$template_package_repository}
-  package_revision=${package_revision:-$template_package_revision}
-  package_commit=$(orinoco-lite package update --check \
-    --repository "$package_repository" --revision "$package_revision")
-  # Still in the inherited engineering environment. Record the override before
-  # switching to the downstream environment below.
-  datalad run --explicit -m "chore: select Orinoco Lite package candidate" \
-    --output pixi.toml --output pixi.lock -- \
-    orinoco-lite package update \
-      --repository "$package_repository" --revision "$package_commit"
-  package_selection='development override'
-else
-  package_repository=$template_package_repository
-  package_commit=$template_package_revision
-  package_selection='selected template dependency (bundled lock retained)'
-fi
-printf '\nSelected package: %s\n  Source: %s\n  Revision: %s\n' \
-  "$package_repository" "$package_selection" "$package_commit"
+# Still in the inherited engineering environment. Record the exact candidate
+# and update the template's lock before switching to the downstream environment.
+datalad run --explicit -m "chore: select Orinoco Lite package candidate" \
+  --output pixi.toml --output pixi.lock -- \
+  orinoco-lite package update \
+    --repository "$package_repository" --revision "$package_commit"
+printf '\nSelected package: %s\n  Revision: %s\n' \
+  "$package_repository" "$package_commit"
 
 populate=(orinoco-lite dev upstream populate --api "$api" --site-layout "$site_layout")
 if [[ -n $dump ]]; then populate+=(--dump "$dump_relative"); fi
 if [[ -n $site_specific ]]; then populate+=(--site-specific "$site_relative"); fi
-if [[ -n $upstream_submodule ]]; then populate+=(--upstream-submodule "$upstream_submodule"); fi
 # Switch once. The installed package owns the workflow, and all its commands
 # inherit this downstream environment. No workflow files are copied into the site.
 pixi run --manifest-path pixi.toml "${populate[@]}"
