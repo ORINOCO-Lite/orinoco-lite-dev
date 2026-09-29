@@ -10,6 +10,7 @@ import tomllib
 import tomlkit
 
 
+from .progress import progress
 from .errors import DriverError
 from .annex_media import annex_files, retrieve_and_verify
 
@@ -145,6 +146,7 @@ def site_settings(source: Path) -> dict:
     }
 
 
+@progress("Importing upstream site files and media")
 def import_site_inputs(source: Path, destination: Path, *, config_path: Path, retrieve_media: bool = False,
                        media_remote: str | None = None, force: bool = False, include_homepage: bool = False) -> dict:
     """Synchronize imported site surfaces, preserving metadata and other config."""

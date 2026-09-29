@@ -10,6 +10,7 @@ from typing import Any, Sequence
 
 import yaml
 
+from .progress import progress
 from .errors import DriverError
 
 
@@ -23,6 +24,7 @@ def _source_for_import(source_root: Path, current: Path, import_name: str) -> Pa
     return current.parent.joinpath(*relative.parts)
 
 
+@progress("Preparing the offline schema")
 def localize_schema(source_root: Path, entry: Path, destination: Path) -> dict[str, Any]:
     source_root = source_root.resolve()
     entry = entry.resolve()

@@ -68,10 +68,11 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
     require_clean(root)
     # The lock is derived from the merged manifest. Merging generated lock text
     # would manufacture conflicts unrelated to the maintainer's dependency choices.
-    run_update(root, vcs_ref=revision, defaults=True, overwrite=True, conflict="inline",
-               exclude=["site-specific/**", "extensions/**"],
-               data={"package_repository": package_repository, "package_revision": package_revision},
-               skip_if_exists=["pixi.lock"])
+    with progress("Applying the template with Copier"):
+        run_update(root, vcs_ref=revision, defaults=True, overwrite=True, conflict="inline",
+                   exclude=["site-specific/**", "extensions/**"],
+                   data={"package_repository": package_repository, "package_revision": package_revision},
+                   skip_if_exists=["pixi.lock"])
     unmerged = git(root, "diff", "--name-only", "--diff-filter=U").splitlines()
     if unmerged:
         # Keep the conflict text as ordinary Git content so a browser can edit it.
@@ -113,8 +114,9 @@ def resolve_template(source: str, revision: str) -> str:
     from copier import run_copy
 
     with tempfile.TemporaryDirectory(prefix="orinoco-release-") as temporary:
-        result = run_copy(source, temporary, defaults=True, quiet=True,
-                          use_prereleases=True, skip_tasks=True)
+        with progress("Finding the latest template release with Copier"):
+            result = run_copy(source, temporary, defaults=True, quiet=True,
+                              use_prereleases=True, skip_tasks=True)
         # Copier falls back to HEAD without a version tag. Do not silently turn
         # the release choice into the development choice in that case.
         release = result.template.commit

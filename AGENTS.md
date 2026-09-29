@@ -60,6 +60,15 @@
 - Before adding durable machinery, identify what user-facing operation cannot work without it.
   If no such operation exists, do not add it.
 
+## CLI feedback
+
+- Keep help and argument parsing fast; defer expensive imports until execution.
+- Use `orinoco_lite.progress.progress` around potentially slow, silent operations.
+  It emits one flushed stderr note after one second; quick operations stay quiet and stdout remains available for results, JSON, and pipes.
+- Name the current operation, including an upstream program when it owns the work.
+  Report distinct stages at their owning boundary; avoid duplicate outer timers when inner stages already report progress.
+  Flush immediate setup and server-ready messages to stderr.
+
 ## Documentation
 
 - Treat `docs/project-design.md` as the durable project design charter.

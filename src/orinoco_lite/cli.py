@@ -310,7 +310,8 @@ def _serve(args: argparse.Namespace) -> int:
     handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer((args.bind, args.port), handler)
     host, port = server.server_address[:2]
-    print(f"Serving {workspace.site_name} at http://{host}:{port}/")
+    print(f"Serving {workspace.site_name} at http://{host}:{port}/",
+          file=sys.stderr, flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
