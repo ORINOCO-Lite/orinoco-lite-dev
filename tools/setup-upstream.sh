@@ -118,6 +118,7 @@ fi
 
 # Resolve both selections before creating a downstream. Unpublished package
 # commits must fail here rather than leaving a partially populated dataset.
+printf 'Resolving package and template revisions...\n' >&2
 template_commit=$(orinoco-lite package update --check \
   --repository "$template_repository" --revision "$template_ref")
 package_commit=$(orinoco-lite package update --check \

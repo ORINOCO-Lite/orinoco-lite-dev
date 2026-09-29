@@ -24,6 +24,7 @@ def commit_checkout(stack, local, repository, commit):
         return local
     root = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="orinoco-setup-summary-")))
     git(root, "init", "--quiet")
+    print(f"Fetching commit details from {repository}...", file=sys.stderr, flush=True)
     git(root, "fetch", "--quiet", "--depth=1", "--no-tags", "--", repository, commit)
     return root
 

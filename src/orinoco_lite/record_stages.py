@@ -25,6 +25,7 @@ import sys
 import tempfile
 from typing import Any, Sequence
 
+from .progress import progress
 from . import upstream_orinoco_records as storage
 from . import upstream_snapshot as snapshot
 from .annotations import assertion_sha256, _check_overlay_path
@@ -335,7 +336,8 @@ def execute(args: argparse.Namespace) -> int:
                 _safe_output(target)
                 if target.exists() and not args.force:
                     raise ConfigurationError(f"Metadata output already exists: {target}; use --force to replace it")
-            result = jsonl_to_yaml(source, site_inputs)
+            with progress("Converting JSONL records to YAML"):
+                result = jsonl_to_yaml(source, site_inputs)
             print(f"Converted {result['record_count']} records (YAML): {site_inputs}")
         elif action == "yaml-to-jsonl":
             site_inputs = explicit_path(args, args.source)
@@ -343,7 +345,8 @@ def execute(args: argparse.Namespace) -> int:
             _safe_output(output)
             if output.exists() and not args.force:
                 raise ConfigurationError(f"JSONL output already exists: {output}; use --force to replace it")
-            joined = yaml_to_jsonl(site_inputs, output)
+            with progress("Exporting YAML records to JSONL"):
+                joined = yaml_to_jsonl(site_inputs, output)
             print(f"Wrote {len(joined)} records (JSONL): {output}")
         elif action == "diff":
             left_path = explicit_path(args, args.left) if args.left else require(data / "downloaded/records.jsonl", "records get")
@@ -353,8 +356,9 @@ def execute(args: argparse.Namespace) -> int:
                     with tempfile.TemporaryDirectory() as temporary:
                         return yaml_to_jsonl(path, Path(temporary) / "records.jsonl")
                 return snapshot.load_jsonl(path)
-            left, right = read(left_path), read(right_path)
-            findings = compare_records(left, right)
+            with progress("Reading and comparing records"):
+                left, right = read(left_path), read(right_path)
+                findings = compare_records(left, right)
             print(f"Before: {left_path}\nAfter:  {right_path}")
             print(f"{len(left)} records before; {len(right)} after; {len({item['subject'] for item in findings})} records differ.")
             fields = defaultdict(set)

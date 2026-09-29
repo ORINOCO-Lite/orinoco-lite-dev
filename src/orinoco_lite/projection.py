@@ -21,6 +21,7 @@ from jinja2 import Environment, FileSystemLoader
 from linkml_runtime import SchemaView
 import yaml
 
+from .progress import progress
 from .annotations import annotation_root
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
@@ -396,6 +397,7 @@ def _records(
     return records, {item["pid"] for item in records}
 
 
+@progress("Validating metadata semantics")
 def validate_semantics(
     workspace: WorkspaceConfig,
     resources_root: Path,
@@ -630,6 +632,7 @@ def _matches_policy(
     return links(record, {record["pid"]})
 
 
+@progress("Checking projection inputs")
 def _projection_cache_key(
     workspace: WorkspaceConfig,
     contract: ProjectionContract,
@@ -711,55 +714,57 @@ def render_projection(
 ) -> dict[str, Any]:
     www_from_model_root = _www_from_model_root(workspace, resources_root)
     semantic = validate_semantics(workspace, resources_root, www_from_model_root)
-    contract = load_contract(workspace, www_from_model_root)
-    records, record_pids = _records(workspace)
-    schema = resources_root / "schema/demo-research-information/unreleased.yaml"
-    machine_records, machine_pids = _records(workspace, schema)
-    if machine_pids != record_pids:
-        raise DriverError("Joined projection changed the metadata record inventory")
-    by_pid = {record["pid"]: record for record in records}
-    if output.exists():
-        shutil.rmtree(output)
-    (output / "content").mkdir(parents=True)
-    (output / "static").mkdir()
-    public_jsonl = "".join(
-        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
-        for record in sorted(
-            records, key=lambda item: (item["schema_type"], item["pid"])
+    with progress("Rendering metadata pages"):
+        contract = load_contract(workspace, www_from_model_root)
+        records, record_pids = _records(workspace)
+        schema = resources_root / "schema/demo-research-information/unreleased.yaml"
+        machine_records, machine_pids = _records(workspace, schema)
+        if machine_pids != record_pids:
+            raise DriverError("Joined projection changed the metadata record inventory")
+        by_pid = {record["pid"]: record for record in records}
+        if output.exists():
+            shutil.rmtree(output)
+        (output / "content").mkdir(parents=True)
+        (output / "static").mkdir()
+        public_jsonl = "".join(
+            json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+            for record in sorted(
+                records, key=lambda item: (item["schema_type"], item["pid"])
+            )
         )
-    )
-    machine_jsonl = "".join(
-        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
-        for record in sorted(
-            machine_records, key=lambda item: (item["schema_type"], item["pid"])
+        machine_jsonl = "".join(
+            json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+            for record in sorted(
+                machine_records, key=lambda item: (item["schema_type"], item["pid"])
+            )
         )
-    )
-    (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
-    for pid in sorted(record_pids):
-        record = by_pid[pid]
-        schema_type = record["schema_type"]
-        if pid == contract.homepage_pid:
-            policy = contract.homepage
-            destination = output / "content" / "_index.md"
-        elif schema_type in contract.pages:
-            policy = contract.pages[schema_type]
-            if not _matches_policy(record, policy, by_pid):
+        (output / "records.jsonl").write_text(machine_jsonl, encoding="utf-8")
+        for pid in sorted(record_pids):
+            record = by_pid[pid]
+            schema_type = record["schema_type"]
+            if pid == contract.homepage_pid:
+                policy = contract.homepage
+                destination = output / "content" / "_index.md"
+            elif schema_type in contract.pages:
+                policy = contract.pages[schema_type]
+                if not _matches_policy(record, policy, by_pid):
+                    continue
+                route = rendered_record_route(pid, contract, by_pid)
+                destination = output / "content" / route / "_index.md"
+            else:
                 continue
-            route = rendered_record_route(pid, contract, by_pid)
-            destination = output / "content" / route / "_index.md"
-        else:
-            continue
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(
-            _render_record(record, policy, by_pid, records), encoding="utf-8"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(
+                _render_record(record, policy, by_pid, records), encoding="utf-8"
+            )
+    with progress("Generating the metadata graph"):
+        graph_result = subprocess.run(
+            [sys.executable, str(contract.graph_producer)],
+            input=public_jsonl,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-    graph_result = subprocess.run(
-        [sys.executable, str(contract.graph_producer)],
-        input=public_jsonl,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
     if graph_result.returncode or (
         graph_result.stderr.strip() and contract.missing_graph_targets == "reject"
     ):

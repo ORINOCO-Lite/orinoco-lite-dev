@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 import yaml
 
+from .progress import progress
 from .annotations import annotation_root, companion_sources, validate_stored_record
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
@@ -186,6 +187,7 @@ def _validate_extension_boundary(workspace: WorkspaceConfig) -> None:
             )
 
 
+@progress("Checking record files and site configuration")
 def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     """Validate path ownership and the basic record inventory.
 

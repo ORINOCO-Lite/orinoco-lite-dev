@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 import tomlkit
 
+from .progress import progress
 from .errors import ConfigurationError
 from .resources import SOURCE_REPOSITORY
 
@@ -90,7 +91,8 @@ def resolve_commit(repository: str, revision: str) -> str:
                     + result.stderr.strip())
             return result.stdout.strip()
         git("init", "--quiet")
-        git("fetch", "--quiet", "--depth=1", "--no-tags", repository, revision)
+        with progress(f"Fetching {revision} from {repository}"):
+            git("fetch", "--quiet", "--depth=1", "--no-tags", repository, revision)
         return git("rev-parse", "FETCH_HEAD^{commit}")
 
 
