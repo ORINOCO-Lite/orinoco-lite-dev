@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 import yaml
 
+from .progress import progress
 from .annotations import annotation_root, companion_sources, validate_stored_record
 from .config import WorkspaceConfig
 from .errors import ConfigurationError
@@ -186,6 +187,7 @@ def _validate_extension_boundary(workspace: WorkspaceConfig) -> None:
             )
 
 
+@progress("Checking record files and site configuration")
 def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     """Validate path ownership and the basic record inventory.
 
@@ -195,14 +197,16 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     """
 
     links = _gitlinks(workspace.root)
-    site_submodule = links == ["site-specific"]
-    if (workspace.root / ".gitmodules").exists() and not site_submodule:
+    allowed_links = [link for link in links
+                     if link in ("site-specific", "sourcedata/www-from-model")]
+    if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
-            "A downstream Orinoco repository must not contain .gitmodules"
+            "Downstream .gitmodules requires site-specific or www-from-model subdatasets"
         )
-    if links and not site_submodule:
+    forbidden_links = sorted(set(links) - set(allowed_links))
+    if forbidden_links:
         raise ConfigurationError(
-            f"A downstream Orinoco repository must not contain gitlinks: {links}"
+            f"Downstream gitlinks must be site-specific or sourcedata/www-from-model: {forbidden_links}"
         )
     for name in REQUIRED_INPUT_PATHS:
         path = workspace.path(name)

@@ -318,6 +318,31 @@ class HugoCompatibilityTests(unittest.TestCase):
                 (assembly / "static/site.webmanifest").read_text(encoding="utf-8"),
             )
 
+            # Fresh metadata supplies a homepage and entity pages without any
+            # authored scaffolding. A same-path authored file replaces all of it.
+            projection = root / "generated/projection/content"
+            for name, value in {
+                "_index.md": "---\ntitle: Metadata home\n---\nMetadata introduction\n",
+                "projects/example/_index.md": "---\ntitle: Metadata entity\n---\nEntity description\n",
+            }.items():
+                target = projection / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(value)
+            site._assemble(workspace, root / "resources", assembly, www_from_model=www_from_model)
+            self.assertIn("Metadata introduction", (assembly / "content/_index.md").read_text())
+            self.assertIn("Entity description", (assembly / "content/projects/example/_index.md").read_text())
+            editorial = workspace.path("editorial")
+            editorial.mkdir(parents=True)
+            home = "---\ntitle: Authored home\n---\nAuthored introduction\n"
+            (editorial / "_index.md").write_text(home)
+            section_override = editorial / "section/_index.md"
+            section_override.parent.mkdir()
+            section_override.write_text("---\ntitle: Authored section\n---\nSection introduction\n")
+            site._assemble(workspace, root / "resources", assembly, www_from_model=www_from_model)
+            self.assertEqual((assembly / "content/_index.md").read_text(), home)
+            self.assertIn("Section introduction", (assembly / "content/section/_index.md").read_text())
+            self.assertIn("Entity description", (assembly / "content/projects/example/_index.md").read_text())
+
     def test_structured_site_prefix_must_match_projection_routing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

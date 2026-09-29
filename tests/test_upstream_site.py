@@ -101,6 +101,12 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
     assert cli.main(command + ["--force"]) == 0
     assert not obsolete.exists()
     assert (destination / "metadata/keep.yaml").read_text() == "authored: true\n"
+    # A deliberate homepage override does not enable importing generated entity pages.
+    assert cli.main(command + ["--force", "--include-homepage"]) == 0
+    assert (destination / "content/_index.md").read_text() == "Generated home page\n"
+    assert not (destination / "content/persons/person/_index.md").exists()
+    assert cli.main(command + ["--force"]) == 0
+    assert not (destination / "content/_index.md").exists()
     with pytest.raises(SystemExit, match="2"):
         cli.main(command + ["--destination", str(website)])
 
@@ -144,3 +150,39 @@ def test_import_refuses_deletion_without_overwrite_conflict(tmp_path, monkeypatc
     site_inputs.import_site_inputs(tmp_path / "source", destination, config_path=manifest, force=True)
     assert not old.exists()
     assert "site" in tomllib.loads(manifest.read_text())["tool"]["orinoco"]
+
+
+def test_upstream_checkout_preserves_dirty_input_and_rejects_unregistered_destination(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from orinoco_lite import upstream
+    from orinoco_lite.errors import ConfigurationError
+    monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+    source, root = tmp_path / "source", tmp_path / "site"
+    for path in (source, root):
+        repository(path)
+        (path / "input").write_text("recorded\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "test: initial")
+    git(source, "remote", "add", "origin", source.as_uri())
+    monkeypatch.setattr(upstream, "resolve_resources", lambda: SimpleNamespace(root=tmp_path))
+    monkeypatch.setattr(upstream, "resolve_www_from_model", lambda *_: source)
+    upstream.checkout_upstream(root)
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "test: select website")
+    (root / "sourcedata/www-from-model/input").write_text("unfinished work\n")
+    before = git(root / "sourcedata/www-from-model", "rev-parse", "HEAD")
+    with pytest.raises(ConfigurationError, match="changes"):
+        upstream.checkout_upstream(root)
+    assert (root / "sourcedata/www-from-model/input").read_text() == "unfinished work\n"
+    assert git(root / "sourcedata/www-from-model", "rev-parse", "HEAD") == before
+    other = tmp_path / "other-site"
+    repository(other)
+    (other / "sourcedata").mkdir()
+    (other / "sourcedata/www-from-model").write_text("existing input\n")
+    git(other, "add", ".")
+    with pytest.raises(ConfigurationError, match="not one submodule"):
+        upstream.checkout_upstream(other)
+    (other / "sourcedata/www-from-model").unlink()
+    (other / "sourcedata/www-from-model").symlink_to(source, target_is_directory=True)
+    with pytest.raises(ConfigurationError, match="inside the downstream"):
+        upstream.checkout_upstream(other)

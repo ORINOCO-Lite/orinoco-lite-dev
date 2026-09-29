@@ -91,20 +91,17 @@ Create an inspectable downstream populated from the upstream Pool:
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
-Setup selects the template remote's `main` commit and keeps that template's declared package dependency and lock.
-For development with both checkouts' current commits, use `pixi run setup-upstream --local-heads`; explicit overrides are also available independently.
+Setup uses the template's remote `main` and the engineering checkout's committed package version.
+Use `pixi run setup-upstream --help` for options.
+See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
-See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.
-Setup stops before projection and building; run `pixi run build` in the downstream when ready.
+In an existing downstream, use `pixi run dev-enable [PATH]` to connect an editable package checkout and `pixi run dev-disable` to restore its previous selection.
+These tasks record the package selection and development link with DataLad; direct `orinoco-lite dev enable` and `dev disable` calls leave committing to the caller.
 
-Use `pixi run setup-upstream --help` for candidate and input selection, and `pixi run orinoco-lite dev upstream --help` or `dev records --help` for individual stages.
-CLI help is the reference for options and defaults.
-
-`dev enable [PATH]` and `dev disable` remain explicit editable-development conveniences; normal setup does not use them.
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
-Pixi's downstream tasks only supply convenient arguments.
+Pixi's downstream tasks supply convenient arguments and wrap development switches with DataLad.
 Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
 The original upstream application retains its own native development commands.
 

@@ -6,7 +6,6 @@ from collections.abc import Mapping
 import json
 from typing import Any, cast
 
-from dump_things_service.utils import json2yaml, order_dict
 import yaml
 
 
@@ -53,11 +52,15 @@ def canonical_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
 
     if not isinstance(value, Mapping):
         raise TypeError("Canonical metadata must be a mapping")
+    from dump_things_service.utils import order_dict
+
     return cast(dict[str, Any], order_dict(dict(value)))
 
 
 def canonical_yaml(value: Mapping[str, Any]) -> str:
     """Serialize one mapping exactly like the pinned Dump Things helpers."""
+
+    from dump_things_service.utils import json2yaml
 
     return json2yaml(canonical_mapping(value))
 
