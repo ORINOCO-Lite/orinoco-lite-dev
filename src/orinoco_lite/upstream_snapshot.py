@@ -29,7 +29,6 @@ import shutil
 import tempfile
 from typing import Any
 
-from dump_things_service.utils import json2yaml, order_dict
 import yaml
 from yaml.constructor import ConstructorError
 
@@ -150,6 +149,8 @@ def canonical_json(value: Any) -> str:
 
 def canonical_yaml_bytes(record: Mapping[str, Any]) -> bytes:
     """Use the upstream serializer that Orinoco Lite also pins."""
+
+    from dump_things_service.utils import json2yaml, order_dict
 
     _strict_json_value(record, location="record")
     return json2yaml(order_dict(dict(record))).encode("utf-8")

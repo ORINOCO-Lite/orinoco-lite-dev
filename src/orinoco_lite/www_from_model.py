@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 from typing import Sequence
 
+from .progress import progress
 from .errors import IntegrityError
 from .resources import SOURCE_REPOSITORY, source_commit
 
@@ -121,6 +122,7 @@ def _selected_www_from_model_commit(engineering: Path, commit: str) -> str:
     return match.group("commit")
 
 
+@progress("Checking upstream sources")
 def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
     actual_commit = _repository_head(engineering, label="Cached engineering checkout")
     if actual_commit != expected_commit:
@@ -250,7 +252,8 @@ def _ensure_checkout(
     temporary = Path(tempfile.mkdtemp(prefix=".engineering-", dir=cache))
     fresh = temporary / "checkout"
     try:
-        www_from_model = _clone_checkout(repository, commit, fresh)
+        with progress("Fetching www-from-model and its dependencies"):
+            www_from_model = _clone_checkout(repository, commit, fresh)
         relative_checkout = www_from_model.relative_to(fresh)
         if destination.exists() or destination.is_symlink():
             _remove_cache_path(destination)
