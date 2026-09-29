@@ -20,7 +20,7 @@ Inputs:
   --site-layout MODE        Store imported inputs as submodule (default) or directory;
                             ignored with --site-specific
   --upstream-submodule PATH Record the package-selected website as a downstream submodule
-                            (PATH is relative to the new downstream; requires import)
+                            (PATH is below sourcedata/ in the new downstream; requires import)
   --build                   Build and retain a publication bundle after preparation;
                             does not publish or deploy
 

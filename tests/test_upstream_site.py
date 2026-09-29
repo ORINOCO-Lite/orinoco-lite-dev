@@ -166,16 +166,20 @@ def test_upstream_checkout_preserves_dirty_input_and_rejects_unregistered_destin
     git(source, "remote", "add", "origin", source.as_uri())
     monkeypatch.setattr(upstream, "resolve_resources", lambda: SimpleNamespace(root=tmp_path))
     monkeypatch.setattr(upstream, "resolve_www_from_model", lambda *_: source)
-    upstream.checkout_upstream(root, root / "www")
+    upstream.checkout_upstream(root, root / "sourcedata/www")
     git(root, "add", ".")
     git(root, "commit", "-qm", "test: select website")
-    (root / "www/input").write_text("unfinished work\n")
-    before = git(root / "www", "rev-parse", "HEAD")
+    (root / "sourcedata/www/input").write_text("unfinished work\n")
+    before = git(root / "sourcedata/www", "rev-parse", "HEAD")
     with pytest.raises(ConfigurationError, match="changes"):
-        upstream.checkout_upstream(root, root / "www")
-    assert (root / "www/input").read_text() == "unfinished work\n"
-    assert git(root / "www", "rev-parse", "HEAD") == before
+        upstream.checkout_upstream(root, root / "sourcedata/www")
+    assert (root / "sourcedata/www/input").read_text() == "unfinished work\n"
+    assert git(root / "sourcedata/www", "rev-parse", "HEAD") == before
+    (root / "sourcedata/input").write_text("existing input\n")
+    git(root, "add", "sourcedata/input")
     with pytest.raises(ConfigurationError, match="not one submodule"):
-        upstream.checkout_upstream(root, root / "input")
+        upstream.checkout_upstream(root, root / "sourcedata/input")
+    with pytest.raises(ConfigurationError, match="below sourcedata"):
+        upstream.checkout_upstream(root, root / "framework")
     with pytest.raises(ConfigurationError, match="inside the downstream"):
         upstream.checkout_upstream(root, tmp_path / "outside")

@@ -195,14 +195,16 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     """
 
     links = _gitlinks(workspace.root)
-    site_submodule = links == ["site-specific"]
-    if (workspace.root / ".gitmodules").exists() and not site_submodule:
+    allowed_links = [link for link in links
+                     if link == "site-specific" or link.startswith("sourcedata/")]
+    if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
-            "A downstream Orinoco repository must not contain .gitmodules"
+            "Downstream .gitmodules requires site-specific or sourcedata subdatasets"
         )
-    if links and not site_submodule:
+    forbidden_links = sorted(set(links) - set(allowed_links))
+    if forbidden_links:
         raise ConfigurationError(
-            f"A downstream Orinoco repository must not contain gitlinks: {links}"
+            f"Downstream gitlinks must be site-specific or below sourcedata/: {forbidden_links}"
         )
     for name in REQUIRED_INPUT_PATHS:
         path = workspace.path(name)

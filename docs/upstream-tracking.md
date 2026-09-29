@@ -33,7 +33,8 @@ To retain the imported website revision directly and build the complete candidat
 pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --upstream-submodule sourcedata/www-from-model --build
 ```
 
-`--upstream-submodule` is relative to the new downstream.
+`--upstream-submodule` selects a path below `sourcedata/` in the new downstream.
+Normal builds use the imported site files and do not require this source subdataset to be installed.
 It installs the package-selected revision, saves its gitlink with DataLad, and declares that checkout as input to the recorded site import.
 It does not introduce a separate choice of upstream version.
 `--build` uses the ordinary build command and retains its recorded projection and website in `build/pages-publication.bundle`; it does not deploy or push publication refs.

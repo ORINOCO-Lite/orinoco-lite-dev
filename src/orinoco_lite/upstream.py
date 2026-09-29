@@ -17,7 +17,7 @@ def register(commands):
     checkout = groups.add_parser("checkout", description=(
         "Create or update a downstream submodule at the package-selected www-from-model commit. "
         "The caller records the gitlink with DataLad; this command does not import site files."))
-    checkout.add_argument("--destination", type=Path, required=True, help="downstream submodule path")
+    checkout.add_argument("--destination", type=Path, required=True, help="downstream submodule path below sourcedata/")
     export = groups.add_parser("import-from-www", description=(
         "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
         "and comparison with Orinoco Lite. "
@@ -46,7 +46,7 @@ def register(commands):
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
     populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip dump and imports")
     populate.add_argument("--upstream-submodule", type=Path,
-                          help="record the package-selected website at this submodule path before importing")
+                          help="record the package-selected website at this path below sourcedata/ before importing")
 
 
 
@@ -115,6 +115,8 @@ def checkout_upstream(root: Path, destination: Path) -> int:
             or destination.resolve() == root or ".git" in destination.relative_to(root).parts):
         raise ConfigurationError("Upstream submodule must be a path inside the downstream.")
     relative = destination.relative_to(root).as_posix()
+    if not relative.startswith("sourcedata/"):
+        raise ConfigurationError("Upstream submodule must be below sourcedata/.")
     source = resolve_www_from_model(root, resolve_resources().root)
 
     def git(repository, *arguments):
