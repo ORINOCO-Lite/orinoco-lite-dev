@@ -103,8 +103,9 @@ After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-r
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
 Pixi's downstream tasks supply convenient arguments and wrap development switches with DataLad.
 Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
-To check a template checkout, including local edits, with replacement metadata and the active engineering package, run `ORINOCO_TEST_TEMPLATE=/path/to/orinoco-lite-template pixi run pytest tests/engineering/test_template_downstream.py`.
-This uses the existing connected-record fixture and ordinary build CLI; upstream website fidelity is checked separately.
+The replacement-metadata test uses `../orinoco-lite-template`, including local edits; set `ORINOCO_TEST_TEMPLATE` to select another checkout.
+It skips only when neither selection is available locally; CI supplies the template's `main` checkout explicitly.
+This test uses the existing connected-record fixture and ordinary build CLI; upstream website fidelity is checked separately.
 The original upstream application retains its own native development commands.
 
 Project-owned agent skills are canonical, ordinary files under `.agents/skills/`.

@@ -56,7 +56,17 @@ jobs:
       - name: Prepare editable package resources
         run: pixi run orinoco-lite dev prepare-resources
 
+      - name: Check out the downstream template
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORINOCO-Lite/orinoco-lite-template
+          ref: main
+          path: build/template-candidate
+          persist-credentials: false
+
       - name: Run package and engineering tests
+        env:
+          ORINOCO_TEST_TEMPLATE: ${{ github.workspace }}/build/template-candidate
         run: pixi run pytest
 
       - name: Build the source archive and verify its installed wheel

@@ -11,12 +11,13 @@ import pytest
 
 
 def test_downstream_replaces_starter_records_without_overrides(tmp_path):
-    template = os.environ.get("ORINOCO_TEST_TEMPLATE")
-    if not template:
-        pytest.skip("Set ORINOCO_TEST_TEMPLATE to the template checkout to exercise")
+    selected = os.environ.get("ORINOCO_TEST_TEMPLATE")
+    template = Path(selected) if selected else Path(__file__).resolve().parents[3] / "orinoco-lite-template"
+    if not selected and not template.exists():
+        pytest.skip("No sibling orinoco-lite-template checkout; set ORINOCO_TEST_TEMPLATE to select one")
     root = tmp_path / "downstream"
     run_copy(
-        str(Path(template).resolve()), root, vcs_ref="HEAD", defaults=True,
+        str(template.resolve()), root, vcs_ref="HEAD", defaults=True,
         data={"project_name": "Replacement Research", "project_slug": "replacement"},
     )
     subprocess.run(["git", "init", "--quiet", str(root)], check=True)
