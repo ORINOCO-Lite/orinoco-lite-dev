@@ -88,7 +88,14 @@ done
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
 
 template_repository=$(git -C "$template" remote get-url origin)
-package_repository=${package_repository:-$(git remote get-url origin)}
+if [[ -z $package_repository ]]; then
+  package_repository=$(git remote get-url origin)
+  # Public GitHub inputs must be recoverable without the maintainer's SSH setup.
+  case "$package_repository" in
+    git@github.com:*) package_repository="https://github.com/${package_repository#git@github.com:}" ;;
+    ssh://git@github.com/*) package_repository="https://github.com/${package_repository#ssh://git@github.com/}" ;;
+  esac
+fi
 package_revision=${package_revision:-$(git rev-parse HEAD)}
 if $explicit_template_ref || $local_heads; then
   if [[ $template_ref == HEAD ]]; then

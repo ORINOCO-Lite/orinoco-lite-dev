@@ -154,3 +154,14 @@ def test_setup_input_paths_resolve_from_physical_destination(setup, tmp_path):
     populate = next(call for call in calls if "populate" in call)
     retained_input = populate[populate.index("--dump") + 1]
     assert (physical / "site" / retained_input).resolve() == supplied.resolve()
+
+
+@pytest.mark.parametrize("remote", ["git@github.com:example/package.git", "ssh://git@github.com/example/package.git"])
+def test_github_ssh_origin_uses_public_read_url(setup, remote):
+    run, engineering, _, _, package_head, _ = setup
+    git(engineering, "remote", "set-url", "origin", remote)
+    result, calls = run("--build")
+    assert result.returncode == 0, result.stderr
+    update = next(call for call in calls if call[:2] == ["datalad", "run"])
+    assert update[update.index("--repository") + 1] == "https://github.com/example/package.git"
+    assert update[update.index("--revision") + 1] == package_head

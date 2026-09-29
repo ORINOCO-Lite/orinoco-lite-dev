@@ -42,6 +42,7 @@ Without `--build`, setup ends after preparation.
 `--site-specific` installs existing site inputs and skips upstream import.
 
 Setup selects the engineering checkout’s current commit and template `origin/main`.
+GitHub package origins use HTTPS for credential-free reads; an explicit repository URL remains unchanged.
 Publish the package commit first; setup verifies both selections before creating the downstream.
 Use `--package-revision FULL_SHA` to test another package revision, or `--local-heads` to include the local template commit.
 For an existing downstream, record `orinoco-lite package update --revision FULL_SHA` with DataLad, then start a fresh `pixi run` for the build.
