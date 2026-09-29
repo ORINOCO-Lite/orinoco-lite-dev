@@ -151,3 +151,12 @@ def test_capture_selection_uses_existing_preparation_command(tmp_path, selection
     assert args[:9] == ['exec', '--spec', 'git-annex==10.20260601', '--', 'pixi', 'run',
                         'orinoco-lite', 'dev', 'upstream']
     assert args[9:] == ['populate'] + (['--reuse-dump'] if reuse else [])
+
+
+@pytest.mark.parametrize(('conflicts', 'validation', 'succeeds'), [
+    ('0', 'success', True), ('1', 'skipped', False), ('0', 'failure', False),
+])
+def test_failed_preparation_is_reported_without_a_pr(tmp_path, conflicts, validation, succeeds):
+    env = dict(os.environ, CONFLICTS=conflicts, VALIDATION=validation)
+    result = step('prepare', 'Report preparation without publication', tmp_path, env)
+    assert (result.returncode == 0) == succeeds

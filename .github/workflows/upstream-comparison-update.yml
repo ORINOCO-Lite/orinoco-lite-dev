@@ -171,6 +171,16 @@ jobs:
             ${{ runner.temp }}/site-specific-update.bundle
           retention-days: 1
           if-no-files-found: error
+      - name: Report preparation without publication
+        if: steps.bundle.outputs.changed != 'true' || !inputs.publish
+        env:
+          CONFLICTS: ${{ steps.update.outputs.conflicts }}
+          VALIDATION: ${{ steps.validate.outcome }}
+        run: |
+          if [[ "$CONFLICTS" == 1 || "$VALIDATION" == failure ]]; then
+            echo '::error::Preparation needs conflict resolution or a validation fix.'
+            exit 1
+          fi
 
   publish:
     name: Publish comparison update
