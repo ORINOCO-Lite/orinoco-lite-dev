@@ -24,7 +24,8 @@ def commit(root, message):
 
 def step(job, name, root, env):
     script = next(s['run'] for s in WORKFLOW['jobs'][job]['steps'] if s.get('name') == name)
-    return subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root, env=env,
+    # Exercise macOS's system Bash too, even when a newer Bash is on PATH.
+    return subprocess.run(['/bin/bash', '-euo', 'pipefail', '-c', script], cwd=root, env=env,
                           text=True, capture_output=True)
 
 
