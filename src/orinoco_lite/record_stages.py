@@ -25,12 +25,14 @@ import sys
 import tempfile
 from typing import Any, Sequence
 
+from .progress import progress
 from . import upstream_orinoco_records as storage
 from . import upstream_snapshot as snapshot
 from .annotations import assertion_sha256, _check_overlay_path
 from .errors import ConfigurationError
 
 
+SCHEMA_RELATIVE = Path("schema/demo-research-information/unreleased.yaml")
 _MISSING = object()
 
 
@@ -213,6 +215,20 @@ def _safe_output(path: Path) -> None:
         raise snapshot.SnapshotError(f"output must not be a symlink: {path}")
 
 
+def _check_record_input(path: Path) -> None:
+    from .stage_reports import operation_receipt, read_json
+
+    operation_receipt(path)
+    # Interruptions can leave evidence before the CLI writes its receipt.
+    if path.name == "returned.partial.jsonl":
+        raise snapshot.SnapshotError(f"Incomplete RDF return cannot be a complete record input: {path}")
+    conversion = path.with_name("conversion.json")
+    if path.name == "records.jsonl" and conversion.is_file():
+        result = read_json(conversion)
+        if not isinstance(result, dict) or result.get("status") != "complete":
+            raise snapshot.SnapshotError(f"RDF conversion did not complete: {conversion}")
+
+
 def jsonl_to_yaml(source: Path, site_inputs: Path) -> dict[str, Any]:
     """Replace records and overlay files, preserving authored inputs and dumps."""
 
@@ -335,7 +351,8 @@ def execute(args: argparse.Namespace) -> int:
                 _safe_output(target)
                 if target.exists() and not args.force:
                     raise ConfigurationError(f"Metadata output already exists: {target}; use --force to replace it")
-            result = jsonl_to_yaml(source, site_inputs)
+            with progress("Converting JSONL records to YAML"):
+                result = jsonl_to_yaml(source, site_inputs)
             print(f"Converted {result['record_count']} records (YAML): {site_inputs}")
         elif action == "yaml-to-jsonl":
             site_inputs = explicit_path(args, args.source)
@@ -343,7 +360,8 @@ def execute(args: argparse.Namespace) -> int:
             _safe_output(output)
             if output.exists() and not args.force:
                 raise ConfigurationError(f"JSONL output already exists: {output}; use --force to replace it")
-            joined = yaml_to_jsonl(site_inputs, output)
+            with progress("Exporting YAML records to JSONL"):
+                joined = yaml_to_jsonl(site_inputs, output)
             print(f"Wrote {len(joined)} records (JSONL): {output}")
         elif action == "diff":
             left_path = explicit_path(args, args.left) if args.left else require(data / "downloaded/records.jsonl", "records get")
@@ -353,8 +371,9 @@ def execute(args: argparse.Namespace) -> int:
                     with tempfile.TemporaryDirectory() as temporary:
                         return yaml_to_jsonl(path, Path(temporary) / "records.jsonl")
                 return snapshot.load_jsonl(path)
-            left, right = read(left_path), read(right_path)
-            findings = compare_records(left, right)
+            with progress("Reading and comparing records"):
+                left, right = read(left_path), read(right_path)
+                findings = compare_records(left, right)
             print(f"Before: {left_path}\nAfter:  {right_path}")
             print(f"{len(left)} records before; {len(right)} after; {len({item['subject'] for item in findings})} records differ.")
             fields = defaultdict(set)

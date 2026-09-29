@@ -16,6 +16,7 @@ from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from .progress import progress
 from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
@@ -325,6 +326,7 @@ def _safe_destination(workspace, destination: Path) -> Path:
     return resolved
 
 
+@progress("Assembling the Hugo site")
 def _assemble(
     workspace,
     resources_root: Path,
@@ -499,50 +501,52 @@ def build_site(
     if destination.exists():
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    _run(
-        [
-            "hugo",
-            "--minify",
-            "--cleanDestinationDir",
-            "--environment",
-            "con",
-            "--source",
-            assembly,
-            "--destination",
-            destination,
-            "--baseURL",
-            base_url,
-        ],
-        cwd=workspace.root,
-    )
-    adapter = _site_adapter(resources_root)
-    if adapter.is_file():
+    with progress("Building the site with Hugo"):
         _run(
             [
-                sys.executable,
-                adapter,
+                "hugo",
+                "--minify",
+                "--cleanDestinationDir",
+                "--environment",
+                "con",
+                "--source",
+                assembly,
+                "--destination",
                 destination,
-                "--base-path",
-                parsed.path or base_url,
-                "--edit-url",
-                f"{base_url}edit/",
+                "--baseURL",
+                base_url,
             ],
             cwd=workspace.root,
         )
-    editor_report = bind_editor(
-        workspace,
-        resources_root,
-        destination / "edit",
-        repository=repository,
-        service_origin=workspace.curation_service,
-    )
-    review_report = bind_review(
-        workspace,
-        resources_root,
-        destination / "review",
-        repository=repository,
-        service_origin=workspace.curation_service,
-    )
+    adapter = _site_adapter(resources_root)
+    with progress("Preparing the site editor and review pages"):
+        if adapter.is_file():
+            _run(
+                [
+                    sys.executable,
+                    adapter,
+                    destination,
+                    "--base-path",
+                    parsed.path or base_url,
+                    "--edit-url",
+                    f"{base_url}edit/",
+                ],
+                cwd=workspace.root,
+            )
+        editor_report = bind_editor(
+            workspace,
+            resources_root,
+            destination / "edit",
+            repository=repository,
+            service_origin=workspace.curation_service,
+        )
+        review_report = bind_review(
+            workspace,
+            resources_root,
+            destination / "review",
+            repository=repository,
+            service_origin=workspace.curation_service,
+        )
     entries = _manifest(destination)
     digest = hashlib.sha256(("\n".join(entries) + "\n").encode()).hexdigest()
     report = {

@@ -20,6 +20,7 @@ dependencies = [
   "linkml-runtime==1.11.1",
   "packaging==26.3",
   "pydantic==2.13.4",
+  "pyoxigraph==0.5.11",
   "PyYAML==6.0.2",
   "tomlkit>=0.13,<1",
   "rdflib==7.6.0",

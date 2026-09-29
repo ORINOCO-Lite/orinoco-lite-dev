@@ -32,3 +32,21 @@ def explicit_path(args, path):
     root = getattr(args, "root", None) or Path.cwd()
     # Keep the final symlink visible to output safety checks.
     return (root / path).absolute() if not path.is_absolute() else path
+
+
+def prepare_output(path):
+    if path.is_symlink():
+        raise ConfigurationError(f"Output must not be a symbolic link: {path}")
+    if path.exists():
+        raise ConfigurationError(f"Output already exists: {path}; choose a fresh --report directory")
+    return path
+
+
+def record_path(root, name):
+    if name == "downloaded":
+        path, command = root / name / "records.jsonl", "records get"
+    elif name == "yaml-jsonl":
+        path, command = root / name / "records.jsonl", "records yaml-to-jsonl"
+    else:
+        raise ConfigurationError(f"Unknown record state: {name}")
+    return require(path, command)

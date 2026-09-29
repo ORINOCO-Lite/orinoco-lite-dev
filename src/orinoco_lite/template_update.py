@@ -9,6 +9,7 @@ import tomllib
 
 import yaml
 
+from .progress import progress
 from .errors import ConfigurationError
 from . import package_update
 
@@ -44,6 +45,7 @@ def conflicts(root: Path) -> list[str]:
     return result.stdout.splitlines()
 
 
+@progress("Reading selected template dependencies")
 def template_environment(root: Path, source: str, revision: str) -> tuple[str, str, bytes]:
     from copier import run_copy
 

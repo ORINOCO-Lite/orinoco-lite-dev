@@ -64,6 +64,9 @@
 
 - Treat `docs/project-design.md` as the durable project design charter.
   Use it for intended design; keep implementation status and sequencing in active plans.
+- Keep human-facing docs as concise orientation and CLIs unsurprising.
+  Put option details and necessary caveats in CLI help; omit narration of obvious interactions.
+  Revise existing guidance instead of appending notes for each change; Git and PRs carry change history.
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
 - In `docs/project-design.md`, name concrete actors, artifacts, and Git operations.
   Prefer terms such as commit, comment, pull request, and merge over abstract workflow language when they describe the actual action, and omit conclusions already evident from the flow.
