@@ -58,13 +58,17 @@ def changes(root):
 
 def show_changes(label, entries):
     if entries is None:
-        line(f"  {label}: Git status unavailable")
+        line(f"Warning: {label}: Git status unavailable", "33")
         return
     tracked = [entry.strip() for entry in entries if not entry.startswith("??")]
     untracked = [entry[3:] for entry in entries if entry.startswith("??")]
-    for kind, paths in (("changed", tracked), ("untracked", untracked)):
-        if paths:
-            line(f"  {label} {kind} ({len(paths)}): {', '.join(paths)}")
+    details = []
+    if tracked:
+        details.append(", ".join(tracked))
+    if untracked:
+        details.append(f"untracked: {', '.join(untracked)}")
+    if details:
+        line(f"Warning: {label}: {'; '.join(details)}", "33")
 
 
 def main():
@@ -112,24 +116,22 @@ def main():
         show_commit("Package", package_repository, package_commit, package_root, args.package_selection)
         show_commit("Template", template_repository, template_commit, template_root, args.template_selection)
         show_commit("www-from-model", upstream_repository, upstream_commit, upstream_root, "package gitlink")
+        if args.site_specific:
+            line(f"• Inputs: {Path(args.site_specific).resolve()} (site-specific submodule)", "36")
+        else:
+            source = f"dump {Path(args.dump).resolve()}" if args.dump else args.api
+            line(f"• Inputs: {source} (site layout: {args.site_layout})", "36")
         local_changes = [("Engineering", changes(engineering)), ("Template", changes(template))]
         if (Path(engineering) / upstream_path / ".git").exists():
             local_changes.append(("www-from-model", changes(Path(engineering) / upstream_path)))
         destination = args.destination.resolve()
         if (destination / ".git").exists():
             local_changes.append(("Destination", changes(destination)))
-        if any(entries for _, entries in local_changes):
-            line("Warning: uncommitted changes.", "33")
+        action = "Forced overwrite" if destination.exists() else "Create"
+        line(f"{action}: {destination}", "31" if destination.exists() else None)
+        line("Build: site + publication bundle" if args.build == "true" else "Build: skipped")
         for label, entries in local_changes:
             show_changes(label, entries)
-        action = "REPLACE (--force)" if destination.exists() else "Create"
-        line(f"{action}: {destination}", "31" if destination.exists() else None)
-        if args.site_specific:
-            line(f"Inputs: {Path(args.site_specific).resolve()} (site-specific submodule)")
-        else:
-            source = f"dump {Path(args.dump).resolve()}" if args.dump else args.api
-            line(f"Inputs: {source} (site layout: {args.site_layout})")
-        line("Build: site + publication bundle" if args.build == "true" else "Build: skipped")
 
 
 if __name__ == "__main__":

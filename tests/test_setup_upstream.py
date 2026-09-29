@@ -249,11 +249,10 @@ def test_summary_includes_versions_changes_inputs_and_build_hint(setup, tmp_path
     assert "test: remote template" in result.stdout
     assert "• www-from-model:" in result.stdout
     assert git(engineering / "submodules/www-from-model", "rev-parse", "HEAD")[:7] in result.stdout
-    assert "Engineering changed (1):" in result.stdout
-    assert "Engineering untracked (1):" in result.stdout
-    assert result.stdout.index("Warning:") < result.stdout.index("Engineering changed")
+    assert "Warning: Engineering: M .gitmodules; untracked: release/" in result.stdout
+    assert result.stdout.index("• www-from-model:") < result.stdout.index("• Inputs:") < result.stdout.index("Warning:")
     assert " M .gitmodules" in result.stdout
-    assert "Template untracked (1): untracked.txt" in result.stdout
+    assert "Warning: Template: untracked: untracked.txt" in result.stdout
     assert str(dump) in result.stdout
     assert "site layout: directory" in result.stdout
     assert "Build: skipped" in result.stdout
@@ -268,7 +267,7 @@ def test_redirected_input_requires_explicit_noninteractive_flag(setup):
     result, calls = run("--force", interactive=True)
     assert result.returncode == 2
     assert "--non-interactive" in result.stderr
-    assert "REPLACE (--force)" in result.stdout
+    assert "Forced overwrite" in result.stdout
     assert sentinel.read_text() == "keep"
     assert all(call[0] == "orinoco-lite" for call in calls)
 
@@ -302,7 +301,7 @@ def test_terminal_pause_precedes_force_replacement(setup, key, no_color):
         plain = re.sub(r"\x1b\[[0-9;]*m", "", output.decode()).splitlines()
         assert len(plain) <= 20
         assert all(len(row) <= 80 for row in plain)
-        assert b"REPLACE (--force)" in output
+        assert b"Forced overwrite" in output
         assert sentinel.read_text() == "keep"
         assert process.poll() is None
         os.write(master, key)
@@ -384,7 +383,9 @@ def test_review_stays_under_twenty_lines_with_many_local_changes(setup):
     assert len(rows) + 2 <= 20  # Include the blank line and terminal prompt.
     assert all(len(row) <= 240 for row in rows)
     assert "..." in result.stdout
-    assert result.stdout.index("Warning:") < result.stdout.index("Engineering changed")
+    warnings = [row for row in rows if row.startswith("Warning:")]
+    assert len(warnings) == 4
+    assert any(row.startswith("Warning: Destination: A tracked.txt; untracked:") for row in warnings)
     assert "\x1b[" not in result.stdout
     assert "dev enable" not in result.stdout
     assert "DataLad" not in result.stdout
