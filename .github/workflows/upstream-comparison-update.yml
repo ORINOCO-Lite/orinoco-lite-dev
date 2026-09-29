@@ -1,9 +1,6 @@
 name: Update upstream comparison
 
 on:
-  push:
-    branches: [codex/upstream-comparison-updates]
-    paths: [.github/workflows/upstream-comparison-update.yml]
   workflow_dispatch:
     inputs:
       template_revision:
@@ -82,7 +79,7 @@ jobs:
         working-directory: downstream
         env:
           SITE_REVISION: ${{ inputs.site_revision }}
-          SOURCE_DATA: ${{ inputs.source_data || 'Refresh from Pool' }}
+          SOURCE_DATA: ${{ inputs.source_data }}
         run: |
           if [[ "$SOURCE_DATA" == 'Retained capture' ]]; then
             git cat-file -e HEAD:sourcedata/downloaded/records.jsonl || {
@@ -107,7 +104,7 @@ jobs:
       - name: Record template and package update
         id: update
         env:
-          TEMPLATE_REVISION: ${{ inputs.template_revision || 'main' }}
+          TEMPLATE_REVISION: ${{ inputs.template_revision }}
           PACKAGE_REVISION: ${{ inputs.package_revision || github.sha }}
           ORINOCO_UPDATE_ENVIRONMENT: ${{ github.server_url }}/${{ github.repository }}@${{ github.sha }}
         run: |
@@ -119,7 +116,7 @@ jobs:
         if: steps.update.outputs.conflicts == '0'
         working-directory: downstream
         env:
-          SOURCE_DATA: ${{ inputs.source_data || 'Refresh from Pool' }}
+          SOURCE_DATA: ${{ inputs.source_data }}
         run: |
           set --
           case "$SOURCE_DATA" in
@@ -175,7 +172,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
       - name: Report preparation without publication
-        if: steps.bundle.outputs.changed != 'true' || (github.event_name != 'push' && !inputs.publish)
+        if: steps.bundle.outputs.changed != 'true' || !inputs.publish
         env:
           CONFLICTS: ${{ steps.update.outputs.conflicts }}
           VALIDATION: ${{ steps.validate.outcome }}
@@ -188,7 +185,7 @@ jobs:
   publish:
     name: Publish comparison update
     needs: prepare
-    if: (github.event_name == 'push' || inputs.publish) && needs.prepare.outputs.changed == 'true'
+    if: inputs.publish && needs.prepare.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     environment: upstream-comparison
     steps:
@@ -283,7 +280,7 @@ jobs:
 
             DataLad-recorded template/package selection and upstream preparation.
             Site-specific update: ${{ steps.site_pull.outputs.pull-request-url || 'already published' }}.
-            Source records: ${{ inputs.source_data || 'Refresh from Pool' }}.
+            Source records: ${{ inputs.source_data }}.
             Conflict status: ${{ needs.prepare.outputs.conflicts }} (0 = none, 1 = resolve conflicts).
             Validation: ${{ needs.prepare.outputs.validation }}.
             [Preparation and validation](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
