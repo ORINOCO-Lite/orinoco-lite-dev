@@ -95,10 +95,13 @@ Setup uses the template's remote `main` and the engineering checkout's committed
 Use `pixi run setup-upstream --help` for options.
 See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
+In an existing downstream, use `pixi run dev-enable [PATH]` to connect an editable package checkout and `pixi run dev-disable` to restore its previous selection.
+These tasks record the package selection and development link with DataLad; direct `orinoco-lite dev enable` and `dev disable` calls leave committing to the caller.
+
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
-Pixi's downstream tasks only supply convenient arguments.
+Pixi's downstream tasks supply convenient arguments and wrap development switches with DataLad.
 Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
 The original upstream application retains its own native development commands.
 

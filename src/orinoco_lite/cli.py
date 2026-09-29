@@ -112,9 +112,19 @@ def _parser() -> argparse.ArgumentParser:
     dev = commands.add_parser("dev", help="development-only commands")
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
-    enable = dev_commands.add_parser("enable", help="connect an editable package checkout and prepare its resources")
+    enable = dev_commands.add_parser(
+        "enable", help="connect an editable package checkout and prepare its resources",
+        description="Connect an editable package checkout and prepare its resources. "
+        "Use pixi run dev-enable [PATH] in a downstream to record this operation with DataLad. "
+        "Direct CLI use leaves changes uncommitted; commit them before disabling.",
+    )
     enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
-    dev_commands.add_parser("disable", help="restore the package selection used before editable development")
+    dev_commands.add_parser(
+        "disable", help="restore the package selection used before editable development",
+        description="Restore the package selection used before editable development. "
+        "Use pixi run dev-disable in a downstream to record this operation with DataLad. "
+        "Direct CLI use leaves changes uncommitted.",
+    )
     from . import upstream, pool_capture, record_stages
     upstream.register(dev_commands)
     records = dev_commands.add_parser("records", help="capture, convert, and compare records")
