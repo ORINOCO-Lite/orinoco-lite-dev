@@ -97,7 +97,9 @@ raise SystemExit(cli.main())
     workflow.chmod(0o755)
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], TEST_WWW=str(www))
     upstream_args = ["--upstream-submodule", "sourcedata/www-from-model"] if retain_upstream else []
-    run(site, "orinoco-lite", "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, *upstream_args, env=env)
+    alias = tmp_path / "site-alias"
+    alias.symlink_to(site, target_is_directory=True)
+    run(tmp_path, "orinoco-lite", "--root", str(alias), "dev", "upstream", "populate", "--dump", str(supplied), "--site-layout", layout, *upstream_args, env=env)
     supplied.unlink()
     ingestion = run(site, "git", "log", "--format=%B", "--grep=retain supplied records dump")
     assert ingestion

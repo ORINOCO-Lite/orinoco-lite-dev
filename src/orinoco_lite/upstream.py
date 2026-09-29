@@ -59,7 +59,8 @@ def execute(args):
         # Store paths relative to the dataset, even when callers supply absolutes.
         import os
         def relative(path):
-            return os.path.relpath(explicit_path(args, path), root)
+            target = explicit_path(args, path)
+            return os.path.relpath(target.parent.resolve() / target.name, root)
         command = ["orinoco-lite-populate-upstream.sh",
                    "--directory", relative(args.directory), "--destination", relative(args.destination),
                    "--api", args.api, "--site-layout", args.site_layout]
@@ -109,7 +110,7 @@ def execute(args):
 
 def checkout_upstream(root: Path, destination: Path) -> int:
     """Use Git's submodule registration and the package's existing resolver."""
-    destination = destination.absolute()
+    destination = destination.parent.resolve() / destination.name
     if (destination.is_symlink() or not destination.resolve().is_relative_to(root)
             or destination.resolve() == root or ".git" in destination.relative_to(root).parts):
         raise ConfigurationError("Upstream submodule must be a path inside the downstream.")

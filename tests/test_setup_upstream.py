@@ -64,8 +64,8 @@ elif name == "datalad" and args[0] == "create":
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log))
     destination = tmp_path / "downstream"
 
-    def run(*args, fail=False):
-        result = subprocess.run(["bash", str(SCRIPT), str(destination), "--template", str(template), *args],
+    def run(*args, fail=False, destination_path=None):
+        result = subprocess.run(["bash", str(SCRIPT), str(destination_path or destination), "--template", str(template), *args],
                                 cwd=engineering, env={**env, **({"SETUP_TEST_FAIL": "1"} if fail else {})},
                                 text=True, capture_output=True)
         calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
@@ -155,3 +155,18 @@ def test_existing_site_inputs_reject_upstream_import_option_before_writes(setup)
     assert result.returncode == 2
     assert not destination.exists()
     assert not calls
+
+
+def test_setup_input_paths_resolve_from_physical_destination(setup, tmp_path):
+    run, _, _, _, _, _ = setup
+    physical = tmp_path / "deeper/physical"
+    physical.mkdir(parents=True)
+    alias = tmp_path / "alias"
+    alias.symlink_to(physical, target_is_directory=True)
+    supplied = tmp_path / "capture.jsonl"
+    supplied.write_text('{}\n')
+    result, calls = run("--dump", str(supplied), destination_path=alias / "site")
+    assert result.returncode == 0, result.stderr
+    populate = next(call for call in calls if "populate" in call)
+    retained_input = populate[populate.index("--dump") + 1]
+    assert (physical / "site" / retained_input).resolve() == supplied.resolve()

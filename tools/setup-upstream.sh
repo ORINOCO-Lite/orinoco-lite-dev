@@ -43,7 +43,7 @@ HELP
 
 # Internal path calculations may be absolute; every recorded command uses relative paths.
 relative_to() {
-  python -c 'import os, sys; print(os.path.relpath(os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])))' "$1" "$2"
+  python -c 'import os, sys; print(os.path.relpath(os.path.realpath(sys.argv[1]), os.path.realpath(sys.argv[2])))' "$1" "$2"
 }
 
 engineering=$PWD
