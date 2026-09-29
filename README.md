@@ -92,6 +92,7 @@ pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
 Setup selects the template remote's `main` commit and the engineering checkout's committed package revision.
+It shows the selected commits and local changes, then waits for a keypress before modifying the destination; use `--non-interactive` for unattended runs.
 For development with both checkouts' current commits, use `pixi run setup-upstream --local-heads`; explicit overrides are also available independently.
 
 See [upstream tracking](docs/upstream-tracking.md) for preparation, synchronization, comparison, deployment overrides, and recovery.

@@ -1,6 +1,11 @@
 """Check setup selection and handoff without downloading or populating a site."""
+import fcntl
 import json
 import os
+import pty
+import select
+import time
+import termios
 from pathlib import Path
 import subprocess
 import sys
@@ -29,6 +34,25 @@ def setup(tmp_path):
     engineering, template = tmp_path / "engineering", tmp_path / "template"
     package_head = repository(engineering, "package-candidate")
     template_head = repository(template, "template-candidate")
+    git(template, "branch", "main")
+    git(template, "checkout", "--quiet", "main")
+    git(template, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+        "-c", "commit.gpgsign=false", "commit", "--no-verify", "--allow-empty", "-qm", "test: remote template")
+    remote_template = git(template, "rev-parse", "HEAD")
+    git(template, "checkout", "--quiet", "template-candidate")
+    (engineering / "submodules").mkdir()
+    upstream = engineering / "submodules/www-from-model"
+    upstream_head = repository(upstream, "main")
+    (engineering / ".gitmodules").write_text(
+        f'[submodule "submodules/www-from-model"]\n path = submodules/www-from-model\n url = {upstream}\n')
+    git(engineering, "add", ".gitmodules")
+    git(engineering, "update-index", "--add", "--cacheinfo", f"160000,{upstream_head},submodules/www-from-model")
+    git(engineering, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+        "-c", "commit.gpgsign=false", "commit", "--no-verify", "-qm", "test: selected upstream")
+    git(engineering, "tag", "alternate")
+    git(engineering, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+        "-c", "commit.gpgsign=false", "commit", "--no-verify", "--allow-empty", "-qm", "test: package candidate")
+    package_head = git(engineering, "rev-parse", "HEAD")
     (engineering / "release").mkdir()
     (engineering / "release/package-resources.yaml").write_text("fixture\n")
     commands = tmp_path / "bin"
@@ -48,7 +72,7 @@ if name == "orinoco-lite":
     revision = args[args.index("--revision") + 1]
     repository = args[args.index("--repository") + 1]
     if revision == "refs/heads/main":
-        revision = ("b" if "template.git" in repository else "a") * 40
+        revision = "{remote_template}"
     print(revision)
 elif name == "pixi" and "copier" in args:
     Path("pixi.toml").write_text('[pypi-dependencies]\\n orinoco-lite = {{git = "https://example.invalid/declared-package.git", rev = "' + "d" * 40 + '"}}\\n')
@@ -64,12 +88,13 @@ elif name == "datalad" and args[0] == "create":
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log))
     destination = tmp_path / "downstream"
 
-    def run(*args, fail=False, destination_path=None):
-        result = subprocess.run(["bash", str(SCRIPT), str(destination_path or destination), "--template", str(template), *args],
+    def run(*args, fail=False, destination_path=None, interactive=False):
+        result = subprocess.run(["bash", str(SCRIPT), str(destination_path or destination), "--template", str(template), *([] if interactive else ["--non-interactive"]), *args],
                                 cwd=engineering, env={**env, **({"SETUP_TEST_FAIL": "1"} if fail else {})},
                                 text=True, capture_output=True)
         calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
         return result, calls
+    run.env = env
     return run, engineering, template, destination, package_head, template_head
 
 
@@ -79,7 +104,7 @@ def test_selection_summary_and_immutable_handoff(setup, local):
     result, calls = run(*(["--local-heads"] if local else []))
     assert result.returncode == 0, result.stderr
     expected_package = package_head
-    expected_template = template_head if local else "b" * 40
+    expected_template = template_head if local else git(template, "rev-parse", "main")
     assert f"Revision: {expected_package}" in result.stdout
     assert f"Commit: {expected_template}" in result.stdout
     copier = next(call for call in calls if "copier" in call and "copy" in call)
@@ -97,13 +122,13 @@ def test_selection_summary_and_immutable_handoff(setup, local):
 @pytest.mark.parametrize("local", [False, True])
 @pytest.mark.parametrize("option", ["--template-ref", "--package-revision", "--package-repository"])
 def test_explicit_override_retains_other_defaults(setup, local, option):
-    run, _, _, _, package_head, template_head = setup
-    selected = {"--template-ref": template_head, "--package-revision": "c" * 40,
+    run, engineering, template, _, package_head, template_head = setup
+    selected = {"--template-ref": template_head, "--package-revision": git(engineering, "rev-parse", "alternate"),
                 "--package-repository": "https://example.invalid/fork.git"}[option]
     result, calls = run(*(["--local-heads"] if local else []), option, selected)
     assert result.returncode == 0, result.stderr
     expected_package = selected if option == "--package-revision" else package_head
-    expected_template = template_head if local or option == "--template-ref" else "b" * 40
+    expected_template = template_head if local or option == "--template-ref" else git(template, "rev-parse", "main")
     assert f"Revision: {expected_package}" in result.stdout
     assert f"Commit: {expected_template}" in result.stdout
     expected_repository = selected if option == "--package-repository" else "https://example.invalid/engineering.git"
@@ -111,12 +136,12 @@ def test_explicit_override_retains_other_defaults(setup, local, option):
 
 
 def test_explicit_selections_and_detached_template(setup):
-    run, _, template, _, _, template_head = setup
+    run, engineering, template, _, _, template_head = setup
     git(template, "checkout", "--quiet", "--detach")
     result, calls = run("--package-repository", "https://example.invalid/fork.git",
-                        "--package-revision", "c" * 40, "--template-ref", template_head)
+                        "--package-revision", git(engineering, "rev-parse", "alternate"), "--template-ref", template_head)
     assert result.returncode == 0, result.stderr
-    assert "Revision: " + "c" * 40 in result.stdout
+    assert "Revision: " + git(engineering, "rev-parse", "alternate") in result.stdout
     assert "detached commit" in result.stdout
     assert "https://example.invalid/fork.git" in result.stdout
 
@@ -209,3 +234,122 @@ def test_github_ssh_origin_uses_public_read_url(setup, remote):
     update = next(call for call in calls if call[:2] == ["datalad", "run"])
     assert update[update.index("--repository") + 1] == "https://github.com/example/package.git"
     assert update[update.index("--revision") + 1] == package_head
+
+
+def test_summary_includes_versions_changes_inputs_and_build_hint(setup, tmp_path):
+    run, engineering, template, _, package_head, _ = setup
+    (template / "untracked.txt").write_text("local edit")
+    (engineering / ".gitmodules").write_text("local edit")
+    dump = tmp_path / "input.jsonl"
+    dump.write_text("{}")
+    result, _ = run("--dump", str(dump), "--site-layout", "directory")
+    assert result.returncode == 0, result.stderr
+    assert "test: package candidate" in result.stdout
+    assert "test: remote template" in result.stdout
+    assert "Selected www-from-model:" in result.stdout
+    assert git(engineering / "submodules/www-from-model", "rev-parse", "HEAD") in result.stdout
+    assert "1 changed, 1 untracked" in result.stdout
+    assert " M .gitmodules" in result.stdout
+    assert "?? untracked.txt" in result.stdout
+    assert str(dump) in result.stdout
+    assert "site layout: directory" in result.stdout
+    assert "Build: skipped" in result.stdout
+    assert "or add --build to the task invocation next time" in result.stdout
+
+
+def test_redirected_input_requires_explicit_noninteractive_flag(setup):
+    run, _, _, destination, _, _ = setup
+    destination.mkdir()
+    sentinel = destination / "sentinel"
+    sentinel.write_text("keep")
+    result, calls = run("--force", interactive=True)
+    assert result.returncode == 2
+    assert "--non-interactive" in result.stderr
+    assert "REPLACE (--force)" in result.stdout
+    assert sentinel.read_text() == "keep"
+    assert all(call[0] == "orinoco-lite" for call in calls)
+
+
+@pytest.mark.parametrize("key", [b"x", b"\x03"])
+def test_terminal_pause_precedes_force_replacement(setup, key):
+    run, engineering, template, destination, _, _ = setup
+    destination.mkdir()
+    sentinel = destination / "sentinel"
+    sentinel.write_text("keep")
+    master, slave = pty.openpty()
+    process = subprocess.Popen(
+        ["bash", str(SCRIPT), str(destination), "--template", str(template), "--force"],
+        cwd=engineering, env=run.env, stdin=slave, stdout=slave, stderr=slave,
+        start_new_session=True, preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0))
+    os.close(slave)
+    output = b""
+    try:
+        deadline = time.monotonic() + 15
+        while b"Press any key to continue" not in output and time.monotonic() < deadline:
+            if select.select([master], [], [], 0.1)[0]:
+                output += os.read(master, 65536)
+        assert b"Press any key to continue" in output, output.decode()
+        assert b"Selected www-from-model" in output
+        assert b"REPLACE (--force)" in output
+        assert sentinel.read_text() == "keep"
+        assert process.poll() is None
+        os.write(master, key)
+        # Drain the terminal so the pipeline's trace cannot fill its output buffer.
+        while process.poll() is None and time.monotonic() < deadline:
+            if select.select([master], [], [], 0.1)[0]:
+                try:
+                    output += os.read(master, 65536)
+                except OSError:
+                    break
+        process.wait(timeout=5)
+        if key == b"x":
+            assert process.returncode == 0, output.decode()
+            assert not sentinel.exists()
+        else:
+            assert process.returncode != 0, output.decode()
+            assert sentinel.read_text() == "keep"
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        os.close(master)
+
+
+def test_summary_uses_selected_gitlink_instead_of_upstream_checkout_head(setup):
+    run, engineering, _, _, _, _ = setup
+    upstream = engineering / "submodules/www-from-model"
+    selected = git(upstream, "rev-parse", "HEAD")
+    git(upstream, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+        "-c", "commit.gpgsign=false", "commit", "--no-verify", "--allow-empty", "-qm", "test: unselected upstream")
+    result, _ = run()
+    assert result.returncode == 0, result.stderr
+    assert f"Commit: {selected}" in result.stdout
+    assert "test: unselected upstream" not in result.stdout
+
+
+@pytest.mark.parametrize("relative_url", [False, True])
+def test_summary_fetches_commit_metadata_without_modifying_checkouts(setup, tmp_path, relative_url):
+    _, engineering, template, destination, package_head, template_head = setup
+    if relative_url:
+        modules = engineering / ".gitmodules"
+        modules.write_text(modules.read_text().replace(str(engineering / "submodules/www-from-model"),
+                                                       "./submodules/www-from-model"))
+        git(engineering, "add", ".gitmodules")
+        git(engineering, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "-c", "commit.gpgsign=false", "commit", "--no-verify", "-qm", "test: relative upstream URL")
+        package_head = git(engineering, "rev-parse", "HEAD")
+    missing = tmp_path / "no-checkout"
+    result = subprocess.run([
+        sys.executable, str(SCRIPT.with_name("setup-upstream-summary.py")),
+        "--package", str(missing), str(engineering), package_head,
+        "--template", str(missing), str(template), template_head,
+        "--package-selection", package_head, "--template-selection", template_head,
+        "--destination", str(destination), "--api", "https://example.invalid/api",
+        "--site-layout", "submodule", "--build", "true"], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert ("test: relative upstream URL" if relative_url else "test: package candidate") in result.stdout
+    assert "Selected www-from-model:" in result.stdout
+    assert "Build: projection, validation, site and publication bundle" in result.stdout
+    assert not destination.exists()
+    assert not missing.exists()
+    assert git(engineering, "rev-parse", "HEAD") == package_head

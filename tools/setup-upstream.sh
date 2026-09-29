@@ -22,7 +22,8 @@ Inputs:
   --build                   Build and retain a publication bundle after preparation;
                             does not publish or deploy
   --force                   Delete an existing destination, including local changes,
-                            after selections resolve
+                            after reviewing the selections
+  --non-interactive         Print the summary and continue without a keypress (for CI)
 
 Version overrides (optional):
   --local-heads             Also use the committed local template HEAD
@@ -39,7 +40,11 @@ Paths are relative to the engineering directory. Selected commits must be
 available from their remotes so DataLad-recorded setup can be reproduced.
 Publish the engineering commit before running setup. Uncommitted changes
 are not included in the installed downstream package; a dirty checkout
-produces a warning but does not stop setup.
+appears in the review summary. Setup waits for any key before changing the
+destination; Ctrl-C cancels. Without terminal input, pass --non-interactive
+explicitly. --force is still required to replace an existing destination.
+The summary includes commit subjects and dates for the package, template,
+and selected www-from-model; local Git changes; inputs; and build choices.
 
 To test local edits, run `pixi run orinoco-lite dev enable PATH` in an
 existing downstream, where PATH is the engineering checkout. Start a fresh
@@ -67,6 +72,7 @@ package_repository=
 package_revision=
 build=false
 force=false
+non_interactive=false
 if [[ $# -gt 0 && $1 != -* ]]; then destination=$1; shift; fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -74,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --local-heads) local_heads=true; shift ;;
     --build) build=true; shift ;;
     --force) force=true; shift ;;
+    --non-interactive) non_interactive=true; shift ;;
     --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
@@ -97,14 +104,6 @@ done
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
 
-if [[ -n $(git status --porcelain --untracked-files=normal --ignore-submodules=none) ]]; then
-  cat >&2 <<'WARNING'
-Warning: the engineering checkout has uncommitted changes.
-The downstream package uses the selected published commit, without those changes.
-To test local edits, run `pixi run orinoco-lite dev enable PATH` in an existing downstream.
-WARNING
-fi
-
 template_repository=$(git -C "$template" remote get-url origin)
 if [[ -z $package_repository ]]; then
   package_repository=$(git remote get-url origin)
@@ -114,6 +113,7 @@ if [[ -z $package_repository ]]; then
     ssh://git@github.com/*) package_repository="https://github.com/${package_repository#ssh://git@github.com/}" ;;
   esac
 fi
+package_selection=${package_revision:-"engineering HEAD ($(git symbolic-ref --quiet --short HEAD || printf detached))"}
 package_revision=${package_revision:-$(git rev-parse HEAD)}
 if $explicit_template_ref || $local_heads; then
   if [[ $template_ref == HEAD ]]; then
@@ -134,13 +134,14 @@ template_commit=$(orinoco-lite package update --check \
   --repository "$template_repository" --revision "$template_ref")
 package_commit=$(orinoco-lite package update --check \
   --repository "$package_repository" --revision "$package_revision")
-if [[ -e $destination || -L $destination ]]; then
-  if ! $force; then
-    echo "Destination already exists: $destination (use --force to replace it)" >&2
-    exit 2
-  fi
-  # Refuse paths containing this checkout or any selected local input.
-  python - "$destination" "$engineering" "$HOME" "$template" "$dump" "$site_specific" <<'PY'
+check_destination() {
+  if [[ -e $destination || -L $destination ]]; then
+    if ! $force; then
+      echo "Destination already exists: $destination (use --force to replace it)" >&2
+      exit 2
+    fi
+    # Refuse paths containing this checkout or any selected local input.
+    python - "$destination" "$engineering" "$HOME" "$template" "$dump" "$site_specific" <<'PY'
 from pathlib import Path
 import sys
 
@@ -152,13 +153,35 @@ for value in sys.argv[2:]:
     if value and Path(value).resolve().is_relative_to(target):
         sys.exit(f"Refusing to remove destination containing a protected path: {target}")
 PY
+  fi
+}
+check_destination
+python "$(dirname "${BASH_SOURCE[0]}")/setup-upstream-summary.py" \
+  --package "$engineering" "$package_repository" "$package_commit" \
+  --template "$template" "$template_repository" "$template_commit" \
+  --package-selection "$package_selection" --template-selection "$template_selection" \
+  --destination "$destination" --dump "$dump" --site-specific "$site_specific" \
+  --api "$api" --site-layout "$site_layout" --build "$build"
+if ! $non_interactive; then
+  if [[ ! -t 0 ]]; then
+    echo 'Setup requires terminal input; pass --non-interactive for unattended execution.' >&2
+    exit 2
+  fi
+  printf '\nPress any key to continue, or Ctrl-C to cancel: ' >&2
+  if ! IFS= read -r -s -n 1; then
+    printf '\nSetup cancelled; destination unchanged.\n' >&2
+    exit 2
+  fi
+  printf '\n' >&2
+fi
+# Recheck after the pause in case the destination changed while waiting.
+check_destination
+if [[ -e $destination || -L $destination ]]; then
   # Annex object directories are read-only. Only directories need write
   # permission for deletion; do not follow Annex symlinks or chmod file bytes.
   find "$destination" -type d -exec chmod u+w {} +
   rm -rf -- "$destination"
 fi
-printf '\nSelected template: %s\n  Source: %s\n  Commit: %s\n' \
-  "$template_repository" "$template_selection" "$template_commit"
 if [[ -n $dump ]]; then dump_relative=$(relative_to "$dump" "$destination"); fi
 if [[ -n $site_specific ]]; then site_relative=$(relative_to "$site_specific" "$destination"); fi
 destination=$(relative_to "$destination" "$engineering")
@@ -200,5 +223,5 @@ set +x
 if $build; then
   printf '\nSetup and build complete in %s. Publication bundle: build/pages-publication.bundle\n' "$PWD"
 else
-  printf '\nSetup complete in %s. Build separately with pixi run build.\n' "$PWD"
+  printf '\nSetup complete in %s. Build separately with pixi run build (or add --build to the task invocation next time).\n' "$PWD"
 fi
