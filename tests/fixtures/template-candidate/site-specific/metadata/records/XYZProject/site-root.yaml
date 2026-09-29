@@ -7,3 +7,6 @@ display_label: Architecture Proof
 pid: xyzrins:.
 schema_type: xyzri:XYZProject
 title: Architecture Proof
+associated_with:
+  - object: xyzrins:persons/example-person
+    schema_type: dlthings:Association
