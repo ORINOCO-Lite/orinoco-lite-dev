@@ -149,6 +149,10 @@ Only the separate publishing job may receive a repository-scoped installation to
 Package installation, Copier, and candidate validation run without write credentials or OIDC access in the preparation job.
 The publishing job transports recorded commits, opens the bot-owned draft, reports the result, and revokes access without executing updated code.
 Its token requires contents, pull request, and workflow write permissions; it never merges the update.
+When recomputation changes a `site-specific` subdataset, the service derives its repository and base from the original website gitlink, requires the dispatch actor's write permission there, and checks that the child default branch still equals that base.
+The publishing job receives a separate child token, publishes its recorded commits in a draft PR first, and then proposes the parent gitlink.
+Candidate code cannot select the authorized child repository; both tokens are revoked after transport.
+Accept the child without squashing or rebasing its recorded commits before accepting the parent, so every recorded gitlink remains reachable.
 Workflow files under `.github/workflows/` are part of the Copier scaffold, so a template update can change them along with other template-owned files.
 GitHub's workflow write permission authorizes those file changes; merely running an existing workflow or posting a pull-request description does not require it.
 The template authorization route is part of the existing central service and shares its credentials; deploying that code and approving the App's additional GitHub permission are separate operator actions.

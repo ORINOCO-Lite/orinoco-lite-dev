@@ -145,3 +145,92 @@ describe("template update App access", () => {
     expect(auth.token).not.toHaveBeenCalled();
   });
 });
+
+describe("coordinated site-specific update access", () => {
+  function childFixture() {
+    const auth = fixture();
+    vi.spyOn(GitHubClient.prototype, "siteSubmodule").mockResolvedValue({
+      repository: "owner/inputs",
+      sha: head,
+    });
+    const json = vi
+      .mocked(GitHubClient.prototype.json)
+      .getMockImplementation()!;
+    vi.spyOn(GitHubClient.prototype, "json").mockImplementation(async (path) =>
+      path === "/repos/owner/inputs" ? { default_branch: "main" } : json(path),
+    );
+    return auth;
+  }
+  it("authorizes only the child selected by the original gitlink", async () => {
+    const auth = childFixture();
+    const result = await templateWorkflowAccess(
+      {} as Env,
+      identity,
+      { repository: "owner/site", head, site_specific: true },
+      auth,
+    );
+    expect(result).toMatchObject({
+      site_repository: "owner/inputs",
+      site_head: head,
+      site_branch: "main",
+      site_token: "bounded",
+    });
+    expect(GitHubClient.prototype.siteSubmodule).toHaveBeenCalledWith(
+      "owner/site",
+      head,
+    );
+    expect(GitHubClient.prototype.requireCurator).toHaveBeenCalledWith(
+      "owner/inputs",
+      "curator",
+      2,
+    );
+    expect(auth.token).toHaveBeenCalledWith("owner/inputs", true, false, true);
+  });
+  it.each(["missing", "stale", "permission"])(
+    "refuses a %s child",
+    async (failure) => {
+      const auth = childFixture();
+      if (failure === "missing")
+        vi.mocked(GitHubClient.prototype.siteSubmodule).mockResolvedValue(null);
+      if (failure === "stale")
+        vi.mocked(GitHubClient.prototype.branchHead).mockImplementation(
+          async (repo) =>
+            ({ sha: repo === "owner/site" ? head : "b".repeat(40) }) as any,
+        );
+      if (failure === "permission")
+        vi.mocked(GitHubClient.prototype.requireCurator).mockImplementation(
+          async (repo) => {
+            if (repo === "owner/inputs") throw new Error("No child permission");
+          },
+        );
+      await expect(
+        templateWorkflowAccess(
+          {} as Env,
+          identity,
+          { repository: "owner/site", head, site_specific: true },
+          auth,
+        ),
+      ).rejects.toThrow();
+      expect(vi.mocked(auth.token).mock.calls.every((call) => !call[1])).toBe(
+        true,
+      );
+    },
+  );
+  it("revokes child write access if parent access fails", async () => {
+    const auth = childFixture();
+    vi.mocked(auth.token).mockImplementation(async (repo, write) => {
+      if (write && repo === "owner/site")
+        throw new Error("Parent token unavailable");
+      return { token: write ? "child-write" : "read", expires_at: "later" };
+    });
+    await expect(
+      templateWorkflowAccess(
+        {} as Env,
+        identity,
+        { repository: "owner/site", head, site_specific: true },
+        auth,
+      ),
+    ).rejects.toThrow();
+    expect(auth.revoke).toHaveBeenCalledWith("child-write");
+  });
+});

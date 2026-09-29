@@ -9,6 +9,7 @@ import argparse
 import base64
 import json
 import os
+import re
 from pathlib import Path
 import urllib.error
 import urllib.parse
@@ -77,6 +78,15 @@ def obtain(body: dict, *, curation: bool = False, template: bool = False) -> dic
         if not isinstance(website_token, str) or not website_token or any(c in website_token for c in "\r\n\0"):
             raise RuntimeError("The service did not return bounded website access")
         print(f"::add-mask::{website_token}")
+    if template and body.get("site_specific"):
+        site_token = result.get("site_token")
+        if not isinstance(site_token, str) or not site_token or any(c in site_token for c in "\r\n\0"):
+            raise RuntimeError("The service did not return site-specific access")
+        print(f"::add-mask::{site_token}")
+        for key, pattern in (("site_repository", r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"),
+                             ("site_head", r"[0-9a-f]{40}"), ("site_branch", r"[^\s\x00-\x1f]+")):
+            if not isinstance(result.get(key), str) or not re.fullmatch(pattern, result[key]):
+                raise RuntimeError("Invalid site-specific checkout coordinate")
     if curation:
         for key in ("repository", "head"):
             value = result.get(key)
@@ -117,8 +127,11 @@ def main() -> None:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--curation", action="store_true")
     parser.add_argument("--template", action="store_true")
+    parser.add_argument("--site-specific", action="store_true")
     parser.add_argument("--check-operation")
     args = parser.parse_args()
+    if args.site_specific and not args.template:
+        parser.error("--site-specific requires --template")
     if args.check_operation:
         require_operation(os.environ["GITHUB_REPOSITORY"], args.check_operation, os.environ["GH_TOKEN"])
         return
@@ -133,10 +146,14 @@ def main() -> None:
         body["comment_id"] = int(os.environ["CURATION_COMMENT_ID"]) if os.environ.get("CURATION_COMMENT_ID") else None
     if args.template:
         body = {"repository": os.environ["GITHUB_REPOSITORY"], "head": os.environ["GITHUB_SHA"]}
+        if args.site_specific:
+            body["site_specific"] = True
     if os.environ.get("PROPOSAL_HANDOFF") and not args.curation:
         body["handoff"] = os.environ["PROPOSAL_HANDOFF"]
     result = obtain(body, curation=args.curation, template=args.template)
     keys = ["token"]
+    if args.site_specific:
+        keys += ["site_token", "site_repository", "site_head", "site_branch"]
     if args.curation:
         keys += ["repository", "head"]
         if args.write:

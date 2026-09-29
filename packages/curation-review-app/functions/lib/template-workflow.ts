@@ -19,13 +19,16 @@ export async function templateWorkflowAccess(
 ) {
   requireExactKeys(
     request,
-    ["repository", "head"],
+    "site_specific" in request
+      ? ["repository", "head", "site_specific"]
+      : ["repository", "head"],
     "template workflow request",
   );
   const repository = parseRepository(
     typeof request.repository === "string" ? request.repository : null,
   );
   if (
+    ("site_specific" in request && request.site_specific !== true) ||
     identity.repository !== repository ||
     typeof request.head !== "string" ||
     !/^[0-9a-f]{40}$/.test(request.head) ||
@@ -105,7 +108,43 @@ export async function templateWorkflowAccess(
       deny(
         "Only the separate publishing job may obtain update access after preparation.",
       );
-    return await auth.token(repository, true, false, true, true);
+    if (!request.site_specific)
+      return await auth.token(repository, true, false, true, true);
+    // The original gitlink authorizes the child repository, never candidate output.
+    const pinned = await github.siteSubmodule(repository, request.head);
+    if (!pinned) deny("The update base has no site-specific submodule.");
+    const childRead = await auth.token(pinned.repository);
+    try {
+      const child = new GitHubClient(childRead.token, auth.fetcher);
+      await child.requireCurator(
+        pinned.repository,
+        identity.actor,
+        Number(identity.actor_id),
+      );
+      const childRepo = object(await child.json(`/repos/${pinned.repository}`));
+      const branch = childRepo.default_branch;
+      if (
+        (await child.branchHead(pinned.repository, branch)).sha !== pinned.sha
+      )
+        deny(
+          "The site-specific default branch changed; update the parent gitlink first.",
+        );
+      const childWrite = await auth.token(pinned.repository, true, false, true);
+      try {
+        return {
+          ...(await auth.token(repository, true, false, true, true)),
+          site_token: childWrite.token,
+          site_repository: pinned.repository,
+          site_head: pinned.sha,
+          site_branch: branch,
+        };
+      } catch (error) {
+        await auth.revoke(childWrite.token);
+        throw error;
+      }
+    } finally {
+      await auth.revoke(childRead.token);
+    }
   } finally {
     await auth.revoke(read.token);
   }

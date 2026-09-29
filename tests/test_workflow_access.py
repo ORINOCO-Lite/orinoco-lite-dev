@@ -123,3 +123,21 @@ def test_workflow_token_transport_checks_current_default_branch(enabled):
                 workflow_access.require_operation("owner/site", "shacl_materialization", "secret")
     assert request.call_args_list[1].args[0].endswith("/branches/main")
     assert request.call_args_list[2].args[0].endswith("/contents/pyproject.toml?ref=" + "a" * 40)
+
+
+def test_template_child_access_masks_token_and_validates_coordinates(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("[tool.orinoco]\n")
+    monkeypatch.setenv("ACTIONS_ID_TOKEN_REQUEST_URL", "https://example.actions.githubusercontent.com/token?api-version=2")
+    monkeypatch.setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "request-secret")
+    result = {"token": "parent-secret", "site_token": "child-secret",
+              "site_repository": "owner/inputs", "site_head": "a" * 40, "site_branch": "main"}
+    body = {"repository": "owner/site", "head": "b" * 40, "site_specific": True}
+    with patch.object(workflow_access, "request_json", side_effect=[{"value": "identity-secret"}, result]):
+        assert workflow_access.obtain(body, template=True) == result
+    assert "::add-mask::child-secret" in capsys.readouterr().out
+    for key, value in [("site_token", "bad\nvalue"), ("site_repository", "owner/inputs\nextra"),
+                       ("site_head", "main"), ("site_branch", "main\nextra")]:
+        with patch.object(workflow_access, "request_json", side_effect=[{"value": "identity-secret"}, {**result, key: value}]):
+            with pytest.raises(RuntimeError):
+                workflow_access.obtain(body, template=True)
