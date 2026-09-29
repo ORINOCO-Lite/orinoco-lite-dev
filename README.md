@@ -93,6 +93,9 @@ pixi run setup-upstream ../orinoco-lite-test-downstream
 
 Setup uses the template's remote `main` and the engineering checkout's committed package version.
 Use `pixi run setup-upstream --help` for options.
+
+The engineering **Update upstream comparison** workflow updates the existing psychoinformatics parent and site-input datasets and proposes their DataLad commits as draft PRs.
+See [comparison updates](docs/upstream-comparison-updates.md) for inputs and publication setup.
 See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
 In an existing downstream, use `pixi run dev-enable [PATH]` to connect an editable package checkout and `pixi run dev-disable` to restore its previous selection.

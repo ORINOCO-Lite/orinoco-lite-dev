@@ -63,7 +63,8 @@ The engineering workflow should:
 4. Validate and build the candidate, then publish its existing DataLad commits in draft PRs from a separate trusted publishing job.
    Keep `site-specific` in [its existing repository](https://github.com/ORINOCO-Lite/psychoinformatics-site-specific).
    Publish changed child commits before proposing parent gitlinks, preserving their SHAs.
-   Cross-repository publication credentials and treatment of a parent pin that trails child `main` remain rollout decisions; do not silently advance that pin.
+   The [engineering workflow](../upstream-comparison-updates.md) retains the parent pin by default and requires an explicit selection to advance it.
+   Configure publication credentials before exercising the live PR path.
    Keep upstream-comparison orchestration and its authorization out of the generic template and curation service.
    Leave conflicts and failed checks visible, skip empty updates, and leave acceptance and deployment to their existing review workflows.
 5. When useful, inspect the candidate locally with #170–#173's comparisons.
