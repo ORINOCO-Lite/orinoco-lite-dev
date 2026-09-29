@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -19,9 +20,10 @@ FILES = ("pixi.toml", "pixi.lock", LINK)
 EDITABLE = {"path": f"./{LINK}", "editable": True}
 
 
-def run(*arguments: str | Path, cwd: Path, quiet: bool = False) -> None:
+def run(*arguments: str | Path, cwd: Path, quiet: bool = False,
+        env: dict[str, str] | None = None) -> None:
     result = subprocess.run([str(value) for value in arguments], cwd=cwd,
-                            capture_output=quiet, text=True)
+                            capture_output=quiet, text=True, env=env)
     if result.returncode and quiet:
         print(result.stdout + result.stderr, file=sys.stderr)
     result.check_returncode()
@@ -77,7 +79,10 @@ def apply(root: Path, action: str, checkout: Path | None) -> None:
             link.symlink_to(os.path.relpath(checkout, link.parent))
         document["pypi-dependencies"]["orinoco-lite"] = replacement
         manifest.write_text(tomlkit.dumps(document))
-        run("pixi", "install", "--manifest-path", manifest, cwd=root)
+        # Switching package selection deliberately updates the dependency lock.
+        environment = dict(os.environ)
+        environment.pop("PIXI_LOCKED", None)
+        run("pixi", "install", "--manifest-path", manifest, cwd=root, env=environment)
         if action == "disable":
             link.unlink()
     except BaseException:
@@ -132,6 +137,9 @@ def enable(root: Path, path: Path | None = None) -> None:
     run("pixi", "run", "--manifest-path", checkout / "pixi.toml",
         "orinoco-lite", "dev", "prepare-resources", cwd=checkout)
     print(f"Editable Orinoco Lite source: {checkout}", flush=True)
+    task = shlex.join(["pixi", "run", "dev-enable", *([str(path)] if path is not None else [])])
+    print(f"Consider running `{task}` next time to record this operation with DataLad.", flush=True)
+    print("The enabled package selection must be committed before dev disable can restore it.", flush=True)
 
 
 def disable(root: Path) -> None:
@@ -141,3 +149,4 @@ def disable(root: Path) -> None:
         raise ConfigurationError("This downstream has no editable development connection.")
     print("Restoring the previous package selection...", flush=True)
     apply(root, "disable", None)
+    print("Consider running `pixi run dev-disable` next time to record this operation with DataLad.", flush=True)

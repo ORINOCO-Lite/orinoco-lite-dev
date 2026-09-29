@@ -24,14 +24,15 @@ def downstream(tmp_path, monkeypatch):
     (root / "pixi.lock").write_text("original lock\n")
     (root / "page.md").write_text("initial content\n")
     commit(root, "test: initial selection")
-    def install(*args, cwd):
+    def install(*args, cwd, env):
         assert args[0:2] == ("pixi", "install")
+        assert "PIXI_LOCKED" not in env
         (root / "pixi.lock").write_text((root / "pixi.toml").read_text())
     monkeypatch.setattr(dev, "run", install)
     return root
 
 
-def test_disable_preserves_site_edits_and_intervening_dependencies(downstream):
+def test_disable_preserves_site_edits_and_intervening_dependencies(downstream, capsys):
     root = downstream
     before = tomllib.loads((root / "pixi.toml").read_text())["pypi-dependencies"]["orinoco-lite"]
     dev.apply(root, "enable", root.parent / "orinoco-lite-dev")
@@ -41,7 +42,8 @@ def test_disable_preserves_site_edits_and_intervening_dependencies(downstream):
     commit(root, "chore: update another dependency")
     (root / "page.md").write_text("uncommitted human edit\n")
     dev.check_workspace(root)
-    dev.apply(root, "disable", None)
+    dev.disable(root)
+    assert "pixi run dev-disable" in capsys.readouterr().out
     dependencies = tomllib.loads(manifest.read_text())["pypi-dependencies"]
     assert dependencies["orinoco-lite"] == before
     assert dependencies["other"] == "==2"
@@ -54,7 +56,7 @@ def test_disable_preserves_site_edits_and_intervening_dependencies(downstream):
 def test_failed_install_restores_connection_files(downstream, monkeypatch):
     root = downstream
     before = (root / "pixi.toml").read_bytes()
-    def fail(*args, cwd):
+    def fail(*args, cwd, env):
         (root / "pixi.lock").write_text("partial solve")
         raise subprocess.CalledProcessError(1, "pixi")
     monkeypatch.setattr(dev, "run", fail)
@@ -93,7 +95,10 @@ def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypa
     assert calls[0] == ("git", "clone", dev.PACKAGE_REPOSITORY, checkout)
     assert ("enable", checkout) in calls
     assert calls[-1][-3:] == ("orinoco-lite", "dev", "prepare-resources")
-    assert f"Editable Orinoco Lite source: {checkout}" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert f"Editable Orinoco Lite source: {checkout}" in output
+    assert "`pixi run dev-enable`" in output
+    assert "must be committed before dev disable" in output
 
 
 def test_dirty_connection_files_are_not_overwritten(downstream):
@@ -121,3 +126,28 @@ def test_enable_cannot_redirect_source_checkout(downstream, monkeypatch, explici
         dev.enable(root, root.parent / "another-checkout" if explicit_path else None)
     assert {name: (root / name).read_bytes() for name in before} == before
     assert not (root / dev.LINK).is_symlink()
+
+
+def test_enable_hint_quotes_explicit_checkout_path(downstream, monkeypatch, capsys):
+    checkout = downstream.parent / "package with spaces"
+    (checkout / "src/orinoco_lite").mkdir(parents=True)
+    (checkout / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
+    monkeypatch.setattr(dev, "run", lambda *args, **kwargs: None)
+    dev.enable(downstream, checkout)
+    assert f"`pixi run dev-enable '{checkout}'`" in capsys.readouterr().out
+    assert dev.git(downstream, "status", "--porcelain", "--", *dev.FILES)
+
+
+def test_disable_requires_enable_changes_to_be_committed(downstream):
+    dev.apply(downstream, "enable", downstream.parent / "orinoco-lite-dev")
+    with pytest.raises(ConfigurationError, match="Commit or discard"):
+        dev.disable(downstream)
+
+
+def test_switch_allows_deliberate_lock_update_without_changing_caller(downstream, monkeypatch):
+    monkeypatch.setenv("PIXI_LOCKED", "true")
+    dev.apply(downstream, "enable", downstream.parent / "orinoco-lite-dev")
+    assert dev.os.environ["PIXI_LOCKED"] == "true"
+    commit(downstream, "chore: enable editable Orinoco Lite")
+    dev.disable(downstream)
+    assert dev.os.environ["PIXI_LOCKED"] == "true"
