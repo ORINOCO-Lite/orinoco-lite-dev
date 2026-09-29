@@ -24,7 +24,8 @@ This section plans the integration work; it does not authorize resetting downstr
    Projection now validates with the selected upstream writer and preserves source records; it no longer requires lossless RDF readback.
    Keep editor readback diagnostic and retain the test demonstrating upstream's omission.
 3. Address [#182](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/182) and [#189](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/189).
-   For #182, exercise minimal second-lab inputs and same-path authored overrides, then fix only demonstrated gaps in defaults, import, or media placement.
+   [Template #88](https://github.com/ORINOCO-Lite/orinoco-lite-template/pull/88) exercises minimal second-lab inputs, supplied portrait media, and same-path authored overrides for #182.
+   It fixes the starter person association and selects the existing page homepage layout; no new presentation framework is needed.
    For #189, make the exact imported `www-from-model` revision available as a Git submodule/DataLad input and pass that checkout explicitly to import.
    Derive its revision from the package's controlled upstream selection; the downstream gitlink records the input used rather than introducing an independently selected upstream version.
    Verify retrieval from a fresh clone, including required Annex content, and include the subdataset among the run's declared inputs.
@@ -45,7 +46,12 @@ Use `setup-upstream` with exact, recoverable package and template selections, re
 Keep acquisition, record conversion, authored-site import, and generated projection separately identifiable in DataLad history.
 Dataset creation, saved supplied inputs, and human conflict resolutions may be ordinary DataLad saves; do not fabricate run records for commands that were not executed.
 
-The recurring downstream operation should compose existing commands:
+The recurring comparison update belongs in `orinoco-lite-dev` CI and composes existing commands.
+The generic downstream template updater remains responsible for template updates.
+Fresh setup applies initialization defaults; recurring updates preserve existing site state except for explicitly refreshed imported surfaces.
+Matching version selections alone does not imply identical final trees.
+
+The engineering workflow should:
 
 1. Start an update branch from the accepted downstream commit and resolve the requested template and package selections to immutable commits.
 2. Use [#192](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/192)'s `orinoco-lite template update` to record the Copier transformation and any package override.
@@ -54,9 +60,11 @@ The recurring downstream operation should compose existing commands:
 3. When an upstream-input refresh is requested, record that subdataset's new selection and rerun the relevant import and conversion operations.
    A template-only update must not implicitly refetch live Pool data or replace site inputs.
    Recompute against retained captures by default for this comparison site; a live refresh is a separate acquisition with its own recorded outputs.
-4. Validate and build the candidate, then publish the existing DataLad commits in a draft PR using the template-update workflow's separation between candidate execution and trusted publishing.
-   Resolve how changed `site-specific` child commits are published before proposing the parent gitlink: both must be retrievable from their configured remotes.
-   The current template updater preserves submodule selections; coordinated input publication is additional work, not an existing updater capability.
+4. Validate and build the candidate, then publish its existing DataLad commits in draft PRs from a separate trusted publishing job.
+   Keep `site-specific` in [its existing repository](https://github.com/ORINOCO-Lite/psychoinformatics-site-specific).
+   Publish changed child commits before proposing parent gitlinks, preserving their SHAs.
+   Cross-repository publication credentials and treatment of a parent pin that trails child `main` remain rollout decisions; do not silently advance that pin.
+   Keep upstream-comparison orchestration and its authorization out of the generic template and curation service.
    Leave conflicts and failed checks visible, skip empty updates, and leave acceptance and deployment to their existing review workflows.
 5. When useful, inspect the candidate locally with #170–#173's comparisons.
    Record conclusions with the relevant change; keep generated diagnostic reports outside tracked state by default.
