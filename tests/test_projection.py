@@ -24,9 +24,7 @@ from orinoco_lite.integrity import tree_sha256
 from orinoco_lite.projection import (
     _all_links,
     _apply_inline,
-    _machine_pav_fingerprint,
     _matches_policy,
-    _native_fingerprint,
     _relationship_targets,
     _route_for_pid,
     load_contract,
@@ -76,8 +74,6 @@ class SemanticReferencePolicyTests(unittest.TestCase):
         if to_ttl is None:
             to_ttl = Mock()
             to_ttl.convert.side_effect = lambda value, _class_name: deepcopy(value)
-        to_json = Mock()
-        to_json.convert.side_effect = lambda value, _class_name: deepcopy(value)
         with (
             patch("orinoco_lite.projection.load_contract", return_value=contract),
             patch(
@@ -87,7 +83,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
             patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
             patch(
                 "orinoco_lite.projection.build_format_converters",
-                return_value=(to_ttl, to_json),
+                return_value=(to_ttl,),
             ),
         ):
             return validate_semantics(Mock(), Path("/unused-resources"))
@@ -185,7 +181,7 @@ class SemanticReferencePolicyTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             DriverError,
-            "JSON/RDF/JSON schema validation failed: invalid creator PID",
+            "JSON/RDF schema validation failed: invalid creator PID",
         ):
             self._validate(
                 record,
@@ -578,7 +574,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             patch("orinoco_lite.projection.SchemaView", return_value=schema_view),
             patch(
                 "orinoco_lite.projection.build_format_converters",
-                return_value=(IdentityConverter(), IdentityConverter()),
+                return_value=(IdentityConverter(),),
             ),
         ):
             return validate_semantics(self.workspace, self.resources)
@@ -817,62 +813,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             "reject",
         )
 
-    def test_machine_pav_fingerprint_binds_provenance_to_assertion(self) -> None:
-        annotation = {
-            "pav:importedBy": {
-                "annotation_tag": "pav:importedBy",
-                "annotation_value": "acme:source-adapters/example/v1",
-            },
-            "pav:importedFrom": {
-                "annotation_tag": "pav:importedFrom",
-                "annotation_value": "https://source.example/people/one",
-            },
-        }
-        original = {
-            "notation": "source-one",
-            "schema_type": "dlthings:Identifier",
-            "annotations": annotation,
-        }
-        changed_assertion = deepcopy(original)
-        changed_assertion["notation"] = "source-two"
-        changed_source = deepcopy(original)
-        changed_source["annotations"]["pav:importedFrom"][
-            "annotation_value"
-        ] = "https://source.example/people/two"
-
-        self.assertNotEqual(
-            _machine_pav_fingerprint(original),
-            _machine_pav_fingerprint(changed_assertion),
-        )
-        self.assertNotEqual(
-            _machine_pav_fingerprint(original),
-            _machine_pav_fingerprint(changed_source),
-        )
-
-    def test_native_fingerprint_treats_rdf_multivalues_as_unordered(self) -> None:
-        first = {
-            "schema_type": "dlthings:Rule",
-            "attributes": [
-                {
-                    "schema_type": "dlthings:AttributeSpecification",
-                    "predicate": "acme:first",
-                    "value": "one",
-                },
-                {
-                    "schema_type": "dlthings:AttributeSpecification",
-                    "predicate": "acme:second",
-                    "value": "two",
-                },
-            ],
-        }
-        second = deepcopy(first)
-        second["attributes"].reverse()
-
-        self.assertEqual(
-            _native_fingerprint(first),
-            _native_fingerprint(second),
-        )
-
     def test_double_failure_preserves_recovery_backup(self) -> None:
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic):
             update_projection(self.workspace, self.resources)
@@ -983,6 +923,37 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
     path.write_text(canonical_yaml(record), encoding="utf-8")
     with pytest.raises(DriverError, match="unknown CURIE schema type xyzri:Unknown"):
         update_projection(workspace, resources)
+
+
+def test_upstream_date_readback_does_not_block_projection_or_edit_stored_input(tmp_path, monkeypatch):
+    root = tmp_path / "site"
+    shutil.copytree(PACKAGE_ROOT / "tests/fixtures/template-candidate", root)
+    monkeypatch.setattr("orinoco_lite.projection.resolve_www_from_model",
+                        lambda *_: PACKAGE_ROOT / "submodules/www-from-model")
+    workspace = load_workspace(root)
+    resources = resolve_resources().root
+    path = workspace.path("records") / "XYZPublication/example-publication.yaml"
+    record = yaml.safe_load(path.read_text())
+    record["generated_by"] = [{"schema_type": "dlthings:Generation", "at_time": "-",
+                               "object": "xyzrins:projects/example-project"}]
+    path.write_text(canonical_yaml(record))
+    original = path.read_bytes()
+    update_projection(workspace, resources)
+    projection = workspace.path("generated") / "projection"
+    projected = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
+    assert record in projected
+    assert path.read_bytes() == original
+
+    # The editor and diagnostic readback use the selected upstream reader. Its
+    # omission remains observable; build success is not a preservation claim.
+    from dump_things_service.converter import FormatConverter
+    writer, reader = build_format_converters(resources / "schema/demo-research-information/unreleased.yaml")
+    assert type(reader) is FormatConverter
+    rdf, _ = _render_rdf_sources(record_sources(workspace), writer)
+    assert '"-"^^<https://concepts.datalad.org/s/things/v2/w3ctr-datetime>' in rdf[record["pid"]]
+    restored = reader.convert(rdf[record["pid"]], "XYZPublication")
+    assert "at_time" not in restored["generated_by"][0]
+    assert path.read_bytes() == original
 
 
 if __name__ == "__main__":
