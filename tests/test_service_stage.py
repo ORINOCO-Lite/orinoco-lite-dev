@@ -61,3 +61,21 @@ def test_incomplete_input_never_starts_service_or_creates_output(tmp_path, monke
         roundtrip(source, output, scratch=scratch, schema=tmp_path / "schema")
     assert not output.exists()
     assert not scratch.exists()
+
+
+def test_roundtrip_cli_replaces_only_selected_output(tmp_path):
+    from orinoco_lite.cli import main
+    source = tmp_path / "sourcedata/yaml-jsonl/records.jsonl"
+    source.parent.mkdir(parents=True)
+    source.write_text(json.dumps({"class_name": "XYZPublication", "record": {
+        "pid": "https://example.org/publication", "schema_type": "xyzri:XYZPublication",
+        "title": "Retained publication",
+    }}) + "\n")
+    command = ["--root", str(tmp_path), "dev", "records", "roundtrip", "yaml-jsonl"]
+    assert main(command) == 0
+    original = source.read_bytes()
+    with pytest.raises(SystemExit) as error:
+        main(command)
+    assert error.value.code == 2
+    assert main([*command, "--force"]) == 0
+    assert source.read_bytes() == original

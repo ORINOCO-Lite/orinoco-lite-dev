@@ -1,6 +1,7 @@
 """Default data paths and explicit command paths."""
 
 from pathlib import Path
+import shutil
 
 from .errors import ConfigurationError
 
@@ -34,11 +35,18 @@ def explicit_path(args, path):
     return (root / path).absolute() if not path.is_absolute() else path
 
 
-def prepare_output(path):
+def prepare_output(path, force=None):
     if path.is_symlink():
         raise ConfigurationError(f"Output must not be a symbolic link: {path}")
     if path.exists():
-        raise ConfigurationError(f"Output already exists: {path}; choose a fresh --report directory")
+        if force is None:
+            raise ConfigurationError(f"Output already exists: {path}; choose a fresh --report directory")
+        if not force:
+            raise ConfigurationError(f"Output already exists: {path}. Use --force to replace it, or --directory for another investigation.")
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
     return path
 
 
