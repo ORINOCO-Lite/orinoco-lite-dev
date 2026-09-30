@@ -45,7 +45,7 @@ def datasets(tmp_path, monkeypatch):
     runner = tmp_path / 'runner'
     runner.mkdir()
     env = dict(os.environ, PARENT_BASE=base, SITE_BASE=child_base, RUNNER_TEMP=str(runner),
-               GITHUB_OUTPUT=str(tmp_path / 'outputs'), GITHUB_STEP_SUMMARY=str(tmp_path / 'summary'))
+               SITE_BASE_BRANCH="main", GITHUB_OUTPUT=str(tmp_path / 'outputs'), GITHUB_STEP_SUMMARY=str(tmp_path / 'summary'))
     return parent, child, env
 
 
@@ -138,20 +138,22 @@ def test_recorded_update_transport(datasets, tmp_path, case):
         assert not git(published, 'status', '--porcelain')
 
 
-@pytest.mark.parametrize(('selection', 'reuse'), [('Retained capture', True), ('Refresh from Pool', False)])
-def test_capture_selection_uses_existing_preparation_command(tmp_path, selection, reuse):
+@pytest.mark.parametrize('mode', ['Software only', 'Data refresh'])
+def test_update_mode_selects_only_its_operation(tmp_path, mode):
     executable = tmp_path / 'pixi'
     executable.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$ARGS"\n')
     executable.chmod(0o755)
     arguments = tmp_path / 'arguments'
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ['PATH'],
-               SOURCE_DATA=selection, ARGS=str(arguments))
+               UPDATE_MODE=mode, WWW_REVISION='a' * 40, ARGS=str(arguments))
     result = step('prepare', 'Prepare selected upstream inputs', tmp_path, env)
     assert result.returncode == 0, result.stderr
     args = arguments.read_text().splitlines()
-    assert args[:9] == ['exec', '--spec', 'git-annex==10.20260601', '--', 'pixi', 'run',
-                        'orinoco-lite', 'dev', 'upstream']
-    assert args[9:] == ['populate'] + (['--reuse-dump'] if reuse else [])
+    if mode == 'Software only':
+        assert args == ['run', 'orinoco-lite', 'dev', 'upstream', 'populate', '--reuse-dump', '--records-only']
+    else:
+        assert args == ['exec', '--spec', 'git-annex==10.20260601', '--', 'pixi', 'run',
+                        'orinoco-lite', 'dev', 'upstream', 'populate', '--www-revision', 'a' * 40]
 
 
 @pytest.mark.parametrize(('conflicts', 'validation', 'succeeds'), [

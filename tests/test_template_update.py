@@ -162,3 +162,24 @@ def test_latest_release_uses_copier_tags_not_unreleased_head(downstream):
     assert template_update.resolve_template(url, "latest") == git(source, "rev-parse", "HEAD")
     assert template_update.update(root) == 0
     assert yaml.safe_load((root / ".copier-answers.yml").read_text())["_commit"] == git(source, "rev-parse", "HEAD")
+
+
+def test_unmerged_template_sha_selects_its_unmerged_package_sha(downstream):
+    root, url, _, _, _ = downstream
+    source = root.parent / "published"
+    git(source, "checkout", "-b", "candidate-package")
+    git(source, "commit", "--allow-empty", "-qm", "test: unmerged package candidate")
+    package = git(source, "rev-parse", "HEAD")
+    git(source, "checkout", "-b", "candidate-template")
+    path = source / "copier.yml"
+    declaration = yaml.safe_load(path.read_text())
+    declaration["package_revision"]["default"] = package
+    path.write_text(yaml.safe_dump(declaration))
+    git(source, "add", "copier.yml")
+    git(source, "commit", "-qm", "test: select unmerged package")
+    template = git(source, "rev-parse", "HEAD")
+    assert template_update.update(root, template) == 0
+    selected = yaml.safe_load((root / ".copier-answers.yml").read_text())
+    assert selected["package_revision"] == package
+    assert selected["_commit"] == template
+    assert "package override" not in git(root, "log", "-1", "--format=%B")

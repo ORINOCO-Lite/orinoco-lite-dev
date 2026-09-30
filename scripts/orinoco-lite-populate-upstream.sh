@@ -9,6 +9,8 @@ site_layout=submodule
 supplied_dump=
 site_specific=
 reuse_dump=false
+records_only=false
+www_revision=
 upstream_submodule=sourcedata/www-from-model
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,10 +20,15 @@ while [[ $# -gt 0 ]]; do
     --site-layout) site_layout=$2; shift 2 ;;
     --dump) supplied_dump=$2; shift 2 ;;
     --site-specific) site_specific=$2; shift 2 ;;
+    --records-only) records_only=true; shift ;;
+    --www-revision) www_revision=$2; shift 2 ;;
     --reuse-dump) reuse_dump=true; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+if $records_only && { ! $reuse_dump || [[ -n $www_revision || -n $site_specific || -n $supplied_dump ]]; }; then
+  echo "--records-only requires --reuse-dump and cannot select site inputs." >&2; exit 2
+fi
 if ! python - <<'PYTHON'
 from pathlib import Path
 import sys
@@ -99,7 +106,10 @@ datalad run --explicit -m "chore: convert records dump" \
   orinoco-lite dev records jsonl-to-yaml \
     --source "$dump_path" --destination "$destination" --force
 
-orinoco-lite dev upstream checkout
+if $records_only; then exit 0; fi
+checkout_args=()
+if [[ -n $www_revision ]]; then checkout_args+=(--revision "$www_revision"); fi
+orinoco-lite dev upstream checkout "${checkout_args[@]}"
 # Save the selection of existing upstream history, then record its transformation.
 datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upstream_submodule"
 # The importer retrieves and verifies selected Annex media; do not get the whole site.

@@ -3,27 +3,31 @@ name: Update upstream comparison
 on:
   workflow_dispatch:
     inputs:
-      template_revision:
-        description: Template revision
+      update_mode:
+        description: Update to prepare
+        type: choice
+        default: Software only
+        options:
+          - Software only
+          - Data refresh
+      base_branch:
+        description: Parent PR base (use the software-update branch for a stacked data refresh)
         type: string
         default: main
-      package_revision:
-        description: Package revision (defaults to this engineering commit)
+      site_base_branch:
+        description: Site-specific PR base (use its software-update branch when metadata changed)
         type: string
-      site_revision:
-        description: Site-input revision (blank preserves the parent pin)
+        default: main
+      template_revision:
+        description: Exact template commit SHA (required for Software only; unused for Data refresh)
+        type: string
+      www_revision:
+        description: Exact authored-input commit SHA (required for Data refresh)
         type: string
       publish:
         description: Publish draft pull requests
         type: boolean
         default: true
-      source_data:
-        description: Source records
-        type: choice
-        default: Retained capture
-        options:
-          - Retained capture
-          - Refresh from Pool
 
 permissions:
   contents: read
@@ -69,7 +73,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ORINOCO-Lite/psychoinformatics-downstream
-          ref: main
+          ref: ${{ inputs.base_branch }}
           path: downstream
           fetch-depth: 0
           submodules: recursive
@@ -78,61 +82,94 @@ jobs:
         id: base
         working-directory: downstream
         env:
-          SITE_REVISION: ${{ inputs.site_revision }}
-          SOURCE_DATA: ${{ inputs.source_data }}
+          UPDATE_MODE: ${{ inputs.update_mode }}
+          TEMPLATE_REVISION: ${{ inputs.template_revision }}
+          WWW_REVISION: ${{ inputs.www_revision }}
         run: |
-          if [[ "$SOURCE_DATA" == 'Retained capture' ]]; then
-            git cat-file -e HEAD:sourcedata/downloaded/records.jsonl || {
-              echo 'No retained capture. Prepare the dataset first or choose Refresh from Pool.'; exit 2;
-            }
-          fi
+          case "$UPDATE_MODE" in
+            'Software only')
+              [[ "$TEMPLATE_REVISION" =~ ^[0-9a-f]{40}$ && -z "$WWW_REVISION" ]] || {
+                echo 'Software only requires an exact template SHA and no authored-input revision.'; exit 2;
+              }
+              git cat-file -e HEAD:sourcedata/downloaded/records.jsonl || {
+                echo 'No retained capture. Prepare the dataset before updating software.'; exit 2;
+              } ;;
+            'Data refresh')
+              [[ "$WWW_REVISION" =~ ^[0-9a-f]{40}$ && -z "$TEMPLATE_REVISION" ]] || {
+                echo 'Data refresh requires an exact authored-input SHA and retains the base software selection.'; exit 2;
+              } ;;
+            *) echo 'Choose Software only or Data refresh.'; exit 2 ;;
+          esac
           echo "parent=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           url=$(git config -f .gitmodules --get submodule.site-specific.url)
           case "$url" in
             https://github.com/ORINOCO-Lite/psychoinformatics-site-specific.git|git@github.com:ORINOCO-Lite/psychoinformatics-site-specific.git) ;;
             *) echo 'Unexpected site-specific repository.'; exit 2 ;;
           esac
-          if [[ -n "$SITE_REVISION" ]]; then
-            git -C site-specific fetch origin "$SITE_REVISION"
-            git -C site-specific merge-base --is-ancestor HEAD FETCH_HEAD
-            git -C site-specific checkout --detach FETCH_HEAD
-          fi
           echo "site=$(git -C site-specific rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Record published site-input selection
+      - name: Retain base comparison inputs
+        working-directory: downstream
         run: |
-          pixi run --manifest-path engineering/pixi.toml datalad -C "$GITHUB_WORKSPACE/downstream" save -m 'chore: select published site inputs' -- site-specific
+          mkdir -p "$RUNNER_TEMP/comparison"
+          cp sourcedata/downloaded/records.jsonl "$RUNNER_TEMP/comparison/base-capture.jsonl"
+          pixi run --manifest-path ../engineering/pixi.toml orinoco-lite --root "$PWD" dev records yaml-to-jsonl --output "$RUNNER_TEMP/comparison/base-records.jsonl"
       - name: Record template and package update
         id: update
+        if: inputs.update_mode == 'Software only'
         env:
           TEMPLATE_REVISION: ${{ inputs.template_revision }}
-          PACKAGE_REVISION: ${{ inputs.package_revision || github.sha }}
           ORINOCO_UPDATE_ENVIRONMENT: ${{ github.server_url }}/${{ github.repository }}@${{ github.sha }}
         run: |
           status=0
-          pixi run --manifest-path engineering/pixi.toml orinoco-lite --root "$GITHUB_WORKSPACE/downstream" template update --revision "$TEMPLATE_REVISION" --package-revision "$PACKAGE_REVISION" || status=$?
+          pixi run --manifest-path engineering/pixi.toml orinoco-lite --root "$GITHUB_WORKSPACE/downstream" template update --revision "$TEMPLATE_REVISION" || status=$?
           if [[ "$status" -gt 1 ]]; then exit "$status"; fi
           echo "conflicts=$status" >> "$GITHUB_OUTPUT"
       - name: Prepare selected upstream inputs
-        if: steps.update.outputs.conflicts == '0'
+        if: inputs.update_mode == 'Data refresh' || steps.update.outputs.conflicts == '0'
         working-directory: downstream
         env:
-          SOURCE_DATA: ${{ inputs.source_data }}
+          UPDATE_MODE: ${{ inputs.update_mode }}
+          WWW_REVISION: ${{ inputs.www_revision }}
         run: |
-          set --
-          case "$SOURCE_DATA" in
-            'Retained capture') set -- --reuse-dump ;;
-            'Refresh from Pool') ;;
-            *) echo 'Choose retained capture or refresh from Pool.'; exit 2 ;;
+          case "$UPDATE_MODE" in
+            'Software only')
+              pixi run orinoco-lite dev upstream populate --reuse-dump --records-only ;;
+            'Data refresh')
+              pixi exec --spec 'git-annex==10.20260601' -- pixi run orinoco-lite dev upstream populate --www-revision "$WWW_REVISION" ;;
+            *) echo 'Choose Software only or Data refresh.'; exit 2 ;;
           esac
-          pixi exec --spec 'git-annex==10.20260601' -- pixi run orinoco-lite dev upstream populate "$@"
       - name: Validate in the selected environment
         id: validate
-        if: steps.update.outputs.conflicts == '0'
+        if: inputs.update_mode == 'Data refresh' || steps.update.outputs.conflicts == '0'
         continue-on-error: true
         working-directory: downstream
         run: |
           pixi run build
           pixi run orinoco-lite verify-site build/site
+      - name: Report input and conversion changes
+        if: inputs.update_mode == 'Data refresh' || steps.update.outputs.conflicts == '0'
+        working-directory: downstream
+        env:
+          PARENT_BASE: ${{ steps.base.outputs.parent }}
+          SITE_BASE: ${{ steps.base.outputs.site }}
+        run: |
+          report="$RUNNER_TEMP/comparison"
+          pixi run orinoco-lite dev records yaml-to-jsonl --output "$report/selected-records.jsonl"
+          for stage in capture records; do
+            if [[ "$stage" == capture ]]; then selected=sourcedata/downloaded/records.jsonl; else selected="$report/selected-records.jsonl"; fi
+            status=0
+            pixi run orinoco-lite dev records diff "$report/base-$stage.jsonl" "$selected" --limit 100 --full-values > "$report/$stage.txt" || status=$?
+            [[ "$status" -le 1 ]] || exit "$status"
+          done
+          git diff "$PARENT_BASE" HEAD -- .copier-answers.yml pixi.toml pyproject.toml sourcedata/www-from-model > "$report/selections.patch"
+          git -C site-specific diff "$SITE_BASE" HEAD -- content assets static overrides > "$report/authored-inputs.patch"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: comparison-reports
+          path: ${{ runner.temp }}/comparison
+          retention-days: 7
+          if-no-files-found: warn
       - name: Export recorded update
         id: bundle
         shell: pixi exec --spec git-annex==10.20260601 -- bash -e {0}
@@ -193,7 +230,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ORINOCO-Lite/psychoinformatics-downstream
-          ref: main
+          ref: ${{ inputs.base_branch }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -225,11 +262,13 @@ jobs:
         env:
           SITE_BASE: ${{ needs.prepare.outputs.site_base }}
           SITE_CHANGED: ${{ needs.prepare.outputs.site_changed }}
+          SITE_BASE_BRANCH: ${{ inputs.site_base_branch }}
         run: |
           [[ "$(git -C site-specific rev-parse HEAD)" == "$SITE_BASE" ]] || { echo 'Unexpected site-input base.'; exit 1; }
           if [[ "$SITE_CHANGED" == true ]]; then
-            [[ "$(git -C site-specific rev-parse origin/main)" == "$SITE_BASE" ]] || {
-              echo 'site-specific main differs from the selected base. Reconcile the pin, or select site_revision=main for a new run.'; exit 1;
+            git -C site-specific fetch origin "refs/heads/$SITE_BASE_BRANCH"
+            [[ "$(git -C site-specific rev-parse FETCH_HEAD)" == "$SITE_BASE" ]] || {
+              echo 'The site-specific PR base differs from the selected gitlink. Select its matching base branch and start a new run.'; exit 1;
             }
             git -C site-specific bundle verify "$RUNNER_TEMP/template-update/site-specific-update.bundle"
             git -C site-specific fetch "$RUNNER_TEMP/template-update/site-specific-update.bundle" refs/heads/orinoco-site-result
@@ -245,9 +284,9 @@ jobs:
         with:
           token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
           path: site-specific
-          base: main
+          base: ${{ inputs.site_base_branch }}
           branch: automation/upstream-update-${{ github.run_id }}
-          title: 'chore: update upstream comparison inputs'
+          title: 'chore: update upstream comparison inputs (${{ inputs.update_mode }})'
           draft: true
           body: |
             **AI-generated draft — not reviewed by John**
@@ -272,16 +311,18 @@ jobs:
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
-          base: main
+          base: ${{ inputs.base_branch }}
           branch: automation/upstream-update-${{ github.run_id }}
-          title: 'chore: update upstream comparison'
+          title: 'chore: update upstream comparison (${{ inputs.update_mode }})'
           draft: true
           body: |
             **AI-generated draft — not reviewed by John**
 
             DataLad-recorded template/package selection and upstream preparation.
             Site-specific update: ${{ steps.site_pull.outputs.pull-request-url || 'already published' }}.
-            Source records: ${{ inputs.source_data }}.
+            Update: ${{ inputs.update_mode }}.
+            Parent base: ${{ inputs.base_branch }}.
+            Authored-input revision: ${{ inputs.www_revision || 'retained' }}.
             Conflict status: ${{ needs.prepare.outputs.conflicts }} (0 = none, 1 = resolve conflicts).
             Validation: ${{ needs.prepare.outputs.validation }}.
             [Preparation and validation](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

@@ -85,9 +85,10 @@ def test_populate_and_rerun_with_retained_data_and_changed_www_from_model(tmp_pa
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from orinoco_lite import cli, upstream
+from orinoco_lite import cli, upstream, www_from_model
+import subprocess
 upstream.resolve_resources = lambda: SimpleNamespace(root=Path("unused"))
-upstream.resolve_www_from_model = lambda *args: Path(os.environ["TEST_WWW"])
+www_from_model.selected_www_from_model_source = lambda *args: (Path(os.environ["TEST_WWW"]).as_uri(), subprocess.check_output(["git", "-C", os.environ["TEST_WWW"], "rev-parse", "HEAD"], text=True).strip())
 raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)
@@ -111,10 +112,23 @@ raise SystemExit(cli.main())
     assert note.read_text() == "unfinished note edit\n"
     assert not run(site, "git", "ls-files", "--", "sourcedata/downloaded/scratch.txt")
     assert scratch.read_text() == "untracked work\n"
-    # Reuse accepts unrelated dirty files and still performs site import.
+    # A software-only recomputation keeps the saved capture and authored inputs,
+    # even when a newer authored-input revision is available.
+    old_www = run(www, "git", "rev-parse", "HEAD")
+    old_capture = dump.read_bytes()
+    old_settings = (site / "pyproject.toml").read_bytes()
     (www / "content/contact.md").write_text("Reused dump import\n")
     commit(www, "test: update site before dump reuse")
+    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", "--records-only", env=env)
+    assert run(site, "git", "rev-parse", "HEAD:sourcedata/www-from-model") == old_www
+    assert (site / "site-specific/content/contact.md").read_text() == "Version one\n"
+    assert dump.read_bytes() == old_capture
+    assert (site / "pyproject.toml").read_bytes() == old_settings
+    # Plain populate retains the authored-input pin too. Advancing it is explicit.
     run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", env=env)
+    assert (site / "site-specific/content/contact.md").read_text() == "Version one\n"
+    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", "--www-revision",
+        run(www, "git", "rev-parse", "HEAD"), env=env)
     assert (site / "site-specific/content/contact.md").read_text() == "Reused dump import\n"
     assert note.read_text() == "unfinished note edit\n"
     assert scratch.read_text() == "untracked work\n"
@@ -153,7 +167,7 @@ raise SystemExit(cli.main())
     commit(www, "test: upstream two")
     (site / "pixi.lock").write_text("fixture version two\n")
     commit(site, "test: select second environment")
-    run(site, "orinoco-lite", "dev", "upstream", "checkout", env=env)
+    run(site, "orinoco-lite", "dev", "upstream", "checkout", "--revision", run(www, "git", "rev-parse", "HEAD"), env=env)
     run(site, "datalad", "save", "-m", "test: select upstream revision", "--", ".gitmodules", "sourcedata/www-from-model", env=env)
     run(site, "datalad", "rerun", imported[1], env=env)
     assert (site / "site-specific/content/contact.md").read_text() == "Version two\n"
