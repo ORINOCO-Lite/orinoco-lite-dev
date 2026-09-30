@@ -1,0 +1,302 @@
+name: Update upstream comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_revision:
+        description: Template revision
+        type: string
+        default: main
+      package_revision:
+        description: Package revision (defaults to this engineering commit)
+        type: string
+      site_revision:
+        description: Site-input revision (blank preserves the parent pin)
+        type: string
+      publish:
+        description: Publish draft pull requests
+        type: boolean
+        default: true
+      source_data:
+        description: Source records
+        type: choice
+        default: Retained capture
+        options:
+          - Retained capture
+          - Refresh from Pool
+
+permissions:
+  contents: read
+
+env:
+  PIXI_LOCKED: "true"
+
+concurrency:
+  group: psychoinformatics-downstream-update
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare comparison update
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    outputs:
+      parent_base: ${{ steps.base.outputs.parent }}
+      site_base: ${{ steps.base.outputs.site }}
+      changed: ${{ steps.bundle.outputs.changed }}
+      site_changed: ${{ steps.bundle.outputs.site_changed }}
+      conflicts: ${{ steps.update.outputs.conflicts }}
+      validation: ${{ steps.validate.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: engineering
+          persist-credentials: false
+      - name: Initialize package inputs
+        working-directory: engineering
+        run: |
+          git submodule update --init --depth 1 -- submodules/pool.psychoinformatics.de-ui submodules/query-things submodules/www-from-model submodules/things-schemas
+          git -C submodules/pool.psychoinformatics.de-ui submodule update --init --depth 1 -- shacl-vue
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          locked: true
+          manifest-path: engineering/pixi.toml
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ORINOCO-Lite/psychoinformatics-downstream
+          ref: main
+          path: downstream
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Select existing dataset histories
+        id: base
+        working-directory: downstream
+        env:
+          SITE_REVISION: ${{ inputs.site_revision }}
+          SOURCE_DATA: ${{ inputs.source_data }}
+        run: |
+          if [[ "$SOURCE_DATA" == 'Retained capture' ]]; then
+            git cat-file -e HEAD:sourcedata/downloaded/records.jsonl || {
+              echo 'No retained capture. Prepare the dataset first or choose Refresh from Pool.'; exit 2;
+            }
+          fi
+          echo "parent=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          url=$(git config -f .gitmodules --get submodule.site-specific.url)
+          case "$url" in
+            https://github.com/ORINOCO-Lite/psychoinformatics-site-specific.git|git@github.com:ORINOCO-Lite/psychoinformatics-site-specific.git) ;;
+            *) echo 'Unexpected site-specific repository.'; exit 2 ;;
+          esac
+          if [[ -n "$SITE_REVISION" ]]; then
+            git -C site-specific fetch origin "$SITE_REVISION"
+            git -C site-specific merge-base --is-ancestor HEAD FETCH_HEAD
+            git -C site-specific checkout --detach FETCH_HEAD
+          fi
+          echo "site=$(git -C site-specific rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Record published site-input selection
+        run: |
+          pixi run --manifest-path engineering/pixi.toml datalad -C "$GITHUB_WORKSPACE/downstream" save -m 'chore: select published site inputs' -- site-specific
+      - name: Record template and package update
+        id: update
+        env:
+          TEMPLATE_REVISION: ${{ inputs.template_revision }}
+          PACKAGE_REVISION: ${{ inputs.package_revision || github.sha }}
+          ORINOCO_UPDATE_ENVIRONMENT: ${{ github.server_url }}/${{ github.repository }}@${{ github.sha }}
+        run: |
+          status=0
+          pixi run --manifest-path engineering/pixi.toml orinoco-lite --root "$GITHUB_WORKSPACE/downstream" template update --revision "$TEMPLATE_REVISION" --package-revision "$PACKAGE_REVISION" || status=$?
+          if [[ "$status" -gt 1 ]]; then exit "$status"; fi
+          echo "conflicts=$status" >> "$GITHUB_OUTPUT"
+      - name: Prepare selected upstream inputs
+        if: steps.update.outputs.conflicts == '0'
+        working-directory: downstream
+        env:
+          SOURCE_DATA: ${{ inputs.source_data }}
+        run: |
+          set --
+          case "$SOURCE_DATA" in
+            'Retained capture') set -- --reuse-dump ;;
+            'Refresh from Pool') ;;
+            *) echo 'Choose retained capture or refresh from Pool.'; exit 2 ;;
+          esac
+          pixi exec --spec 'git-annex==10.20260601' -- pixi run orinoco-lite dev upstream populate "$@"
+      - name: Validate in the selected environment
+        id: validate
+        if: steps.update.outputs.conflicts == '0'
+        continue-on-error: true
+        working-directory: downstream
+        run: |
+          pixi run build
+          pixi run orinoco-lite verify-site build/site
+      - name: Export recorded update
+        id: bundle
+        env:
+          PARENT_BASE: ${{ steps.base.outputs.parent }}
+          SITE_BASE: ${{ steps.base.outputs.site }}
+        run: |
+          echo 'site_changed=false' >> "$GITHUB_OUTPUT"
+          cd downstream
+          [[ -z "$(git status --porcelain)" ]] || { echo 'Unrecorded changes remain.'; exit 1; }
+          site_entry=$(git ls-tree "$PARENT_BASE" -- site-specific)
+          if [[ "$site_entry" == 160000* ]]; then
+            site_base=$SITE_BASE
+            site_head=$(git rev-parse HEAD:site-specific)
+            if [[ "$site_head" != "$site_base" ]]; then
+              git -C site-specific merge-base --is-ancestor "$site_base" "$site_head"
+              [[ -z "$(git -C site-specific status --porcelain)" ]] || { echo 'Unrecorded site-input changes remain.'; exit 1; }
+              git -C site-specific branch orinoco-site-result "$site_head"
+              git -C site-specific bundle create "$RUNNER_TEMP/site-specific-update.bundle" orinoco-site-result "^$site_base"
+              echo 'site_changed=true' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [[ "$(git rev-parse HEAD)" == "$PARENT_BASE" ]]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'The selected inputs produced no changes.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            git branch orinoco-template-result HEAD
+            git bundle create "$RUNNER_TEMP/template-update.bundle" orinoco-template-result "^$PARENT_BASE"
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: steps.bundle.outputs.changed == 'true'
+        with:
+          name: template-update
+          path: |
+            ${{ runner.temp }}/template-update.bundle
+            ${{ runner.temp }}/site-specific-update.bundle
+          retention-days: 1
+          if-no-files-found: error
+      - name: Report preparation without publication
+        if: steps.bundle.outputs.changed != 'true' || !inputs.publish
+        env:
+          CONFLICTS: ${{ steps.update.outputs.conflicts }}
+          VALIDATION: ${{ steps.validate.outcome }}
+        run: |
+          if [[ "$CONFLICTS" == 1 || "$VALIDATION" == failure ]]; then
+            echo '::error::Preparation needs conflict resolution or a validation fix.'
+            exit 1
+          fi
+
+  publish:
+    name: Publish comparison update
+    needs: prepare
+    if: inputs.publish && needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    environment: upstream-comparison
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ORINOCO-Lite/psychoinformatics-downstream
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: template-update
+          path: ${{ runner.temp }}/template-update
+      - name: Import recorded commits without executing updated code
+        env:
+          PARENT_BASE: ${{ needs.prepare.outputs.parent_base }}
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$PARENT_BASE" ]] || { echo 'Parent main changed. Start a new update.'; exit 1; }
+          git bundle verify "$RUNNER_TEMP/template-update/template-update.bundle"
+          git fetch "$RUNNER_TEMP/template-update/template-update.bundle" refs/heads/orinoco-template-result
+          git merge-base --is-ancestor "$PARENT_BASE" FETCH_HEAD
+          before=$(git config --blob "$PARENT_BASE:.gitmodules" --get-regexp '^submodule\.site-specific\.(path|url|datalad-url)$')
+          after=$(git config --blob 'FETCH_HEAD:.gitmodules' --get-regexp '^submodule\.site-specific\.(path|url|datalad-url)$')
+          [[ "$before" == "$after" ]] || { echo 'The update changed the site-specific repository configuration.'; exit 1; }
+          git branch orinoco-parent-result FETCH_HEAD
+          git checkout -B main FETCH_HEAD
+      - name: Check out the published site-specific base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ORINOCO-Lite/psychoinformatics-site-specific
+          ref: ${{ needs.prepare.outputs.site_base }}
+          path: site-specific
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Import the recorded site-specific commits
+        env:
+          SITE_BASE: ${{ needs.prepare.outputs.site_base }}
+          SITE_CHANGED: ${{ needs.prepare.outputs.site_changed }}
+        run: |
+          [[ "$(git -C site-specific rev-parse HEAD)" == "$SITE_BASE" ]] || { echo 'Unexpected site-input base.'; exit 1; }
+          if [[ "$SITE_CHANGED" == true ]]; then
+            [[ "$(git -C site-specific rev-parse origin/main)" == "$SITE_BASE" ]] || {
+              echo 'site-specific main differs from the selected base. Reconcile the pin, or select site_revision=main for a new run.'; exit 1;
+            }
+            git -C site-specific bundle verify "$RUNNER_TEMP/template-update/site-specific-update.bundle"
+            git -C site-specific fetch "$RUNNER_TEMP/template-update/site-specific-update.bundle" refs/heads/orinoco-site-result
+            git -C site-specific merge-base --is-ancestor "$SITE_BASE" FETCH_HEAD
+            git -C site-specific checkout -B main FETCH_HEAD
+          fi
+          [[ "$(git -C site-specific rev-parse HEAD)" == "$(git rev-parse HEAD:site-specific)" ]] || { echo 'Child bundle does not match the parent gitlink.'; exit 1; }
+          [[ -z "$(git status --porcelain)" ]] || { echo 'Unrecorded changes remain.'; exit 1; }
+      - name: Open site-specific draft pull request
+        id: site_pull
+        if: needs.prepare.outputs.site_changed == 'true'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
+          path: site-specific
+          base: main
+          branch: automation/upstream-update-${{ github.run_id }}
+          title: 'chore: update upstream comparison inputs'
+          draft: true
+          body: |
+            **AI-generated draft — not reviewed by John**
+
+            Recorded upstream preparation for psychoinformatics-downstream.
+            [Preparation and validation](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Preserve these commits when merging, then accept the parent update.
+      - name: Require published site-specific commits
+        if: needs.prepare.outputs.site_changed == 'true'
+        env:
+          SITE_PULL_URL: ${{ steps.site_pull.outputs.pull-request-url }}
+          SITE_PULL_HEAD: ${{ steps.site_pull.outputs.pull-request-head-sha }}
+        run: |
+          [[ -n "$SITE_PULL_URL" ]] || { echo 'No site-specific pull request was created.'; exit 1; }
+          [[ "$SITE_PULL_HEAD" == "$(git rev-parse HEAD:site-specific)" ]] || { echo 'Published child does not match the parent gitlink.'; exit 1; }
+          git -C site-specific checkout --detach "$SITE_PULL_HEAD"
+          [[ -z "$(git status --porcelain)" ]] || { echo 'Unrecorded changes remain.'; exit 1; }
+          echo "[Review site-specific changes]($SITE_PULL_URL)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Open parent draft pull request
+        id: pull
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.UPSTREAM_UPDATE_TOKEN }}
+          base: main
+          branch: automation/upstream-update-${{ github.run_id }}
+          title: 'chore: update upstream comparison'
+          draft: true
+          body: |
+            **AI-generated draft — not reviewed by John**
+
+            DataLad-recorded template/package selection and upstream preparation.
+            Site-specific update: ${{ steps.site_pull.outputs.pull-request-url || 'already published' }}.
+            Source records: ${{ inputs.source_data }}.
+            Conflict status: ${{ needs.prepare.outputs.conflicts }} (0 = none, 1 = resolve conflicts).
+            Validation: ${{ needs.prepare.outputs.validation }}.
+            [Preparation and validation](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Preserve the child commits before accepting this gitlink update.
+      - name: Report update result
+        env:
+          PULL_URL: ${{ steps.pull.outputs.pull-request-url }}
+          PULL_HEAD: ${{ steps.pull.outputs.pull-request-head-sha }}
+          CONFLICTS: ${{ needs.prepare.outputs.conflicts }}
+          VALIDATION: ${{ needs.prepare.outputs.validation }}
+        run: |
+          [[ -n "$PULL_URL" ]] || { echo 'The recorded update did not produce a pull request.'; exit 1; }
+          [[ "$PULL_HEAD" == "$(git rev-parse orinoco-parent-result)" ]] || { echo 'Published parent does not match the recorded update.'; exit 1; }
+          echo "[Review comparison update]($PULL_URL)" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$CONFLICTS" == 1 || "$VALIDATION" == failure ]]; then
+            echo '::error::The draft update needs conflict resolution or a validation fix.'
+            exit 1
+          fi

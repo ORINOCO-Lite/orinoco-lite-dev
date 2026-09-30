@@ -71,6 +71,8 @@
 
 ## Documentation
 
+- Place new documentation under `docs/agents/` unless another location is explicitly requested or approved by the user.
+
 - Treat `docs/project-design.md` as the durable project design charter.
   Use it for intended design; keep implementation status and sequencing in active plans.
 - Keep human-facing docs as concise orientation and CLIs unsurprising.
