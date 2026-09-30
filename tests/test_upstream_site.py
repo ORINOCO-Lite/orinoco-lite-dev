@@ -165,7 +165,8 @@ def test_upstream_checkout_preserves_dirty_input_and_rejects_unregistered_destin
         git(path, "commit", "-qm", "test: initial")
     git(source, "remote", "add", "origin", source.as_uri())
     monkeypatch.setattr(upstream, "resolve_resources", lambda: SimpleNamespace(root=tmp_path))
-    monkeypatch.setattr(upstream, "resolve_www_from_model", lambda *_: source)
+    monkeypatch.setattr("orinoco_lite.www_from_model.selected_www_from_model_source",
+                        lambda *_: (source.as_uri(), git(source, "rev-parse", "HEAD")))
     upstream.checkout_upstream(root)
     git(root, "add", ".")
     git(root, "commit", "-qm", "test: select website")
