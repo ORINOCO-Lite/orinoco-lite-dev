@@ -135,6 +135,7 @@ jobs:
           pixi run orinoco-lite verify-site build/site
       - name: Export recorded update
         id: bundle
+        shell: pixi exec --spec git-annex==10.20260601 -- bash -e {0}
         env:
           PARENT_BASE: ${{ steps.base.outputs.parent }}
           SITE_BASE: ${{ steps.base.outputs.site }}
