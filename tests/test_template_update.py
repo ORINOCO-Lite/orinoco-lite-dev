@@ -25,11 +25,12 @@ def downstream(tmp_path, remote, monkeypatch):
         "package_repository": {"type": "str", "default": url},
         "package_revision": {"type": "str", "default": package_commit},
         "project_name": {"type": "str", "default": "Example"},
+        "include_site_specific": {"type": "bool", "default": True, "when": False},
     }))
     scaffold = source / "template"
     scaffold.mkdir()
     (scaffold / ".copier-answers.yml.jinja").write_text(
-        '{{ dict(_copier_answers, _commit=_copier_conf.vcs_ref_hash) | to_nice_yaml }}\n')
+        '{{ dict(_copier_answers, _commit=_copier_conf.vcs_ref_hash, include_site_specific=include_site_specific) | to_nice_yaml }}\n')
     (scaffold / "pixi.toml.jinja").write_text(
         '[pypi-dependencies]\norinoco-lite = {git="{{ package_repository }}", rev="{{ package_revision }}"}\n')
     (scaffold / "pixi.lock").write_text("initial lock\n")
@@ -42,7 +43,7 @@ def downstream(tmp_path, remote, monkeypatch):
     old = git(source, "rev-parse", "HEAD")
     root = tmp_path / "downstream"
     subprocess.run(["datalad", "create", "--no-annex", str(root)], check=True)
-    run_copy(url, root, vcs_ref=old, defaults=True, data={"project_name": "Retained"})
+    run_copy(url, root, vcs_ref=old, defaults=True, data={"project_name": "Retained", "include_site_specific": False})
     git(root, "-c", "protocol.file.allow=always", "submodule", "add", str(source), "site-specific")
     (root / "pyproject.toml").write_text("custom site configuration\n")
     git(root, "add", ".")
@@ -82,6 +83,7 @@ def test_update_records_actual_copier_operation_preserves_submodule_and_replays(
     assert (root / "pyproject.toml").read_text() == "custom site configuration\n"
     assert git(root, "ls-tree", "HEAD", "site-specific") == site
     assert yaml.safe_load((root / ".copier-answers.yml").read_text())["project_name"] == "Retained"
+    assert yaml.safe_load((root / ".copier-answers.yml").read_text())["include_site_specific"] is False
     message = git(root, "log", "-1", "--format=%B")
     assert "orinoco-lite template apply" in message and new in message
     assert execution_environment in message

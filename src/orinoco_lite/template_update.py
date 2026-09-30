@@ -66,12 +66,13 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
         if not re.fullmatch(r"[0-9a-f]{40}", selection):
             raise ConfigurationError("template apply requires full template and package commit SHAs.")
     require_clean(root)
+    retained = {key: value for key, value in answers(root).items() if not key.startswith("_")}
     # The lock is derived from the merged manifest. Merging generated lock text
     # would manufacture conflicts unrelated to the maintainer's dependency choices.
     with progress("Applying the template with Copier"):
         run_update(root, vcs_ref=revision, defaults=True, overwrite=True, conflict="inline",
                    exclude=["site-specific/**", "extensions/**"],
-                   data={"package_repository": package_repository, "package_revision": package_revision},
+                   data={**retained, "package_repository": package_repository, "package_revision": package_revision},
                    skip_if_exists=["pixi.lock"])
     unmerged = git(root, "diff", "--name-only", "--diff-filter=U").splitlines()
     if unmerged:
