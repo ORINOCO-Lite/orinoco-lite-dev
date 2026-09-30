@@ -107,9 +107,9 @@ datalad run --explicit -m "chore: convert records dump" \
     --source "$dump_path" --destination "$destination" --force
 
 if $records_only; then exit 0; fi
-checkout_args=()
+checkout_args=(orinoco-lite dev upstream checkout)
 if [[ -n $www_revision ]]; then checkout_args+=(--revision "$www_revision"); fi
-orinoco-lite dev upstream checkout "${checkout_args[@]}"
+"${checkout_args[@]}"
 # Save the selection of existing upstream history, then record its transformation.
 datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upstream_submodule"
 # The importer retrieves and verifies selected Annex media; do not get the whole site.

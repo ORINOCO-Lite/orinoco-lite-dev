@@ -93,7 +93,9 @@ raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)
     workflow = commands / "orinoco-lite-populate-upstream.sh"
-    shutil.copyfile(Path(__file__).resolve().parents[1] / "scripts/orinoco-lite-populate-upstream.sh", workflow)
+    # Exercise macOS system Bash as well as Linux Bash.
+    script = Path(__file__).resolve().parents[1] / "scripts/orinoco-lite-populate-upstream.sh"
+    workflow.write_text(script.read_text().replace("#!/usr/bin/env bash", "#!/bin/bash", 1))
     workflow.chmod(0o755)
     env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], TEST_WWW=str(www))
     alias = tmp_path / "site-alias"
