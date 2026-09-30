@@ -144,7 +144,8 @@ def update(root: Path, revision: str = "latest", package_repository: str | None 
     if not (root / ".datalad/config").exists():
         subprocess.run(["datalad", "create", "--force", "--no-annex", "."], cwd=root, check=True)
     subprocess.run(["datalad", "status"], cwd=root, check=True)
-    record_apply(root, commit, repository, default_commit, "chore: update downstream template")
+    if override_commit is None or previous["_commit"] != commit:
+        record_apply(root, commit, repository, default_commit, "chore: update downstream template")
     unresolved = conflicts(root)
     if unresolved:
         print("Resolve template update conflicts, commit, and run template update again:\n"

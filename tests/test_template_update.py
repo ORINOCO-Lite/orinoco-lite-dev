@@ -127,6 +127,9 @@ def test_package_override_is_separate_and_next_update_uses_template_default(down
     assert "package override" in git(root, "log", "-1", "--format=%B")
     assert "update downstream template" in git(root, "log", "-1", "--format=%B", "HEAD^")
     assert yaml.safe_load((root / ".copier-answers.yml").read_text())["package_revision"] == old
+    recorded = git(root, "rev-parse", "HEAD")
+    assert template_update.update(root, new, package_revision=old) == 0
+    assert git(root, "rev-parse", "HEAD") == recorded
     assert template_update.update(root, new) == 0
     assert yaml.safe_load((root / ".copier-answers.yml").read_text())["package_revision"] == package_commit
     assert not template_update.conflicts(root)
