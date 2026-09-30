@@ -65,7 +65,7 @@ const options = JSON.parse(fs.readFileSync(0, 'utf8'));
     page.on('pageerror', error => pageErrors.push(error.message));
     await page.goto(options.url);
     await page.locator('#findings[aria-busy="false"]').waitFor();
-    await page.getByRole('button', {name:'All comparisons',exact:true}).click();
+    if (await page.getByRole('button', {name:'All comparisons',exact:true}).count()) await page.getByRole('button', {name:'All comparisons',exact:true}).click();
     await page.locator('#findings[aria-busy="false"]').waitFor();
 """ + script + """
     assert.deepEqual(pageErrors, []);
@@ -326,8 +326,9 @@ def test_unified_diff_problem_separation_and_target_selection(tmp_path, browser_
         assert.equal(await page.locator('#findings .finding-row').count(),1);
         await page.locator('#findings .finding-row').click();
         assert.match(await page.locator('#detail').innerText(), /not compared across targets/);
-        await page.getByRole('button',{name:/^Differences/}).click();
-        await page.getByRole('button',{name:'Orinoco → Lite candidate',exact:true}).click();
+        await page.getByRole('button',{name:/^Changes to inspect/}).click();
+        await page.getByRole('button',{name:'Orinoco → Lite candidate (1)',exact:true}).click();
+        await page.locator('#target-context > summary').click();
         await page.getByText('Reported revision: abc123',{exact:true}).waitFor();
         await page.locator('#findings .finding-row').filter({hasText:'person.json'}).waitFor();
         assert.equal(await page.locator('#findings .finding-row').count(),1);
@@ -363,3 +364,48 @@ def test_original_file_view_and_agent_notes_remain_separate(tmp_path, browser_no
     console.log(JSON.stringify({ok:true}));
 ''')
     assert result['ok']
+
+
+def test_site_buttons_and_sidebar_are_scoped_to_one_pair(tmp_path, browser_node):
+    from orinoco_lite.site_compare import compare_trees
+    reports = []
+    for name, count in [('Orinoco', 1), ('Orinoco Lite', 2)]:
+        directory = tmp_path/name
+        left, right = directory/'left', directory/'right'
+        left.mkdir(parents=True); right.mkdir()
+        for index in range(count):
+            (left/f'{index}.html').write_text('<script src="https://old.example/a.js"></script>')
+            (right/f'{index}.html').write_text('<script src="https://new.example/a.js"></script>')
+        if count == 1:
+            (left/'unique.txt').write_text('old')
+            (right/'unique.txt').write_text('new')
+        changes, _ = compare_trees(left, right, rendered=True)
+        output = directory/'report'
+        write_report(output, stage='rendering', left=left, right=right,
+            findings=changes, comparator='site-files/1',
+            targets={'left':{'label':name, 'url':'https://old.example/'},
+                     'right':{'label':'Draft site', 'url':'https://new.example/'}})
+        reports.append(output)
+    support, _ = report(tmp_path, 'support', [finding('metadata', 'new')], stage='projection')
+    output = tmp_path/'bundle'; bundle([*reports, support], output)
+    model = ReviewModel(output)
+    pairs = [p for p in model.overview()['comparisons'] if p['deployment']]
+    with review_servers(model, port=0) as server:
+        browser(browser_node, server, """
+        assert.equal(await page.locator('#comparison-buttons button').count(), 2);
+        assert.equal(await page.locator('#investigation-buttons button').count(), 1);
+        const first = options.pairs[0], second = options.pairs[1];
+        for (const pair of [second, first]) {
+          await page.getByRole('button',{name:pair.label+' ('+pair.counts.unclassified+')',exact:true}).click();
+          await page.locator('#findings[aria-busy="false"]').waitFor();
+          assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(), String(pair.counts.unclassified));
+          assert.equal(await page.locator('#view-nav button').filter({hasText:'Recognized patterns'}).locator('.nav-count').innerText(), String(pair.counts.recognized));
+          await page.getByRole('button',{name:/^Recognized patterns/}).click();
+          await page.locator('#findings[aria-busy="false"]').waitFor();
+          assert.equal(await page.locator('#findings .finding-row').count(), pair.counts.recognized);
+          await page.getByRole('button',{name:/^Changes to inspect/}).click();
+          await page.locator('#findings[aria-busy="false"]').waitFor();
+        }
+        assert.equal(await page.locator('.comparison-choice #stage-flow').count(),1);
+        console.log('{}');
+        """, pairs=pairs)

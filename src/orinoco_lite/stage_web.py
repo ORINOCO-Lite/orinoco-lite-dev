@@ -215,7 +215,7 @@ class _Handler(BaseHTTPRequestHandler):
             name = "index.html" if path == "/" else path[1:]
             self._file(self.server.application / name, ASSETS[name] + "; charset=utf-8")
         elif path == "/api/review":
-            self._json({**self.server.model.overview(), "csrf_token": self.server.token})
+            self._json({**self.server.model.overview(params.get("comparison", "")), "csrf_token": self.server.token})
         elif path == "/api/findings":
             self._json(self.server.model.findings(
                 state=params.get("state", "new"), stage=params.get("stage", ""), q=params.get("q", ""),
@@ -223,7 +223,7 @@ class _Handler(BaseHTTPRequestHandler):
                 run_id=params.get("run_id", ""),
                 stage_index=int(params["stage_index"]) if "stage_index" in params else None,
                 category=params.get('category', 'all'), raw=params.get('raw', 'true') == 'true',
-                comparison=params.get('comparison', '')))
+                comparison=params.get('comparison', ''), classification=params.get('classification', 'all'), pattern=params.get('pattern', ''), group=params.get('group', '')))
         elif path == '/api/original-files':
             self._json(self.server.model.original_files(comparison=params.get('comparison', ''), stage=params.get('stage', ''),
                        q=params.get('q', ''), offset=int(params.get('offset', '0')), limit=int(params.get('limit', '50'))))

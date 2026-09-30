@@ -12,7 +12,9 @@ const json = value => JSON.stringify(value, null, 2);
 const pretty = value => String(value || '').replaceAll('-', ' ');
 const locationText = location => location?.length ? location.map(part => typeof part === 'number' ? `[${part}]` : part).join(' / ') : '(whole subject)';
 const views = [
-  ['queue', 'Differences', 'Unified diffs between the selected targets. Size and fingerprint observations are grouped with the change.'],
+  ['queue', 'Changes to inspect', 'Differences not fully classified by a deterministic rule. Counts are independent of human decisions.'],
+  ['recognized', 'Recognized patterns', 'Differences matching a named deterministic rule. Classification is not human acceptance.'],
+  ['coverage', 'Capture coverage', 'Observed HTTP absences and files not retained in a capture remain distinct.'],
   ['files', 'Original-file diffs', 'Every changed retained file, independent of grouping and decisions. Text diffs preserve original formatting; binary changes are explicit.'],
   ['problems', 'Possible problems', 'Site checks, separate from differences. A reported problem may also exist upstream.'],
   ['outstanding', 'Known outstanding', 'Tolerated defects and deferred questions remain visible.'],
@@ -28,7 +30,7 @@ const phases = [
   ['projection', 'Projection', 'Pages & graph'], ['assembly', 'Assembly', 'Hugo input tree'],
   ['rendering', 'Rendering', 'HTML & assets'], ['site-check', 'Site checks', 'Targets & browser'],
 ];
-const state = {overview: null, view: 'queue', stage: '', query: '', comparison: '', offset: 0, limit: 50, items: [], total: 0,
+const state = {overview: null, view: 'queue', stage: '', query: '', pattern: '', group: '', comparison: '', offset: 0, limit: 50, items: [], total: 0,
   selected: null, tab: 'values', edits: new Map(), draftsByKey: new Map(), formCache: new Map(), dirtyForms: new Set(),
   rawDecisions: new Map(), preview: null, previewSerialized: null, author: '', listRequest: 0, detailRequest: 0, artifactRequest: 0};
 let toastTimer;
@@ -73,10 +75,12 @@ const decisionById = id => state.edits.get(id)?.decision || decisions().find(dec
 function viewCount(view) {
   const counts = {...state.overview.counts, ...state.overview.difference_states};
   if (view === 'files') return null;
-  if (view === 'problems') return state.overview.presentation_counts?.problems || 0;
-  if (view === 'queue') return (counts.new || 0) + (counts.changed || 0);
+  if (view === 'problems') return state.overview.stages.some(s => s.stage === 'site-check') ? state.overview.presentation_counts?.problems || 0 : null;
+  if (view === 'queue') return state.overview.classification_counts?.unclassified || 0;
+  if (view === 'recognized') return state.overview.classification_counts?.recognized || 0;
+  if (view === 'coverage') return state.overview.classification_counts?.coverage || 0;
   if (view === 'all') return state.overview.observation_count;
-  if (view === 'outstanding') return counts.outstanding;
+  if (view === 'outstanding') return state.overview.outstanding_count;
   return counts[view] || 0;
 }
 function renderNavigation() {
@@ -84,7 +88,7 @@ function renderNavigation() {
     const button = el('button', `nav-button${(state.view === key || (key === 'queue' && ['new', 'changed'].includes(state.view))) ? ' active' : ''}`); button.type = 'button';
     if (state.view === key) button.setAttribute('aria-current', 'page');
     button.append(el('span', '', title), el('span', 'nav-count', viewCount(key) == null ? '↗' : fmt(viewCount(key))));
-    button.addEventListener('click', () => { state.view = key; state.selected = null; if (key === 'problems' || state.stage === 'site-check') state.stage = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings(); });
+    button.addEventListener('click', () => { state.view = key; state.pattern = ''; state.group = ''; state.selected = null; if (key === 'problems' || state.stage === 'site-check') state.stage = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings(); });
     return button;
   }));
   const view = views.find(([key]) => key === state.view) || [state.view, state.view === 'new' ? 'New findings' : 'Changed behavior', state.view === 'new' ? 'Findings with no saved decision.' : 'Prior decisions need to be reconsidered against this evidence.'];
@@ -128,19 +132,27 @@ function renderStages() {
     el('p', '', state.overview.integration_reason || 'Review complete-path evidence before making an integration judgment.'));
 }
 function renderComparisons() {
-  const pairs = new Map();
-  for (const stage of state.overview.stages) pairs.set(stage.comparison_id, stage);
+  const pairs = new Map(state.overview.comparisons.map(pair => [pair.id, pair]));
+  const hasDeployments = [...pairs.values()].some(pair => pair.deployment);
   const buttons = $('#comparison-buttons'); buttons.replaceChildren();
-  const choose = (key, label) => {
+  const investigations = $('#investigation-buttons'); investigations.replaceChildren();
+  const choose = (key, label, target = buttons) => {
     const button = el('button', `comparison-button${state.comparison === key ? ' active' : ''}`, label);
     button.type = 'button'; button.setAttribute('aria-pressed', String(state.comparison === key));
-    button.onclick = () => { stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = ''; state.offset = 0; renderComparisons(); renderStages(); loadFindings(); };
-    buttons.append(button);
+    button.onclick = () => chooseComparison(key);
+    target.append(button);
   };
-  for (const [key, stage] of pairs) choose(key, stage.comparison_label || `${stage.targets.left.label} → ${stage.targets.right.label}`);
-  choose('', 'All comparisons');
+  for (const [key, pair] of pairs) {
+    if (pair.deployment || !hasDeployments) choose(key, `${pair.label} (${fmt(pair.counts.unclassified)})`);
+    else choose(key, pair.label, investigations);
+  }
+  if (!hasDeployments) choose('', 'All comparisons');
+  $('#investigations').hidden = !hasDeployments;
+  const selectedCounts = state.overview.classification_counts;
+  $('#comparison-summary').textContent = `${fmt(selectedCounts.unclassified)} unclassified · ${fmt(selectedCounts.recognized)} recognized · ${fmt(selectedCounts.coverage)} capture coverage observations = ${fmt(selectedCounts.differences)} differences. ${fmt(selectedCounts.supporting)} additional size/fingerprint observations remain in All observations.`;
   const panel = $('#comparison-targets'); panel.replaceChildren();
   const selected = pairs.get(state.comparison);
+  $('#selected-comparison').textContent = selected?.label || 'Supporting investigations';
   if (selected) for (const side of ['left', 'right']) {
     const target = selected.targets[side], item = el('div', 'target-card'); item.append(el('strong', '', target.label));
     const labels = {url:'Website', branch_url:'Related upstream branch', revision:'Reported revision',
@@ -159,6 +171,46 @@ function renderComparisons() {
     panel.append(item);
   }
   if (!selected) panel.append(el('p', 'inline-note', 'Choose a comparison above to see its websites, source references, and capture details.'));
+}
+async function chooseComparison(key) {
+  $('#findings').setAttribute('aria-busy', 'true');
+  stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = ''; state.pattern = ''; state.group = ''; state.query = ''; state.offset = 0;
+  $('#search').value = '';
+  try {
+    const overview = await api(`/api/review?${new URLSearchParams({comparison:key})}`);
+    if (state.comparison !== key) return;
+    state.overview = overview;
+    renderNavigation(); renderComparisons(); renderStages(); await loadFindings();
+  } catch (error) {toast(error.message);}
+}
+function renderPatternSummary() {
+  const target = $('#pattern-summary'); target.replaceChildren();
+  if (state.view === 'recognized') {
+    target.append(el('h3', '', 'Deterministically recognized changes'), el('p', 'inline-note', 'These rules organize evidence; they do not establish correctness or human acceptance.'));
+    const options = [['', 'All recognized patterns'], ...Object.entries(state.overview.pattern_rules).map(([key, rule]) => [key, rule.label])];
+    for (const [value, label] of options) {
+      const count = value ? state.overview.classification_counts.patterns[value] || 0 : state.overview.classification_counts.recognized;
+      const button = el('button', 'comparison-button', `${label} (${fmt(count)})`); button.type = 'button'; button.setAttribute('aria-pressed', String(state.pattern === value));
+      button.onclick = () => {state.pattern = value; state.group = ''; state.offset = 0; state.selected = null; loadFindings();}; target.append(button);
+    }
+    for (const [key, rule] of Object.entries(state.overview.pattern_rules)) if (!state.pattern || state.pattern === key) target.append(el('h4', '', rule.label), el('p', 'inline-note', rule.criteria));
+    if (!state.pattern || state.pattern === 'repeated-html-edit') {
+      const groups = el('details', 'json-details'); groups.append(el('summary', '', `Repeated edit groups (${state.overview.pattern_groups.length}) · inspect examples or select all occurrences`));
+      for (const group of state.overview.pattern_groups) {
+        const item = el('details', 'json-details');
+        const sample = group.after?.[0] || group.before?.[0] || [];
+        item.append(el('summary', '', `${sample[0] || 'HTML'} ${sample[1] || ''} · ${fmt(group.occurrences)} occurrences · example ${group.example}`));
+        const button = el('button', 'text-button', 'Show every occurrence of this edit'); button.onclick = () => {state.pattern = 'repeated-html-edit'; state.group = group.group; state.offset = 0; state.selected = null; loadFindings();};
+        item.append(button, details('Exact repeated before/after events', {before:group.before,after:group.after})); groups.append(item);
+      }
+      target.append(groups);
+    }
+    target.append(el('p', 'inline-note', 'Each result below is a matched example with its exact diff. Pagination exposes all matches.'));
+  }
+  if (state.view === 'coverage') {
+    $('#target-context').open = true;
+    target.append(el('p', 'notice', 'HTTP 404/410 means observed absence at capture time. File not retained means evidence is unavailable; it is not a verified online deletion.'));
+  }
 }
 function setStage(value) {
   stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value;
@@ -179,6 +231,7 @@ function matchesStage(row) {
 }
 async function loadFindings() {
   const request = ++state.listRequest;
+  renderPatternSummary();
   $('#findings').setAttribute('aria-busy', 'true');
   $('#findings').replaceChildren(el('p', 'list-empty', 'Loading findings…'));
   $('#page-prev').disabled = $('#page-next').disabled = true;
@@ -191,7 +244,7 @@ async function loadFindings() {
       result = await api(`/api/original-files?${new URLSearchParams({comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit})}`);
       result.items = result.items.map(item => ({...item, original: true, state: 'file', finding: {subject: item.subject, location: ['Original-file diff'], change: item.change}}));
     } else {
-      const params = new URLSearchParams({state: state.view === 'problems' ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: state.view === 'all' ? 'true' : 'false', comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
+      const params = new URLSearchParams({state: ['queue', 'recognized', 'coverage', 'problems'].includes(state.view) ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: state.view === 'all' ? 'true' : 'false', classification: state.view === 'queue' ? 'unclassified' : ['recognized','coverage'].includes(state.view) ? state.view : 'all', pattern: state.pattern, group: state.group, comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
       result = await api(`/api/findings?${params}`);
     }
     if (request !== state.listRequest) return;
@@ -221,7 +274,7 @@ function renderStageSummary() {
   $('#detail').replaceChildren(body);
 }
 function renderList() {
-  if (!state.items.length) { $('#findings').replaceChildren(el('p', 'list-empty', 'No results in this selection. Try another stage or view.')); return; }
+  if (!state.items.length) { $('#findings').replaceChildren(el('p', 'list-empty', state.view === 'problems' && !state.overview.stages.some(s => s.stage === 'site-check') ? 'No problem-check report was supplied for these sites.' : state.view === 'queue' && !state.query && !state.stage ? 'No unclassified differences in retained evidence. Recognized patterns and capture coverage remain available.' : 'No results in this selection. Try another stage or view.')); return; }
   $('#findings').replaceChildren(...state.items.map(row => {
     const key = selectionKey(row), finding = row.finding || row.decision, stage = row.finding ? stageFor(row) : null;
     const button = el('button', `finding-row${state.selected && selectionKey(state.selected) === key ? ' selected' : ''}`); button.type = 'button';
@@ -290,6 +343,7 @@ function renderDetail() {
       const delta = el('div', 'delta-grid'); delta.append(valuePanel(row.targets?.left.label || 'Left', finding.before_present !== false, finding.before, 'before', row.value_views?.before), valuePanel(row.targets?.right.label || 'Right', finding.after_present !== false, finding.after, 'after', row.value_views?.after)); exact.append(delta); body.append(exact);
       const originals = el('button', 'text-button', 'Open original-file diffs'); originals.type = 'button';
       originals.onclick = () => {state.view = 'files'; state.selected = null; state.stage = `${row.run_id}/${row.stage_index}`; state.query = ''; $('#search').value = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings();}; body.append(originals);
+      if (row.classification?.category === 'recognized' || row.classification?.category === 'coverage') body.append(el('h4', '', row.classification.label), el('p', 'inline-note', row.classification.criteria), details('Exact classification evidence', row.classification));
       renderAnnotations(body, row);
       if (row.supporting_observations?.length) body.append(details('Supporting observations · size and fingerprint', row.supporting_observations));
       if (row.category !== 'problems') {
@@ -298,7 +352,7 @@ function renderDetail() {
         for (const effect of row.effects || []) {
           effects.append(el('p', '', effect.conclusion), el('p', 'inline-note', effect.scope));
           const inspect = el('button', 'text-button', 'Inspect replay comparison'); inspect.type = 'button';
-          inspect.addEventListener('click', () => {state.comparison = ''; renderComparisons(); setStage(`${effect.run_id}/0`);}); effects.append(inspect);
+          inspect.addEventListener('click', () => {const pair = state.overview.comparisons.find(p => p.label === 'Test a change’s effect on the website'); if (pair) chooseComparison(pair.id);}); effects.append(inspect);
         }
         body.append(effects);
       }
@@ -563,7 +617,7 @@ function renderContext() {
   if (ruleDecisions.length) body.append(el('h3', 'context-section-title', 'Named equivalence decisions'), el('p', 'inline-note', 'These bounded rules can cover many raw findings. They never hide the findings or accept downstream effects.'), details(`${ruleDecisions.length} saved rule decisions`, ruleDecisions));
 }
 function wire() {
-  $('#state-filter').addEventListener('change', event => { state.view = event.target.value; state.offset = 0; renderNavigation(); loadFindings(); });
+  $('#state-filter').addEventListener('change', event => { state.view = event.target.value; state.pattern = ''; state.group = ''; state.selected = null; state.offset = 0; renderNavigation(); loadFindings(); });
   $('#stage-filter').addEventListener('change', event => setStage(event.target.value));
   $('#stage-reset').addEventListener('click', () => setStage(''));
   let searchTimer;
@@ -580,10 +634,10 @@ function wire() {
 async function init() {
   try {
     state.overview = await api('/api/review');
-    state.comparison = state.overview.stages.find(s => s.targets?.left.label === 'Orinoco' && s.targets?.right.label === 'Orinoco Lite')?.comparison_id || state.overview.stages[0]?.comparison_id || '';
+    state.comparison = state.overview.comparisons.find(p => p.deployment)?.id || state.overview.comparisons[0]?.id || '';
+    if (state.comparison) state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison})}`);
     $('#review-title').textContent = state.overview.title || 'Staged comparison'; document.title = `${state.overview.title || 'Change review'} · Orinoco`;
-    const outstanding = await api('/api/findings?state=outstanding&category=differences&raw=false&offset=0&limit=1');
-    state.overview.counts.outstanding = outstanding.total;
+
     $('#base-label').textContent = `Decision base ${state.overview.base_digest.slice(0, 12)}`;
     renderNavigation(); renderComparisons(); renderStages(); wire(); await loadFindings();
   } catch (error) { $('#fatal').textContent = `This review could not be opened. ${error.message}`; $('#fatal').hidden = false; }

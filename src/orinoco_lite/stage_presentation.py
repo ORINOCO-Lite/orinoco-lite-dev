@@ -120,6 +120,8 @@ def render_rows(rows, stages, *, category='differences', subject='', raw=False):
             lines.append(diff_text(finding, stage, root))
             if row['supporting_keys']:
                 lines.append(f"# {len(row['supporting_keys'])} supporting observations retained (--raw)")
+        if row.get('classification', {}).get('category') in {'recognized', 'coverage'}:
+            lines.append('# Classification: ' + json.dumps(row['classification'], ensure_ascii=False))
         for effect in row.get('effects', []):
             lines.append('# ' + effect['conclusion'])
         lines.append('')

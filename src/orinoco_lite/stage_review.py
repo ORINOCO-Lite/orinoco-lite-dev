@@ -49,6 +49,7 @@ def register(subparsers) -> None:
     for parser in (show, bundle):
         parser.add_argument('--annotations', type=Path, help='optional authored investigation notes with evidence; separate from human decisions')
     show.add_argument("--category", choices=("differences", "problems", "all"), default="differences")
+    show.add_argument('--classification', choices=('unclassified', 'recognized', 'coverage', 'all'), default='unclassified', help='deterministic categories; classification never changes human decisions (default: unclassified)')
     show.add_argument("--subject", default="", help="limit to subjects containing this text")
     show.add_argument("--raw", action="store_true", help="include supporting size and fingerprint observations")
     show.add_argument("--format", choices=("diff", "json"), default="diff")
@@ -487,8 +488,14 @@ def execute(args) -> int:
         stages = {f"{r['run_id']}/{f['id']}": (s, base)
                   for path in args.reports for r, base in [load_report(path)]
                   for s in r['stages'] for f in s['findings']}
+        from .stage_patterns import classifications, counts
+        classified = classifications(loaded)
+        for row in result['findings']:
+            row['classification'] = classified[row['key']]
+        result['classification_counts'] = counts(result['findings'])
         rows = [row for row in result['findings']
-                if (args.category == 'all' or row['category'] == args.category)
+                if (row['category'] == 'problems' or getattr(args, 'classification', 'all') == 'all' or row['classification']['category'] == args.classification)
+                and (args.category == 'all' or row['category'] == args.category)
                 and (args.raw or not row['supporting'])
                 and args.subject in row['finding']['subject']]
         if args.format == 'json':
@@ -498,6 +505,7 @@ def execute(args) -> int:
                                        if row['category'] == 'differences' else None)}
                 for row in rows]}))
         else:
+            print('# Classification counts: ' + canonical(result['classification_counts']))
             text = render_rows(rows, stages, category=args.category, raw=args.raw)
             print(text or f"No {args.category} in the selected reports.")
             for note in notes:

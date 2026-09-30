@@ -48,7 +48,18 @@ For durable acquisitions, run the public capture command through the downstream'
 
 ## Read differences and investigate effects
 
-`dev review show` prints normalized structured diffs with context.
+`dev review show` prints unclassified normalized structured diffs with context.
+Use `--classification recognized` for deterministic patterns, `--classification coverage` for capture gaps, or `--classification all` for every category.
+These categories do not accept changes or alter human decisions.
+Declared URL-prefix rules require identical remaining paths, queries, fragments, and other attributes.
+A separate rule groups identical complete HTML edits repeated across at least two files, including mixed asset, integrity, and template changes; repetition does not establish correctness or cause.
+Both CLI and web retain the rules, counts, and every underlying diff.
+
+The web starts with buttons for two coherent site outputs.
+Each button shows its unclassified count, and sidebar counts and contents follow the selected pair.
+Stage choices sit directly below the comparison buttons; unavailable stages are explicit.
+Supporting investigations remain separately accessible.
+Recognized patterns show their criteria and repeated-edit examples with access to all occurrences.
 `dev review show --view files` compares every original retained file, independently of findings and decisions.
 The web **Original-file diffs** view exposes the same text, added/deleted files, and explicit binary changes.
 **All observations** includes supporting size and fingerprint observations.

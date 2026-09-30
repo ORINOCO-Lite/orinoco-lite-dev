@@ -176,9 +176,15 @@ class ReviewModel:
         self.review = _relative_review(self.paths, self.decisions, self.root)
         if canonical(data.get("review")) != canonical(self.review):
             raise ConfigurationError("Review summary differs from its reports and decision snapshot; rebuild the bundle")
+        from .stage_patterns import classifications
+        classified = classifications(self.reports)
+        for row in self.review['findings']:
+            row['classification'] = classified[row['key']]
         self._rows = {row["key"]: row for row in self.review["findings"]}
         self._stages = {(report["run_id"], index): (report, stage, root)
                         for report, root in self.reports for index, stage in enumerate(report["stages"])}
+        from .stage_presentation import targets
+        self._pair_ids = {key: json_digest(targets(stage)) for key, (_, stage, _) in self._stages.items()}
 
     def original_files(self, *, comparison='', stage='', q='', offset=0, limit=50):
         from .stage_originals import original_files
@@ -214,7 +220,7 @@ class ReviewModel:
             raise ConfigurationError('Annotation evidence changed since this review was opened')
         return path
 
-    def overview(self) -> dict:
+    def overview(self, comparison="") -> dict:
         result = {key: deepcopy(self.review[key]) for key in (
             "counts", "groups", "data_flow", "incompatibilities", "integration", "integration_reason", "absent")}
         result.update(title=self.title, base_digest=self.base_digest, contexts=deepcopy(self.review["reports"]),
@@ -238,6 +244,61 @@ class ReviewModel:
         result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
         result['observation_count'] = sum(row['category'] == 'differences' for row in self.review['findings'])
         result['annotations'] = deepcopy(self.annotations)
+        from .stage_patterns import counts, RULE, CRITERIA, PATTERNS
+        pairs = {}
+        for stage in result['stages']:
+            key = stage['comparison_id']
+            selected = [row for row in self.review['findings']
+                        if self._pair_ids[row['run_id'], row['stage_index']] == key]
+            deployment = stage['stage'] == 'rendering' and not stage['scope'].get('replay')
+            pairs[key] = {'id': key, 'label': stage['comparison_label'], 'deployment': deployment or pairs.get(key, {}).get('deployment', False),
+                          'targets': stage['targets'], 'counts': counts(selected)}
+            if deployment:
+                labels = []
+                for side in ('left', 'right'):
+                    target = stage['targets'][side]
+                    label = target['label']
+                    if target.get('captured_at'):
+                        label = 'Captured ' + label[0].lower() + label[1:]
+                    elif label in {'Orinoco', 'Orinoco Lite'}:
+                        label = 'Locally built ' + label.replace('Orinoco Lite', 'Lite')
+                    labels.append(label)
+                pairs[key]['label'] = ' → '.join(labels)
+        result['comparisons'] = sorted(pairs.values(), key=lambda pair: (not pair['deployment'], {'Orinoco': 0, 'Orinoco Lite': 1}.get(pair['targets']['left']['label'], 2), pair['label']))
+        result['pattern_rules'] = PATTERNS
+        result['pattern_rule'] = {'id': RULE, 'label': 'Declared URL prefix change', 'criteria': CRITERIA}
+        if comparison and comparison not in pairs:
+            raise ConfigurationError('Unknown comparison')
+        selected_stages = [stage for stage in result['stages'] if not comparison or stage['comparison_id'] == comparison]
+        selected_keys = {(stage['run_id'], stage['stage_index']) for stage in selected_stages}
+        rows = [row for row in self.review['findings'] if (row['run_id'], row['stage_index']) in selected_keys]
+        result['classification_counts'] = counts(rows)
+        repeated = {}
+        for row in rows:
+            classification = row['classification']
+            if classification.get('rule') != 'repeated-html-edit':
+                continue
+            key = classification['group']
+            f = row['finding']
+            item = repeated.setdefault(key, {'group': key, 'occurrences': 0, 'example': f['subject'],
+                'before': f['before'], 'after': f['after'], 'finding_key': row['key']})
+            item['occurrences'] += 1
+        result['pattern_groups'] = sorted(repeated.values(), key=lambda item: (-item['occurrences'], item['group']))
+        result['observation_count'] = result['classification_counts']['raw_observations']
+        result['difference_states'] = dict(Counter(row['state'] for row in rows if row['category'] == 'differences' and not row['supporting']))
+        result['counts'] = dict(Counter(row['state'] for row in rows)) if comparison else deepcopy(self.review['counts'])
+        result['outstanding_count'] = sum(bool(row.get('decision')) and row['decision']['disposition'] in {'tolerated', 'undecided'} for row in rows if not row['supporting'])
+        result['presentation_counts'] = dict(Counter(row['category'] for row in rows if not row['supporting']))
+        result['stages'] = selected_stages
+        if comparison:
+            result['absent'] = [row for row in result['absent'] if row['decision']['stage'] in {s['stage'] for s in selected_stages}]
+            for key in ('not-observed', 'not-evaluated'):
+                result['counts'][key] = sum(row['state'] == key for row in result['absent'])
+            runs = {s['run_id'] for s in selected_stages}
+            result['contexts'] = [r for r in result['contexts'] if r['run_id'] in runs]
+            result['data_flow'] = [link for link in result['data_flow'] if all(any(str(value).startswith(run + '/') for run in runs) for value in [link.get('from', ''), link.get('to', '')])]
+            result['groups'] = []
+            result['incompatibilities'] = []
         return result
 
     def _present(self, row):
@@ -252,7 +313,7 @@ class ReviewModel:
         return result
 
     def findings(self, state: str = "new", stage: str = "", q: str = "", offset: int = 0, limit: int = 50,
-                 *, run_id: str = "", stage_index: int | None = None, category: str = "all", raw: bool = True, comparison: str = "") -> dict:
+                 *, run_id: str = "", stage_index: int | None = None, category: str = "all", raw: bool = True, comparison: str = "", classification: str = "all", pattern: str = "", group: str = "") -> dict:
         if state not in {"all", "new", "changed", "matched", "outstanding", "queue"}:
             raise ConfigurationError("Unknown finding state")
         if not isinstance(stage, str) or not isinstance(q, str):
@@ -263,14 +324,22 @@ class ReviewModel:
             raise ConfigurationError("Finding offset must be nonnegative and limit must be between 1 and 500")
         if category not in {'all', 'differences', 'problems'}:
             raise ConfigurationError('Unknown review category')
+        if classification not in {'all', 'unclassified', 'recognized', 'coverage'}:
+            raise ConfigurationError('Unknown classification')
         selected = []
         needle = q.casefold().strip()
         for row in self.review["findings"]:
+            if classification != 'all' and row['classification']['category'] != classification:
+                continue
+            if group and row['classification'].get('group') != group:
+                continue
+            if pattern and row['classification'].get('subtype') != pattern:
+                continue
             if (category != 'all' and row['category'] != category) or (not raw and row['supporting']):
                 continue
             if comparison:
                 from .stage_presentation import targets
-                if json_digest(targets(self._stages[row['run_id'], row['stage_index']][1])) != comparison:
+                if self._pair_ids[row['run_id'], row['stage_index']] != comparison:
                     continue
             if (run_id and row["run_id"] != run_id) or (stage_index is not None and row["stage_index"] != stage_index):
                 continue
