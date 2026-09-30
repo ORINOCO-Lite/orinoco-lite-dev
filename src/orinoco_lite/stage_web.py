@@ -203,7 +203,10 @@ class _Handler(BaseHTTPRequestHandler):
         return unquote(parsed.path), {key: value[0] for key, value in query.items()}
 
     def _artifact(self, params):
-        root = self.server.model.artifact_root(params["run_id"], int(params["stage_index"]), params["role"])
+        if 'annotation' in params:
+            root = self.server.model.annotation_artifact(int(params['annotation']), int(params['evidence']))
+        else:
+            root = self.server.model.artifact_root(params["run_id"], int(params["stage_index"]), params["role"])
         return root, _child(root, params.get("path", ""))
 
     def _application(self):
@@ -221,12 +224,29 @@ class _Handler(BaseHTTPRequestHandler):
                 stage_index=int(params["stage_index"]) if "stage_index" in params else None,
                 category=params.get('category', 'all'), raw=params.get('raw', 'true') == 'true',
                 comparison=params.get('comparison', '')))
+        elif path == '/api/original-files':
+            self._json(self.server.model.original_files(comparison=params.get('comparison', ''), stage=params.get('stage', ''),
+                       q=params.get('q', ''), offset=int(params.get('offset', '0')), limit=int(params.get('limit', '50'))))
+        elif path == '/api/original-file':
+            self._json(self.server.model.original_file(params['key']))
         elif path == "/api/finding":
             self._json(self.server.model.finding(params["key"]))
         elif path in {"/api/artifact", "/download", "/image"}:
             root, target = self._artifact(params)
             query = urlencode(params)
             if path == "/download":
+                if target.is_dir() and params.get('archive') == 'true' and 'annotation' in params:
+                    import tempfile
+                    import zipfile
+                    with tempfile.TemporaryDirectory() as temporary:
+                        archive = Path(temporary) / (target.name + '.zip')
+                        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+                            for entry in sorted(target.rglob('*')):
+                                checked = _child(target, entry.relative_to(target).as_posix())
+                                if checked.is_file():
+                                    output.write(checked, checked.relative_to(target).as_posix())
+                        self._file(archive, 'application/zip', download=True)
+                    return
                 if not target.is_file():
                     raise ConfigurationError("Choose a file to download")
                 self._file(target, "application/octet-stream", download=True)
@@ -265,7 +285,7 @@ class _Handler(BaseHTTPRequestHandler):
                     result.update(kind="binary")
                 else:
                     result.update(kind="text", text=content, truncated=len(raw) > TEXT_LIMIT)
-                    if target.suffix.lower() in {".html", ".htm"}:
+                    if target.suffix.lower() in {".html", ".htm"} and "annotation" not in params:
                         mount = hashlib.sha256((params["run_id"] + "/" + params["stage_index"] + "/" + params["role"]).encode()).hexdigest()[:24]
                         self.server.preview.mounts[mount] = (params["run_id"], int(params["stage_index"]), params["role"])
                         relative = target.relative_to(root).as_posix() if root.is_dir() else ""

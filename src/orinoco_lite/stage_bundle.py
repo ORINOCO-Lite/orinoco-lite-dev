@@ -76,7 +76,7 @@ def _relative_review(paths: list[Path], decisions: dict, root: Path) -> dict:
 
 
 def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None,
-           title: str = "Staged comparison review") -> dict:
+           title: str = "Staged comparison review", annotations: Path | None = None) -> dict:
     """Copy only explicit validated reports and their evidence into a fresh directory.
 
     Application assets are supplied by the installed CLI when serving; bundle
@@ -109,6 +109,8 @@ def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None
         runs.add(report["run_id"])
         loaded.append((report, root))
         protected.append(root)
+    from .stage_annotations import load_annotations, copy_annotations
+    notes = load_annotations(annotations, loaded)
     if any(output == path or output in path.parents or path in output.parents for path in protected):
         raise ConfigurationError("Review output overlaps a report or decision input")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -135,7 +137,7 @@ def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None
             report_paths.append((destination / "report.json").relative_to(target).as_posix())
         review = _relative_review([target / path for path in report_paths], snapshot, target)
         document = {"schema_version": VERSION, "title": title.strip(), "report_paths": report_paths,
-                    "decisions": snapshot, "base_digest": json_digest(snapshot), "review": review}
+                    "decisions": snapshot, "base_digest": json_digest(snapshot), "review": review, "annotations": copy_annotations(notes, target)}
         write_json(target / "review.json", document)
         target.rename(output)
     return {"title": document["title"], "reports": len(report_paths),
@@ -168,12 +170,49 @@ class ReviewModel:
             raise ConfigurationError("Review decision snapshot does not match its base digest")
         self.title = data["title"]
         self.reports = [load_report(path) for path in self.paths]
+        from .stage_annotations import validate_copied
+        self.annotations = deepcopy(data.get("annotations", []))
+        validate_copied(self.annotations, self.root, self.reports)
         self.review = _relative_review(self.paths, self.decisions, self.root)
         if canonical(data.get("review")) != canonical(self.review):
             raise ConfigurationError("Review summary differs from its reports and decision snapshot; rebuild the bundle")
         self._rows = {row["key"]: row for row in self.review["findings"]}
         self._stages = {(report["run_id"], index): (report, stage, root)
                         for report, root in self.reports for index, stage in enumerate(report["stages"])}
+
+    def original_files(self, *, comparison='', stage='', q='', offset=0, limit=50):
+        from .stage_originals import original_files
+        from .stage_presentation import targets
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 500:
+            raise ConfigurationError('Invalid original-file pagination')
+        if not hasattr(self, '_originals'):
+            self._originals = {item['key']: item for (run, index), (report, s, root) in self._stages.items()
+                               for item in original_files(report, s, root, index)}
+        rows = [r for r in self._originals.values()
+                if (not comparison or json_digest(r['targets']) == comparison)
+                and (not stage or stage in {self._stages[r['run_id'], r['stage_index']][1]['stage'], f"{r['run_id']}/{r['stage_index']}"})
+                and q.casefold() in r['subject'].casefold()]
+        return {'items': deepcopy(rows[offset:offset + limit]), 'total': len(rows), 'offset': offset, 'limit': limit}
+
+    def original_file(self, key):
+        from .stage_originals import original_diff
+        self.original_files()
+        if key not in self._originals:
+            raise ConfigurationError('Unknown original-file key')
+        row = self._originals[key]
+        _, stage, root = self._stages[row['run_id'], row['stage_index']]
+        for role in ('left', 'right'):
+            self.artifact_root(row['run_id'], row['stage_index'], role)
+        return original_diff(row, stage, root)
+
+    def annotation_artifact(self, annotation, evidence):
+        if not 0 <= annotation < len(self.annotations) or not 0 <= evidence < len(self.annotations[annotation]['evidence']):
+            raise ConfigurationError('Unknown annotation evidence')
+        item = self.annotations[annotation]['evidence'][evidence]
+        path = safe_artifact(self.root, item['path'])
+        if artifact_digest(path) != item['digest']:
+            raise ConfigurationError('Annotation evidence changed since this review was opened')
+        return path
 
     def overview(self) -> dict:
         result = {key: deepcopy(self.review[key]) for key in (
@@ -197,6 +236,7 @@ class ReviewModel:
             item['comparison_label'] = comparison_label(original)
         result['presentation_counts'] = dict(Counter(row['category'] for row in self.review['findings'] if not row['supporting']))
         result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
+        result['annotations'] = deepcopy(self.annotations)
         return result
 
     def _present(self, row):
@@ -205,6 +245,8 @@ class ReviewModel:
         _, stage, root = self._stages[row['run_id'], row['stage_index']]
         result['targets'] = targets(stage)
         result['unified_diff'] = diff_text(row['finding'], stage, root) if row['category'] == 'differences' else None
+        result['diff_representation'] = 'Original-file diff' if row['finding']['location'][:1] == ['bytes'] else 'Normalized structured diff'
+        result['annotations'] = [dict(note, index=i) for i, note in enumerate(self.annotations) if note['finding_key'] == row['key']]
         result['supporting_observations'] = [self._rows[key]['finding'] for key in row['supporting_keys']]
         return result
 

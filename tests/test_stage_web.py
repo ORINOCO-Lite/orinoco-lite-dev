@@ -182,3 +182,26 @@ def test_cli_bundle_and_serve_respect_root(tmp_path, monkeypatch, capsys):
     assert cli.main(['--root', str(tmp_path), 'dev', 'review', 'serve', '--port', '0']) == 0
     assert seen == [((tmp_path / 'sourcedata/bundle',), {'port': 0, 'open_browser': False})]
     capsys.readouterr()
+
+
+def test_annotation_directory_archive(tmp_path, monkeypatch):
+    import io
+    import zipfile
+    from urllib.request import urlopen
+    from orinoco_lite.stage_bundle import bundle, ReviewModel
+    from orinoco_lite.stage_reports import write_report, write_json
+    from orinoco_lite.stage_web import review_servers
+    monkeypatch.setattr('orinoco_lite.stage_reports.execution_context', lambda: {})
+    evidence=tmp_path/'experiment'; evidence.mkdir(); (evidence/'reproduce.py').write_text('print(1)\n')
+    left=tmp_path/'left';right=tmp_path/'right';left.write_text('a');right.write_text('b')
+    output=tmp_path/'report'
+    r=write_report(output,stage='storage',left=left,right=right,findings=[{'subject':'one','location':[],
+       'change':'changed','before':'a','after':'b','before_present':True,'after_present':True}],comparator='test')
+    notes=tmp_path/'notes.json';write_json(notes,{'annotations':[{'finding_key':r['run_id']+'/storage:1',
+      'author':'Agent','explanation':'Example','limits':'Example only','evidence':[{'label':'Experiment','path':'experiment'}]}]})
+    bundle([output],tmp_path/'bundle',annotations=notes)
+    with review_servers(ReviewModel(tmp_path/'bundle'),port=0) as server:
+        with urlopen(f'http://127.0.0.1:{server.server_port}/download?annotation=0&evidence=0&archive=true') as response:
+            with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
+                assert archive.namelist()==['reproduce.py']
+                assert archive.read('reproduce.py')==b'print(1)\n'

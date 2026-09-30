@@ -48,7 +48,11 @@ For durable acquisitions, run the public capture command through the downstream'
 
 ## Read differences and investigate effects
 
-`dev review show` prints unified diffs with context.
+`dev review show` prints normalized structured diffs with context.
+`dev review show --view files` compares every original retained file, independently of findings and decisions.
+The web **Original-file diffs** view exposes the same text, added/deleted files, and explicit binary changes.
+**All observations** includes supporting size and fingerprint observations.
+Original-file diffs preserve formatting; the structured view explains what its comparator observes.
 Structured values use sorted mapping keys while preserving types, list order, multiplicity, and missing versus null.
 Size and fingerprint observations support their owning change; `--raw` exposes them separately.
 Use `--subject` to narrow the output and `--format json` for further processing.
@@ -70,6 +74,36 @@ A repeated baseline must agree before the result supports an effect claim.
 Retained inputs and outputs connect the result to the original finding in both CLI and web review.
 This tests that substitution for those inputs and that renderer, not every deployment.
 Files with multiple semantic changes require a more focused investigation.
+
+## Add an agent investigation
+
+Agent annotations are separate from human dispositions.
+Supply a JSON file to `review show --annotations notes.json` or `review bundle --annotations notes.json`:
+
+```json
+{
+  "annotations": [{
+    "finding_key": "RUN-ID/projection:3",
+    "author": "Codex",
+    "tags": ["identifier representation"],
+    "explanation": "Explain what the linked data shows.",
+    "hypothesis": "State the proposed cause, if unresolved.",
+    "conclusion": "State only the supported conclusion.",
+    "limits": "Name the tested inputs, renderer, and remaining uncertainty.",
+    "evidence": [{"label": "Reproduce experiment", "path": "experiment"}],
+    "commands": [["python", "experiment/reproduce.py", "--output", "fresh-output"]]
+  }]
+}
+```
+
+Evidence paths are relative to the notes file; files and directories are copied into the portable review and verified against their digests.
+Every annotation, including an opinion, requires inspectable evidence.
+Commands are displayed and never executed by the page.
+Use ordinary retained scripts for investigations beyond the single-file replay.
+Keep inputs, package selections, locks, and outputs with the experiment; exercise its instructions from a fresh directory before claiming it is reproducible.
+A command from a dirty checkout is historical evidence, not a recoverable software selection.
+Comparing retained outputs and reproducing the experiment are separate operations.
+Annotations do not change decision matching or automatically establish a verified effect.
 
 ## Open a review
 

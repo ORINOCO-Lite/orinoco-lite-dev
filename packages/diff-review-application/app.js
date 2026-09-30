@@ -13,10 +13,11 @@ const pretty = value => String(value || '').replaceAll('-', ' ');
 const locationText = location => location?.length ? location.map(part => typeof part === 'number' ? `[${part}]` : part).join(' / ') : '(whole subject)';
 const views = [
   ['queue', 'Differences', 'Unified diffs between the selected targets. Size and fingerprint observations are grouped with the change.'],
+  ['files', 'Original-file diffs', 'Every changed retained file, independent of grouping and decisions. Text diffs preserve original formatting; binary changes are explicit.'],
   ['problems', 'Possible problems', 'Site checks, separate from differences. A reported problem may also exist upstream.'],
   ['outstanding', 'Known outstanding', 'Tolerated defects and deferred questions remain visible.'],
   ['matched', 'Carried decisions', 'Unchanged findings covered by an existing decision.'],
-  ['all', 'All differences', 'Raw findings are observations, not a count of defects. Reviewed representation changes remain available.'],
+  ['all', 'All observations', 'Raw findings are observations, not a count of defects. Reviewed representation changes remain available.'],
   ['not-observed', 'Retirement candidates', 'Previously reviewed differences absent from a compatible, complete comparison.'],
   ['not-evaluated', 'Not evaluated', 'Decisions whose scope was not covered by the supplied comparisons.'],
 ];
@@ -71,6 +72,7 @@ const stageFor = row => state.overview.stages.find(stage => stage.run_id === row
 const decisionById = id => state.edits.get(id)?.decision || decisions().find(decision => decision.id === id);
 function viewCount(view) {
   const counts = {...state.overview.counts, ...state.overview.difference_states};
+  if (view === 'files') return null;
   if (view === 'problems') return state.overview.presentation_counts?.problems || 0;
   if (view === 'queue') return (counts.new || 0) + (counts.changed || 0);
   if (view === 'all') return ['new', 'changed', 'matched'].reduce((total, key) => total + (counts[key] || 0), 0);
@@ -185,8 +187,11 @@ async function loadFindings() {
     if (state.view.startsWith('not-')) {
       const rows = state.overview.absent.filter(row => row.state === state.view && matchesStage(row) && (!state.query || json(row).toLowerCase().includes(state.query.toLowerCase())));
       result = {items: rows.slice(state.offset, state.offset + state.limit), total: rows.length};
+    } else if (state.view === 'files') {
+      result = await api(`/api/original-files?${new URLSearchParams({comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit})}`);
+      result.items = result.items.map(item => ({...item, original: true, state: 'file', finding: {subject: item.subject, location: ['Original-file diff'], change: item.change}}));
     } else {
-      const params = new URLSearchParams({state: state.view === 'problems' ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: 'false', comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
+      const params = new URLSearchParams({state: state.view === 'problems' ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: state.view === 'all' ? 'true' : 'false', comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
       result = await api(`/api/findings?${params}`);
     }
     if (request !== state.listRequest) return;
@@ -238,7 +243,7 @@ async function openFinding(key) {
 function openRow(row, invalidate = true) {
   stashEditor(); if (invalidate) ++state.detailRequest;
   ++state.artifactRequest; state.selected = row; state.tab = 'values';
-  renderList(); renderDetail();
+  renderList(); if (row.original) { renderOriginal(row); return; } renderDetail();
   if (matchMedia('(max-width: 650px)').matches) $('#detail').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 function valuePanel(label, present, value, className, view) {
@@ -279,10 +284,13 @@ function renderDetail() {
       } else {
         const diff = el('pre', 'unified-diff'); diff.setAttribute('aria-label', 'Unified diff');
         for (const line of (row.unified_diff || '').split('\n')) diff.append(el('span', line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-remove' : line.startsWith('@@') ? 'diff-hunk' : '', line + '\n'));
-        body.append(diff);
+        body.append(el('h4', '', row.diff_representation || 'Normalized structured diff'), diff);
       }
       const exact = el('details', 'json-details'); exact.append(el('summary', '', 'Exact left and right values'));
       const delta = el('div', 'delta-grid'); delta.append(valuePanel(row.targets?.left.label || 'Left', finding.before_present !== false, finding.before, 'before', row.value_views?.before), valuePanel(row.targets?.right.label || 'Right', finding.after_present !== false, finding.after, 'after', row.value_views?.after)); exact.append(delta); body.append(exact);
+      const originals = el('button', 'text-button', 'Open original-file diffs'); originals.type = 'button';
+      originals.onclick = () => {state.view = 'files'; state.selected = null; state.stage = `${row.run_id}/${row.stage_index}`; state.query = ''; $('#search').value = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings();}; body.append(originals);
+      renderAnnotations(body, row);
       if (row.supporting_observations?.length) body.append(details('Supporting observations · size and fingerprint', row.supporting_observations));
       if (row.category !== 'problems') {
         const effects = el('section', 'links-panel'); effects.append(el('h4', '', 'Downstream effects'));
@@ -352,7 +360,7 @@ function renderEditor(body, row) {
   const previous = row.previous_decisions || [];
   const existing = draftId ? decisionById(draftId) : row.decision || (previous.length === 1 ? decisionById(previous[0]) : null);
   const section = el('section', 'editor'), heading = el('div', 'editor-heading');
-  heading.append(el('h4', '', existing ? 'Review the decision' : 'Record a decision'), el('span', 'tag', 'Draft only')); section.append(heading);
+  heading.append(el('h4', '', existing ? 'Human disposition' : 'Human disposition'), el('span', 'tag', 'Draft only')); section.append(heading);
   const form = el('form'); form.id = 'decision-form';
   let target;
   if (row.finding && previous.length > 1) {
@@ -581,3 +589,62 @@ async function init() {
   } catch (error) { $('#fatal').textContent = `This review could not be opened. ${error.message}`; $('#fatal').hidden = false; }
 }
 init();
+
+function showUnified(body, text) {
+  const diff = el('pre', 'unified-diff'); diff.setAttribute('aria-label', 'Original-file unified diff');
+  for (const line of (text || '').split('\n')) diff.append(el('span', line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-remove' : '', line + '\n'));
+  body.append(diff);
+}
+async function renderOriginal(row) {
+  const request = ++state.detailRequest, body = el('div', 'detail-body');
+  $('#detail').replaceChildren(body); body.append(el('h3', '', row.subject), el('p', '', 'Loading original-file diff…'));
+  try {
+    const item = await api(`/api/original-file?${new URLSearchParams({key: row.key})}`);
+    if (request !== state.detailRequest) return;
+    body.replaceChildren(el('h3', '', row.subject), el('h4', '', 'Original-file diff'), el('p', 'inline-note', 'Computed from retained bytes. No normalization, grouping, or saved decision hides files in this view.'));
+    if (item.scope.complete === false) body.append(el('p', 'notice', 'Capture coverage is limited. Absence from retained files is not proof of absence online; inspect the capture evidence.'));
+    showUnified(body, item.unified_diff);
+    for (const side of ['left', 'right']) {
+      if (item.digests[side] === null) {body.append(el('p', '', `${item.targets[side].label}: no retained file`)); continue;}
+      const link = el('a', 'text-button', `Download ${item.targets[side].label} original`);
+      link.href = `/download?${new URLSearchParams({run_id: item.run_id, stage_index: item.stage_index, role: side, path: item.path})}`;
+      body.append(link);
+    }
+    body.append(details('Exact file digests and comparison scope', {digests: item.digests, scope: item.scope}));
+  } catch (error) {if (request === state.detailRequest) body.append(el('p', 'form-error', error.message));}
+}
+function renderAnnotations(body, row) {
+  const section = el('section', 'links-panel'); section.append(el('h4', '', 'Agent annotations'));
+  section.append(el('p', 'inline-note', 'Authored claims with inspectable evidence. These notes neither accept a difference nor automatically verify a conclusion.'));
+  if (!row.annotations?.length) section.append(el('p', '', 'No agent annotation supplied.'));
+  for (const note of row.annotations || []) {
+    const block = el('section', 'context-stage'); block.append(el('strong', '', note.author));
+    if (note.tags?.length) block.append(el('p', 'inline-note', note.tags.join(' · ')));
+    for (const field of ['explanation', 'hypothesis', 'conclusion', 'limits']) if (note[field]) block.append(el('h5', '', pretty(field)), el('p', '', note[field]));
+    block.append(el('h5', '', 'Inspect retained evidence'));
+    note.evidence.forEach((evidence, index) => {
+      const button = el('button', 'text-button', evidence.label), target = el('div'); button.type = 'button';
+      button.onclick = () => browseAnnotation(target, note.index, index, ''); block.append(button, target);
+    });
+    if (note.commands?.length) block.append(details('Reproduce experiment · recorded commands, not executed by this page', note.commands));
+    section.append(block);
+  }
+  body.append(section);
+}
+async function browseAnnotation(target, annotation, evidence, path) {
+  try {
+    const query = new URLSearchParams({annotation, evidence, path});
+    const item = await api(`/api/artifact?${query}`); target.replaceChildren();
+    if (path) {const up = el('button', 'text-button', 'Back to evidence root'); up.onclick = () => browseAnnotation(target, annotation, evidence, ''); target.append(up);}
+    if (item.kind === 'directory') {
+      const archive = el('a', 'text-button', 'Download evidence archive'); archive.href = `/download?${query}&archive=true`; target.append(archive);
+      for (const entry of item.entries) {
+      const button = el('button', 'text-button', entry.name + (entry.kind === 'directory' ? '/' : ''));
+      button.onclick = () => browseAnnotation(target, annotation, evidence, entry.path); target.append(button);
+    }} else {
+      const link = el('a', 'text-button', 'Download original evidence'); link.href = item.download_url; target.append(link);
+      if (item.kind === 'text') target.append(el('pre', 'artifact-text', item.text), el('p', 'inline-note', item.truncated ? 'Preview truncated; download contains the complete original.' : ''));
+      else target.append(el('p', '', 'Binary evidence: download the original file.'));
+    }
+  } catch (error) {target.replaceChildren(el('p', 'form-error', error.message));}
+}

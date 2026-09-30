@@ -221,8 +221,8 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
     lines += ["", *diagnostics] if diagnostics else [""]
     categories = Counter(row.get("representation_equivalence", "unclassified raw changes") for row in rows)
     lines.append("Finding categories: " + canonical(dict(categories)))
-    from .stage_presentation import annotate, render_rows
-    presented = annotate([{'key': row['id'], 'report': str(report_dir), 'finding': row} for row in rows])
+    from .stage_presentation import group_supporting_observations, render_rows
+    presented = group_supporting_observations([{'key': row['id'], 'report': str(report_dir), 'finding': row} for row in rows])
     visible = [row for row in presented if not row['supporting']]
     lines += ["", "```diff", render_rows(visible[:50], {row['key']: (entry, report_dir) for row in presented}, category='differences'), "```"]
     problems = render_rows(visible[:50], {row['key']: (entry, report_dir) for row in presented}, category='problems')

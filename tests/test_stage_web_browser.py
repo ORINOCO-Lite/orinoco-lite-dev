@@ -333,3 +333,33 @@ def test_unified_diff_problem_separation_and_target_selection(tmp_path, browser_
         assert.equal(await page.locator('#findings .finding-row').count(),1);
         console.log('{}');
         """)
+
+
+def test_original_file_view_and_agent_notes_remain_separate(tmp_path, browser_node):
+    source, data = report(tmp_path, 'annotated', [finding('record', 'candidate')])
+    evidence = tmp_path/'experiment.py'; evidence.write_text('print("inspectable experiment")\n')
+    notes = tmp_path/'notes.json'
+    write_json(notes, {'annotations':[{'finding_key':data['run_id']+'/storage:1', 'author':'Codex',
+        'explanation':'An attributed investigation.', 'hypothesis':'A possible cause.',
+        'conclusion':'Not established.', 'limits':'One fixture only.', 'tags':['unresolved'],
+        'evidence':[{'label':'Retained experiment','path':'experiment.py'}],
+        'commands':[['python','experiment.py']]}]})
+    output=tmp_path/'bundle'; bundle([source], output, annotations=notes)
+    with review_servers(ReviewModel(output), port=0) as server:
+        result=browser(browser_node, server, '''
+    await page.locator('.finding-row').first().click();
+    assert.match(await page.locator('#detail').innerText(), /Agent annotations/);
+    assert.match(await page.locator('#detail').innerText(), /An attributed investigation/);
+    assert.match(await page.locator('#detail').innerText(), /Human disposition/);
+    await page.getByRole('button', {name:'Retained experiment',exact:true}).click();
+    await page.getByText('print("inspectable experiment")', {exact:true}).waitFor();
+    await page.getByRole('button', {name:/^Original-file diffs/}).click();
+    await page.locator('#findings[aria-busy="false"]').waitFor();
+    await page.locator('.finding-row').first().click();
+    await page.getByLabel('Original-file unified diff', {exact:true}).waitFor();
+    assert.match(await page.locator('#detail').innerText(), /candidate/);
+    assert.equal(await page.getByRole('button',{name:'Save to draft',exact:true}).count(), 0);
+    assert.equal(await page.getByRole('link',{name:/Download .* original/}).count(),2);
+    console.log(JSON.stringify({ok:true}));
+''')
+    assert result['ok']

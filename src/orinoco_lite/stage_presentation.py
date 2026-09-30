@@ -41,7 +41,7 @@ def comparison_label(stage):
     return pair['left']['label'] + ' → ' + pair['right']['label']
 
 
-def annotate(rows):
+def group_supporting_observations(rows):
     """Group mechanical observations without changing IDs or decision scope."""
     by_subject = defaultdict(list)
     for row in rows:

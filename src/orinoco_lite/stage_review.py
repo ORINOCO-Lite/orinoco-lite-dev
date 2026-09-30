@@ -45,6 +45,9 @@ def register(subparsers) -> None:
     show = commands.add_parser("show", help="print unified diffs or possible problems without an interactive session")
     show.add_argument("reports", nargs="*", help="comparison names (default: all reports)")
     options(show, replace=False)
+    show.add_argument('--view', choices=('structured', 'files'), default='structured', help='normalized structured differences or every original-file difference, independent of decisions')
+    for parser in (show, bundle):
+        parser.add_argument('--annotations', type=Path, help='optional authored investigation notes with evidence; separate from human decisions')
     show.add_argument("--category", choices=("differences", "problems", "all"), default="differences")
     show.add_argument("--subject", default="", help="limit to subjects containing this text")
     show.add_argument("--raw", action="store_true", help="include supporting size and fingerprint observations")
@@ -218,8 +221,8 @@ def summarize(paths: list[Path], decisions: dict) -> dict:
         absent.append({"decision": decision, "state": "not-observed" if evaluated else "not-evaluated"})
     links, incompatibilities = data_flow(entries)
     groups, attribution_diagnostics = causal_groups(reports, findings)
-    from .stage_presentation import annotate, targets
-    annotate(findings)
+    from .stage_presentation import group_supporting_observations, targets
+    group_supporting_observations(findings)
     from .stage_investigation import effects
     replay_effects = effects(reports)
     for row in findings:
@@ -469,6 +472,17 @@ def execute(args) -> int:
         args.reports = report_paths(root, args.reports)
     if args.review_command == "show":
         from .stage_presentation import render_rows
+        from .stage_annotations import load_annotations
+        loaded = [load_report(path) for path in args.reports]
+        notes = load_annotations(getattr(args, 'annotations', None), loaded)
+        if getattr(args, 'view', 'structured') == 'files':
+            from .stage_originals import original_files, original_diff
+            items = [original_diff(item, stage, base) for report, base in loaded
+                     for index, stage in enumerate(report['stages'])
+                     for item in original_files(report, stage, base, index) if args.subject in item['subject']]
+            print(canonical({'files': items, 'annotations': notes}) if args.format == 'json' else
+                  '\n'.join(f"# {item['change']}: {item['subject']}\n{item['unified_diff']}" for item in items) or 'No original-file differences.')
+            return 0
         result = summarize(args.reports, load_decisions(args.decisions))
         stages = {f"{r['run_id']}/{f['id']}": (s, base)
                   for path in args.reports for r, base in [load_report(path)]
@@ -479,13 +493,15 @@ def execute(args) -> int:
                 and args.subject in row['finding']['subject']]
         if args.format == 'json':
             from .stage_presentation import diff_text
-            print(canonical({**result, 'findings': [
+            print(canonical({**result, 'annotations': notes, 'findings': [
                 {**row, 'unified_diff': (diff_text(row['finding'], *stages[row['key']])
                                        if row['category'] == 'differences' else None)}
                 for row in rows]}))
         else:
             text = render_rows(rows, stages, category=args.category, raw=args.raw)
             print(text or f"No {args.category} in the selected reports.")
+            for note in notes:
+                print('Agent annotation (authored claim; not a human decision): ' + canonical(note))
         return 0
     if args.review_command == "summarize":
         args.output = root / "review"
@@ -502,7 +518,7 @@ def execute(args) -> int:
             args.decisions = None
         prepare_output(args.output, args.force)
         from .stage_bundle import bundle
-        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title)))
+        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title, annotations=getattr(args, "annotations", None))))
         print(f"Review bundle: {args.output}. Open it with 'orinoco-lite dev review serve' using the same --directory.")
         return 0
     if args.review_command == "serve":
