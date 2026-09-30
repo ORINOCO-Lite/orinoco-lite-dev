@@ -42,7 +42,9 @@ def test_import_preserves_authored_sections_resources_and_existing_records(tmp_p
     write(output / "metadata/records/Thing/one.yaml", "human record")
     write(output / "sources/capture.jsonl", "raw capture")
     write(output / "content/local.md", "local page")
-    import_site_inputs(upstream, output, force=True)
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
     assert (output / "content/projects/_index.md").read_text() == "authored section body"
     assert (output / "content/projects/one/logo.svg").read_text() == "page resource"
     assert (output / "content/posts/news/index.md").read_text() == "authored post"
@@ -58,8 +60,10 @@ def test_missing_import_resource_leaves_existing_inputs_untouched(tmp_path):
     (upstream / "content/projects/one/logo.svg").write_text("/annex/objects/not-present")
     output = tmp_path / "site-specific"
     write(output / "site.yaml", "original")
+    config = tmp_path / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
     with pytest.raises(DriverError, match="Annex pointer"):
-        import_site_inputs(upstream, output, force=True)
+        import_site_inputs(upstream, output, config_path=config, force=True)
     assert (output / "site.yaml").read_text() == "original"
     assert list(output.iterdir()) == [output / "site.yaml"]
 
@@ -70,7 +74,9 @@ def test_input_comparison_accepts_system_temporary_directory_symlink(tmp_path, m
 
     upstream = source(tmp_path)
     output = tmp_path / "sourcedata/site-inputs"
-    import_site_inputs(upstream, output, force=True)
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
     real_temporary = tmp_path / "real-temporary"
     real_temporary.mkdir()
     temporary_alias = tmp_path / "temporary-alias"
@@ -185,7 +191,9 @@ def test_import_preserves_source_identity_settings_without_shadowing_site_yaml(t
     subprocess.run(["git", "-C", str(upstream), "add", "."], check=True)
     output = tmp_path / "inputs"
     write(output / "overrides/config/params.toml", '[article]\nshowDate=true\n')
-    import_site_inputs(upstream, output, force=True)
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
     settings = tomllib.loads((output / "overrides/config/params.toml").read_text())
     assert settings == {"article": {"showDate": True}, "header": {"logo": "img/logo.png", "logoDark": "img/dark.svg"}, "footer": {"showCopyright": True}}
     language = tomllib.loads((output / "overrides/config/languages.en.toml").read_text())

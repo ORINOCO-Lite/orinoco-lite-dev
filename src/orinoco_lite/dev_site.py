@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import tomllib
 
 from .config import load_workspace, _load_site_data
 from .errors import DriverError, OrinocoError
@@ -184,14 +185,20 @@ def execute(args):
             resources, presentation = _selection(args)
             destination = _path(args, args.inputs)
             if args.inputs_command == "import":
-                result = import_site_inputs(presentation, destination)
+                destination.mkdir(parents=True, exist_ok=True)
+                config = destination / "pyproject.toml"
+                config.write_text("[tool.orinoco]\n")
+                result = import_site_inputs(presentation, destination, config_path=config)
                 print(json.dumps(result, indent=2))
                 print(f"Site inputs: {destination}")
                 return 0
             with tempfile.TemporaryDirectory(prefix="orinoco-site-inputs-") as temporary:
                 expected = Path(temporary).resolve() / "expected"
-                import_site_inputs(presentation, expected)
-                subjects = [path.as_posix() for path in selected_site_files(presentation)] + ["site.yaml"]
+                expected.mkdir()
+                config = expected / "pyproject.toml"
+                config.write_text("[tool.orinoco]\n")
+                import_site_inputs(presentation, expected, config_path=config)
+                subjects = [path.as_posix() for path in selected_site_files(presentation)] + ["pyproject.toml"]
                 findings, names = compare_trees(expected, destination, subjects=subjects)
                 return _report(args, expected, destination, findings, {
                     "complete": True, "subjects": names,
@@ -237,7 +244,7 @@ def execute(args):
                 projection, site_inputs = _path(args, args.projection), _path(args, args.inputs)
                 operation_receipt(projection)
                 operation_receipt(site_inputs)
-                data = _load_site_data(site_inputs / "site.yaml")
+                data = _load_site_data(tomllib.loads((site_inputs / "pyproject.toml").read_text())["tool"]["orinoco"]["site"])
                 workspace = replace(workspace, site_data=data, site_name=data["identity"]["title"],
                                     base_url=data["identity"]["base_url"])
                 result = assemble_hugo(workspace, resources, output, projection=projection,
