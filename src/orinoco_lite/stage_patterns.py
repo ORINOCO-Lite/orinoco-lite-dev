@@ -7,7 +7,7 @@ from .stage_reports import safe_artifact, canonical, json_digest
 RULE = 'declared-url-prefix-change'
 CRITERIA = ('Only declared deployment prefixes differ in href/src attributes of a, link, img, script, source, or iframe elements. '
             'The remaining path, query, fragment, event order, and every other attribute must match exactly. '
-            'Canonical links, metadata, embedded data, and mixed edits remain unclassified. No human acceptance is implied.')
+            'Canonical links, metadata, embedded data, and mixed edits are outside this rule. No human acceptance is implied.')
 
 
 def prefix(stage, side):
