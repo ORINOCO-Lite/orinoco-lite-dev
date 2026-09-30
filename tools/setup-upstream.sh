@@ -19,6 +19,7 @@ Inputs:
                             (default: https://pool.psychoinformatics.de/api)
   --site-layout MODE        Store imported inputs as submodule (default) or directory;
                             ignored with --site-specific
+  --site-specific-url URL   Register the new subdataset’s published repository; does not push
   --build                   Also build the site and publication bundle
   --force                   Replace the destination, including local changes
   --non-interactive         Skip the review pause
@@ -54,6 +55,7 @@ local_heads=false
 explicit_template_ref=false
 dump=
 site_specific=
+site_specific_url=
 site_layout=submodule
 api=https://pool.psychoinformatics.de/api
 package_repository=
@@ -69,7 +71,7 @@ while [[ $# -gt 0 ]]; do
     --build) build=true; shift ;;
     --force) force=true; shift ;;
     --non-interactive) non_interactive=true; shift ;;
-    --template|--template-ref|--dump|--api|--site-specific|--site-layout|--package-repository|--package-revision)
+    --template|--template-ref|--dump|--api|--site-specific|--site-specific-url|--site-layout|--package-repository|--package-revision)
       if [[ $# -lt 2 ]]; then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
       case "$1" in
         --template) template=$2 ;;
@@ -77,6 +79,7 @@ while [[ $# -gt 0 ]]; do
         --dump) dump=$2 ;;
         --api) api=$2 ;;
         --site-specific) site_specific=$2 ;;
+        --site-specific-url) site_specific_url=$2 ;;
         --site-layout) site_layout=$2 ;;
         --package-repository) package_repository=$2 ;;
         --package-revision) package_revision=$2 ;;
@@ -92,7 +95,15 @@ done
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
 
+if [[ -n $site_specific_url && ( $site_layout != submodule || -n $site_specific ) ]]; then
+  echo '--site-specific-url requires a newly imported submodule.' >&2; exit 2
+fi
+
 template_repository=$(git -C "$template" remote get-url origin)
+case "$template_repository" in
+  git@github.com:*) template_repository="https://github.com/${template_repository#git@github.com:}" ;;
+  ssh://git@github.com/*) template_repository="https://github.com/${template_repository#ssh://git@github.com/}" ;;
+esac
 if [[ -z $package_repository ]]; then
   package_repository=$(git remote get-url origin)
   # Public GitHub inputs must be recoverable without the maintainer's SSH setup.
@@ -202,6 +213,12 @@ if [[ -n $site_specific ]]; then populate+=(--site-specific "$site_relative"); f
 # Switch once. The installed package owns the workflow, and all its commands
 # inherit this downstream environment. No workflow files are copied into the site.
 pixi run --manifest-path pixi.toml "${populate[@]}"
+if [[ -n $site_specific_url ]]; then
+  pixi run datalad run --explicit --output .gitmodules \
+    -m "chore: register published site-input repository" -- \
+    git submodule set-url site-specific "$site_specific_url"
+  pixi run datalad -C site-specific siblings configure --name origin --url "$site_specific_url"
+fi
 if $build; then
   pixi run --manifest-path pixi.toml orinoco-lite build --destination build/site \
     --publication-bundle build/pages-publication.bundle

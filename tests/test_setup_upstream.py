@@ -389,3 +389,34 @@ def test_review_stays_under_twenty_lines_with_many_local_changes(setup):
     assert "\x1b[" not in result.stdout
     assert "dev enable" not in result.stdout
     assert "DataLad" not in result.stdout
+
+
+def test_site_specific_publication_url_is_recorded_after_population(setup):
+    run, *_ = setup
+    url = "https://github.com/example/site-inputs.git"
+    result, calls = run("--site-specific-url", url)
+    assert result.returncode == 0, result.stderr
+    registration = next(c for c in calls if "set-url" in c)
+    assert registration[-3:] == ["set-url", "site-specific", url]
+    assert registration[:4] == ["pixi", "run", "datalad", "run"]
+    assert ".gitmodules" in registration
+    assert calls.index(registration) > next(i for i, c in enumerate(calls) if "populate" in c)
+    assert any("siblings" in c and c[-1] == url for c in calls)
+
+
+def test_site_specific_url_rejects_directory_layout_before_creation(setup):
+    run, _, _, destination, *_ = setup
+    result, _ = run("--site-specific-url", "https://example.invalid/inputs.git", "--site-layout", "directory")
+    assert result.returncode != 0
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("remote", ["git@github.com:ORINOCO-Lite/orinoco-lite-template.git",
+                                    "ssh://git@github.com/ORINOCO-Lite/orinoco-lite-template.git"])
+def test_public_template_records_https_source(setup, remote):
+    run, engineering, template, destination, package_head, template_head = setup
+    git(template, "remote", "set-url", "origin", remote)
+    result, calls = run()
+    assert result.returncode == 0, result.stderr
+    copier = next(call for call in calls if "copier" in call and "copy" in call)
+    assert copier[-2] == "https://github.com/ORINOCO-Lite/orinoco-lite-template.git"
