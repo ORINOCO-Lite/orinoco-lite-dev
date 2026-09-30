@@ -68,6 +68,58 @@ def test_missing_import_resource_leaves_existing_inputs_untouched(tmp_path):
     assert list(output.iterdir()) == [output / "site.yaml"]
 
 
+@pytest.mark.parametrize("state", ["prepared", "missing", "pointer", "symlink", "revision"])
+def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, monkeypatch, capsys, state):
+    from orinoco_lite import cli
+
+    selected = source(tmp_path)
+    relative = "content/projects/one/logo.svg"
+    pointer = "/annex/objects/SHA256E-s5--example.svg\n"
+    (selected / relative).write_text(pointer)
+    (selected / ".gitattributes").write_text(f"{relative} filter=annex\n")
+
+    def git(root, *args):
+        return subprocess.run(["git", "-C", str(root), "-c", "user.name=Test",
+                               "-c", "user.email=test@example.invalid", "-c", "core.hooksPath=/dev/null",
+                               *args], check=True, capture_output=True, text=True)
+
+    git(selected, "add", ".")
+    git(selected, "commit", "-qm", "test: selected source")
+    prepared = tmp_path / "sourcedata/www-from-model"
+    git(tmp_path, "clone", str(selected), str(prepared))
+    media = prepared / relative
+    media.write_text("<svg/>")
+    if state == "missing":
+        media.unlink()
+    elif state == "pointer":
+        media.write_text(pointer)
+    elif state == "symlink":
+        media.unlink()
+        target = prepared / ".git/annex/objects/example.svg"
+        write(target, "<svg/>")
+        media.symlink_to(target)
+    elif state == "revision":
+        git(prepared, "commit", "--allow-empty", "-qm", "test: wrong revision")
+    # A Git cleanliness check must not accidentally invoke the Annex filter.
+    invoked = tmp_path / "annex-invoked"
+    git(prepared, "config", "filter.annex.process", f"touch '{invoked}'; exit 1")
+    monkeypatch.setattr(dev_site, "_selection", lambda args: (tmp_path / "resources", selected))
+    command = ["--root", str(tmp_path), "dev", "inputs"]
+    if state == "prepared":
+        assert cli.main([*command, "import"]) == 0
+        assert (tmp_path / "sourcedata/site-inputs" / relative).read_text() == "<svg/>"
+        assert cli.main([*command, "diff"]) == 0
+    else:
+        assert cli.main([*command, "import"]) == 2
+        expected = {"missing": "unavailable", "pointer": "Annex pointer",
+                    "symlink": "Annex pointer", "revision": "expected"}[state]
+        captured = capsys.readouterr()
+        assert expected in captured.out + captured.err
+        assert not (tmp_path / "sourcedata/site-inputs" / relative).exists()
+    assert not invoked.exists()
+    assert (selected / relative).read_text() == pointer
+
+
 def test_input_comparison_accepts_system_temporary_directory_symlink(tmp_path, monkeypatch):
     from contextlib import contextmanager
     from orinoco_lite import cli

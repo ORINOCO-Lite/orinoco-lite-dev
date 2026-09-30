@@ -458,10 +458,9 @@ Check portability by cloning into a different directory and rerunning a recorded
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
 Reuse the downstream tool lock and record both the input change and the parent submodule pointer.
 
-Upstream site-data import requires actual file bytes in a prepared maintainer checkout.
-The clean presentation cache can contain Annex pointers and must fail rather than import them or invoke Annex downstream.
-Local candidate setup selects the exact engineering gitlink through the existing development connection when importing those prepared site inputs.
-A relocated checkout must reconnect the selected, prepared maintainer source before replaying this import.
+Input diagnostics use the prepared `sourcedata/www-from-model` checkout when present, requiring the package-selected upstream revision.
+Otherwise they use the selected source cache.
+Prepare missing media with `dev upstream populate --reuse-dump` in the maintainer environment; diagnostics require ordinary file bytes and do not retrieve Annex content.
 Recorded conversion from a retained capture does not have this local-source requirement.
 
 ## Existing PRs and review

@@ -27,7 +27,11 @@ def register(dev_subparsers):
     inputs = dev_subparsers.add_parser("inputs", help="inspect selected upstream site inputs")
     actions = inputs.add_subparsers(dest="inputs_command", required=True)
     for action in ("import", "diff"):
-        parser = actions.add_parser(action, help="copy selected site inputs into the investigation" if action == "import" else "compare the copied inputs with upstream")
+        parser = actions.add_parser(action, help="copy selected site inputs into the investigation" if action == "import" else "compare the copied inputs with upstream", description=(
+            "Read prepared site files from sourcedata/www-from-model at the selected "
+            "package's upstream revision, or from its source cache if no prepared "
+            "checkout exists. Retrieve missing media with dev upstream populate "
+            "--reuse-dump before running diagnostics."))
         options(parser)
     hugo = dev_subparsers.add_parser("hugo", help="project records, assemble Hugo inputs, or build HTML")
     actions = hugo.add_subparsers(dest="hugo_command", required=True)
@@ -72,6 +76,22 @@ def _selection(args):
     resources = resolve_resources().root
     presentation = resolve_www_from_model(Path(args.root), resources)
     return resources, presentation
+
+
+def _input_source(root: Path, presentation: Path) -> Path:
+    from .www_from_model import _repository_head
+
+    prepared = root / "sourcedata/www-from-model"
+    if not prepared.exists() and not prepared.is_symlink():
+        return presentation
+    actual = _repository_head(prepared, label="Prepared upstream checkout")
+    expected = _repository_head(presentation, label="Selected upstream checkout")
+    if actual != expected:
+        raise DriverError(
+            f"Prepared upstream checkout is {actual}, expected {expected}. "
+            "Run dev upstream populate --reuse-dump to prepare the selected revision."
+        )
+    return prepared
 
 
 def _report(args, left, right, findings, scope, *, comparator, evidence=None):
@@ -183,6 +203,7 @@ def execute(args):
             }, comparator="site-files/1" if group == "site" else "hugo-content/1")
         if group == "inputs":
             resources, presentation = _selection(args)
+            presentation = _input_source(Path(args.root), presentation)
             destination = _path(args, args.inputs)
             if args.inputs_command == "import":
                 destination.mkdir(parents=True, exist_ok=True)
