@@ -100,6 +100,10 @@ if [[ -n $site_specific_url && ( $site_layout != submodule || -n $site_specific 
 fi
 
 template_repository=$(git -C "$template" remote get-url origin)
+case "$template_repository" in
+  git@github.com:*) template_repository="https://github.com/${template_repository#git@github.com:}" ;;
+  ssh://git@github.com/*) template_repository="https://github.com/${template_repository#ssh://git@github.com/}" ;;
+esac
 if [[ -z $package_repository ]]; then
   package_repository=$(git remote get-url origin)
   # Public GitHub inputs must be recoverable without the maintainer's SSH setup.

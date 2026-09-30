@@ -409,3 +409,14 @@ def test_site_specific_url_rejects_directory_layout_before_creation(setup):
     result, _ = run("--site-specific-url", "https://example.invalid/inputs.git", "--site-layout", "directory")
     assert result.returncode != 0
     assert not destination.exists()
+
+
+@pytest.mark.parametrize("remote", ["git@github.com:ORINOCO-Lite/orinoco-lite-template.git",
+                                    "ssh://git@github.com/ORINOCO-Lite/orinoco-lite-template.git"])
+def test_public_template_records_https_source(setup, remote):
+    run, engineering, template, destination, package_head, template_head = setup
+    git(template, "remote", "set-url", "origin", remote)
+    result, calls = run()
+    assert result.returncode == 0, result.stderr
+    copier = next(call for call in calls if "copier" in call and "copy" in call)
+    assert copier[-2] == "https://github.com/ORINOCO-Lite/orinoco-lite-template.git"
