@@ -7,6 +7,7 @@ description: Compare Orinoco metadata and generated outputs across upstream and 
 
 Produce an inspectable explanation of what changed, where it first changed, and which later effects are verified consequences.
 Keep detection, causal explanation, and the human decision separate.
+Explain meaningful differences and minimize unnecessary local behavior; reducing the reported difference count is not the objective.
 A dependency is evidence of possible influence, not proof that it caused the observed difference.
 This is an investigation procedure, not an implementation checklist requiring every stage to produce lineage or causal explanations.
 Start with stage outputs, same-input comparisons, and the complete-path comparison.
@@ -94,7 +95,8 @@ An agent may propose an explanation; reproducible evidence, not confidence in th
 
 ## Carry the decision at its owning boundary
 
-Distinguish intended behavior, a tolerated unresolved defect, and an undecided finding.
+Classify findings as required, human-agreed Orinoco adaptations, upstream defects, local defects, or unexplained differences.
+An upstream reference establishes observed behavior, not correctness; check preservation and other requirements independently.
 Acknowledging a report does not approve its behavior.
 Existing source-adapter accept/reject/defer decisions govern curation claims; do not repurpose their cache for engineering differences.
 
@@ -104,11 +106,36 @@ If an actual recurring decision cannot be recognized with existing checks, propo
 Approval fixtures and machine-readable decision scope are not prerequisites for every comparison; where recognition remains manual, say so and retain the human explanation.
 Do not automatically approve generated output or turn a tolerated defect into a claim of correctness.
 Retain adaptations as separable changes with their tests so they can be removed independently.
+For a retained patch or workaround, use its existing commit, issue, or PR to explain its purpose, originating defect, verified downstream effects, upstream submission or inclusion status, and removal condition.
+Explain why a change must remain downstream when it is not suitable for upstream; an upstream rejection alone does not justify retention.
+Passing checks must not hide the original defect or make a workaround an approved adaptation.
 
 Reapply the decision only while its conditions and observed behavior still match.
 Changed values, expanded effects, changed relevant transformation behavior, or failed expectations require review.
 A vanished difference calls for checking whether its expectation or adaptation can be retired.
 Retiring an adaptation requires testing without it against the selected upstream, not just observing agreement while it remains active.
+
+## Report check outcomes separately
+
+Use these familiar terms for checks with stated expectations, independently of finding classification and patch maintenance status:
+
+| Outcome | Meaning |
+| --- | --- |
+| PASS | Meets the stated expectation, including a human-agreed adaptation; keep any upstream difference visible. |
+| FAIL | Violates the expectation without a matching acknowledged expected failure. |
+| XFAIL | Fails in the documented, acknowledged way for the specified inputs and effect scope; retain the linked defect. |
+| XPASS | Meets an expectation previously marked as failing; review the defect and removal condition. |
+| ERROR | Execution or evaluation failed to produce a trustworthy comparison. |
+| SKIP | Deliberately not evaluated; state the reason and coverage gap. |
+
+A known failure must not absorb new or expanded differences; report those separately.
+Keep findings without a stated expectation unexplained rather than manufacturing a verdict.
+Acknowledging an expected failure does not authorize a workaround, and successful execution alone is not PASS.
+
+Choose tooling for the comparison, not to reproduce this vocabulary.
+Use focused pytest checks when inputs, comparison, and assertions fit naturally; constrain expected failures to the known cause and use strict XPASS handling to prompt review.
+For exploratory, expensive, or multi-stage comparisons, existing commands and inspectable reports may be more appropriate.
+No pytest suite or new reporting framework is required merely to use these outcome labels.
 
 ## Present and repeat
 
@@ -127,3 +154,12 @@ Generate detailed traces and reports on demand outside tracked state.
 Keep durable state in existing code, tests, reviewed fixtures, Git, and PR explanations.
 Do not add a lineage service, exception registry, per-file provenance inventory, or new workflow engine merely to execute this procedure.
 If the operation genuinely needs new durable state, identify the unsupported user operation and obtain agreement on that design first.
+
+## Established practices
+
+Borrow concepts and existing tools where they fit; these references do not require a new patch format or test framework:
+
+- [Debian DEP-3](https://dep-team.pages.debian.net/deps/dep3/) supplies patch purpose, origin, upstream issue, forwarding, and inclusion conventions; keep this information with the change.
+- [Yocto upstream patch status](https://docs.yoctoproject.org/4.0.27/contributor-guide/recipe-style-guide.html#patch-upstream-status) distinguishes submission, backport, rejection, and downstream-specific maintenance states.
+- [Approval testing](https://github.com/Amey-Thakur/AI-SKILLS/blob/main/skills/testing/approval-testing/SKILL.md) supports reviewable expected output; approving a snapshot does not establish correctness or justify divergence.
+- [pytest expected failures](https://pytest.org/en/stable/how-to/skipping.html) provides executable expected-failure checks where appropriate; report vocabulary can be used independently of pytest.
