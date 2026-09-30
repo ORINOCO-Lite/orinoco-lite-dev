@@ -103,7 +103,8 @@ A bundle may contain failed and skipped stages, but must display failed, skipped
 | Rendering | Same assembled tree through both build operations | Routes, HTML, assets, browser differences, and site-check failures |
 | Complete paths | Each path consumes its own preceding outputs | Integrated effects and interactions absent from isolated comparisons |
 
-Hugo layouts, assets, and the Congo theme come from the selected `www-from-model` gitlink and that revision's dependency declarations.
+Hugo layouts, assets, and the Congo theme come from the package-selected `www-from-model` gitlink and that revision's dependency declarations.
+Authored-input diagnostics read the independently selected `sourcedata/www-from-model` gitlink; preparing its media does not advance the software selection.
 The template layers its adaptation and bounded assets over it; site-specific settings and overrides apply afterward.
 Authored content overlays generated content.
 Importing site data does not copy the Hugo dependency tree into a downstream.

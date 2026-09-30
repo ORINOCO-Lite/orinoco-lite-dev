@@ -88,13 +88,6 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
     prepared = tmp_path / "sourcedata/www-from-model"
     git(tmp_path, "init", "-q")
     git(tmp_path, "-c", "protocol.file.allow=always", "submodule", "add", str(selected), "sourcedata/www-from-model")
-    engineering = tmp_path / "engineering"
-    engineering.mkdir()
-    git(engineering, "init", "-q")
-    selected_commit = git(selected, "rev-parse", "HEAD").stdout.strip()
-    git(engineering, "update-index", "--add", "--cacheinfo", "160000", selected_commit, "submodules/www-from-model")
-    git(engineering, "commit", "-qm", "test: select upstream")
-    engineering_commit = git(engineering, "rev-parse", "HEAD").stdout.strip()
     media = prepared / relative
     media.write_text("<svg/>")
     if state == "missing":
@@ -112,7 +105,9 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
     invoked = tmp_path / "annex-invoked"
     git(prepared, "config", "filter.annex.process", f"touch '{invoked}'; exit 1")
     monkeypatch.setattr(dev_site, "resolve_resources", lambda: SimpleNamespace(root=tmp_path / "resources"))
-    monkeypatch.setattr(www_from_model, "resolve_engineering_source", lambda *_: (engineering, engineering_commit))
+    # Authored-input diagnostics must not resolve or require software selections.
+    monkeypatch.setattr(www_from_model, "resolve_engineering_source",
+                        lambda *_: pytest.fail("Input diagnostics resolved software"))
     command = ["--root", str(tmp_path), "dev", "inputs"]
     if state == "prepared":
         assert cli.main([*command, "import"]) == 0

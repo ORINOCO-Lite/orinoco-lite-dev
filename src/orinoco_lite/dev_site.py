@@ -28,9 +28,9 @@ def register(dev_subparsers):
     actions = inputs.add_subparsers(dest="inputs_command", required=True)
     for action in ("import", "diff"):
         parser = actions.add_parser(action, help="copy selected site inputs into the investigation" if action == "import" else "compare the copied inputs with upstream", description=(
-            "Read prepared site files from sourcedata/www-from-model at the selected "
-            "package's upstream revision, or from its source cache if no prepared "
-            "checkout exists. Retrieve missing media with dev upstream populate "
+            "Read prepared site files from sourcedata/www-from-model at its recorded "
+            "authored-input revision, independently of the software selection. "
+            "Retrieve missing media with dev upstream populate "
             "--reuse-dump before running diagnostics."))
         options(parser)
     hugo = dev_subparsers.add_parser("hugo", help="project records, assemble Hugo inputs, or build HTML")
@@ -74,7 +74,18 @@ def _revision(path):
 
 def _selection(args):
     resources = resolve_resources().root
-    presentation = resolve_www_from_model(Path(args.root), resources)
+    if args.dev_command == "inputs":
+        from .www_from_model import _git_text, _repository_head
+        workspace = Path(args.root)
+        presentation = workspace / "sourcedata/www-from-model"
+        entry = _git_text(workspace, ("ls-files", "--stage", "--", "sourcedata/www-from-model"),
+                          operation="read authored-input gitlink").split()
+        if len(entry) != 4 or entry[0] != "160000" or entry[2] != "0":
+            raise DriverError("Prepare the authored-input submodule with dev upstream checkout before diagnostics")
+        if _repository_head(presentation, label="Authored-input checkout") != entry[1]:
+            raise DriverError("Authored-input checkout does not match its recorded gitlink")
+    else:
+        presentation = resolve_www_from_model(Path(args.root), resources)
     return resources, presentation
 
 
