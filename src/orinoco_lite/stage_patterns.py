@@ -1,4 +1,15 @@
-"""Conservative deterministic categories over unchanged comparison observations."""
+"""Deterministic rules over unchanged observations, in deliberate precedence order.
+
+1. Problem checks and supporting byte observations are not primary differences.
+2. Missing captured files are snapshot evidence questions, before content rules.
+3. Narrow ordinary URL-prefix matches require an otherwise identical hunk.
+4. Narrow canonical/social metadata-prefix matches use the same exactness test.
+5. Only remaining complete HTML hunks may enter repeated-edit groups (>=2 files).
+6. Everything else stays unclassified, including any unmatched mixed hunk.
+
+First matching rule owns each entire hunk. Repetition never absorbs a partial
+match or hides a remainder. Recognition changes neither evidence nor decisions.
+"""
 from collections import Counter
 from urllib.parse import urlsplit
 from .stage_presentation import targets
@@ -103,8 +114,13 @@ def classify(row, stage, indexes):
             url = base + route if base else None
             status = indexes[side].get(url)
             observed = status in {404, 410}
-            return {'category': 'coverage', 'subtype': 'observed-absence' if observed else 'not-retained',
-                    'label': f'Observed HTTP {status}' if observed else 'File not retained in capture',
+            capture = (stage['artifacts'][side].get('operation') or {}).get('context', {}).get('capture', {})
+            requested = route in capture.get('routes', [])
+            failed = status is not None and status >= 400 and not observed
+            return {'category': 'coverage', 'subtype': 'observed-absence' if observed else 'retrieval-failed' if failed else 'not-retained',
+                    'selected_route': requested,
+                    'request_outcome': 'http-response' if status is not None else 'unknown',
+                    'label': f'Observed HTTP {status}' if observed else f'Retrieval failed: HTTP {status}' if failed else f'HTTP {status} recorded; file not retained' if status is not None else 'No retained file; request outcome unknown',
                     'side': side, 'url': url, 'http_status': status,
                     'criteria': 'A retained 404/410 establishes absence at capture time. Other missing files do not establish absence online.'}
     return url_pattern(finding, stage) or url_pattern(finding, stage, metadata=True) or {'category': 'unclassified'}
@@ -149,3 +165,35 @@ PATTERNS = {
     'metadata-prefix': {'label': 'Canonical and social metadata URL prefixes', 'criteria': 'Only declared prefixes differ in canonical link href or og:url, og:image, twitter:url, twitter:image content. URL suffix and all other event values match exactly. This recognizes a representation pattern, not correctness.'},
     'repeated-html-edit': {'label': 'Repeated HTML edits', 'criteria': 'The exact same before/after HTML event hunk occurs in at least two distinct files in this comparison. Paths, queries, asset references, integrity, or content may differ within that repeated edit. Grouping establishes repetition only, not its cause or correctness. Every complete hunk remains inspectable.'},
 }
+
+
+def snapshot_scope(stage, root):
+    """Describe the saved snapshot, not the completeness of the online website."""
+    from .site_compare import files
+    indexes = capture_indexes(stage, root)
+    result = []
+    for side in ('left', 'right'):
+        artifact = stage['artifacts'].get(side)
+        if not artifact:
+            continue
+        context = (artifact.get('operation') or {}).get('context', {})
+        item = {'side': side, 'label': targets(stage)[side]['label']}
+        path = safe_artifact(root, artifact['path'])
+        if side not in indexes:
+            item.update(kind='local', description='Complete retained local output tree; no network retrieval was involved.',
+                        files=len(files(path)) if path.is_dir() else 1)
+        else:
+            capture = context['capture']; responses = indexes[side]
+            base = prefix(stage, side)
+            requested = [base + route for route in capture.get('routes', [])] if base else []
+            item.update(kind='capture', description='Selected routes and discovered same-host page assets. Other routes may exist; no exhaustive crawl or JavaScript execution.',
+                requested_routes=capture.get('requested_routes'), routes=capture.get('routes', []),
+                successful_responses=sum(200 <= c < 300 for c in responses.values()),
+                confirmed_absences=sum(c in {404, 410} for c in responses.values()),
+                error_responses=sum(c >= 400 and c not in {404,410} for c in responses.values()),
+                requested_without_response=sum(url not in responses for url in requested),
+                retrieval_complete=capture.get('retrieval_complete'),
+                files=len(files(path)) if path.is_dir() else 1,
+                evidence_roles=[role for role in stage['artifacts'] if role.startswith(side + '-http') or role == side + '-wget-log'])
+        result.append(item)
+    return result

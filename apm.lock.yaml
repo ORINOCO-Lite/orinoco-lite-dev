@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T15:34:39.840103+00:00'
+generated_at: '2026-10-01T16:47:47.882130+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: danyuchn/asd-ste100-skill
@@ -25,6 +25,16 @@ dependencies:
     .agents/skills/asd-ste100-skill/references/writing-rules.md: sha256:4b92c86bf803f9f54e069767d34dc7356fbb95fb52a3f28476093917c608c102
     .agents/skills/asd-ste100-skill/scripts/ste-lint.py: sha256:c2c2013476d1a4737db91f6e44c9f89554b3df28f91547deac8638b13437c55f
   content_hash: sha256:e8369d16ff72f99dfb6ffe04111bb5e8e7eba533bab21c64be8cda91fa3f9c3e
+- repo_url: leej3/agentic-awesome-skills
+  name: ui-ux-designer
+  host: github.com
+  resolved_commit: 8fec5f9ebf4f885a00f2a526c2ca79aa834511b3
+  resolved_ref: 8fec5f9ebf4f885a00f2a526c2ca79aa834511b3
+  version: 0.1.0
+  virtual_path: skills/ui-ux-designer
+  is_virtual: true
+  package_type: hybrid
+  content_hash: sha256:b196a5fbafa0cbe386ebef5ced3379aa014963c9f7c430ef6fdda387f445437f
 - repo_url: leej3/skills-workshop
   name: workshop-skills
   host: github.com
@@ -40,6 +50,16 @@ dependencies:
   content_hash: sha256:72a9d363b1718aaf3c0efc2dbbe2c129902821acaf376d5583c5bed2bf4f209d
   skill_subset:
   - unix-cli-design
+- repo_url: leej3/ui-ux-pro-max-skill
+  name: ui-ux-pro-max
+  host: github.com
+  resolved_commit: a339a9418822609b77fe3bcfe5efd7c7c6105391
+  resolved_ref: a339a9418822609b77fe3bcfe5efd7c7c6105391
+  version: 0.1.0
+  virtual_path: .claude/skills/ui-ux-pro-max
+  is_virtual: true
+  package_type: hybrid
+  content_hash: sha256:6d87151237f4cbce826721705021b343b4246766aa85d80bb4213195fce2998e
 deployments:
 - kind: project-relative
   target: agent-skills

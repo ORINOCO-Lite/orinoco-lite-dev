@@ -185,6 +185,8 @@ class ReviewModel:
                         for report, root in self.reports for index, stage in enumerate(report["stages"])}
         from .stage_presentation import targets
         self._pair_ids = {key: json_digest(targets(stage)) for key, (_, stage, _) in self._stages.items()}
+        from .stage_site_scope import site_scopes
+        self._site_scopes = site_scopes(self._stages)
 
     def original_files(self, *, comparison='', stage='', q='', offset=0, limit=50):
         from .stage_originals import original_files
@@ -195,7 +197,7 @@ class ReviewModel:
             self._originals = {item['key']: item for (run, index), (report, s, root) in self._stages.items()
                                for item in original_files(report, s, root, index)}
         rows = [r for r in self._originals.values()
-                if (not comparison or json_digest(r['targets']) == comparison)
+                if (not comparison or self._in_comparison(r['run_id'], r['stage_index'], comparison))
                 and (not stage or stage in {self._stages[r['run_id'], r['stage_index']][1]['stage'], f"{r['run_id']}/{r['stage_index']}"})
                 and q.casefold() in r['subject'].casefold()]
         return {'items': deepcopy(rows[offset:offset + limit]), 'total': len(rows), 'offset': offset, 'limit': limit}
@@ -220,7 +222,12 @@ class ReviewModel:
             raise ConfigurationError('Annotation evidence changed since this review was opened')
         return path
 
-    def overview(self, comparison="") -> dict:
+    def _in_comparison(self, run_id, index, comparison):
+        if comparison in self._site_scopes:
+            return (run_id, index) in self._site_scopes[comparison]['members']
+        return self._pair_ids[run_id, index] == comparison
+
+    def overview(self, comparison="", stage_filter="") -> dict:
         result = {key: deepcopy(self.review[key]) for key in (
             "counts", "groups", "data_flow", "incompatibilities", "integration", "integration_reason", "absent")}
         result.update(title=self.title, base_digest=self.base_digest, contexts=deepcopy(self.review["reports"]),
@@ -246,31 +253,35 @@ class ReviewModel:
         result['annotations'] = deepcopy(self.annotations)
         from .stage_patterns import counts, RULE, CRITERIA, PATTERNS
         pairs = {}
-        for stage in result['stages']:
-            key = stage['comparison_id']
-            selected = [row for row in self.review['findings']
-                        if self._pair_ids[row['run_id'], row['stage_index']] == key]
-            deployment = stage['stage'] == 'rendering' and not stage['scope'].get('replay')
-            pairs[key] = {'id': key, 'label': stage['comparison_label'], 'deployment': deployment or pairs.get(key, {}).get('deployment', False),
-                          'targets': stage['targets'], 'counts': counts(selected)}
-            if deployment:
-                labels = []
-                for side in ('left', 'right'):
-                    target = stage['targets'][side]
-                    label = target['label']
-                    if target.get('captured_at'):
-                        label = 'Captured ' + label[0].lower() + label[1:]
-                    elif label in {'Orinoco', 'Orinoco Lite'}:
-                        label = 'Locally built ' + label.replace('Orinoco Lite', 'Lite')
-                    labels.append(label)
-                pairs[key]['label'] = ' → '.join(labels)
-        result['comparisons'] = sorted(pairs.values(), key=lambda pair: (not pair['deployment'], {'Orinoco': 0, 'Orinoco Lite': 1}.get(pair['targets']['left']['label'], 2), pair['label']))
+        anchors = [(key, value['anchor']) for key, value in self._site_scopes.items()] if self._site_scopes else [(item['comparison_id'], (item['run_id'], item['stage_index'])) for item in result['stages']]
+        for key, anchor in anchors:
+            item = next(s for s in result['stages'] if (s['run_id'], s['stage_index']) == anchor)
+            selected = [row for row in self.review['findings'] if self._in_comparison(row['run_id'], row['stage_index'], key)]
+            deployment = key in self._site_scopes
+            labels = []
+            for side in ('left', 'right'):
+                target = item['targets'][side]
+                label = target['label']
+                if deployment and target.get('captured_at'):
+                    label = 'Captured ' + label[0].lower() + label[1:]
+                elif deployment and label in {'Orinoco', 'Orinoco Lite'}:
+                    label = 'Locally built ' + label.replace('Orinoco Lite', 'Lite')
+                labels.append(label)
+            pairs[key] = {'id': key, 'label': ' → '.join(labels) if deployment else item['comparison_label'],
+                          'deployment': deployment, 'targets': item['targets'], 'counts': counts(selected)}
+        result['comparisons'] = sorted(pairs.values(), key=lambda pair: (not (pair['targets']['left']['label'] == 'Orinoco' and pair['targets']['right']['label'] == 'Orinoco Lite'), not pair['deployment'], {'Orinoco': 0, 'Orinoco Lite': 1}.get(pair['targets']['left']['label'], 2), pair['label']))
+        from .stage_patterns import snapshot_scope
+        result['snapshot_scope'] = []
+        if comparison in self._site_scopes:
+            anchor = self._site_scopes[comparison]['anchor']
+            _, s, root = self._stages[anchor]
+            result['snapshot_scope'] = [dict(item, run_id=anchor[0], stage_index=anchor[1]) for item in snapshot_scope(s, root)]
         result['pattern_rules'] = PATTERNS
         result['pattern_rule'] = {'id': RULE, 'label': 'Declared URL prefix change', 'criteria': CRITERIA}
         if comparison and comparison not in pairs:
             raise ConfigurationError('Unknown comparison')
-        selected_stages = [stage for stage in result['stages'] if not comparison or stage['comparison_id'] == comparison]
-        selected_keys = {(stage['run_id'], stage['stage_index']) for stage in selected_stages}
+        selected_stages = [stage for stage in result['stages'] if not comparison or self._in_comparison(stage['run_id'], stage['stage_index'], comparison)]
+        selected_keys = {(s['run_id'], s['stage_index']) for s in selected_stages if not stage_filter or stage_filter in {s['stage'], f"{s['run_id']}/{s['stage_index']}"}}
         rows = [row for row in self.review['findings'] if (row['run_id'], row['stage_index']) in selected_keys]
         result['classification_counts'] = counts(rows)
         repeated = {}
@@ -305,10 +316,15 @@ class ReviewModel:
         from .stage_presentation import diff_text, targets
         result = _present_row(row)
         _, stage, root = self._stages[row['run_id'], row['stage_index']]
+        result['stage_context'] = dict(run_id=row['run_id'], stage_index=row['stage_index'], **{key: deepcopy(value) for key, value in stage.items() if key != 'findings'})
         result['targets'] = targets(stage)
         result['unified_diff'] = diff_text(row['finding'], stage, root) if row['category'] == 'differences' else None
         result['diff_representation'] = 'Original-file diff' if row['finding']['location'][:1] == ['bytes'] else 'Normalized structured diff'
         result['annotations'] = [dict(note, index=i) for i, note in enumerate(self.annotations) if note['finding_key'] == row['key']]
+        from .stage_site_scope import identity
+        selected_artifacts = {identity(a) for a in stage['artifacts'].values()}
+        result['related_diagnostics'] = [{'key': r['key'], 'mode': other['mode'], 'stage': other['stage']} for r in self.review['findings'] if r['key'] != row['key'] and r['finding']['subject'] == row['finding']['subject'] and r['finding']['location'] == row['finding']['location'] for other in [self._stages[r['run_id'], r['stage_index']][1]] if other['stage'] == stage['stage'] and other['mode'] == 'isolated' and any(identity(a) in selected_artifacts for a in other['artifacts'].values())]
+        result['experiments'] = [dict(run_id=run, stage_index=index, **{key: deepcopy(value) for key, value in s.items() if key != 'findings'}) for (run, index), (_, s, _) in self._stages.items() if s['scope'].get('replay', {}).get('origin') == row['key']]
         result['supporting_observations'] = [self._rows[key]['finding'] for key in row['supporting_keys']]
         return result
 
@@ -339,7 +355,7 @@ class ReviewModel:
                 continue
             if comparison:
                 from .stage_presentation import targets
-                if self._pair_ids[row['run_id'], row['stage_index']] != comparison:
+                if not self._in_comparison(row['run_id'], row['stage_index'], comparison):
                     continue
             if (run_id and row["run_id"] != run_id) or (stage_index is not None and row["stage_index"] != stage_index):
                 continue

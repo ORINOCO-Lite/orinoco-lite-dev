@@ -56,10 +56,15 @@ A separate rule groups identical complete HTML edits repeated across at least tw
 Both CLI and web retain the rules, counts, and every underlying diff.
 
 The web starts with buttons for two coherent site outputs.
-Each button shows its unclassified count, and sidebar counts and contents follow the selected pair.
+Each button shows the unclassified count across its linked stages; sidebar counts and contents follow the selected pair and stage.
+The default is the complete local Orinoco → Lite site comparison when supplied.
+Stages are associated through exact artifact digests and producing-operation links, not display labels.
 Stage choices sit directly below the comparison buttons; unavailable stages are explicit.
-Supporting investigations remain separately accessible.
+Related isolated-stage diagnostics and replay evidence open from their relevant change without switching the selected sites.
 Recognized patterns show their criteria and repeated-edit examples with access to all occurrences.
+Rules are ordered in `src/orinoco_lite/stage_patterns.py`: missing capture evidence first, narrow URL and metadata matches next, then exact repeated HTML edits; unmatched hunks remain unclassified.
+Capture coverage describes the saved snapshot: selected routes, saved files, successful responses, HTTP-confirmed absence, and errors or unknown outcomes.
+Routes outside the selection may never have been requested; their absence is not a verdict on the live site.
 `dev review show --view files` compares every original retained file, independently of findings and decisions.
 The web **Original-file diffs** view exposes the same text, added/deleted files, and explicit binary changes.
 **All observations** includes supporting size and fingerprint observations.

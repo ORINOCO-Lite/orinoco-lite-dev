@@ -63,8 +63,6 @@
 ## CLI feedback
 
 - Use the APM-managed `unix-cli-design` skill when designing or reviewing CLI behavior.
-  Restore it with `pixi run -e skills setup-skills` before starting an agent task; verify it with `pixi run -e skills audit-skills`.
-  Edit external skills in their canonical source repositories, not their generated deployments.
 
 - Keep help and argument parsing fast; defer expensive imports until execution.
 - Use `orinoco_lite.progress.progress` around potentially slow, silent operations.
@@ -72,6 +70,11 @@
 - Name the current operation, including an upstream program when it owns the work.
   Report distinct stages at their owning boundary; avoid duplicate outer timers when inner stages already report progress.
   Flush immediate setup and server-ready messages to stderr.
+
+## External skills
+
+Restore pinned skill dependencies with `pixi run -e skills setup-skills` before starting an agent task; verify them with `pixi run -e skills audit-skills`.
+Edit external skills in their source repositories, not the ignored APM deployments.
 
 ## Documentation
 

@@ -85,3 +85,21 @@ def test_repeated_mixed_edits_are_grouped_without_claiming_equivalence(tmp_path,
     assert model.findings(state='all',classification='recognized',group=matches[0]['group'])['total']==2
     assert model.original_files()['total']==2
     assert not model.decisions['decisions']
+
+
+def test_narrow_prefix_precedes_repetition_and_mixed_remainder_stays_visible(tmp_path, monkeypatch):
+    monkeypatch.setattr('orinoco_lite.stage_reports.execution_context', lambda: {})
+    left, right = tmp_path/'left', tmp_path/'right'; left.mkdir(); right.mkdir()
+    for name in ['a.html', 'b.html']:
+        (left/name).write_text('<script src="https://old.example/a.js"></script>')
+        (right/name).write_text('<script src="https://new.example/a.js"></script>')
+    (left/'mixed.html').write_text('<p>unique old</p><script src="https://old.example/b.js"></script>')
+    (right/'mixed.html').write_text('<p>unique new</p><script src="https://new.example/c.js"></script>')
+    changes, _ = compare_trees(left, right, rendered=True)
+    output = tmp_path/'report'
+    write_report(output, stage='rendering', left=left, right=right, findings=changes,
+        comparator='site-files/1', targets={'left':{'label':'Old','url':'https://old.example/'},'right':{'label':'New','url':'https://new.example/'}})
+    rules = classifications([load_report(output)])
+    assert sum(c.get('rule') == 'declared-url-prefix-change' for c in rules.values()) == 2
+    assert not any(c.get('rule') == 'repeated-html-edit' for c in rules.values())
+    assert any(c['category'] == 'unclassified' for c in rules.values())

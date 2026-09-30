@@ -235,7 +235,7 @@ def test_draft_preview_export_changed_conflict_and_absent_workflows(tmp_path, br
       assert.equal((await response).status(),200);
       await page.getByText('Saved to this draft. Preview matching before exporting.',{exact:true}).waitFor();
     };
-    assert.match(await page.locator('#integration').innerText(),/not established/);
+    assert.equal(await page.locator('#integration').count(), 0);
     assert.match(await page.locator('#stage-flow button').filter({hasText:'RDF outputs'}).innerText(),/incomplete/);
     await select('record:new');
     assert.match(await page.getByLabel('Unified diff', {exact:true}).innerText(), /9007199254740993/);
@@ -393,7 +393,7 @@ def test_site_buttons_and_sidebar_are_scoped_to_one_pair(tmp_path, browser_node)
     with review_servers(model, port=0) as server:
         browser(browser_node, server, """
         assert.equal(await page.locator('#comparison-buttons button').count(), 2);
-        assert.equal(await page.locator('#investigation-buttons button').count(), 1);
+        assert.equal(await page.getByText('Supporting investigations',{exact:true}).count(), 0);
         const first = options.pairs[0], second = options.pairs[1];
         for (const pair of [second, first]) {
           await page.getByRole('button',{name:pair.label+' ('+pair.counts.unclassified+')',exact:true}).click();
@@ -409,3 +409,57 @@ def test_site_buttons_and_sidebar_are_scoped_to_one_pair(tmp_path, browser_node)
         assert.equal(await page.locator('.comparison-choice #stage-flow').count(),1);
         console.log('{}');
         """, pairs=pairs)
+
+
+def test_complete_site_stage_pattern_diff_evidence_and_return(tmp_path, browser_node):
+    from orinoco_lite.site_compare import compare_trees
+    from orinoco_lite.stage_reports import write_operation
+    reports = []
+    sources = []
+    for side, flavor in [('upstream','upstream'),('lite','lite')]:
+        source = tmp_path/side/'projection'; source.mkdir(parents=True)
+        (source/'page.json').write_text(json.dumps(side))
+        write_operation(source, operation='projection', inputs={}, context={'flavor':flavor})
+        site = tmp_path/side/'website'; site.mkdir()
+        for name in ['a.html','b.html']:
+            (site/name).write_text(f'<p>{side}</p>')
+        write_operation(site, operation='rendering', inputs={'projection':source}, context={'flavor':flavor})
+        sources.append((source,site))
+    for index, stage in [(0,'projection'),(1,'rendering')]:
+        left,right = sources[0][index],sources[1][index]
+        changes,_=compare_trees(left,right,rendered=stage=='rendering')
+        output=tmp_path/(stage+'-report')
+        write_report(output,stage=stage,left=left,right=right,findings=changes,comparator='site-files/1',mode='complete-path')
+        reports.append(output)
+    output=tmp_path/'bundle';bundle(reports,output)
+    model=ReviewModel(output)
+    assert len(model.overview()['comparisons']) == 1
+    pair=model.overview()['comparisons'][0]
+    assert {s['stage'] for s in model.overview(pair['id'])['stages']} == {'projection','rendering'}
+    with review_servers(model,port=0) as server:
+        browser(browser_node,server,'''
+        assert.match(await page.locator('#selected-comparison').innerText(), /Locally built Orinoco → Locally built Lite/);
+        assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(),'0');
+        await page.locator('#stage-flow button').filter({hasText:'Projection'}).click();
+        await page.locator('#findings[aria-busy="false"]').waitFor();
+        await page.waitForFunction(() => document.querySelector('#scope-label').textContent.endsWith('projection'));
+        assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(),'1');
+        await page.locator('#stage-flow button').filter({hasText:'Rendering'}).click();
+        await page.waitForFunction(() => document.querySelector('#scope-label').textContent.endsWith('rendering'));
+        await page.getByRole('button',{name:/^Recognized patterns/}).click();
+        await page.locator('#findings[aria-busy="false"]').waitFor();
+        await page.locator('#pattern-summary button').filter({hasText:'Repeated HTML edits'}).click();
+        await page.locator('#findings[aria-busy="false"]').waitFor();
+        await page.locator('#findings .finding-row').first().click();
+        await page.getByLabel('Unified diff',{exact:true}).waitFor();
+        const selectedScope=await page.locator('#scope-label').innerText();
+        await page.getByRole('button',{name:'Open original-file diffs',exact:true}).click();
+        await page.getByLabel('Original-file unified diff',{exact:true}).waitFor();
+        await page.getByRole('button',{name:'Back to selected difference',exact:true}).click();
+        await page.getByLabel('Unified diff',{exact:true}).waitFor();
+        assert.equal(await page.locator('#scope-label').innerText(),selectedScope);
+        assert.equal(await page.locator('#findings .finding-row').count(),2);
+        await page.getByRole('tab',{name:'Artifacts',exact:true}).click();
+        assert.equal(await page.locator('#scope-label').innerText(),selectedScope);
+        console.log('{}');
+        ''')

@@ -16,3 +16,5 @@ apm_modules/
 
 # APM-generated skill dependencies
 /.agents/skills/unix-cli-design/
+/.agents/skills/ui-ux-pro-max/
+/.agents/skills/ui-ux-designer/

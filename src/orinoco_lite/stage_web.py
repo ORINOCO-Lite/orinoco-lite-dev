@@ -215,7 +215,7 @@ class _Handler(BaseHTTPRequestHandler):
             name = "index.html" if path == "/" else path[1:]
             self._file(self.server.application / name, ASSETS[name] + "; charset=utf-8")
         elif path == "/api/review":
-            self._json({**self.server.model.overview(params.get("comparison", "")), "csrf_token": self.server.token})
+            self._json({**self.server.model.overview(params.get("comparison", ""), params.get("stage", "")), "csrf_token": self.server.token})
         elif path == "/api/findings":
             self._json(self.server.model.findings(
                 state=params.get("state", "new"), stage=params.get("stage", ""), q=params.get("q", ""),

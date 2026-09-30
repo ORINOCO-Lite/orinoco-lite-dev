@@ -69,7 +69,7 @@ function empty(target, title, description) {
   target.replaceChildren(box);
 }
 const decisions = () => Array.isArray(state.overview.decisions) ? state.overview.decisions : state.overview.decisions?.decisions || [];
-const stageFor = row => state.overview.stages.find(stage => stage.run_id === row.run_id && stage.stage_index === row.stage_index)
+const stageFor = row => row.stage_context || state.overview.stages.find(stage => stage.run_id === row.run_id && stage.stage_index === row.stage_index)
   || state.overview.stages.find(stage => row.key?.startsWith(`${stage.run_id}/`) && row.finding?.id?.startsWith(`${stage.stage}:`));
 const decisionById = id => state.edits.get(id)?.decision || decisions().find(decision => decision.id === id);
 function viewCount(view) {
@@ -88,7 +88,7 @@ function renderNavigation() {
     const button = el('button', `nav-button${(state.view === key || (key === 'queue' && ['new', 'changed'].includes(state.view))) ? ' active' : ''}`); button.type = 'button';
     if (state.view === key) button.setAttribute('aria-current', 'page');
     button.append(el('span', '', title), el('span', 'nav-count', viewCount(key) == null ? '↗' : fmt(viewCount(key))));
-    button.addEventListener('click', () => { state.view = key; state.pattern = ''; state.group = ''; state.selected = null; if (key === 'problems' || state.stage === 'site-check') state.stage = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings(); });
+    button.addEventListener('click', () => { state.view = key; state.pattern = ''; state.group = ''; state.selected = null; state.offset = 0; renderNavigation(); renderStages(); loadFindings(); });
     return button;
   }));
   const view = views.find(([key]) => key === state.view) || [state.view, state.view === 'new' ? 'New findings' : 'Changed behavior', state.view === 'new' ? 'Findings with no saved decision.' : 'Prior decisions need to be reconsidered against this evidence.'];
@@ -97,10 +97,10 @@ function renderNavigation() {
   if (state.view === 'matched') { const rules = decisions().filter(decision => decision.rule); if (rules.length) $('#queue-description').textContent += ` ${rules.length} named equivalence rule${rules.length === 1 ? '' : 's'} in this review; every raw finding remains accessible.`; }
 }
 function renderStages() {
-  const visibleStages = state.overview.stages.filter(stage => !state.comparison || stage.comparison_id === state.comparison);
+  const visibleStages = state.overview.stages;
   const known = new Set(phases.map(([name]) => name));
   const extras = [...new Set(visibleStages.map(stage => stage.stage))].filter(name => !known.has(name)).map(name => [name, pretty(name), 'Additional comparison']);
-  $('#stage-flow').replaceChildren(...[...phases, ...extras].map(([name, label, description], index) => {
+  $('#stage-flow').replaceChildren(...[...phases, ...extras].filter(([name]) => visibleStages.some(s => s.stage === name)).map(([name, label, description], index) => {
     const available = visibleStages.filter(stage => stage.stage === name);
     const selected = state.stage === name || available.some(stage => state.stage === `${stage.run_id}/${stage.stage_index}`);
     const button = el('button', `stage-card${available.length ? '' : ' unavailable'}${selected ? ' selected' : ''}`);
@@ -111,12 +111,13 @@ function renderStages() {
     const step = el('span', 'stage-step'); step.append(el('span', '', String(index + 1).padStart(2, '0')), el('span', '', available.length ? '→' : '—'));
     button.append(step, el('span', 'stage-name', label), el('span', 'stage-status', status));
     const modes = el('span', 'stage-modes');
-    for (const [mode, label] of [['isolated', 'Isolated'], ['complete-path', 'Full path']]) {
+    for (const [mode, label] of [['isolated', 'Isolated stage'], ['complete-path', 'Complete path']]) {
       if (available.some(stage => stage.mode === mode)) modes.append(el('span', 'tag', label));
     }
     button.append(modes); button.title = `${description}. ${available.map(stage => `${stage.mode}: ${stage.status}`).join('; ') || 'No report supplied'}`;
     button.addEventListener('click', () => setStage(selected ? '' : name)); return button;
   }));
+  $('#stage-scope-note').textContent = 'Complete path follows the actual retained outputs into these two builds. Isolated-stage diagnostics test one boundary separately; their results do not replace the complete path.';
   const filter = $('#stage-filter');
   filter.replaceChildren(new Option('All reports and stages', ''));
   for (const [name, label] of [...phases, ...extras]) {
@@ -128,14 +129,13 @@ function renderStages() {
     filter.append(group);
   }
   filter.value = state.stage;
-  $('#integration').replaceChildren(el('strong', '', `Integration: ${pretty(state.overview.integration || 'not-established')}`),
-    el('p', '', state.overview.integration_reason || 'Review complete-path evidence before making an integration judgment.'));
+  $('#unavailable-stages').textContent = 'Not available for these sites: ' + phases.filter(([name]) => !visibleStages.some(s => s.stage === name)).map(([,label]) => label).join(', ') + '.';
 }
 function renderComparisons() {
   const pairs = new Map(state.overview.comparisons.map(pair => [pair.id, pair]));
   const hasDeployments = [...pairs.values()].some(pair => pair.deployment);
   const buttons = $('#comparison-buttons'); buttons.replaceChildren();
-  const investigations = $('#investigation-buttons'); investigations.replaceChildren();
+
   const choose = (key, label, target = buttons) => {
     const button = el('button', `comparison-button${state.comparison === key ? ' active' : ''}`, label);
     button.type = 'button'; button.setAttribute('aria-pressed', String(state.comparison === key));
@@ -144,15 +144,16 @@ function renderComparisons() {
   };
   for (const [key, pair] of pairs) {
     if (pair.deployment || !hasDeployments) choose(key, `${pair.label} (${fmt(pair.counts.unclassified)})`);
-    else choose(key, pair.label, investigations);
+
   }
   if (!hasDeployments) choose('', 'All comparisons');
-  $('#investigations').hidden = !hasDeployments;
+
   const selectedCounts = state.overview.classification_counts;
-  $('#comparison-summary').textContent = `${fmt(selectedCounts.unclassified)} unclassified · ${fmt(selectedCounts.recognized)} recognized · ${fmt(selectedCounts.coverage)} capture coverage observations = ${fmt(selectedCounts.differences)} differences. ${fmt(selectedCounts.supporting)} additional size/fingerprint observations remain in All observations.`;
+  $('#scope-label').textContent = `${pairs.get(state.comparison)?.label || 'Supplied reports'} · ${state.stage ? pretty(state.overview.stages.find(s => state.stage === `${s.run_id}/${s.stage_index}`)?.stage || state.stage) : 'All linked stages'}`;
+  $('#comparison-summary').textContent = `${fmt(selectedCounts.unclassified)} unclassified · ${fmt(selectedCounts.recognized)} recognized · ${fmt(selectedCounts.coverage)} capture coverage observations = ${fmt(selectedCounts.differences)} grouped differences in the selected stage. ${fmt(selectedCounts.supporting)} additional size/fingerprint observations remain in All observations.`;
   const panel = $('#comparison-targets'); panel.replaceChildren();
   const selected = pairs.get(state.comparison);
-  $('#selected-comparison').textContent = selected?.label || 'Supporting investigations';
+  $('#selected-comparison').textContent = selected?.label || 'Supplied stage reports';
   if (selected) for (const side of ['left', 'right']) {
     const target = selected.targets[side], item = el('div', 'target-card'); item.append(el('strong', '', target.label));
     const labels = {url:'Website', branch_url:'Related upstream branch', revision:'Reported revision',
@@ -170,16 +171,18 @@ function renderComparisons() {
     if (target.branch_url) item.append(el('p', 'inline-note', 'The linked branch provides source context; its current head may differ from the deployed commit.'));
     panel.append(item);
   }
+  renderSnapshotScope();
   if (!selected) panel.append(el('p', 'inline-note', 'Choose a comparison above to see its websites, source references, and capture details.'));
 }
 async function chooseComparison(key) {
   $('#findings').setAttribute('aria-busy', 'true');
-  stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = ''; state.pattern = ''; state.group = ''; state.query = ''; state.offset = 0;
+  stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = 'rendering'; state.pattern = ''; state.group = ''; state.query = ''; state.offset = 0;
   $('#search').value = '';
   try {
-    const overview = await api(`/api/review?${new URLSearchParams({comparison:key})}`);
+    const overview = await api(`/api/review?${new URLSearchParams({comparison:key,stage:state.stage})}`);
     if (state.comparison !== key) return;
     state.overview = overview;
+    if (!overview.stages.some(s => s.stage === state.stage)) state.stage = '';
     renderNavigation(); renderComparisons(); renderStages(); await loadFindings();
   } catch (error) {toast(error.message);}
 }
@@ -209,14 +212,17 @@ function renderPatternSummary() {
   }
   if (state.view === 'coverage') {
     $('#target-context').open = true;
+    renderSnapshotScope(target);
     target.append(el('p', 'notice', 'HTTP 404/410 means observed absence at capture time. File not retained means evidence is unavailable; it is not a verified online deletion.'));
   }
 }
-function setStage(value) {
+async function setStage(value) {
   stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value;
   const selectedStage = state.overview.stages.find(s => value === `${s.run_id}/${s.stage_index}` || value === s.stage);
   if (selectedStage) state.view = selectedStage.stage === 'site-check' ? 'problems' : 'queue';
-  renderNavigation(); state.offset = 0; renderStages(); loadFindings();
+  state.pattern = ''; state.group = '';
+  state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison,stage:state.stage})}`);
+  renderNavigation(); renderComparisons(); state.offset = 0; renderStages(); loadFindings();
 }
 function stashEditor() {
   const form = $('#decision-form');
@@ -342,9 +348,19 @@ function renderDetail() {
       const exact = el('details', 'json-details'); exact.append(el('summary', '', 'Exact left and right values'));
       const delta = el('div', 'delta-grid'); delta.append(valuePanel(row.targets?.left.label || 'Left', finding.before_present !== false, finding.before, 'before', row.value_views?.before), valuePanel(row.targets?.right.label || 'Right', finding.after_present !== false, finding.after, 'after', row.value_views?.after)); exact.append(delta); body.append(exact);
       const originals = el('button', 'text-button', 'Open original-file diffs'); originals.type = 'button';
-      originals.onclick = () => {state.view = 'files'; state.selected = null; state.stage = `${row.run_id}/${row.stage_index}`; state.query = ''; $('#search').value = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings();}; body.append(originals);
+      originals.onclick = async () => {
+        const result = await api(`/api/original-files?${new URLSearchParams({comparison:state.comparison,stage:`${row.run_id}/${row.stage_index}`,q:finding.subject,limit:500})}`);
+        const file = result.items.find(item => item.subject === finding.subject);
+        if (file) renderOriginal({...file,returnFinding:row}); else toast('No original-file difference for this subject.');
+      }; body.append(originals);
       if (row.classification?.category === 'recognized' || row.classification?.category === 'coverage') body.append(el('h4', '', row.classification.label), el('p', 'inline-note', row.classification.criteria), details('Exact classification evidence', row.classification));
       renderAnnotations(body, row);
+      if (row.returnFinding) {const back = el('button','button','Back to selected difference'); back.onclick = () => {state.selected = row.returnFinding; renderDetail();}; body.prepend(back);}
+      for (const related of row.related_diagnostics || []) {
+        const inspect = el('button','text-button','Inspect isolated-stage diagnostic');
+        inspect.onclick = async () => {const other = await api(`/api/finding?${new URLSearchParams({key:related.key})}`); state.selected = {...other,returnFinding:row}; renderDetail();};
+        body.append(el('p','inline-note','Related diagnostic shares a retained artifact with this stage; it is not the complete-path comparison.'),inspect);
+      }
       if (row.supporting_observations?.length) body.append(details('Supporting observations · size and fingerprint', row.supporting_observations));
       if (row.category !== 'problems') {
         const effects = el('section', 'links-panel'); effects.append(el('h4', '', 'Downstream effects'));
@@ -352,7 +368,13 @@ function renderDetail() {
         for (const effect of row.effects || []) {
           effects.append(el('p', '', effect.conclusion), el('p', 'inline-note', effect.scope));
           const inspect = el('button', 'text-button', 'Inspect replay comparison'); inspect.type = 'button';
-          inspect.addEventListener('click', () => {const pair = state.overview.comparisons.find(p => p.label === 'Test a change’s effect on the website'); if (pair) chooseComparison(pair.id);}); effects.append(inspect);
+          inspect.addEventListener('click', () => {
+            const experiment = row.experiments.find(item => item.run_id === effect.run_id);
+            if (!experiment) return;
+            const panel = el('section', 'context-stage'); effects.append(panel);
+            panel.append(el('h4', '', 'Selected-change experiment'), el('p', '', effect.scope), details('Experiment scope and command', {scope:experiment.scope,command:experiment.command}));
+            renderArtifacts(panel, experiment, row); inspect.remove();
+          }); effects.append(inspect);
         }
         body.append(effects);
       }
@@ -626,7 +648,7 @@ function wire() {
   $('#page-next').addEventListener('click', () => { state.offset += state.limit; loadFindings(); });
   $('#draft-open').addEventListener('click', () => { stashEditor(); renderDraft(); $('#draft-dialog').showModal(); });
   $('#context-open').addEventListener('click', () => { renderContext(); $('#context-dialog').showModal(); });
-  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'queue'; state.stage = ''; state.query = ''; state.offset = 0; $('#search').value = ''; renderNavigation(); renderComparisons(); renderStages(); loadFindings(); });
+  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'queue'; state.query = ''; $('#search').value = ''; setStage(''); });
   for (const button of $$('[data-close]')) button.addEventListener('click', () => document.getElementById(button.dataset.close).close());
   $('#draft-preview').addEventListener('click', () => previewDraft()); $('#draft-export').addEventListener('click', () => previewDraft(true));
   window.addEventListener('beforeunload', event => { if (state.edits.size || state.dirtyForms.size) { event.preventDefault(); event.returnValue = ''; } });
@@ -635,7 +657,8 @@ async function init() {
   try {
     state.overview = await api('/api/review');
     state.comparison = state.overview.comparisons.find(p => p.deployment)?.id || state.overview.comparisons[0]?.id || '';
-    if (state.comparison) state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison})}`);
+    state.stage = state.overview.comparisons.some(p => p.deployment) ? 'rendering' : '';
+    if (state.comparison) state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison,stage:state.stage})}`);
     $('#review-title').textContent = state.overview.title || 'Staged comparison'; document.title = `${state.overview.title || 'Change review'} · Orinoco`;
 
     $('#base-label').textContent = `Decision base ${state.overview.base_digest.slice(0, 12)}`;
@@ -656,6 +679,7 @@ async function renderOriginal(row) {
     const item = await api(`/api/original-file?${new URLSearchParams({key: row.key})}`);
     if (request !== state.detailRequest) return;
     body.replaceChildren(el('h3', '', row.subject), el('h4', '', 'Original-file diff'), el('p', 'inline-note', 'Computed from retained bytes. No normalization, grouping, or saved decision hides files in this view.'));
+    if (row.returnFinding) { const back = el('button', 'button', 'Back to selected difference'); back.onclick = () => {state.selected = row.returnFinding; renderDetail();}; body.prepend(back); }
     if (item.scope.complete === false) body.append(el('p', 'notice', 'Capture coverage is limited. Absence from retained files is not proof of absence online; inspect the capture evidence.'));
     showUnified(body, item.unified_diff);
     for (const side of ['left', 'right']) {
@@ -701,4 +725,23 @@ async function browseAnnotation(target, annotation, evidence, path) {
       else target.append(el('p', '', 'Binary evidence: download the original file.'));
     }
   } catch (error) {target.replaceChildren(el('p', 'form-error', error.message));}
+}
+
+function renderSnapshotScope(destination) {
+  const panel = destination || $('#snapshot-scope'); panel.replaceChildren();
+  panel.append(el('h3', '', 'What was saved?'), el('p', 'inline-note', 'This describes the saved website snapshots, not everything that exists on the live sites.'));
+  for (const item of state.overview.snapshot_scope || []) {
+    const card = el('section','context-stage'); card.append(el('h4','',item.label),el('p','',item.description));
+    if (item.kind === 'local') card.append(el('p','',`${fmt(item.files)} retained files from the local build.`));
+    else {
+      card.append(el('p','',`${fmt(item.requested_routes)} selected routes; ${fmt(item.files)} website files saved. Response index: ${fmt(item.successful_responses)} successful HTTP responses, ${fmt(item.confirmed_absences)} HTTP 404/410 responses, ${fmt(item.error_responses)} other HTTP errors. ${fmt(item.requested_without_response)} selected routes have no indexed response.`));
+      card.append(el('p','inline-note','A missing response is not proof of absence: retrieval may have failed or stopped. Routes outside the selected list may never have been requested; discovered assets are also fetched. Without request evidence, the outcome remains unknown.'));
+      card.append(details('Selected routes',item.routes));
+      for (const role of item.evidence_roles) {
+        const link = el('a','text-button',role.endsWith('http-cdx') ? 'HTTP response index' : role.endsWith('wget-log') ? 'Retrieval log' : 'HTTP archive');
+        link.href = `/download?${new URLSearchParams({run_id:item.run_id,stage_index:item.stage_index,role})}`; card.append(link);
+      }
+    }
+    panel.append(card);
+  }
 }
