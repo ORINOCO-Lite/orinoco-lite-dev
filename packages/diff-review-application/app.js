@@ -126,27 +126,37 @@ function renderStages() {
     el('p', '', state.overview.integration_reason || 'Review complete-path evidence before making an integration judgment.'));
 }
 function renderComparisons() {
-  const select = $('#comparison-filter'), pairs = new Map();
-  for (const stage of state.overview.stages) pairs.set(stage.comparison_id, stage.targets);
-  select.replaceChildren(new Option('All supplied comparisons', ''));
-  for (const [key, targets] of pairs) select.append(new Option(`${targets.left.label} → ${targets.right.label}`, key));
-  select.value = state.comparison;
+  const pairs = new Map();
+  for (const stage of state.overview.stages) pairs.set(stage.comparison_id, stage);
+  const buttons = $('#comparison-buttons'); buttons.replaceChildren();
+  const choose = (key, label) => {
+    const button = el('button', `comparison-button${state.comparison === key ? ' active' : ''}`, label);
+    button.type = 'button'; button.setAttribute('aria-pressed', String(state.comparison === key));
+    button.onclick = () => { stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = ''; state.offset = 0; renderComparisons(); renderStages(); loadFindings(); };
+    buttons.append(button);
+  };
+  for (const [key, stage] of pairs) choose(key, stage.comparison_label || `${stage.targets.left.label} → ${stage.targets.right.label}`);
+  choose('', 'All comparisons');
   const panel = $('#comparison-targets'); panel.replaceChildren();
-  const targets = pairs.get(state.comparison);
-  if (targets) for (const side of ['left', 'right']) {
-    const item = el('div', 'target-card'); item.append(el('strong', '', `${pretty(side)}: ${targets[side].label}`));
-    for (const [key, value] of Object.entries(targets[side])) {
+  const selected = pairs.get(state.comparison);
+  if (selected) for (const side of ['left', 'right']) {
+    const target = selected.targets[side], item = el('div', 'target-card'); item.append(el('strong', '', target.label));
+    const labels = {url:'Website', branch_url:'Related upstream branch', revision:'Reported revision',
+      package_revision:'Package commit', captured_at:'Captured', capture_finished_at:'Capture finished', deployed_at:'Deployed', capture_scope:'Capture coverage', http_responses:'HTTP responses', capture_status:'Capture result'};
+    for (const [key, value] of Object.entries(target)) {
       if (key === 'label' || !value) continue;
-      const line = el('p', 'inline-note'); line.append(document.createTextNode(`${pretty(key.replaceAll('_', '-'))}: `));
+      const line = el('p', 'inline-note'); line.append(document.createTextNode(`${labels[key] || pretty(key.replaceAll('_', '-'))}: `));
       if (['url', 'branch_url'].includes(key) && /^https?:\/\//i.test(value)) {
         const link = el('a', '', value); link.href = value; link.target = '_blank'; link.rel = 'noopener noreferrer'; line.append(link);
       } else line.append(document.createTextNode(value));
       item.append(line);
     }
-    if (targets[side].branch_url) item.append(el('p', 'inline-note', 'Related branch; its current head is not proof of the deployed revision.'));
+    if (target.url && !target.revision) item.append(el('p', 'inline-note', 'Deployed commit: not identified from the captured site.'));
+    if (target.url && !target.deployed_at) item.append(el('p', 'inline-note', 'Deployment time: not identified; capture time is when this review fetched the site.'));
+    if (target.branch_url) item.append(el('p', 'inline-note', 'The linked branch provides source context; its current head may differ from the deployed commit.'));
     panel.append(item);
   }
-  select.onchange = () => { stashEditor(); state.selected = null; state.comparison = select.value; state.stage = ''; state.offset = 0; renderComparisons(); renderStages(); loadFindings(); };
+  if (!selected) panel.append(el('p', 'inline-note', 'Choose a comparison above to see its websites, source references, and capture details.'));
 }
 function setStage(value) {
   stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value;
@@ -280,7 +290,7 @@ function renderDetail() {
         for (const effect of row.effects || []) {
           effects.append(el('p', '', effect.conclusion), el('p', 'inline-note', effect.scope));
           const inspect = el('button', 'text-button', 'Inspect replay comparison'); inspect.type = 'button';
-          inspect.addEventListener('click', () => {state.comparison = ''; $('#comparison-filter').value = ''; setStage(`${effect.run_id}/0`);}); effects.append(inspect);
+          inspect.addEventListener('click', () => {state.comparison = ''; renderComparisons(); setStage(`${effect.run_id}/0`);}); effects.append(inspect);
         }
         body.append(effects);
       }
@@ -562,6 +572,7 @@ function wire() {
 async function init() {
   try {
     state.overview = await api('/api/review');
+    state.comparison = state.overview.stages.find(s => s.targets?.left.label === 'Orinoco' && s.targets?.right.label === 'Orinoco Lite')?.comparison_id || state.overview.stages[0]?.comparison_id || '';
     $('#review-title').textContent = state.overview.title || 'Staged comparison'; document.title = `${state.overview.title || 'Change review'} · Orinoco`;
     const outstanding = await api('/api/findings?state=outstanding&category=differences&raw=false&offset=0&limit=1');
     state.overview.counts.outstanding = outstanding.total;

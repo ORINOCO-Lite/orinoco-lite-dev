@@ -23,7 +23,28 @@ orinoco-lite dev review show draft-comparison | less
 Link the relevant upstream Aneksajo hub branch when available.
 Its current head is not proof of the deployed commit: a branch may advance after deployment.
 Supply revisions and capture/deployment timestamps only from retained evidence.
-The command reads local artifacts; it does not fetch websites or infer missing intermediate outputs.
+`compare` reads retained artifacts; use `capture` first to fetch a live site.
+Capture composes GNU Wget, retains original response bodies without rewriting links, and saves its WARC HTTP archive, response index, and log.
+Supply explicit routes, or use a local rendered tree to choose the routes to request:
+
+```sh
+orinoco-lite dev review capture https://www.psychoinformatics.de/ \
+  --name official-today --label "Official site" \
+  --branch-url https://hub.psychoinformatics.de/www/www-from-model/src/branch/published \
+  --routes-from sourcedata/complete-path/upstream/website --route graph.json
+orinoco-lite dev review capture https://www-draft.psychoinformatics.de/ \
+  --name draft-today --label "Draft site" \
+  --branch-url https://hub.psychoinformatics.de/www/www-from-model/src/branch/main \
+  --routes-from sourcedata/complete-path/upstream/website --route graph.json
+orinoco-lite dev review compare sourcedata/captures/official-today/site \
+  sourcedata/captures/draft-today/site --name official-vs-draft
+```
+
+Capture requests selected routes and Wget-discovered same-host page assets, not an exhaustive crawl or JavaScript execution.
+HTTP 404/410 responses establish observed absence; network errors and unreceived responses make retrieval incomplete.
+The comparison imports capture labels, timestamps, URLs, source-branch references, and HTTP evidence automatically.
+It explicitly limits claims to retained files; missing intermediate data or deployment coordinates are never inferred.
+For durable acquisitions, run the public capture command through the downstream's `datalad run` with explicit inputs and outputs.
 
 ## Read differences and investigate effects
 
@@ -51,6 +72,9 @@ This tests that substitution for those inputs and that renderer, not every deplo
 Files with multiple semantic changes require a more focused investigation.
 
 ## Open a review
+
+Comparison buttons name the task or the two sites.
+Selecting one exposes its target details above the stage diagram.
 
 After running comparisons, bundle and open them:
 

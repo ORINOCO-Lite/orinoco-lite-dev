@@ -1588,3 +1588,8 @@ main {
 .diff-hunk { color: #405b85; }
 
 .stage-flow { grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); }
+
+#comparison-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.comparison-button { border: 1px solid #cbd9d5; border-radius: 8px; padding: 10px 14px; background: white; color: #244e49; cursor: pointer; font: inherit; }
+.comparison-button.active { background: #e1efea; border-color: #397b70; box-shadow: inset 0 0 0 1px #397b70; font-weight: 650; }
+.comparison-button:focus-visible { outline: 3px solid #3b8175; outline-offset: 3px; }

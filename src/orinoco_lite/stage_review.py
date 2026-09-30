@@ -51,6 +51,8 @@ def register(subparsers) -> None:
     show.add_argument("--format", choices=("diff", "json"), default="diff")
     from .stage_investigation import register as register_investigation
     register_investigation(commands)
+    from .stage_capture import register as register_capture
+    register_capture(commands)
     serve = commands.add_parser("serve", help="open a portable review on a local web server")
     options(serve, replace=False)
     serve.add_argument("--port", type=int, default=8765)
@@ -456,6 +458,9 @@ def apply_changes(decisions: dict, changes: dict) -> dict:
 def execute(args) -> int:
     from .diagnostics import directory, report_paths, prepare_output, require
     root = directory(args)
+    if args.review_command == "capture":
+        from .stage_capture import execute as capture
+        return capture(args, root)
     if args.review_command in {"compare", "replay"}:
         from .stage_investigation import execute as investigate
         return investigate(args, root)

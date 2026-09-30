@@ -188,12 +188,13 @@ class ReviewModel:
             for artifact in item["artifacts"].values():
                 artifact["path"] = safe_artifact(root, artifact["path"]).relative_to(self.root).as_posix()
             result["stages"].append(item)
-        from .stage_presentation import targets
+        from .stage_presentation import targets, comparison_label
         from collections import Counter
         for item in result['stages']:
             original = self._stages[item['run_id'], item['stage_index']][1]
             item['targets'] = targets(original)
             item['comparison_id'] = json_digest(item['targets'])
+            item['comparison_label'] = comparison_label(original)
         result['presentation_counts'] = dict(Counter(row['category'] for row in self.review['findings'] if not row['supporting']))
         result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
         return result

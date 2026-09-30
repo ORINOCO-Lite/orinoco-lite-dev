@@ -65,6 +65,8 @@ const options = JSON.parse(fs.readFileSync(0, 'utf8'));
     page.on('pageerror', error => pageErrors.push(error.message));
     await page.goto(options.url);
     await page.locator('#findings[aria-busy="false"]').waitFor();
+    await page.getByRole('button', {name:'All comparisons',exact:true}).click();
+    await page.locator('#findings[aria-busy="false"]').waitFor();
 """ + script + """
     assert.deepEqual(pageErrors, []);
   } finally { await browser.close(); }
@@ -325,8 +327,8 @@ def test_unified_diff_problem_separation_and_target_selection(tmp_path, browser_
         await page.locator('#findings .finding-row').click();
         assert.match(await page.locator('#detail').innerText(), /not compared across targets/);
         await page.getByRole('button',{name:/^Differences/}).click();
-        await page.getByLabel('What are you comparing?').selectOption({label:'Orinoco → Lite candidate'});
-        await page.getByText('revision: abc123',{exact:true}).waitFor();
+        await page.getByRole('button',{name:'Orinoco → Lite candidate',exact:true}).click();
+        await page.getByText('Reported revision: abc123',{exact:true}).waitFor();
         await page.locator('#findings .finding-row').filter({hasText:'person.json'}).waitFor();
         assert.equal(await page.locator('#findings .finding-row').count(),1);
         console.log('{}');

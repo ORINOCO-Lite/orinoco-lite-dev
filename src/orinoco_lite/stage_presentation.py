@@ -12,11 +12,33 @@ def targets(stage):
         artifact = stage['artifacts'].get(side, {})
         operation = artifact.get('operation') or {}
         context = operation.get('context', {})
-        label = {'upstream': 'Orinoco (selected upstream)', 'lite': 'Orinoco Lite'}.get(context.get('flavor'), operation.get('operation', side.title()))
-        result[side] = {'label': label,
-                        'package_revision': context.get('package_commit'),
-                        **stage.get('targets', {}).get(side, {})}
+        defaults = {
+            'storage': ('Original records', 'Stored and exported records'),
+            'service': ('Records sent to service', 'Records returned by service'),
+            'site-check': ('Website being checked', 'Website being checked'),
+            'site-input-import': ('Upstream site inputs', 'Imported site inputs'),
+        }
+        default = defaults.get(stage['stage'], ('Reference output', 'Candidate output'))[side == 'right']
+        label = {'upstream': 'Orinoco', 'lite': 'Orinoco Lite'}.get(context.get('flavor'), default)
+        captured = context.get('target', {})
+        result[side] = {'label': label, **({'package_revision': context.get('package_commit')} if not captured else {}),
+                        **captured, **stage.get('targets', {}).get(side, {})}
+    if stage.get('scope', {}).get('replay'):
+        result['left']['label'] = 'Unchanged build'
+        result['right']['label'] = 'Build with the selected value substituted'
     return result
+
+
+def comparison_label(stage):
+    pair = targets(stage)
+    if not stage.get('targets'):
+        special = {'storage': 'Record storage', 'service': 'Service round-trip',
+                   'site-check': 'Local website checks', 'site-input-import': 'Imported site content'}
+        if stage['stage'] in special:
+            return special[stage['stage']]
+    if stage.get('scope', {}).get('replay'):
+        return 'Test a change’s effect on the website'
+    return pair['left']['label'] + ' → ' + pair['right']['label']
 
 
 def annotate(rows):

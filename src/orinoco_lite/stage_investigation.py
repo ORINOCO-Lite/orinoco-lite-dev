@@ -20,7 +20,7 @@ def register(commands):
     compare.add_argument('--right-base-url', default='/')
     compare.add_argument('--mode', choices=('isolated', 'complete-path'), default='complete-path')
     for side in ('left', 'right'):
-        compare.add_argument(f'--{side}-label', required=True, help='e.g. Orinoco, Lite candidate, Official site, Draft deployment')
+        compare.add_argument(f'--{side}-label', help='e.g. Orinoco, Lite candidate, Official site, Draft deployment')
         for field, help_text in (
             ('url', 'site URL for retained deployment artifacts; does not fetch the site'),
             ('branch-url', 'related upstream hub branch; does not establish the deployed revision'),
@@ -68,12 +68,33 @@ def execute(args, root):
             raise ConfigurationError('--check-links requires --stage rendering')
         if args.check_links:
             report_output(root, args.name + '-checks')
+        from .stage_reports import operation_receipt
+        receipts = {side: operation_receipt(path, allow_failed=True) for side, path in [('left', left), ('right', right)]}
         targets = {side: {field: getattr(args, f'{side}_{field}') for field in
                          ('label', 'url', 'branch_url', 'revision', 'captured_at', 'deployed_at')
                          if getattr(args, f'{side}_{field}') is not None}
                    for side in ('left', 'right')}
+        for side in ('left', 'right'):
+            retained = (receipts[side] or {}).get('context', {}).get('target', {})
+            targets[side] = {**retained, **targets[side]}
+            targets[side].setdefault('label', 'Reference output' if side == 'left' else 'Candidate output')
+        captures = {side: r['context']['capture'] for side, r in receipts.items() if r and 'capture' in r['context']}
+        scope['captures'] = captures
+        if captures:
+            scope['complete'] = False
+            scope['selection'] = 'Retained capture files only; missing files may be outside capture coverage'
+        evidence = {}
+        for side, source in [('left', left), ('right', right)]:
+            if side in captures:
+                for suffix in ('http.warc.gz', 'http.cdx', 'wget.log'):
+                    candidate = source.parent / suffix
+                    if candidate.is_file():
+                        evidence[side + '-' + suffix.replace('.', '-')] = candidate
+        incomplete = any((r or {}).get('context', {}).get('status') == 'failed' for r in receipts.values())
         report = write_report(output, stage=args.stage, left=left, right=right, findings=findings,
                               comparator=comparator, scope=scope, mode=args.mode, targets=targets,
+                              status='failed' if incomplete else 'complete', evidence=evidence,
+                              diagnostics=['Capture retrieval was incomplete; inspect retained HTTP evidence.'] if incomplete else [],
                               command=getattr(args, 'invocation', []))
         if args.check_links:
             from .site_compare import check_site, finding
@@ -99,7 +120,8 @@ def execute(args, root):
                 problems.append(row)
             write_report(root / 'reports' / (args.name + '-checks'), stage='site-check',
                          left=left, right=right, findings=problems, comparator='paired-local-html-targets/1',
-                         scope={'complete': True, 'checks': scopes}, mode=args.mode, targets=targets,
+                         scope={'complete': not bool(captures), 'checks': scopes}, mode=args.mode, targets=targets,
+                         status='failed' if incomplete else 'complete',
                          command=getattr(args, 'invocation', []))
     else:
         source = report_paths(root, [args.report])[0]
@@ -114,6 +136,8 @@ def execute(args, root):
     if args.review_command == 'replay':
         print('No downstream effect observed in replay.' if not report['stages'][0]['findings'] else
               'Downstream differences observed; inspect the replay report.')
+    if report['stages'][0]['status'] != 'complete':
+        print('Incomplete capture: differences describe retained files only; inspect HTTP evidence.')
     print(f'Report: {output}')
     if args.review_command == 'compare' and args.check_links:
         from collections import Counter
