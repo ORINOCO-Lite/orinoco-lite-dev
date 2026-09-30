@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -44,6 +45,7 @@ class WwwFromModelResolverTests(unittest.TestCase):
         self.website = self._repository(
             "www-from-model",
             {
+                ".gitattributes": "page_templates/record.md filter=annex\n",
                 "content/german.md": "German fixture must remain upstream\n",
                 "page_templates/record.md": "www-from-model fixture\n",
             },
@@ -236,10 +238,15 @@ class WwwFromModelResolverTests(unittest.TestCase):
              str(self.website), "sourcedata/www-from-model")
         prepared = self.workspace / "sourcedata/www-from-model"
         _git(prepared, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+        invoked = self.root / "annex-invoked"
+        _git(prepared, "config", "filter.annex.process", f"touch {shlex.quote(str(invoked))}; exit 1")
+        # Force Git to inspect bytes instead of trusting the index's stat cache.
+        os.utime(prepared / "page_templates/record.md", (0, 0))
         with patch("orinoco_lite.www_from_model._package_source", return_value=(
                 str(self.engineering), self.engineering_commit)):
             source = resolve_www_from_model(self.workspace, self.root / "resources")
         self.assertEqual(source, prepared.resolve())
+        self.assertFalse(invoked.exists())
         self.assertFalse(list((self.workspace / ".orinoco").rglob("themes")))
 
     def test_missing_package_source_commit_is_rejected(self) -> None:

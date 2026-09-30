@@ -52,6 +52,12 @@ def _git(
         f"core.hooksPath={os.devnull}",
         "-c",
         "core.fsmonitor=false",
+        # Source resolution is a Git-only software operation, including when a
+        # maintainer has initialized Annex in a reusable authored-input checkout.
+        "-c", "filter.annex.process=",
+        "-c", "filter.annex.clean=cat",
+        "-c", "filter.annex.smudge=cat",
+        "-c", "filter.annex.required=false",
         "-C",
         os.fspath(repository),
         *arguments,
