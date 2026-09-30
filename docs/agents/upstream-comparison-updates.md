@@ -28,3 +28,6 @@ Workflow permission allows template updates to change the parent's workflow file
 Restrict the engineering repository's `upstream-comparison` environment to `main`, with any required reviewers.
 Only the separate publishing job uses the token; pull requests are opened as its owner.
 The generic downstream template and curation service require no changes.
+
+For a new imported subdataset, pass `--site-specific-url https://github.com/ORINOCO-Lite/psychoinformatics-site-specific.git` to `setup-upstream`.
+Setup records its clone URL and configures the local child remote; repository creation and publication remain explicit.

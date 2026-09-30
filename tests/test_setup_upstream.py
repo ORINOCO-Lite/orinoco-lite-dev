@@ -389,3 +389,23 @@ def test_review_stays_under_twenty_lines_with_many_local_changes(setup):
     assert "\x1b[" not in result.stdout
     assert "dev enable" not in result.stdout
     assert "DataLad" not in result.stdout
+
+
+def test_site_specific_publication_url_is_recorded_after_population(setup):
+    run, *_ = setup
+    url = "https://github.com/example/site-inputs.git"
+    result, calls = run("--site-specific-url", url)
+    assert result.returncode == 0, result.stderr
+    registration = next(c for c in calls if "set-url" in c)
+    assert registration[-3:] == ["set-url", "site-specific", url]
+    assert registration[:4] == ["pixi", "run", "datalad", "run"]
+    assert ".gitmodules" in registration
+    assert calls.index(registration) > next(i for i, c in enumerate(calls) if "populate" in c)
+    assert any("siblings" in c and c[-1] == url for c in calls)
+
+
+def test_site_specific_url_rejects_directory_layout_before_creation(setup):
+    run, _, _, destination, *_ = setup
+    result, _ = run("--site-specific-url", "https://example.invalid/inputs.git", "--site-layout", "directory")
+    assert result.returncode != 0
+    assert not destination.exists()
