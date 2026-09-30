@@ -252,6 +252,48 @@ class WwwFromModelResolverTests(unittest.TestCase):
             with self.assertRaisesRegex(IntegrityError, "source commit"):
                 resolve_www_from_model(self.workspace, resources)
 
+    def _register_website(self):
+        _git(self.workspace, "init", "-q")
+        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
+             str(self.website), "sourcedata/www-from-model")
+        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+        return self.workspace / "sourcedata/www-from-model"
+
+    def test_registered_source_reuses_prepared_checkout_without_duplicate(self):
+        source = self._register_website()
+        (self.workspace / ".orinoco-lite").mkdir()
+        (self.workspace / ".orinoco-lite/dev").symlink_to(self.engineering)
+        with patch("orinoco_lite.www_from_model._package_source",
+                   return_value=(str(self.engineering), self.engineering_commit)):
+            self.assertEqual(resolve_www_from_model(self.workspace, self.root), source.resolve())
+        self.assertFalse((self.workspace / ".orinoco").exists())
+
+    def test_incomplete_registered_dependencies_use_an_independent_checkout(self):
+        source = self._register_website()
+        _git(source / "themes/congo", "submodule", "deinit", "--force", "--all")
+        with patch("orinoco_lite.www_from_model._package_source",
+                   return_value=(str(self.engineering), self.engineering_commit)):
+            resolved = resolve_www_from_model(self.workspace, self.root)
+        self.assertNotEqual(resolved, source.resolve())
+        self.assertTrue((resolved / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
+        self.assertFalse((source / "themes/congo/vendor/leaf/assets/leaf.txt").exists())
+
+    def test_selected_relative_url_uses_engineering_origin_without_website_checkout(self):
+        from orinoco_lite.www_from_model import selected_www_from_model_source
+
+        _git(self.engineering, "config", "--file", ".gitmodules",
+             "submodule.submodules/www-from-model.url", "../www-from-model")
+        _git(self.engineering, "add", ".gitmodules")
+        _git(self.engineering, "commit", "-qm", "test: use relative upstream URL")
+        commit = _git(self.engineering, "rev-parse", "HEAD")
+        with patch("orinoco_lite.www_from_model._package_source",
+                   return_value=(str(self.engineering), commit)):
+            repository, revision = selected_www_from_model_source(self.workspace, self.root)
+        self.assertEqual(Path(repository).resolve(), self.website.resolve())
+        self.assertEqual(revision, self.website_commit)
+        cache = next((self.workspace / ".orinoco/www-from-model").glob("engineering-*"))
+        self.assertFalse((cache / "submodules/www-from-model/themes").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
