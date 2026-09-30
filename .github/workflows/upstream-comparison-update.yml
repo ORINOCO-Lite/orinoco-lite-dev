@@ -112,7 +112,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/comparison"
           cp sourcedata/downloaded/records.jsonl "$RUNNER_TEMP/comparison/base-capture.jsonl"
-          pixi run --manifest-path ../engineering/pixi.toml orinoco-lite --root "$PWD" dev records yaml-to-jsonl --output "$RUNNER_TEMP/comparison/base-records.jsonl"
+          pixi run orinoco-lite dev records yaml-to-jsonl --output "$RUNNER_TEMP/comparison/base-records.jsonl"
       - name: Record template and package update
         id: update
         if: inputs.update_mode == 'Software only'
