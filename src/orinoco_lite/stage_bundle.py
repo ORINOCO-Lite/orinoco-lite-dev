@@ -236,6 +236,7 @@ class ReviewModel:
             item['comparison_label'] = comparison_label(original)
         result['presentation_counts'] = dict(Counter(row['category'] for row in self.review['findings'] if not row['supporting']))
         result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
+        result['observation_count'] = sum(row['category'] == 'differences' for row in self.review['findings'])
         result['annotations'] = deepcopy(self.annotations)
         return result
 

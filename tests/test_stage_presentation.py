@@ -49,6 +49,7 @@ def test_group_unified_diff_problems_and_exact_values(tmp_path):
     assert len(row['supporting_observations']) == 2
     assert model.findings(category='problems', raw=False)['total'] == 1
     assert model.findings(raw=True)['total'] == 4
+    assert model.overview()['observation_count'] == 3
     assert model.overview()['presentation_counts'] == {'differences': 1, 'problems': 1}
 
 

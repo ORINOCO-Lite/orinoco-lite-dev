@@ -75,7 +75,7 @@ function viewCount(view) {
   if (view === 'files') return null;
   if (view === 'problems') return state.overview.presentation_counts?.problems || 0;
   if (view === 'queue') return (counts.new || 0) + (counts.changed || 0);
-  if (view === 'all') return ['new', 'changed', 'matched'].reduce((total, key) => total + (counts[key] || 0), 0);
+  if (view === 'all') return state.overview.observation_count;
   if (view === 'outstanding') return counts.outstanding;
   return counts[view] || 0;
 }
