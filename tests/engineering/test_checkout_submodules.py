@@ -73,6 +73,8 @@ def add_submodule(parent: Path, source: Path, path: str) -> None:
         source.resolve().as_uri(),
         path,
     )
+    git(parent, "config", "-f", ".gitmodules", f"submodule.{path}.branch", "main")
+    git(parent, "add", ".gitmodules")
 
 
 def is_shallow(repository: Path) -> bool:
