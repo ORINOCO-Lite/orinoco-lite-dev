@@ -92,16 +92,14 @@ def _selection(args):
 
 def _report(args, left, right, findings, scope, *, comparator, evidence=None):
     from .stage_reports import write_report
-    print(f"{args.stage}: {len(findings)} raw differences")
-    print(f"  left: {left}\n  right: {right}")
-    for item in findings[:30]:
-        print(f"  {item['change']}: {item['subject']} / {'/'.join(map(str, item['location']))}")
-    if len(findings) > 30:
-        print(f"  {len(findings) - 30} additional findings; inspect the report")
     if args.report:
         report = write_report(_path(args, args.report), stage=args.stage, left=left, right=right,
                              findings=findings, comparator=comparator, scope=scope, mode=args.mode,
                              evidence=evidence, command=getattr(args, "invocation", []))
+        from .stage_presentation import annotate, render_rows
+        stage = report['stages'][0]
+        rows = annotate([{'key': f['id'], 'report': str(args.report), 'finding': f} for f in stage['findings']])
+        print(render_rows(rows, {r['key']: (stage, _path(args, args.report)) for r in rows}, category='all') or 'No differences or possible problems.')
         print(f"  report: {_path(args, args.report)}")
     return int(bool(findings))
 

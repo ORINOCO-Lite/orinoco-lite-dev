@@ -1574,3 +1574,17 @@ main {
     padding-right:155px;
   }
 }
+
+/* Read the comparison before judging its changes. */
+.comparison-choice { margin: 0 0 24px; padding: 20px; background: white; border: 1px solid #d9dfda; border-radius: 12px; }
+.comparison-choice > label { display: block; font-weight: 650; margin-bottom: 8px; }
+.comparison-choice select { width: 100%; padding: 10px; }
+#comparison-targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.target-card { padding-top: 16px; overflow-wrap: anywhere; }
+.unified-diff { white-space: pre; overflow: auto; max-height: 65vh; font: 12px/1.65 ui-monospace, monospace; background: #fafcfb; border: 1px solid #d9dfda; padding: 12px; }
+.unified-diff span { display: inline; }
+.diff-add { background: #ddf4e4; color: #164b2e; }
+.diff-remove { background: #ffe4e4; color: #772828; }
+.diff-hunk { color: #405b85; }
+
+.stage-flow { grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); }

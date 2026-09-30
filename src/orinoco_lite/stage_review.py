@@ -42,6 +42,15 @@ def register(subparsers) -> None:
     bundle.add_argument("reports", nargs="*", help="comparison names (default: all existing reports)")
     options(bundle)
     bundle.add_argument("--title", default="Staged comparison review")
+    show = commands.add_parser("show", help="print unified diffs or possible problems without an interactive session")
+    show.add_argument("reports", nargs="*", help="comparison names (default: all reports)")
+    options(show, replace=False)
+    show.add_argument("--category", choices=("differences", "problems", "all"), default="differences")
+    show.add_argument("--subject", default="", help="limit to subjects containing this text")
+    show.add_argument("--raw", action="store_true", help="include supporting size and fingerprint observations")
+    show.add_argument("--format", choices=("diff", "json"), default="diff")
+    from .stage_investigation import register as register_investigation
+    register_investigation(commands)
     serve = commands.add_parser("serve", help="open a portable review on a local web server")
     options(serve, replace=False)
     serve.add_argument("--port", type=int, default=8765)
@@ -207,13 +216,19 @@ def summarize(paths: list[Path], decisions: dict) -> dict:
         absent.append({"decision": decision, "state": "not-observed" if evaluated else "not-evaluated"})
     links, incompatibilities = data_flow(entries)
     groups, attribution_diagnostics = causal_groups(reports, findings)
+    from .stage_presentation import annotate, targets
+    annotate(findings)
+    from .stage_investigation import effects
+    replay_effects = effects(reports)
+    for row in findings:
+        row['effects'] = replay_effects.get(row['key'], [])
     counts = Counter(row["state"] for row in findings + absent)
     return {"schema_version": VERSION, "reports": [{"run_id": r["run_id"], "context": r["context"]}
                                                    for r, _ in reports],
             "decisions_digest": json_digest(decisions), "findings": findings,
             "absent": absent, "counts": dict(counts), "groups": groups,
             "stages": [{"run_id": r["run_id"], "stage": s["stage"], "status": s["status"],
-                        "scope": s["scope"], "mode": s["mode"]} for r, s in entries],
+                        "scope": s["scope"], "mode": s["mode"], "targets": targets(s)} for r, s in entries],
             "data_flow": links, "incompatibilities": incompatibilities + attribution_diagnostics,
             "integration": "not-established",
             "integration_reason": "Inspect explicit links and complete-path evidence; isolated agreement alone is insufficient."}
@@ -353,15 +368,20 @@ def render_summary(result: dict) -> str:
         lines.append(f"Attribution ({group['status']}): {group['origin']} -> {group['effect']}")
     for problem in result["incompatibilities"]:
         lines.append(f"INCOMPLETE: {problem}")
-    def brief(value):
-        text = canonical(value)
-        return text if len(text) < 400 else text[:397] + "... (full value in raw evidence)"
-
+    from .stage_presentation import diff_text
+    evidence_stages = {}
+    for source in dict.fromkeys(row['report'] for row in result['findings']):
+        report, root = load_report(Path(source))
+        for stage in report['stages']:
+            for finding in stage['findings']:
+                evidence_stages[f"{report['run_id']}/{finding['id']}"] = (stage, root)
     matched_rules = Counter(row["decision"]["id"] for row in result["findings"]
                             if row.get("decision") and row["decision"].get("rule"))
     displayed_rules, displayed = set(), Counter()
     for row in result["findings"]:
         finding, decision = row["finding"], row["decision"]
+        if row.get("supporting"):
+            continue
         if decision and decision.get("rule"):
             if decision["id"] in displayed_rules:
                 continue
@@ -382,9 +402,11 @@ def render_summary(result: dict) -> str:
             continue
         lines += ["", f"## {label}: {finding['subject']} {canonical(finding['location'])}",
                   f"First causal boundary: {finding['first_boundary']}; change: {finding['change']}",
-                  "Before: " + (brief(finding.get("before")) if finding.get("before_present", True) else "<missing>"),
-                  "After: " + (brief(finding.get("after")) if finding.get("after_present", True) else "<missing>"),
+                  ("Possible problem: " + canonical(finding['after']) if row.get('category') == 'problems'
+                   else "```diff\n" + diff_text(finding, *evidence_stages[row['key']]) + "```"),
                   f"Evidence: {row['raw_evidence']}; finding {finding['id']}"]
+        for effect in row.get('effects', []):
+            lines.append(effect['conclusion'])
         if decision:
             lines += [f"Decision by {decision['author']}: {decision['rationale']}",
                       f"Reconsider when: {decision['reconsider_when']}"]
@@ -434,9 +456,32 @@ def apply_changes(decisions: dict, changes: dict) -> dict:
 def execute(args) -> int:
     from .diagnostics import directory, report_paths, prepare_output, require
     root = directory(args)
+    if args.review_command in {"compare", "replay"}:
+        from .stage_investigation import execute as investigate
+        return investigate(args, root)
     args.decisions = root / "decisions.json"
-    if args.review_command in {"summarize", "inspect", "bundle"}:
+    if args.review_command in {"summarize", "inspect", "bundle", "show"}:
         args.reports = report_paths(root, args.reports)
+    if args.review_command == "show":
+        from .stage_presentation import render_rows
+        result = summarize(args.reports, load_decisions(args.decisions))
+        stages = {f"{r['run_id']}/{f['id']}": (s, base)
+                  for path in args.reports for r, base in [load_report(path)]
+                  for s in r['stages'] for f in s['findings']}
+        rows = [row for row in result['findings']
+                if (args.category == 'all' or row['category'] == args.category)
+                and (args.raw or not row['supporting'])
+                and args.subject in row['finding']['subject']]
+        if args.format == 'json':
+            from .stage_presentation import diff_text
+            print(canonical({**result, 'findings': [
+                {**row, 'unified_diff': (diff_text(row['finding'], *stages[row['key']])
+                                       if row['category'] == 'differences' else None)}
+                for row in rows]}))
+        else:
+            text = render_rows(rows, stages, category=args.category, raw=args.raw)
+            print(text or f"No {args.category} in the selected reports.")
+        return 0
     if args.review_command == "summarize":
         args.output = root / "review"
         if not args.decisions.exists():
@@ -512,7 +557,7 @@ def inspect_review(paths: list[Path], decision_path: Path, author: str) -> int:
     position = 0
     while True:
         result = summarize(paths, decisions)
-        rows = [row for row in result["findings"] if selected_stage is None or row["finding"]["stage"] == selected_stage]
+        rows = [row for row in result["findings"] if not row["supporting"] and (selected_stage is None or row["finding"]["stage"] == selected_stage)]
         rows.sort(key=lambda row: ({"new": 0, "changed": 1, "matched": 2}[row["state"]], row["key"]))
         print("\nReview states: " + canonical(result["counts"]))
         print("Stages: " + ", ".join(sorted({s["stage"] for s in result["stages"]})))
@@ -522,7 +567,10 @@ def inspect_review(paths: list[Path], decision_path: Path, author: str) -> int:
             finding = row["finding"]
             print(f"[{position + 1}/{len(rows)}] {row['state']} " + canonical({
                 "stage": finding["stage"], "subject": finding["subject"], "location": finding["location"]}))
-            print("Before/after: " + canonical(expected(finding)))
+            from .stage_presentation import diff_text
+            selected_report, selected_root = load_report(Path(row['report']))
+            stage = next(s for s in selected_report['stages'] if any(f['id'] == finding['id'] for f in s['findings']))
+            print('Possible problem: ' + canonical(finding['after']) if row['category'] == 'problems' else diff_text(finding, stage, selected_root))
             print("Evidence: " + row["raw_evidence"])
             if row["decision"]:
                 print("Decision: " + canonical(row["decision"]))

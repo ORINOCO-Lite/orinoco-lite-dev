@@ -12,10 +12,11 @@ const json = value => JSON.stringify(value, null, 2);
 const pretty = value => String(value || '').replaceAll('-', ' ');
 const locationText = location => location?.length ? location.map(part => typeof part === 'number' ? `[${part}]` : part).join(' / ') : '(whole subject)';
 const views = [
-  ['queue', 'New & changed', 'Raw observations that need a fresh judgment; they are not a count of defects.'],
+  ['queue', 'Differences', 'Unified diffs between the selected targets. Size and fingerprint observations are grouped with the change.'],
+  ['problems', 'Possible problems', 'Site checks, separate from differences. A reported problem may also exist upstream.'],
   ['outstanding', 'Known outstanding', 'Tolerated defects and deferred questions remain visible.'],
   ['matched', 'Carried decisions', 'Unchanged findings covered by an existing decision.'],
-  ['all', 'All findings', 'Raw findings are observations, not a count of defects. Reviewed representation changes remain available.'],
+  ['all', 'All differences', 'Raw findings are observations, not a count of defects. Reviewed representation changes remain available.'],
   ['not-observed', 'Retirement candidates', 'Previously reviewed differences absent from a compatible, complete comparison.'],
   ['not-evaluated', 'Not evaluated', 'Decisions whose scope was not covered by the supplied comparisons.'],
 ];
@@ -26,7 +27,7 @@ const phases = [
   ['projection', 'Projection', 'Pages & graph'], ['assembly', 'Assembly', 'Hugo input tree'],
   ['rendering', 'Rendering', 'HTML & assets'], ['site-check', 'Site checks', 'Targets & browser'],
 ];
-const state = {overview: null, view: 'queue', stage: '', query: '', offset: 0, limit: 50, items: [], total: 0,
+const state = {overview: null, view: 'queue', stage: '', query: '', comparison: '', offset: 0, limit: 50, items: [], total: 0,
   selected: null, tab: 'values', edits: new Map(), draftsByKey: new Map(), formCache: new Map(), dirtyForms: new Set(),
   rawDecisions: new Map(), preview: null, previewSerialized: null, author: '', listRequest: 0, detailRequest: 0, artifactRequest: 0};
 let toastTimer;
@@ -69,7 +70,8 @@ const stageFor = row => state.overview.stages.find(stage => stage.run_id === row
   || state.overview.stages.find(stage => row.key?.startsWith(`${stage.run_id}/`) && row.finding?.id?.startsWith(`${stage.stage}:`));
 const decisionById = id => state.edits.get(id)?.decision || decisions().find(decision => decision.id === id);
 function viewCount(view) {
-  const counts = state.overview.counts;
+  const counts = {...state.overview.counts, ...state.overview.difference_states};
+  if (view === 'problems') return state.overview.presentation_counts?.problems || 0;
   if (view === 'queue') return (counts.new || 0) + (counts.changed || 0);
   if (view === 'all') return ['new', 'changed', 'matched'].reduce((total, key) => total + (counts[key] || 0), 0);
   if (view === 'outstanding') return counts.outstanding;
@@ -80,7 +82,7 @@ function renderNavigation() {
     const button = el('button', `nav-button${(state.view === key || (key === 'queue' && ['new', 'changed'].includes(state.view))) ? ' active' : ''}`); button.type = 'button';
     if (state.view === key) button.setAttribute('aria-current', 'page');
     button.append(el('span', '', title), el('span', 'nav-count', viewCount(key) == null ? '↗' : fmt(viewCount(key))));
-    button.addEventListener('click', () => { state.view = key; state.offset = 0; renderNavigation(); loadFindings(); });
+    button.addEventListener('click', () => { state.view = key; state.selected = null; if (key === 'problems' || state.stage === 'site-check') state.stage = ''; state.offset = 0; renderNavigation(); renderStages(); loadFindings(); });
     return button;
   }));
   const view = views.find(([key]) => key === state.view) || [state.view, state.view === 'new' ? 'New findings' : 'Changed behavior', state.view === 'new' ? 'Findings with no saved decision.' : 'Prior decisions need to be reconsidered against this evidence.'];
@@ -89,10 +91,11 @@ function renderNavigation() {
   if (state.view === 'matched') { const rules = decisions().filter(decision => decision.rule); if (rules.length) $('#queue-description').textContent += ` ${rules.length} named equivalence rule${rules.length === 1 ? '' : 's'} in this review; every raw finding remains accessible.`; }
 }
 function renderStages() {
+  const visibleStages = state.overview.stages.filter(stage => !state.comparison || stage.comparison_id === state.comparison);
   const known = new Set(phases.map(([name]) => name));
-  const extras = [...new Set(state.overview.stages.map(stage => stage.stage))].filter(name => !known.has(name)).map(name => [name, pretty(name), 'Additional comparison']);
+  const extras = [...new Set(visibleStages.map(stage => stage.stage))].filter(name => !known.has(name)).map(name => [name, pretty(name), 'Additional comparison']);
   $('#stage-flow').replaceChildren(...[...phases, ...extras].map(([name, label, description], index) => {
-    const available = state.overview.stages.filter(stage => stage.stage === name);
+    const available = visibleStages.filter(stage => stage.stage === name);
     const selected = state.stage === name || available.some(stage => state.stage === `${stage.run_id}/${stage.stage_index}`);
     const button = el('button', `stage-card${available.length ? '' : ' unavailable'}${selected ? ' selected' : ''}`);
     button.type = 'button'; button.disabled = !available.length;
@@ -111,7 +114,7 @@ function renderStages() {
   const filter = $('#stage-filter');
   filter.replaceChildren(new Option('All reports and stages', ''));
   for (const [name, label] of [...phases, ...extras]) {
-    const matches = state.overview.stages.filter(stage => stage.stage === name);
+    const matches = visibleStages.filter(stage => stage.stage === name);
     if (!matches.length) continue;
     const group = el('optgroup'); group.label = label;
     group.append(new Option(`All ${label.toLowerCase()} reports`, name));
@@ -122,8 +125,34 @@ function renderStages() {
   $('#integration').replaceChildren(el('strong', '', `Integration: ${pretty(state.overview.integration || 'not-established')}`),
     el('p', '', state.overview.integration_reason || 'Review complete-path evidence before making an integration judgment.'));
 }
+function renderComparisons() {
+  const select = $('#comparison-filter'), pairs = new Map();
+  for (const stage of state.overview.stages) pairs.set(stage.comparison_id, stage.targets);
+  select.replaceChildren(new Option('All supplied comparisons', ''));
+  for (const [key, targets] of pairs) select.append(new Option(`${targets.left.label} → ${targets.right.label}`, key));
+  select.value = state.comparison;
+  const panel = $('#comparison-targets'); panel.replaceChildren();
+  const targets = pairs.get(state.comparison);
+  if (targets) for (const side of ['left', 'right']) {
+    const item = el('div', 'target-card'); item.append(el('strong', '', `${pretty(side)}: ${targets[side].label}`));
+    for (const [key, value] of Object.entries(targets[side])) {
+      if (key === 'label' || !value) continue;
+      const line = el('p', 'inline-note'); line.append(document.createTextNode(`${pretty(key.replaceAll('_', '-'))}: `));
+      if (['url', 'branch_url'].includes(key) && /^https?:\/\//i.test(value)) {
+        const link = el('a', '', value); link.href = value; link.target = '_blank'; link.rel = 'noopener noreferrer'; line.append(link);
+      } else line.append(document.createTextNode(value));
+      item.append(line);
+    }
+    if (targets[side].branch_url) item.append(el('p', 'inline-note', 'Related branch; its current head is not proof of the deployed revision.'));
+    panel.append(item);
+  }
+  select.onchange = () => { stashEditor(); state.selected = null; state.comparison = select.value; state.stage = ''; state.offset = 0; renderComparisons(); renderStages(); loadFindings(); };
+}
 function setStage(value) {
-  stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value; state.offset = 0; renderStages(); loadFindings();
+  stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value;
+  const selectedStage = state.overview.stages.find(s => value === `${s.run_id}/${s.stage_index}` || value === s.stage);
+  if (selectedStage) state.view = selectedStage.stage === 'site-check' ? 'problems' : 'queue';
+  renderNavigation(); state.offset = 0; renderStages(); loadFindings();
 }
 function stashEditor() {
   const form = $('#decision-form');
@@ -147,13 +176,14 @@ async function loadFindings() {
       const rows = state.overview.absent.filter(row => row.state === state.view && matchesStage(row) && (!state.query || json(row).toLowerCase().includes(state.query.toLowerCase())));
       result = {items: rows.slice(state.offset, state.offset + state.limit), total: rows.length};
     } else {
-      const params = new URLSearchParams({state: state.view, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
+      const params = new URLSearchParams({state: state.view === 'problems' ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: 'false', comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
       result = await api(`/api/findings?${params}`);
     }
     if (request !== state.listRequest) return;
     state.items = result.items; state.total = result.total; renderList();
     if (!state.selected && state.stage) renderStageSummary();
-    $('#queue-total').textContent = `${fmt(result.total)} ${state.view.startsWith('not-') ? (result.total === 1 ? 'decision' : 'decisions') : (result.total === 1 ? 'raw finding' : 'raw findings')}`;
+    else if (!state.selected) empty($('#detail'), 'Select a difference or problem', 'Inspect its evidence and any tested downstream effects.');
+    $('#queue-total').textContent = `${fmt(result.total)} ${state.view.startsWith('not-') ? (result.total === 1 ? 'decision' : 'decisions') : (state.view === 'problems' ? (result.total === 1 ? 'possible problem' : 'possible problems') : (result.total === 1 ? 'difference' : 'differences'))}`;
     $('#page-range').textContent = result.total ? `${fmt(state.offset + 1)}–${fmt(Math.min(state.offset + state.limit, result.total))} of ${fmt(result.total)}` : '0 results';
     $('#page-prev').disabled = state.offset === 0; $('#page-next').disabled = state.offset + state.limit >= result.total;
     $('#active-filter').hidden = !state.stage && !state.query;
@@ -234,7 +264,26 @@ function renderDetail() {
   if (state.tab === 'values') {
     if (row.finding) {
       if (finding.identity === 'ambiguous' || finding.identity === 'unmatched') body.append(el('div', 'identity-warning', `Identity is ${finding.identity}. An exact reusable decision cannot be established for this finding.`));
-      const delta = el('div', 'delta-grid'); delta.append(valuePanel('Before', finding.before_present !== false, finding.before, 'before', row.value_views?.before), valuePanel('After', finding.after_present !== false, finding.after, 'after', row.value_views?.after)); body.append(delta);
+      if (row.category === 'problems') {
+        body.append(el('p', 'notice', `Possible problem: ${finding.problem_status || 'not compared across targets'}. Listed separately from output differences.`), el('pre', '', row.value_views?.after?.text || json(finding.after)));
+      } else {
+        const diff = el('pre', 'unified-diff'); diff.setAttribute('aria-label', 'Unified diff');
+        for (const line of (row.unified_diff || '').split('\n')) diff.append(el('span', line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-remove' : line.startsWith('@@') ? 'diff-hunk' : '', line + '\n'));
+        body.append(diff);
+      }
+      const exact = el('details', 'json-details'); exact.append(el('summary', '', 'Exact left and right values'));
+      const delta = el('div', 'delta-grid'); delta.append(valuePanel(row.targets?.left.label || 'Left', finding.before_present !== false, finding.before, 'before', row.value_views?.before), valuePanel(row.targets?.right.label || 'Right', finding.after_present !== false, finding.after, 'after', row.value_views?.after)); exact.append(delta); body.append(exact);
+      if (row.supporting_observations?.length) body.append(details('Supporting observations · size and fingerprint', row.supporting_observations));
+      if (row.category !== 'problems') {
+        const effects = el('section', 'links-panel'); effects.append(el('h4', '', 'Downstream effects'));
+        if (!row.effects?.length) effects.append(el('p', '', 'Downstream effect not tested.'));
+        for (const effect of row.effects || []) {
+          effects.append(el('p', '', effect.conclusion), el('p', 'inline-note', effect.scope));
+          const inspect = el('button', 'text-button', 'Inspect replay comparison'); inspect.type = 'button';
+          inspect.addEventListener('click', () => {state.comparison = ''; $('#comparison-filter').value = ''; setStage(`${effect.run_id}/0`);}); effects.append(inspect);
+        }
+        body.append(effects);
+      }
       if (finding.representation_equivalence) body.append(el('p', 'inline-note', `Supported representation rule: ${finding.representation_equivalence}. This rule never accepts a resulting page change.`));
       renderCausal(body, row);
     } else {
@@ -505,7 +554,7 @@ function wire() {
   $('#page-next').addEventListener('click', () => { state.offset += state.limit; loadFindings(); });
   $('#draft-open').addEventListener('click', () => { stashEditor(); renderDraft(); $('#draft-dialog').showModal(); });
   $('#context-open').addEventListener('click', () => { renderContext(); $('#context-dialog').showModal(); });
-  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'queue'; state.stage = ''; state.query = ''; state.offset = 0; $('#search').value = ''; renderNavigation(); renderStages(); loadFindings(); });
+  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'queue'; state.stage = ''; state.query = ''; state.offset = 0; $('#search').value = ''; renderNavigation(); renderComparisons(); renderStages(); loadFindings(); });
   for (const button of $$('[data-close]')) button.addEventListener('click', () => document.getElementById(button.dataset.close).close());
   $('#draft-preview').addEventListener('click', () => previewDraft()); $('#draft-export').addEventListener('click', () => previewDraft(true));
   window.addEventListener('beforeunload', event => { if (state.edits.size || state.dirtyForms.size) { event.preventDefault(); event.returnValue = ''; } });
@@ -514,10 +563,10 @@ async function init() {
   try {
     state.overview = await api('/api/review');
     $('#review-title').textContent = state.overview.title || 'Staged comparison'; document.title = `${state.overview.title || 'Change review'} · Orinoco`;
-    const outstanding = await api('/api/findings?state=outstanding&offset=0&limit=1');
+    const outstanding = await api('/api/findings?state=outstanding&category=differences&raw=false&offset=0&limit=1');
     state.overview.counts.outstanding = outstanding.total;
     $('#base-label').textContent = `Decision base ${state.overview.base_digest.slice(0, 12)}`;
-    renderNavigation(); renderStages(); wire(); await loadFindings();
+    renderNavigation(); renderComparisons(); renderStages(); wire(); await loadFindings();
   } catch (error) { $('#fatal').textContent = `This review could not be opened. ${error.message}`; $('#fatal').hidden = false; }
 }
 init();

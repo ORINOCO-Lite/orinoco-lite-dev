@@ -236,6 +236,8 @@ def test_draft_preview_export_changed_conflict_and_absent_workflows(tmp_path, br
     assert.match(await page.locator('#integration').innerText(),/not established/);
     assert.match(await page.locator('#stage-flow button').filter({hasText:'RDF outputs'}).innerText(),/incomplete/);
     await select('record:new');
+    assert.match(await page.getByLabel('Unified diff', {exact:true}).innerText(), /9007199254740993/);
+    await page.getByText('Exact left and right values', {exact:true}).click();
     assert.match(await page.locator('.value-panel.after').innerText(),/true/);
     assert.match(await page.locator('.value-panel.after').innerText(),/1\.0/);
     assert.match(await page.locator('.value-panel.after').innerText(),/9007199254740993/);
@@ -292,3 +294,40 @@ def test_draft_preview_export_changed_conflict_and_absent_workflows(tmp_path, br
     assert stage_review.execute(Namespace(review_command="apply", directory=tmp_path, write=True)) == 0
     assert read_json(decision_path) == stage_review.apply_changes(json.loads(original), changes)
     capsys.readouterr()
+
+
+def test_unified_diff_problem_separation_and_target_selection(tmp_path, browser_node):
+    from orinoco_lite.site_compare import compare_trees, finding as delta
+    a, b = tmp_path / 'left', tmp_path / 'right'
+    for directory, value in [(a, 'Library'), (b, 'https://example.org/library')]:
+        directory.mkdir()
+        write_json(directory / 'person.json', {'creator': value})
+    changes, names = compare_trees(a, b)
+    diff = tmp_path / 'diff'
+    write_report(diff, stage='projection', left=a, right=b, findings=changes, comparator='hugo-content/1',
+                 targets={'left': {'label': 'Orinoco'}, 'right': {'label': 'Lite candidate', 'revision': 'abc123'}},
+                 scope={'complete': True, 'subjects': names})
+    checks = tmp_path / 'checks'
+    write_report(checks, stage='site-check', left=a, right=b,
+                 findings=[delta('broken.html', ['links', '/missing'], '/missing', {'error': 'missing target'})],
+                 comparator='local-html-targets/2')
+    destination = tmp_path / 'bundle'
+    bundle([diff, checks], destination)
+    with review_servers(ReviewModel(destination), port=0) as server:
+        browser(browser_node, server, r"""
+        assert.equal(await page.locator('#findings .finding-row').count(),1);
+        await page.locator('#findings .finding-row').click();
+        assert.match(await page.getByLabel('Unified diff',{exact:true}).innerText(), /-"Library"/);
+        assert.match(await page.locator('#detail').innerText(), /Downstream effect not tested/);
+        await page.getByRole('button',{name:/^Possible problems/}).click();
+        await page.getByText('broken.html',{exact:true}).waitFor();
+        assert.equal(await page.locator('#findings .finding-row').count(),1);
+        await page.locator('#findings .finding-row').click();
+        assert.match(await page.locator('#detail').innerText(), /not compared across targets/);
+        await page.getByRole('button',{name:/^Differences/}).click();
+        await page.getByLabel('What are you comparing?').selectOption({label:'Orinoco → Lite candidate'});
+        await page.getByText('revision: abc123',{exact:true}).waitFor();
+        await page.locator('#findings .finding-row').filter({hasText:'person.json'}).waitFor();
+        assert.equal(await page.locator('#findings .finding-row').count(),1);
+        console.log('{}');
+        """)

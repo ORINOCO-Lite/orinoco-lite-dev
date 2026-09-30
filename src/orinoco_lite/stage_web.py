@@ -218,7 +218,9 @@ class _Handler(BaseHTTPRequestHandler):
                 state=params.get("state", "new"), stage=params.get("stage", ""), q=params.get("q", ""),
                 offset=int(params.get("offset", "0")), limit=int(params.get("limit", "50")),
                 run_id=params.get("run_id", ""),
-                stage_index=int(params["stage_index"]) if "stage_index" in params else None))
+                stage_index=int(params["stage_index"]) if "stage_index" in params else None,
+                category=params.get('category', 'all'), raw=params.get('raw', 'true') == 'true',
+                comparison=params.get('comparison', '')))
         elif path == "/api/finding":
             self._json(self.server.model.finding(params["key"]))
         elif path in {"/api/artifact", "/download", "/image"}:

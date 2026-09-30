@@ -188,10 +188,27 @@ class ReviewModel:
             for artifact in item["artifacts"].values():
                 artifact["path"] = safe_artifact(root, artifact["path"]).relative_to(self.root).as_posix()
             result["stages"].append(item)
+        from .stage_presentation import targets
+        from collections import Counter
+        for item in result['stages']:
+            original = self._stages[item['run_id'], item['stage_index']][1]
+            item['targets'] = targets(original)
+            item['comparison_id'] = json_digest(item['targets'])
+        result['presentation_counts'] = dict(Counter(row['category'] for row in self.review['findings'] if not row['supporting']))
+        result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
+        return result
+
+    def _present(self, row):
+        from .stage_presentation import diff_text, targets
+        result = _present_row(row)
+        _, stage, root = self._stages[row['run_id'], row['stage_index']]
+        result['targets'] = targets(stage)
+        result['unified_diff'] = diff_text(row['finding'], stage, root) if row['category'] == 'differences' else None
+        result['supporting_observations'] = [self._rows[key]['finding'] for key in row['supporting_keys']]
         return result
 
     def findings(self, state: str = "new", stage: str = "", q: str = "", offset: int = 0, limit: int = 50,
-                 *, run_id: str = "", stage_index: int | None = None) -> dict:
+                 *, run_id: str = "", stage_index: int | None = None, category: str = "all", raw: bool = True, comparison: str = "") -> dict:
         if state not in {"all", "new", "changed", "matched", "outstanding", "queue"}:
             raise ConfigurationError("Unknown finding state")
         if not isinstance(stage, str) or not isinstance(q, str):
@@ -200,9 +217,17 @@ class ReviewModel:
             raise ConfigurationError("Finding run_id must be text and stage_index must be nonnegative")
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 500:
             raise ConfigurationError("Finding offset must be nonnegative and limit must be between 1 and 500")
+        if category not in {'all', 'differences', 'problems'}:
+            raise ConfigurationError('Unknown review category')
         selected = []
         needle = q.casefold().strip()
         for row in self.review["findings"]:
+            if (category != 'all' and row['category'] != category) or (not raw and row['supporting']):
+                continue
+            if comparison:
+                from .stage_presentation import targets
+                if json_digest(targets(self._stages[row['run_id'], row['stage_index']][1])) != comparison:
+                    continue
             if (run_id and row["run_id"] != run_id) or (stage_index is not None and row["stage_index"] != stage_index):
                 continue
             if state == "outstanding":
@@ -218,13 +243,13 @@ class ReviewModel:
             if needle and needle not in canonical(row).casefold():
                 continue
             selected.append(row)
-        return {"items": [_present_row(row) for row in selected[offset:offset + limit]],
+        return {"items": [self._present(row) for row in selected[offset:offset + limit]],
                 "total": len(selected), "offset": offset, "limit": limit}
 
     def finding(self, key: str) -> dict:
         if not isinstance(key, str) or key not in self._rows:
             raise ConfigurationError("Unknown finding key")
-        return _present_row(self._rows[key])
+        return self._present(self._rows[key])
 
     def artifact_root(self, run_id: str, stage_index: int, role: str) -> Path:
         if type(stage_index) is not int or not isinstance(run_id, str) or not isinstance(role, str):

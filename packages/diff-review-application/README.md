@@ -1,8 +1,54 @@
 # Diff review application
 
-Local web interface for understanding what changes as Orinoco metadata becomes a website.
-It reads the staged CLI reports and uses the package's existing matcher to preview scoped decision edits.
-It does not run transformations, modify metadata, or apply repository changes.
+CLI and web review for understanding what changes as Orinoco metadata becomes a website.
+Choose the two comparison targets, inspect unified diffs, then trace their effects.
+Keep possible problems, such as broken links, separate from differences between outputs.
+Prefer implementing comparison and investigation operations in the CLI for testing, maintenance, and Unix composition; this does not prohibit additional web functionality.
+
+## Choose the comparison
+
+Compare Orinoco with Lite, an earlier Lite revision with a candidate, or retained outputs from an official site or draft deployment.
+Reports retain both artifacts and any recorded producing operations.
+To compare explicit artifacts with labels and source references:
+
+```sh
+orinoco-lite dev review compare retained/orinoco retained/draft \
+  --name draft-comparison --stage rendering \
+  --left-label Orinoco --right-label "Draft deployment" \
+  --right-url https://example.org/preview/ \
+  --right-branch-url https://example.org/hub/branch/draft
+orinoco-lite dev review show draft-comparison | less
+```
+
+Link the relevant upstream Aneksajo hub branch when available.
+Its current head is not proof of the deployed commit: a branch may advance after deployment.
+Supply revisions and capture/deployment timestamps only from retained evidence.
+The command reads local artifacts; it does not fetch websites or infer missing intermediate outputs.
+
+## Read differences and investigate effects
+
+`dev review show` prints unified diffs with context.
+Structured values use sorted mapping keys while preserving types, list order, multiplicity, and missing versus null.
+Size and fingerprint observations support their owning change; `--raw` exposes them separately.
+Use `--subject` to narrow the output and `--format json` for further processing.
+`dev review show --category problems` exposes checks separately.
+For rendered trees, `dev review compare --check-links` also writes a separate checks report distinguishing existing, introduced, and resolved link problems.
+
+For a projection or assembly file with one semantic difference:
+
+```sh
+orinoco-lite dev review replay projection projection:3 \
+  --assembly sourcedata/complete-path/lite/assembly \
+  --name identifier-replay --base-url /demo/
+orinoco-lite dev review show projection identifier-replay
+```
+
+Use the actual finding ID from the selected report.
+Replay requires the assembly file to match the right-side evidence, replaces it with the left-side file, and builds both through the same renderer.
+A repeated baseline must agree before the result supports an effect claim.
+Retained inputs and outputs connect the result to the original finding in both CLI and web review.
+This tests that substitution for those inputs and that renderer, not every deployment.
+Files with multiple semantic changes require a more focused investigation.
 
 ## Open a review
 
@@ -116,7 +162,11 @@ When the cause is uncertain, a focused rerun can test whether an earlier change 
 
 ```mermaid
 flowchart TD
-  results[Stage comparisons and complete-path results] --> review[One review workspace]
+  targets[Selected left and right targets] --> results[Stage comparisons and complete-path results]
+  results --> review[CLI and web review]
+  review --> differences[Unified diffs and supporting observations]
+  review --> problems[Possible problems: existing, introduced, resolved]
+  differences --> effects[Investigate downstream effects with focused replay]
   previous[Saved decisions] --> review
   review --> new[New or changed findings]
   review --> outstanding[Known outstanding findings]
