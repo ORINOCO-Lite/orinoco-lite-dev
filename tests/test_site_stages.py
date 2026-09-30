@@ -268,3 +268,60 @@ def test_partial_site_config_overrides_preserve_selected_tables_and_replace_arra
     assert settings["colorScheme"] == "fire"
     assert settings["article"] == {"showDate": False}
     assert settings["custom"]["items"] == ["new"]
+
+
+@pytest.mark.parametrize("base_url", ["/", "/demo/", "https://example.org/demo/"])
+def test_site_check_uses_deployment_base_for_links_and_fragments(tmp_path, base_url):
+    from urllib.parse import urlsplit
+    prefix = urlsplit(base_url).path
+    write(tmp_path / "index.html", (
+        f'<a href="{prefix}about/#intro">About</a><img src="{prefix}logo.svg">'
+        f'<a href="{base_url}about/#gone">Missing fragment</a>'
+        '<a href="https://external.invalid/missing">External</a>'))
+    write(tmp_path / "about/index.html", '<h1 id="intro">About</h1><a href="../missing/">Missing</a>')
+    write(tmp_path / "logo.svg", '<svg/>')
+    findings, scope = check_site(tmp_path, base_url=base_url)
+    assert len(findings) == 2
+    assert {f["after"]["error"] for f in findings} == {"missing fragment", "missing local target"}
+    assert scope["local_links_checked"] == 4
+    assert scope["base_url"] == base_url
+
+
+def test_site_check_cli_uses_retained_build_url_and_allows_override(tmp_path):
+    from orinoco_lite.cli import main
+    from orinoco_lite.stage_reports import write_operation
+    output = tmp_path / "sourcedata/isolated/lite/website"
+    write(output / "index.html", '<a href="/demo/about/">About</a>')
+    write(output / "about/index.html", '<h1>About</h1>')
+    write_operation(output, operation="hugo-build-lite", inputs={}, context={"base_url": "/demo/"})
+    command = ["--root", str(tmp_path), "dev", "site", "check"]
+    assert main(command) == 0
+    assert main([*command, "--base-url", "/", "--force"]) == 1
+
+
+def test_browser_server_mounts_site_at_base_path(tmp_path):
+    from functools import partial
+    from http.server import ThreadingHTTPServer
+    from threading import Thread
+    from urllib.request import urlopen
+    from urllib.error import HTTPError
+    from orinoco_lite.site_browser import _Handler
+    write(tmp_path / "index.html", '<a href="/demo/about/">About</a>')
+    write(tmp_path / "about/index.html", 'About')
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Handler, directory=str(tmp_path), base_path="/demo/"))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        with urlopen(origin + "/demo/about") as response:
+            assert response.url == origin + "/demo/about/"
+            assert response.read() == b"About"
+        with urlopen(origin + "/demo/") as response:
+            assert b"/demo/about/" in response.read()
+        with pytest.raises(HTTPError) as error:
+            urlopen(origin + "/about/")
+        assert error.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

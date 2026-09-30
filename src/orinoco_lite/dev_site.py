@@ -59,8 +59,9 @@ def register(dev_subparsers):
             check.add_argument("flavor", nargs="?", choices=("upstream", "lite"), default="lite")
             check.add_argument("--mode", choices=("isolated", "complete-path"), default="isolated")
             options(check)
+            check.add_argument("--base-url", help="deployment URL or path (default: retained build URL, otherwise /)")
             check.add_argument("--browser", action="store_true", help="also inspect routes in a real browser and retain screenshots")
-            check.add_argument("--route", action="append", default=[], help="browser route (default: /)")
+            check.add_argument("--route", action="append", default=[], help="root-relative browser route (default: deployment base path)")
 
 
 def _path(args, value):
@@ -166,8 +167,9 @@ def execute(args):
         if group in {"content", "site"}:
             if group == "site" and args.site_command == "check":
                 root = _path(args, args.site)
-                operation_receipt(root)
-                findings, checked = check_site(root)
+                receipt = operation_receipt(root)
+                base_url = args.base_url or (receipt or {}).get("context", {}).get("base_url", "/")
+                findings, checked = check_site(root, base_url=base_url)
                 evidence = None
                 if args.browser:
                     if not args.report:
@@ -175,9 +177,12 @@ def execute(args):
                     from .site_browser import inspect
                     from .site_compare import finding
                     browser_output = _path(args, args.report).with_name(args.report.name + "-browser")
-                    observations = inspect(root, browser_output, args.route or ["/"], Path(args.root))
-                    checked["browser_routes"] = args.route or ["/"]
-                    checked["subjects"].extend(args.route or ["/"])
+                    from urllib.parse import urlsplit
+                    routes = args.route or [urlsplit(checked["base_url"]).path]
+                    observations = inspect(root, browser_output, routes, Path(args.root),
+                                           base_url=checked["base_url"])
+                    checked["browser_routes"] = routes
+                    checked["subjects"].extend(routes)
                     checked["locations"].append(["browser"])
                     evidence = {"browser": browser_output}
                     for observed in observations:
@@ -186,7 +191,7 @@ def execute(args):
                 return _report(args, root, root, findings, {
                     "complete": True,
                     "selection": "HTML local href/src/poster targets and fragments", **checked,
-                }, comparator="local-html-targets/1", evidence=evidence)
+                }, comparator="local-html-targets/2", evidence=evidence)
             left, right = _path(args, args.left), _path(args, args.right)
             operation_receipt(left)
             operation_receipt(right)

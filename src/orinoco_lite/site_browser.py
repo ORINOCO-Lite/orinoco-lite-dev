@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import subprocess
 from threading import Thread
+from urllib.parse import unquote, urlsplit
 
 from .errors import DriverError
 
@@ -55,17 +56,36 @@ catch { throw new Error('Playwright is unavailable in this workspace; install th
 
 
 class _Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, base_path="/", **kwargs):
+        self.base_path = base_path
+        super().__init__(*args, **kwargs)
+
+    def do_GET(self):
+        path = unquote(urlsplit(self.path).path)
+        if path != self.base_path.rstrip("/") and not path.startswith(self.base_path):
+            self.send_error(404, "Outside site base path")
+            return
+        super().do_GET()
+
+    def translate_path(self, path):
+        # Keep self.path intact so directory redirects retain the mount prefix.
+        path = unquote(urlsplit(path).path)
+        return super().translate_path("/" + path[len(self.base_path):])
+
     def log_message(self, *args):
         pass
 
 
-def inspect(root: Path, output: Path, routes: list[str], workspace: Path) -> list[dict]:
+def inspect(root: Path, output: Path, routes: list[str], workspace: Path,
+            *, base_url: str = "/") -> list[dict]:
+    from .site import normalize_build_base_url
+    base_path = unquote(urlsplit(normalize_build_base_url(base_url)).path)
     if not routes or any(not route.startswith("/") or route.startswith("//") or ".." in route.split("/") for route in routes):
         raise DriverError("Browser routes must be explicit root-relative paths without traversal")
     if output.exists():
         raise DriverError(f"Browser evidence output already exists: {output}")
     output.mkdir(parents=True)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Handler, directory=str(root)))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Handler, directory=str(root), base_path=base_path))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

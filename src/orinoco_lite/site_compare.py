@@ -169,22 +169,35 @@ def compare_trees(left: Path, right: Path, *, rendered=False, subjects=None):
     return changes, names
 
 
-def check_site(root: Path):
+def check_site(root: Path, *, base_url: str = "/"):
+    from .site import normalize_build_base_url
+
+    base_url = normalize_build_base_url(base_url)
+    base = urlsplit(base_url)
+    prefix = unquote(base.path).rstrip("/") + "/"
     entries = files(root)
     pages = {name: html(path) for name, path in entries.items() if path.suffix == ".html"}
     failures = []
     checked = 0
     for name, page in pages.items():
-        route = "/" + (name[:-10] if name.endswith("index.html") else name)
+        route = prefix + (name[:-10] if name.endswith("index.html") else name)
         for link in page.links:
             parsed = urlsplit(link)
-            if parsed.scheme or parsed.netloc or link.startswith("//"):
-                continue
-            target = urlsplit(urljoin(route, link))
-            path = unquote(target.path).lstrip("/")
-            path = posixpath.normpath(path)
-            if path == ".":
+            if parsed.scheme or parsed.netloc:
+                if (not base.netloc or parsed.netloc.lower() != base.netloc.lower()
+                        or (parsed.scheme and parsed.scheme != base.scheme)):
+                    continue
+            target = urlsplit(urljoin(urljoin(base_url, route), link))
+            target_path = posixpath.normpath(unquote(target.path))
+            if target_path == prefix.rstrip("/") or target_path == "/" and prefix == "/":
                 path = ""
+            elif target_path.startswith(prefix):
+                path = target_path[len(prefix):]
+            else:
+                checked += 1
+                failures.append(finding(name, ["links", link], link, {
+                    "error": "target outside site base path", "target": target.path}))
+                continue
             candidates = [path, path.rstrip("/") + "/index.html" if path else "index.html"]
             resolved = next((item for item in candidates if item in entries), None)
             checked += 1
@@ -194,5 +207,5 @@ def check_site(root: Path):
                 failures.append(finding(name, ["links", link], link, {"error": "missing fragment", "target": resolved, "fragment": unquote(target.fragment)}))
     if not pages:
         raise DriverError(f"Site has no HTML pages to check: {root}")
-    return failures, {"pages": len(pages), "subjects": sorted(pages), "locations": [["links"]], "local_links_checked": checked,
+    return failures, {"base_url": base_url, "pages": len(pages), "subjects": sorted(pages), "locations": [["links"]], "local_links_checked": checked,
                       "excluded": "external URLs, CSS URLs, JavaScript-generated targets"}
