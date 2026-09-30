@@ -78,22 +78,6 @@ def _selection(args):
     return resources, presentation
 
 
-def _input_source(root: Path, presentation: Path) -> Path:
-    from .www_from_model import _repository_head
-
-    prepared = root / "sourcedata/www-from-model"
-    if not prepared.exists() and not prepared.is_symlink():
-        return presentation
-    actual = _repository_head(prepared, label="Prepared upstream checkout")
-    expected = _repository_head(presentation, label="Selected upstream checkout")
-    if actual != expected:
-        raise DriverError(
-            f"Prepared upstream checkout is {actual}, expected {expected}. "
-            "Run dev upstream populate --reuse-dump to prepare the selected revision."
-        )
-    return prepared
-
-
 def _report(args, left, right, findings, scope, *, comparator, evidence=None):
     from .stage_reports import write_report
     print(f"{args.stage}: {len(findings)} raw differences")
@@ -203,7 +187,6 @@ def execute(args):
             }, comparator="site-files/1" if group == "site" else "hugo-content/1")
         if group == "inputs":
             resources, presentation = _selection(args)
-            presentation = _input_source(Path(args.root), presentation)
             destination = _path(args, args.inputs)
             if args.inputs_command == "import":
                 destination.mkdir(parents=True, exist_ok=True)

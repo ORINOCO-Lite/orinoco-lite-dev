@@ -458,8 +458,8 @@ Check portability by cloning into a different directory and rerunning a recorded
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
 Reuse the downstream tool lock and record both the input change and the parent submodule pointer.
 
-Input diagnostics use the prepared `sourcedata/www-from-model` checkout when present, requiring the package-selected upstream revision.
-Otherwise they use the selected source cache.
+Source resolution uses the registered `sourcedata/www-from-model` submodule when present, requiring the package-selected upstream revision and its pinned dependencies.
+Ordinary downstreams without that submodule use the source cache.
 Prepare missing media with `dev upstream populate --reuse-dump` in the maintainer environment; diagnostics require ordinary file bytes and do not retrieve Annex content.
 Recorded conversion from a retained capture does not have this local-source requirement.
 

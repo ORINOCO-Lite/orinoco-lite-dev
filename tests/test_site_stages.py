@@ -70,7 +70,7 @@ def test_missing_import_resource_leaves_existing_inputs_untouched(tmp_path):
 
 @pytest.mark.parametrize("state", ["prepared", "missing", "pointer", "symlink", "revision"])
 def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, monkeypatch, capsys, state):
-    from orinoco_lite import cli
+    from orinoco_lite import cli, www_from_model
 
     selected = source(tmp_path)
     relative = "content/projects/one/logo.svg"
@@ -86,7 +86,15 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
     git(selected, "add", ".")
     git(selected, "commit", "-qm", "test: selected source")
     prepared = tmp_path / "sourcedata/www-from-model"
-    git(tmp_path, "clone", str(selected), str(prepared))
+    git(tmp_path, "init", "-q")
+    git(tmp_path, "-c", "protocol.file.allow=always", "submodule", "add", str(selected), "sourcedata/www-from-model")
+    engineering = tmp_path / "engineering"
+    engineering.mkdir()
+    git(engineering, "init", "-q")
+    selected_commit = git(selected, "rev-parse", "HEAD").stdout.strip()
+    git(engineering, "update-index", "--add", "--cacheinfo", "160000", selected_commit, "submodules/www-from-model")
+    git(engineering, "commit", "-qm", "test: select upstream")
+    engineering_commit = git(engineering, "rev-parse", "HEAD").stdout.strip()
     media = prepared / relative
     media.write_text("<svg/>")
     if state == "missing":
@@ -95,7 +103,7 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
         media.write_text(pointer)
     elif state == "symlink":
         media.unlink()
-        target = prepared / ".git/annex/objects/example.svg"
+        target = Path(git(prepared, "rev-parse", "--absolute-git-dir").stdout.strip()) / "annex/objects/example.svg"
         write(target, "<svg/>")
         media.symlink_to(target)
     elif state == "revision":
@@ -103,7 +111,8 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
     # A Git cleanliness check must not accidentally invoke the Annex filter.
     invoked = tmp_path / "annex-invoked"
     git(prepared, "config", "filter.annex.process", f"touch '{invoked}'; exit 1")
-    monkeypatch.setattr(dev_site, "_selection", lambda args: (tmp_path / "resources", selected))
+    monkeypatch.setattr(dev_site, "resolve_resources", lambda: SimpleNamespace(root=tmp_path / "resources"))
+    monkeypatch.setattr(www_from_model, "resolve_engineering_source", lambda *_: (engineering, engineering_commit))
     command = ["--root", str(tmp_path), "dev", "inputs"]
     if state == "prepared":
         assert cli.main([*command, "import"]) == 0
@@ -112,7 +121,7 @@ def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, m
     else:
         assert cli.main([*command, "import"]) == 2
         expected = {"missing": "unavailable", "pointer": "Annex pointer",
-                    "symlink": "Annex pointer", "revision": "expected"}[state]
+                    "symlink": "Annex pointer", "revision": "does not match"}[state]
         captured = capsys.readouterr()
         assert expected in captured.out + captured.err
         assert not (tmp_path / "sourcedata/site-inputs" / relative).exists()
