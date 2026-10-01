@@ -64,7 +64,7 @@
 
 - Use the APM-managed `unix-cli-design` skill when designing or reviewing CLI behavior.
   Restore it with `pixi run -e skills setup-skills` before starting an agent task; verify it with `pixi run -e skills audit-skills`.
-  Edit reusable skill source in Skills Workshop, not its generated deployment.
+  Edit external skills in their canonical source repositories, not their generated deployments.
 
 - Keep help and argument parsing fast; defer expensive imports until execution.
 - Use `orinoco_lite.progress.progress` around potentially slow, silent operations.
