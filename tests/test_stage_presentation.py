@@ -126,3 +126,48 @@ def test_compare_revisions_and_paired_link_problems(tmp_path):
     assert report['stages'][0]['targets']['right']['branch_url'] == args.right_branch_url
     report, _ = load_report(tmp_path / 'reports/deployment-checks')
     assert {f['problem_status'] for f in report['stages'][0]['findings']} == {'existing', 'introduced', 'resolved'}
+
+
+def test_recomparison_retains_capture_and_build_provenance(tmp_path, capsys):
+    import json
+    from orinoco_lite import cli
+    from orinoco_lite.stage_reports import write_operation, operation_receipt
+    left, right = tmp_path/'local', tmp_path/'captured'
+    left.mkdir(); right.mkdir()
+    (left/'index.html').write_text('<p>local</p>')
+    (right/'index.html').write_text('<p>draft</p>')
+    build = write_operation(left, operation='hugo-build-lite', inputs={},
+        command=['orinoco-lite', 'dev', 'hugo', 'build'],
+        context={'flavor':'lite', 'dirty':True, 'base_url':'/demo/'})
+    capture = write_operation(right, operation='site-capture', inputs={},
+        command=['wget', 'https://draft.example/'], context={
+            'target':{'label':'Draft site', 'url':'https://draft.example/', 'captured_at':'2026-10-01'},
+            'capture':{'routes':[''], 'retrieval_complete':True}})
+    cdx=tmp_path/'http.cdx'; cdx.write_text('CDX header\nhttps://draft.example/ 0 x x 200\n')
+    source=tmp_path/'source'
+    original=write_report(source, stage='rendering', left=left, right=right,
+        findings=[], comparator='site-files/1', evidence={'right-http-cdx':cdx},
+        targets={'left':{'label':'My local build'}, 'right':{'label':'Draft deployment', 'url':'https://draft.example/'}})
+    assert operation_receipt(source/'artifacts/left') == build
+    assert operation_receipt(source/'artifacts/right') == capture
+    assert cli.main(['--root',str(tmp_path),'dev','review','compare',
+        str(source/'artifacts/left'),str(source/'artifacts/right'),'--name','again']) == 1
+    capsys.readouterr()
+    again=tmp_path/'sourcedata/reports/again'
+    stage=load_report(again)[0]['stages'][0]
+    assert stage['targets']['left']['label']=='My local build'
+    assert stage['targets']['right']['label']=='Draft deployment'
+    assert stage['artifacts']['right']['operation']==capture
+    assert 'right-http-cdx' in stage['artifacts']
+    assert not stage['scope']['complete']
+    assert cli.main(['--root',str(tmp_path),'dev','review','show','again','--format','json']) == 0
+    result=json.loads(capsys.readouterr().out)
+    assert result['stages'][0]['target_provenance']['left']['operation']==build
+    output=tmp_path/'bundle'; bundle([again],output)
+    assert ReviewModel(output).overview()['comparisons'][0]['target_provenance']['right']['operation']==capture
+    # The report-writing API also preserves labels when it reuses copied inputs.
+    rewritten=write_report(tmp_path/'rewritten',stage='rendering',
+        left=source/'artifacts/left',right=source/'artifacts/right',findings=[],comparator='test')
+    assert rewritten['stages'][0]['targets']==original['stages'][0]['targets']
+    (source/'artifacts/left/index.html').write_text('edited after capture')
+    assert operation_receipt(source/'artifacts/left') is None

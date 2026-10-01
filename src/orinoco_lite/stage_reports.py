@@ -91,11 +91,38 @@ def receipt_path(path: Path) -> Path:
     return path.with_name(path.name + ".operation.json")
 
 
+def retained_input(path: Path):
+    """Recover metadata for an exact, unchanged artifact in a copied report."""
+    path = Path(path).absolute()
+    root = path.parent.parent
+    if path.parent.name != 'artifacts' or not (root / 'report.json').is_file():
+        return None
+    report = read_json(root / 'report.json')
+    if not isinstance(report, dict) or report.get('schema_version') != VERSION:
+        raise ConfigurationError(f'Unsupported retained report: {root}')
+    matches = [(stage, role) for stage in report.get('stages', [])
+               for role, artifact in stage.get('artifacts', {}).items()
+               if safe_artifact(root, artifact['path']) == path]
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise ConfigurationError(f'Ambiguous retained artifact metadata: {path}')
+    stage, role = matches[0]
+    if artifact_digest(path) != stage['artifacts'][role]['digest']:
+        return None  # Edited bytes no longer have the original producer attribution.
+    validate_report(report, root)
+    return stage, role, root
+
+
 def operation_receipt(path: Path, *, allow_failed: bool = False) -> dict | None:
     receipt = receipt_path(path)
-    if not receipt.is_file():
-        return None
-    data = read_json(receipt)
+    if receipt.is_file():
+        data = read_json(receipt)
+    else:
+        retained = retained_input(path)
+        data = retained[0]['artifacts'][retained[1]].get('operation') if retained else None
+        if data is None:
+            return None
     if not isinstance(data, dict) or data.get("schema_version") != VERSION:
         raise ConfigurationError(f"Unsupported operation receipt at {receipt}")
     if not isinstance(data.get("operation"), str) or not isinstance(data.get("inputs"), dict):
@@ -201,6 +228,19 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
              "scope": scope or {"complete": False}, "comparator": comparator,
              "artifacts": artifacts, "findings": rows,
              "diagnostics": diagnostics or [], "command": command or [], "links": []}
+    if targets is None:
+        retained_targets = {}
+        for side, source in [('left', left), ('right', right)]:
+            retained = retained_input(source) if source.exists() else None
+            if retained:
+                source_stage, source_role, _ = retained
+                if source_role in source_stage.get('targets', {}):
+                    retained_targets[side] = source_stage['targets'][source_role]
+        if retained_targets:
+            from .stage_presentation import targets as describe_targets
+            targets = {side: {key: value for key, value in target.items() if value is not None}
+                       for side, target in describe_targets(entry).items()}
+            targets.update(retained_targets)
     if targets is not None:
         entry["targets"] = targets
     report = {"schema_version": VERSION, "run_id": str(uuid.uuid4()),

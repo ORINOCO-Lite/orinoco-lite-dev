@@ -504,3 +504,29 @@ def test_saved_overview_browser_needs_no_artifact_bytes(tmp_path, browser_node):
         assert.equal(response.status(), 400);
         console.log('{}');
         ''')
+
+
+def test_local_build_and_capture_metadata_visible_together(tmp_path, browser_node):
+    from orinoco_lite.stage_reports import write_operation
+    left,right=tmp_path/'local',tmp_path/'capture'
+    left.mkdir(); right.mkdir()
+    (left/'index.html').write_text('local'); (right/'index.html').write_text('draft')
+    write_operation(left,operation='hugo-build-lite',inputs={},command=['hugo','--baseURL=/demo/'],
+                    context={'flavor':'lite','package_commit':'build-commit','dirty':True})
+    write_operation(right,operation='site-capture',inputs={},command=['wget','https://draft.example/'],
+                    context={'target':{'label':'Draft site','url':'https://draft.example/','captured_at':'2026-10-01'}})
+    source=tmp_path/'report'
+    write_report(source,stage='rendering',left=left,right=right,findings=[],comparator='test')
+    output=tmp_path/'bundle'; bundle([source],output)
+    with review_servers(ReviewModel(output),port=0) as server:
+        browser(browser_node,server, r'''
+        assert.match(await page.locator('#comparison-buttons').innerText(), /Locally built Lite.*Captured draft site/);
+        await page.locator('#target-context > summary').click();
+        assert.match(await page.locator('#comparison-targets').innerText(), /producing checkout had local changes/);
+        assert.match(await page.locator('#comparison-targets').innerText(), /https:\/\/draft.example/);
+        await page.getByText('Build command',{exact:true}).click();
+        await page.getByText('Capture command',{exact:true}).click();
+        assert.match(await page.locator('#comparison-targets').innerText(), /hugo/);
+        assert.match(await page.locator('#comparison-targets').innerText(), /wget/);
+        console.log('{}');
+        ''')

@@ -512,6 +512,9 @@ def execute(args) -> int:
                   '\n'.join(f"# {item['change']}: {item['subject']}\n{item['unified_diff']}" for item in items) or 'No original-file differences.')
             return 0
         result = summarize(args.reports, load_decisions(args.decisions))
+        from .stage_presentation import target_provenance
+        for summary, stage in zip(result['stages'], [s for report, _ in loaded for s in report['stages']]):
+            summary['target_provenance'] = target_provenance(stage)
         stages = {f"{r['run_id']}/{f['id']}": (s, base)
                   for path in args.reports for r, base in [load_report(path)]
                   for s in r['stages'] for f in s['findings']}

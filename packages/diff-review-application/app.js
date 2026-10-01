@@ -159,7 +159,7 @@ function renderComparisons() {
   const selected = pairs.get(state.comparison);
   $('#selected-comparison').textContent = selected?.label || 'Supplied stage reports';
   if (selected) for (const side of ['left', 'right']) {
-    const target = selected.targets[side], item = el('div', 'target-card'); item.append(el('strong', '', target.label));
+    const target = selected.targets[side], item = el('div', 'target-card'); item.append(el('strong', '', selected.target_labels?.[side] || target.label));
     const labels = {url:'Website', branch_url:'Related upstream branch', revision:'Reported revision',
       package_revision:'Package commit', captured_at:'Captured', capture_finished_at:'Capture finished', deployed_at:'Deployed', capture_scope:'Capture coverage', http_responses:'HTTP responses', capture_status:'Capture result'};
     for (const [key, value] of Object.entries(target)) {
@@ -173,6 +173,20 @@ function renderComparisons() {
     if (target.url && !target.revision) item.append(el('p', 'inline-note', 'Deployed commit: not identified from the captured site.'));
     if (target.url && !target.deployed_at) item.append(el('p', 'inline-note', 'Deployment time: not identified; capture time is when this review fetched the site.'));
     if (target.branch_url) item.append(el('p', 'inline-note', 'The linked branch provides source context; its current head may differ from the deployed commit.'));
+    const provenance = selected.target_provenance?.[side], operation = provenance?.operation;
+    const captured = operation?.operation === 'site-capture';
+    const action = captured ? 'Capture' : 'Build';
+    if (operation) {
+      const context = operation.context || {};
+      item.append(el('p', 'inline-note', `Recorded operation: ${operation.operation}`));
+      if (context.dirty === true) item.append(el('p', 'notice', 'The producing checkout had local changes. Its commit alone does not recover those changes.'));
+      if (context.dirty === false) item.append(el('p', 'inline-note', 'Producing package checkout: clean.'));
+      item.append(details(`${action} command`, operation.command?.length ? operation.command : 'Not recorded'));
+      item.append(details(`${action} inputs`, Object.keys(operation.inputs || {}).length ? operation.inputs : 'Not recorded'));
+      item.append(details('Recorded software and settings', context));
+      item.append(el('p', 'inline-note', 'Input digests connect matching retained stages. Recorded paths may refer to the original machine.'));
+    } else item.append(el('p', 'inline-note', 'Producing command, software, and inputs: not recorded.'));
+    if (provenance?.digest) item.append(details('Artifact digest', provenance.digest));
     panel.append(item);
   }
   $('#comparison-purpose').textContent = selected?.purpose ? `What it establishes: ${selected.purpose.establishes} ${selected.purpose.limits}` : '';

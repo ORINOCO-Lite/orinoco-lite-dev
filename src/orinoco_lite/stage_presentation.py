@@ -41,6 +41,12 @@ def comparison_label(stage):
     return pair['left']['label'] + ' → ' + pair['right']['label']
 
 
+def target_provenance(stage):
+    """Expose each artifact's recorded producer, distinct from the comparison."""
+    return {side: {key: stage['artifacts'].get(side, {}).get(key)
+                   for key in ('digest', 'operation')} for side in ('left', 'right')}
+
+
 def group_supporting_observations(rows):
     """Group mechanical observations without changing IDs or decision scope."""
     by_subject = defaultdict(list)
@@ -101,6 +107,7 @@ def diff_text(finding, stage, root):
 def render_rows(rows, stages, *, category='differences', subject='', raw=False):
     """Plain output suitable for a pager, grep, or redirection; no ANSI controls."""
     lines = []
+    described = set()
     rows = sorted(rows, key=lambda row: (row.get('classification', {}).get('category', ''), row.get('classification', {}).get('subtype', '')))
     for row in rows:
         if category != 'all' and row['category'] != category:
@@ -111,6 +118,10 @@ def render_rows(rows, stages, *, category='differences', subject='', raw=False):
         if subject and subject not in finding['subject']:
             continue
         stage, root = stages[row['key']]
+        description = json.dumps([targets(stage), target_provenance(stage)], sort_keys=True)
+        if description not in described:
+            lines += ['# Targets and recorded producers: ' + description]
+            described.add(description)
         lines += [f"# {finding['stage']}: {finding['subject']} [{finding['id']}]",
                   f"# {stage['mode']} · {stage['status']}",
                   '# Targets: ' + json.dumps(targets(stage), ensure_ascii=False, sort_keys=True)]

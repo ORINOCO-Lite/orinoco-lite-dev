@@ -74,15 +74,21 @@ def execute(args, root):
             raise ConfigurationError('--check-links requires --stage rendering')
         if args.check_links:
             report_output(root, args.name + '-checks')
-        from .stage_reports import operation_receipt
+        from .stage_reports import operation_receipt, retained_input
+        from .stage_presentation import targets as describe_targets
         receipts = {side: operation_receipt(path, allow_failed=True) for side, path in [('left', left), ('right', right)]}
+        retained_inputs = {side: retained_input(path) for side, path in [('left', left), ('right', right)]}
         targets = {side: {field: getattr(args, f'{side}_{field}') for field in
                          ('label', 'url', 'branch_url', 'revision', 'captured_at', 'deployed_at')
                          if getattr(args, f'{side}_{field}') is not None}
                    for side in ('left', 'right')}
         for side in ('left', 'right'):
-            retained = (receipts[side] or {}).get('context', {}).get('target', {})
-            targets[side] = {**retained, **targets[side]}
+            retained = describe_targets({'stage': args.stage, 'artifacts': {
+                side: {'operation': receipts[side]}}})[side]
+            if retained_inputs[side]:
+                source_stage, source_role, _ = retained_inputs[side]
+                retained.update(source_stage.get('targets', {}).get(source_role, {}))
+            targets[side] = {key: value for key, value in {**retained, **targets[side]}.items() if value is not None}
             targets[side].setdefault('label', 'Reference output' if side == 'left' else 'Candidate output')
         captures = {side: r['context']['capture'] for side, r in receipts.items() if r and 'capture' in r['context']}
         scope['captures'] = captures
@@ -92,6 +98,11 @@ def execute(args, root):
         evidence = {}
         for side, source in [('left', left), ('right', right)]:
             if side in captures:
+                if retained_inputs[side]:
+                    source_stage, source_role, source_root = retained_inputs[side]
+                    evidence.update({side + role[len(source_role):]: safe_artifact(source_root, artifact['path'])
+                                     for role, artifact in source_stage['artifacts'].items()
+                                     if role.startswith(source_role + '-http') or role == source_role + '-wget-log'})
                 for suffix in ('http.warc.gz', 'http.cdx', 'wget.log'):
                     candidate = source.parent / suffix
                     if candidate.is_file():

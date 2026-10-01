@@ -295,6 +295,9 @@ class ReviewModel:
                 labels.append(label)
             pairs[key] = {'id': key, 'label': ' → '.join(labels) if deployment else item['comparison_label'],
                           'deployment': deployment, 'targets': item['targets'], 'counts': counts(selected)}
+            from .stage_presentation import target_provenance
+            pairs[key]['target_labels'] = dict(zip(('left', 'right'), labels))
+            pairs[key]['target_provenance'] = target_provenance(self._stages[anchor][1])
             from .stage_experiments import comparison_purpose
             pairs[key]['purpose'] = comparison_purpose(item)
         result['comparisons'] = sorted(pairs.values(), key=lambda pair: (not (pair['targets']['left']['label'] == 'Orinoco' and pair['targets']['right']['label'] == 'Orinoco Lite'), not pair['deployment'], {'Orinoco': 0, 'Orinoco Lite': 1}.get(pair['targets']['left']['label'], 2), pair['label']))
