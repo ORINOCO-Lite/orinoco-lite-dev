@@ -69,9 +69,9 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-For CLI interface work, restore the pinned `unix-cli-design` agent skill with `pixi run -e skills setup-skills` before starting an agent task.
-Run `pixi run -e skills audit-skills` to check the installed skill against its lock.
-APM tooling has its own Pixi environment; the skill source is maintained in [Skills Workshop](https://github.com/leej3/skills-workshop).
+Restore pinned agent skills with `pixi run -e skills setup-skills` before starting an agent task.
+Run `pixi run -e skills audit-skills` to check installed skills against their lock.
+APM tooling has its own Pixi environment; `apm.yml` declares the external skill sources.
 
 In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
 
