@@ -13,3 +13,6 @@ __pycache__/
 apm_modules/
 
 .pytest_cache/
+
+# APM-generated skill dependencies
+/.agents/skills/unix-cli-design/

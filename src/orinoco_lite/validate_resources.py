@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--quiet", action="store_true", help="suppress the successful report; retain stderr diagnostics")
     args = parser.parse_args(argv)
     try:
         workspace = load_config_path(args.config)
@@ -24,7 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     except OrinocoError as error:
         print(f"orinoco-lite validate: {error}", file=sys.stderr)
         return 1
-    print(json.dumps(report, sort_keys=True))
+    if not args.quiet:
+        print(json.dumps(report, sort_keys=True))
     return 0
 
 

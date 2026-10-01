@@ -35,8 +35,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": ".", "editable": True},
         )
-        self.assertNotIn("feature", manifest)
-        self.assertNotIn("environments", manifest)
         for forbidden in (
             'path = "submodules/dump-things-service"',
         ):
