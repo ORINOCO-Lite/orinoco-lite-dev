@@ -190,13 +190,13 @@ function renderPatternSummary() {
   const target = $('#pattern-summary'); target.replaceChildren();
   if (state.view === 'recognized') {
     target.append(el('h3', '', 'Deterministically recognized changes'), el('p', 'inline-note', 'These rules organize evidence; they do not establish correctness or human acceptance.'));
-    const options = [['', 'All recognized patterns'], ...Object.entries(state.overview.pattern_rules).map(([key, rule]) => [key, rule.label])];
+    const options = [['', 'All recognized patterns'], ...Object.entries(state.overview.pattern_rules).filter(([key]) => state.overview.classification_counts.patterns[key]).map(([key, rule]) => [key, rule.label])];
     for (const [value, label] of options) {
       const count = value ? state.overview.classification_counts.patterns[value] || 0 : state.overview.classification_counts.recognized;
       const button = el('button', 'comparison-button', `${label} (${fmt(count)})`); button.type = 'button'; button.setAttribute('aria-pressed', String(state.pattern === value));
       button.onclick = () => {state.pattern = value; state.group = ''; state.offset = 0; state.selected = null; loadFindings();}; target.append(button);
     }
-    for (const [key, rule] of Object.entries(state.overview.pattern_rules)) if (!state.pattern || state.pattern === key) target.append(el('h4', '', rule.label), el('p', 'inline-note', rule.criteria));
+    for (const [key, rule] of Object.entries(state.overview.pattern_rules)) if (state.overview.classification_counts.patterns[key] && (!state.pattern || state.pattern === key)) target.append(el('h4', '', rule.label), el('p', 'inline-note', rule.criteria));
     if (!state.pattern || state.pattern === 'repeated-html-edit') {
       const groups = el('details', 'json-details'); groups.append(el('summary', '', `Repeated edit groups (${state.overview.pattern_groups.length}) · inspect examples or select all occurrences`));
       for (const group of state.overview.pattern_groups) {

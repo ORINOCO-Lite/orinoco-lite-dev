@@ -4,13 +4,16 @@
 2. Missing captured files are snapshot evidence questions, before content rules.
 3. Narrow ordinary URL-prefix matches require an otherwise identical hunk.
 4. Narrow canonical/social metadata-prefix matches use the same exactness test.
-5. Only remaining complete HTML hunks may enter repeated-edit groups (>=2 files).
-6. Everything else stays unclassified, including any unmatched mixed hunk.
+5. Graph array and named HTML rules require complete matches.
+6. Only remaining complete HTML hunks may enter repeated-edit groups (>=2 files).
+7. Everything else stays unclassified, including any unmatched mixed hunk.
 
 First matching rule owns each entire hunk. Repetition never absorbs a partial
 match or hides a remainder. Recognition changes neither evidence nor decisions.
 """
 from collections import Counter
+from copy import deepcopy
+import re
 from urllib.parse import urlsplit
 from .stage_presentation import targets
 from .stage_reports import safe_artifact, canonical, json_digest
@@ -82,6 +85,74 @@ def url_pattern(finding, stage, *, metadata=False):
             'criteria': PATTERNS['metadata-prefix']['criteria'] if metadata else CRITERIA, 'prefixes': bases, 'matches': matched}
 
 
+def recognized(kind):
+    return {'category': 'recognized', 'rule': kind, 'subtype': kind, **PATTERNS[kind]}
+
+
+def graph_pattern(finding):
+    """Compare complete arrays without treating IDs or multiplicity as disposable."""
+    if finding.get('subject') not in {'graph.json', 'static/graph.json'} or not all(
+            finding.get(k) for k in ('before_present', 'after_present')):
+        return None
+    location = finding['location']
+    if location not in [['json', 'nodes'], ['json', 'edges']]:
+        return None
+    before, after = finding['before'], finding['after']
+    if not all(isinstance(xs, list) and all(isinstance(x, dict) and isinstance(x.get('id'), str)
+               for x in xs) and len({x['id'] for x in xs}) == len(xs) for xs in (before, after)):
+        return None
+    if Counter(map(canonical, before)) == Counter(map(canonical, after)):
+        return recognized('graph-node-order' if location[-1] == 'nodes' else 'graph-edge-order')
+    if location[-1] == 'edges' and all(re.fullmatch(r'e[0-9]+', x['id']) and
+            isinstance(x.get('source'), str) and isinstance(x.get('target'), str)
+            for xs in (before, after) for x in xs):
+        def content(xs):
+            return Counter(canonical({k: v for k, v in x.items() if k != 'id'}) for x in xs)
+        if content(before) == content(after):
+            return recognized('graph-edge-ids')
+    return None
+
+
+def named_html_pattern(finding):
+    """Recognize complete, bounded edits before generic exact repetition."""
+    if finding['location'][:2] != ['html', 'events'] or not all(
+            finding.get(k) for k in ('before_present', 'after_present')):
+        return None
+    before, after = finding['before'], finding['after']
+    if not isinstance(before, list) or not isinstance(after, list):
+        return None
+    if len(before) == len(after) == 1 and before[0][:2] == after[0][:2] == ['start', 'a']:
+        attrs = before[0][2]
+        if ['target', '_blank'] in attrs and after[0][2] == [a for a in attrs if a != ['target', '_blank']]:
+            return recognized('link-target-removal')
+        if before == [['start', 'a', [['href', None], ['title', None]]]] and after == [['start', 'a', [['href', None], ['title', 'Outputs']]]]:
+            return recognized('navigation-title')
+    if before == [['end', 'span']] and after == [['text', '\n'], ['end', 'span'], ['end', 'span'],
+            ['start', 'span', [['class', 'decoration-primary-500 group-hover:underline group-hover:decoration-2 group-hover:underline-offset-2']]], ['text', 'Collaboration hub']]:
+        return recognized('navigation-label')
+    if before == [['text', 'Edit this record\n'], ['end', 'a'], ['text', 'in the knowledge pool.']] and after == [['text', 'Edit this record'], ['end', 'a']]:
+        return recognized('edit-link-text')
+    if len(before) == len(after) == 1 and before[0][:2] == after[0][:2] == ['start', 'script']:
+        expected = deepcopy(before)
+        for attr in expected[0][2]:
+            if attr == ['src', '/graph.js']:
+                candidates = [v for k, v in after[0][2] if k == 'src']
+                if len(candidates) == 1 and re.fullmatch(r'/graph\.js\?v=[0-9a-f]{64}', candidates[0]):
+                    attr[1] = candidates[0]
+                    if expected == after:
+                        return recognized('graph-script-version')
+    # Match the entire known contact navigation subtree, not an arbitrary deletion.
+    contact = [['start', 'nav', [['class', 'pb-4 text-base font-medium text-neutral-500 dark:text-neutral-400']]],
+        ['start', 'ul', [['class', 'flex list-none flex-col sm:flex-row']]],
+        ['start', 'li', [['class', 'group mb-1 text-end sm:mb-0 sm:me-7 sm:last:me-0']]],
+        ['start', 'a', [['href', '/contact/'], ['title', 'Contact and location']]],
+        ['start', 'span', [['class', 'decoration-primary-500 group-hover:underline group-hover:decoration-2 group-hover:underline-offset-2']]],
+        ['text', 'Contact and location'], ['end', 'span'], ['end', 'a'], ['end', 'li'], ['end', 'ul'], ['end', 'nav']]
+    if before == contact and after == []:
+        return recognized('contact-navigation-removal')
+    return None
+
+
 def capture_indexes(stage, root):
     result = {}
     for side in ('left', 'right'):
@@ -123,7 +194,8 @@ def classify(row, stage, indexes):
                     'label': f'Observed HTTP {status}' if observed else f'Retrieval failed: HTTP {status}' if failed else f'HTTP {status} recorded; file not retained' if status is not None else 'No retained file; request outcome unknown',
                     'side': side, 'url': url, 'http_status': status,
                     'criteria': 'A retained 404/410 establishes absence at capture time. Other missing files do not establish absence online.'}
-    return url_pattern(finding, stage) or url_pattern(finding, stage, metadata=True) or {'category': 'unclassified'}
+    return (url_pattern(finding, stage) or url_pattern(finding, stage, metadata=True)
+            or graph_pattern(finding) or named_html_pattern(finding) or {'category': 'unclassified'})
 
 
 def classifications(reports):
@@ -163,6 +235,15 @@ PATTERNS = {
     'absolute-prefix': {'label': 'Absolute deployment prefixes', 'criteria': CRITERIA},
     'absolute-root-relative': {'label': 'Absolute versus root-relative URLs', 'criteria': CRITERIA},
     'metadata-prefix': {'label': 'Canonical and social metadata URL prefixes', 'criteria': 'Only declared prefixes differ in canonical link href or og:url, og:image, twitter:url, twitter:image content. URL suffix and all other event values match exactly. This recognizes a representation pattern, not correctness.'},
+    'graph-node-order': {'label': 'Graph node order change', 'criteria': 'The complete node objects, IDs, properties, and multiplicities match; only array order differs. Order-dependent display effects are not evaluated.'},
+    'graph-edge-order': {'label': 'Graph edge order change', 'criteria': 'The complete edge objects, IDs, endpoints, properties, and multiplicities match; only array order differs.'},
+    'graph-edge-ids': {'label': 'Graph edge order and ID change', 'criteria': 'All edge properties and multiplicities match after excluding only unique generated e-number IDs. Endpoints and direction are preserved. Consumer dependence on ordering or IDs is not evaluated.'},
+    'link-target-removal': {'label': 'Link target attribute removal', 'criteria': 'The entire hunk removes only target="_blank" from an anchor; its URL and every other attribute are unchanged. This changes the browsing context and is not automatically accepted.'},
+    'navigation-title': {'label': 'Navigation title addition', 'criteria': 'The complete anchor event changes only its empty title to Outputs. Its empty href is preserved.'},
+    'navigation-label': {'label': 'Navigation label markup addition', 'criteria': 'The complete known hunk adds Collaboration hub text with its span and whitespace changes.'},
+    'edit-link-text': {'label': 'Record edit-link text change', 'criteria': 'The complete known hunk removes the trailing knowledge-pool wording and newline. Editor URL changes are separate.'},
+    'graph-script-version': {'label': 'Graph script version query addition', 'criteria': 'Only a 64-character hexadecimal v parameter is added to /graph.js in the complete script event. Other attributes match; script contents and the version value are not verified by this rule.'},
+    'contact-navigation-removal': {'label': 'Contact navigation removal', 'criteria': 'The complete known Contact and location navigation subtree is removed. This does not describe the whole footer or accept the removal.'},
     'repeated-html-edit': {'label': 'Repeated HTML edits', 'criteria': 'The exact same before/after HTML event hunk occurs in at least two distinct files in this comparison. Paths, queries, asset references, integrity, or content may differ within that repeated edit. Grouping establishes repetition only, not its cause or correctness. Every complete hunk remains inspectable.'},
 }
 

@@ -103,3 +103,65 @@ def test_narrow_prefix_precedes_repetition_and_mixed_remainder_stays_visible(tmp
     assert sum(c.get('rule') == 'declared-url-prefix-change' for c in rules.values()) == 2
     assert not any(c.get('rule') == 'repeated-html-edit' for c in rules.values())
     assert any(c['category'] == 'unclassified' for c in rules.values())
+
+
+def test_graph_order_recognition_preserves_all_content_and_multiplicity():
+    from orinoco_lite.stage_patterns import graph_pattern
+    f = {'subject':'graph.json', 'location':['json','nodes'], 'before_present':True,
+         'after_present':True, 'before':[{'id':'a','size':1},{'id':'b','size':2}],
+         'after':[{'id':'b','size':2},{'id':'a','size':1}]}
+    assert graph_pattern(f)['subtype'] == 'graph-node-order'
+    f['after'][0]['size'] = 3
+    assert graph_pattern(f) is None
+    f['location'] = ['json','edges']
+    f['before'] = [{'id':'e0','source':'a','target':'b','weight':1},
+                   {'id':'e1','source':'a','target':'b','weight':1}]
+    f['after'] = [{'id':'e7','source':'a','target':'b','weight':1},
+                  {'id':'e8','source':'a','target':'b','weight':1}]
+    assert graph_pattern(f)['subtype'] == 'graph-edge-ids'
+    for mutation in ['multiplicity','endpoint','property','duplicate-id','external-id','type']:
+        changed = deepcopy(f)
+        if mutation == 'multiplicity': changed['after'].pop()
+        elif mutation == 'endpoint': changed['after'][0]['target'] = 'c'
+        elif mutation == 'property': changed['after'][0]['weight'] = 2
+        elif mutation == 'duplicate-id': changed['after'][0]['id'] = 'e8'
+        elif mutation == 'external-id': changed['after'][0]['id'] = 'permanent-link'
+        else: changed['after'][0]['weight'] = True
+        assert graph_pattern(changed) is None, mutation
+
+
+def test_named_html_patterns_reject_mixed_hunks():
+    from orinoco_lite.stage_patterns import named_html_pattern
+    f = {'location':['html','events',0,1], 'before_present':True, 'after_present':True,
+         'before':[['start','a',[['href','https://example.org'],['target','_blank']]]],
+         'after':[['start','a',[['href','https://example.org']]]]}
+    assert named_html_pattern(f)['subtype'] == 'link-target-removal'
+    f['after'][0][2][0][1] = 'https://other.example'
+    assert named_html_pattern(f) is None
+    f['before'] = [['start','script',[['src','/graph.js'],['integrity','original']]]]
+    f['after'] = deepcopy(f['before']); f['after'][0][2][0][1] += '?v=' + 'a'*64
+    assert named_html_pattern(f)['subtype'] == 'graph-script-version'
+    f['after'][0][2][1][1] = 'changed'
+    assert named_html_pattern(f) is None
+    f['after'][0][2][1][1] = 'original'
+    f['after'].append(['text','unmatched content'])
+    assert named_html_pattern(f) is None
+
+
+def test_graph_patterns_are_available_in_review_without_accepting_findings(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr('orinoco_lite.stage_reports.execution_context', lambda: {})
+    left,right=tmp_path/'left',tmp_path/'right';left.mkdir();right.mkdir()
+    nodes=[{'id':'a','label':'A'},{'id':'b','label':'B'}]
+    edges=[{'id':'e0','source':'a','target':'b'}]
+    (left/'graph.json').write_text(json.dumps({'nodes':nodes,'edges':edges}))
+    (right/'graph.json').write_text(json.dumps({'nodes':nodes[::-1],'edges':[dict(edges[0],id='e2')]}))
+    changes,_=compare_trees(left,right,rendered=True)
+    report=tmp_path/'report'
+    write_report(report,stage='rendering',left=left,right=right,findings=changes,comparator='site-files/1')
+    bundle([report],tmp_path/'bundle');model=ReviewModel(tmp_path/'bundle')
+    rows=model.findings(state='all',classification='recognized')['items']
+    assert {r['classification']['subtype'] for r in rows} == {'graph-node-order','graph-edge-ids'}
+    assert all(r['state']=='new' and r['unified_diff'] for r in rows)
+    assert model.original_files()['total']==1
+    assert not model.decisions['decisions']
