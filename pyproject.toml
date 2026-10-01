@@ -60,7 +60,7 @@ package-dir = { "" = "src" }
 script-files = ["scripts/orinoco-lite-populate-upstream.sh"]
 
 [tool.setuptools.package-data]
-orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
+orinoco_lite = ["_resources/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
