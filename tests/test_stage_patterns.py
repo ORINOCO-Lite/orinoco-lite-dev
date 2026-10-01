@@ -1,6 +1,7 @@
 from copy import deepcopy
 import pytest
-from orinoco_lite.stage_patterns import url_pattern, classifications, counts
+from orinoco_lite.review_heuristic import url_pattern
+from orinoco_lite.stage_patterns import classifications, counts
 from orinoco_lite.stage_reports import write_report, write_operation, load_report
 from orinoco_lite.site_compare import compare_trees
 from orinoco_lite.stage_bundle import bundle, ReviewModel
@@ -81,8 +82,8 @@ def test_repeated_mixed_edits_are_grouped_without_claiming_equivalence(tmp_path,
     assert matches[0]['files']==2
     bundle([report],tmp_path/'bundle');model=ReviewModel(tmp_path/'bundle')
     pair=model.overview()['comparisons'][0]
-    assert pair['counts']['unclassified']==0 and pair['counts']['recognized']==2
-    assert model.findings(state='all',classification='recognized',group=matches[0]['group'])['total']==2
+    assert pair['counts']['unclassified']==2 and pair['counts']['recognized']==0
+    assert model.findings(state='all',classification='unclassified',group=matches[0]['group'])['total']==2
     assert model.original_files()['total']==2
     assert not model.decisions['decisions']
 
@@ -106,7 +107,7 @@ def test_narrow_prefix_precedes_repetition_and_mixed_remainder_stays_visible(tmp
 
 
 def test_graph_order_recognition_preserves_all_content_and_multiplicity():
-    from orinoco_lite.stage_patterns import graph_pattern
+    from orinoco_lite.review_heuristic import graph_pattern
     f = {'subject':'graph.json', 'location':['json','nodes'], 'before_present':True,
          'after_present':True, 'before':[{'id':'a','size':1},{'id':'b','size':2}],
          'after':[{'id':'b','size':2},{'id':'a','size':1}]}
@@ -131,7 +132,7 @@ def test_graph_order_recognition_preserves_all_content_and_multiplicity():
 
 
 def test_named_html_patterns_reject_mixed_hunks():
-    from orinoco_lite.stage_patterns import named_html_pattern
+    from orinoco_lite.review_heuristic import named_html_pattern
     f = {'location':['html','events',0,1], 'before_present':True, 'after_present':True,
          'before':[['start','a',[['href','https://example.org'],['target','_blank']]]],
          'after':[['start','a',[['href','https://example.org']]]]}
@@ -181,14 +182,14 @@ def editor_sample(base='/'):
 
 @pytest.mark.parametrize('base',['/','/demo/','https://lite.example/demo/'])
 def test_editor_link_recognition_uses_declared_base(base):
-    from orinoco_lite.stage_patterns import editor_link_pattern
+    from orinoco_lite.review_heuristic import editor_link_pattern
     f,s=editor_sample(base)
     assert editor_link_pattern(f,s)['subtype']=='record-editor-link'
 
 
 @pytest.mark.parametrize('mutation',['pid','query-order','extra-query','wrapper','rel','target','extra-event','unknown-host','unknown-base','fragment'])
 def test_editor_link_rule_does_not_absorb_additional_changes(mutation):
-    from orinoco_lite.stage_patterns import editor_link_pattern
+    from orinoco_lite.review_heuristic import editor_link_pattern
     f,s=editor_sample('/demo/')
     if mutation=='pid':f['after'][1][2][-1][1]=f['after'][1][2][-1][1].replace('example','another')
     elif mutation=='query-order':

@@ -180,7 +180,7 @@ def test_cli_bundle_and_serve_respect_root(tmp_path, monkeypatch, capsys):
     seen = []
     monkeypatch.setattr('orinoco_lite.stage_web.serve', lambda *args, **kwargs: seen.append((args, kwargs)))
     assert cli.main(['--root', str(tmp_path), 'dev', 'review', 'serve', '--port', '0']) == 0
-    assert seen == [((tmp_path / 'sourcedata/bundle',), {'port': 0, 'open_browser': False})]
+    assert seen == [((tmp_path / 'sourcedata/bundle',), {'port': 0, 'open_browser': False, 'heuristic': None, 'metadata_only': False})]
     capsys.readouterr()
 
 

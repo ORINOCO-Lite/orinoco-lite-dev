@@ -17,6 +17,14 @@ def register(subparsers) -> None:
     from .diagnostics import options
     review = subparsers.add_parser("review", help="review staged comparisons and scoped decisions")
     commands = review.add_subparsers(dest="review_command", required=True)
+    materialize = commands.add_parser('materialize', help='copy a retained bundle, resolving Annex files, and verify it for review')
+    materialize.add_argument('source', type=Path)
+    materialize.add_argument('destination', type=Path, help='fresh output bundle directory')
+    materialize.add_argument('--get', action='store_true', help='retrieve selected bundle content with DataLad first')
+    experiments = commands.add_parser('experiments', help='show investigation questions, controls, missing comparisons, and commands')
+    experiments.add_argument('reports', nargs='*', help='comparison names; without reports the experimental guidance is still available')
+    options(experiments, replace=False)
+    experiments.add_argument('--format', choices=('text', 'json'), default='text')
     summarize = commands.add_parser("summarize", help="validate evidence and carry decisions into this review")
     summarize.add_argument("reports", nargs="*", help="comparison names (default: all existing reports)")
     options(summarize)
@@ -49,7 +57,7 @@ def register(subparsers) -> None:
     for parser in (show, bundle):
         parser.add_argument('--annotations', type=Path, help='optional authored investigation notes with evidence; separate from human decisions')
     show.add_argument("--category", choices=("differences", "problems", "all"), default="differences")
-    show.add_argument('--classification', choices=('unclassified', 'recognized', 'coverage', 'all'), default='unclassified', help='deterministic categories; classification never changes human decisions (default: unclassified)')
+    show.add_argument('--classification', choices=('unclassified', 'recognized', 'coverage', 'all'), default='all', help='filter heuristic classifications (default: all); human decisions are separate')
     show.add_argument("--subject", default="", help="limit to subjects containing this text")
     show.add_argument("--raw", action="store_true", help="include supporting size and fingerprint observations")
     show.add_argument("--format", choices=("diff", "json"), default="diff")
@@ -59,6 +67,10 @@ def register(subparsers) -> None:
     register_capture(commands)
     serve = commands.add_parser("serve", help="open a portable review on a local web server")
     options(serve, replace=False)
+    for parser in (show, bundle, serve):
+        parser.add_argument('--heuristic', type=Path,
+                            help='execute a trusted Python file defining ordered RULES; default: built-in heuristic (serve uses bundled classifications when present)')
+    serve.add_argument('--metadata-only', action='store_true', help='browse saved overview.json without loading evidence; no decision editing')
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument("--open", action="store_true", help="open the local review in your browser")
 
@@ -461,6 +473,11 @@ def apply_changes(decisions: dict, changes: dict) -> dict:
 
 def execute(args) -> int:
     from .diagnostics import directory, report_paths, prepare_output, require
+    if args.review_command == 'materialize':
+        from .stage_evidence import materialize
+        from .diagnostics import explicit_path
+        print(materialize(explicit_path(args, args.source), explicit_path(args, args.destination), get=args.get))
+        return 0
     root = directory(args)
     if args.review_command == "capture":
         from .stage_capture import execute as capture
@@ -468,6 +485,16 @@ def execute(args) -> int:
     if args.review_command in {"compare", "replay"}:
         from .stage_investigation import execute as investigate
         return investigate(args, root)
+    if args.review_command == 'experiments':
+        from .stage_experiments import guidance, render_guidance
+        paths = report_paths(root, args.reports) if args.reports or any((root / 'reports').glob('*/report.json')) else []
+        stages = [dict(s, run_id=r['run_id']) for path in paths for r, _ in [load_report(path)] for s in r['stages']]
+        items = guidance(stages, directory=root)
+        print(canonical(items) if args.format == 'json' else render_guidance(items))
+        return 0
+    if getattr(args, 'heuristic', None) is not None:
+        from .diagnostics import explicit_path
+        args.heuristic = explicit_path(args, args.heuristic)
     args.decisions = root / "decisions.json"
     if args.review_command in {"summarize", "inspect", "bundle", "show"}:
         args.reports = report_paths(root, args.reports)
@@ -488,8 +515,10 @@ def execute(args) -> int:
         stages = {f"{r['run_id']}/{f['id']}": (s, base)
                   for path in args.reports for r, base in [load_report(path)]
                   for s in r['stages'] for f in s['findings']}
-        from .stage_patterns import classifications, counts
-        classified = classifications(loaded)
+        from .stage_patterns import classifications, counts, load_heuristic
+        heuristic = load_heuristic(getattr(args, 'heuristic', None))
+        classified = classifications(loaded, heuristic)
+        result['heuristic'] = heuristic.info
         for row in result['findings']:
             row['classification'] = classified[row['key']]
         result['classification_counts'] = counts(result['findings'])
@@ -526,12 +555,12 @@ def execute(args) -> int:
             args.decisions = None
         prepare_output(args.output, args.force)
         from .stage_bundle import bundle
-        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title, annotations=getattr(args, "annotations", None))))
+        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title, annotations=getattr(args, "annotations", None), heuristic=getattr(args, "heuristic", None))))
         print(f"Review bundle: {args.output}. Open it with 'orinoco-lite dev review serve' using the same --directory.")
         return 0
     if args.review_command == "serve":
         from .stage_web import serve
-        serve(require(root / "bundle", "review bundle"), port=args.port, open_browser=args.open)
+        serve(require(root / "bundle", "review bundle"), port=args.port, open_browser=args.open, heuristic=getattr(args, "heuristic", None), metadata_only=getattr(args, "metadata_only", False))
         return 0
     if args.review_command == "inspect":
         return inspect_review(args.reports, args.decisions, args.author)

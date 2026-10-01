@@ -382,14 +382,23 @@ def review_servers(model, *, port=8765, application=None):
             thread.join()
 
 
-def serve(directory: Path, *, port=8765, open_browser=False):
+def serve(directory: Path, *, port=8765, open_browser=False, heuristic=None, metadata_only=False):
     from .stage_bundle import ReviewModel
+    from .progress import progress
+    import sys
     from threading import Event
-    model = ReviewModel(directory)
+    if metadata_only and heuristic is not None:
+        raise ConfigurationError('Reclassification requires full evidence; omit --metadata-only')
+    if metadata_only:
+        from .stage_evidence import ReviewOverview
+        model = ReviewOverview(directory)
+    else:
+        with progress('Loading and verifying review evidence'):
+            model = ReviewModel(directory, heuristic=heuristic)
     with review_servers(model, port=port) as server:
         url = _origin(server) + "/"
-        print(f"Review: {url}", flush=True)
-        print("Decision drafts are exported for CLI application; repository files are unchanged.", flush=True)
+        print(f"Review: {url}", file=sys.stderr, flush=True)
+        print("Decision drafts are exported for CLI application; repository files are unchanged.", file=sys.stderr, flush=True)
         if open_browser:
             webbrowser.open(url)
         try:

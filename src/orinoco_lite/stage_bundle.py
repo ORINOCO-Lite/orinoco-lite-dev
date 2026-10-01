@@ -76,7 +76,7 @@ def _relative_review(paths: list[Path], decisions: dict, root: Path) -> dict:
 
 
 def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None,
-           title: str = "Staged comparison review", annotations: Path | None = None) -> dict:
+           title: str = "Staged comparison review", annotations: Path | None = None, heuristic=None) -> dict:
     """Copy only explicit validated reports and their evidence into a fresh directory.
 
     Application assets are supplied by the installed CLI when serving; bundle
@@ -138,7 +138,14 @@ def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None
         review = _relative_review([target / path for path in report_paths], snapshot, target)
         document = {"schema_version": VERSION, "title": title.strip(), "report_paths": report_paths,
                     "decisions": snapshot, "base_digest": json_digest(snapshot), "review": review, "annotations": copy_annotations(notes, target)}
+        from .stage_patterns import classifications, load_heuristic
+        selected = load_heuristic(heuristic)
+        document['heuristic'] = selected.info
+        document['classifications'] = classifications(loaded, selected)
         write_json(target / "review.json", document)
+        overview = ReviewModel(target).overview()
+        overview['pattern_groups'] = []  # Large before/after examples stay in the full review.
+        write_json(target / 'overview.json', overview)
         target.rename(output)
     return {"title": document["title"], "reports": len(report_paths),
             "base_digest": document["base_digest"], "counts": review["counts"],
@@ -148,7 +155,7 @@ def bundle(paths: list[Path], output: Path, decisions: Path | dict | None = None
 class ReviewModel:
     """Read copied evidence and preview decisions using the established matcher."""
 
-    def __init__(self, bundle_path: Path):
+    def __init__(self, bundle_path: Path, *, heuristic=None):
         path = _no_links(bundle_path)
         self.root = path if path.is_dir() else path.parent
         source = self.root / "review.json" if path.is_dir() else path
@@ -176,8 +183,27 @@ class ReviewModel:
         self.review = _relative_review(self.paths, self.decisions, self.root)
         if canonical(data.get("review")) != canonical(self.review):
             raise ConfigurationError("Review summary differs from its reports and decision snapshot; rebuild the bundle")
-        from .stage_patterns import classifications
-        classified = classifications(self.reports)
+        from .stage_patterns import classifications, load_heuristic
+        if heuristic is not None or 'classifications' not in data:
+            selected = load_heuristic(heuristic)
+            classified = classifications(self.reports, selected)
+            self.heuristic = selected.info
+        else:
+            classified = data['classifications']
+            self.heuristic = deepcopy(data.get('heuristic', {}))
+            keys = {row['key'] for row in self.review['findings']}
+            if not isinstance(classified, dict) or set(classified) != keys or any(
+                    not isinstance(item, dict) or item.get('category') not in
+                    {'recognized', 'unclassified', 'coverage', 'supporting', 'problem'}
+                    for item in classified.values()):
+                raise ConfigurationError('Invalid retained heuristic classifications')
+            for item in classified.values():
+                if item['category'] == 'recognized' and any(
+                        not isinstance(item.get(field), str) or (field == 'rule' and not item[field].strip())
+                        for field in ('rule', 'subtype', 'label')):
+                    raise ConfigurationError('Invalid retained heuristic classification name')
+                if 'criteria' in item and not isinstance(item['criteria'], str):
+                    raise ConfigurationError('Invalid retained heuristic classification criteria')
         for row in self.review['findings']:
             row['classification'] = classified[row['key']]
         self._rows = {row["key"]: row for row in self.review["findings"]}
@@ -251,7 +277,7 @@ class ReviewModel:
         result['difference_states'] = dict(Counter(row['state'] for row in self.review['findings'] if not row['supporting'] and row['category'] == 'differences'))
         result['observation_count'] = sum(row['category'] == 'differences' for row in self.review['findings'])
         result['annotations'] = deepcopy(self.annotations)
-        from .stage_patterns import counts, RULE, CRITERIA, PATTERNS
+        from .stage_patterns import counts
         pairs = {}
         anchors = [(key, value['anchor']) for key, value in self._site_scopes.items()] if self._site_scopes else [(item['comparison_id'], (item['run_id'], item['stage_index'])) for item in result['stages']]
         for key, anchor in anchors:
@@ -269,6 +295,8 @@ class ReviewModel:
                 labels.append(label)
             pairs[key] = {'id': key, 'label': ' → '.join(labels) if deployment else item['comparison_label'],
                           'deployment': deployment, 'targets': item['targets'], 'counts': counts(selected)}
+            from .stage_experiments import comparison_purpose
+            pairs[key]['purpose'] = comparison_purpose(item)
         result['comparisons'] = sorted(pairs.values(), key=lambda pair: (not (pair['targets']['left']['label'] == 'Orinoco' and pair['targets']['right']['label'] == 'Orinoco Lite'), not pair['deployment'], {'Orinoco': 0, 'Orinoco Lite': 1}.get(pair['targets']['left']['label'], 2), pair['label']))
         from .stage_patterns import snapshot_scope
         result['snapshot_scope'] = []
@@ -276,8 +304,10 @@ class ReviewModel:
             anchor = self._site_scopes[comparison]['anchor']
             _, s, root = self._stages[anchor]
             result['snapshot_scope'] = [dict(item, run_id=anchor[0], stage_index=anchor[1]) for item in snapshot_scope(s, root)]
-        result['pattern_rules'] = PATTERNS
-        result['pattern_rule'] = {'id': RULE, 'label': 'Declared URL prefix change', 'criteria': CRITERIA}
+        result['heuristic'] = deepcopy(self.heuristic)
+        result['pattern_rules'] = {c['subtype']: {k: c[k] for k in ('label', 'criteria') if k in c}
+                                   for row in self.review['findings'] for c in [row['classification']]
+                                   if c['category'] == 'recognized'}
         if comparison and comparison not in pairs:
             raise ConfigurationError('Unknown comparison')
         selected_stages = [stage for stage in result['stages'] if not comparison or self._in_comparison(stage['run_id'], stage['stage_index'], comparison)]
@@ -301,6 +331,8 @@ class ReviewModel:
         result['outstanding_count'] = sum(bool(row.get('decision')) and row['decision']['disposition'] in {'tolerated', 'undecided'} for row in rows if not row['supporting'])
         result['presentation_counts'] = dict(Counter(row['category'] for row in rows if not row['supporting']))
         result['stages'] = selected_stages
+        from .stage_experiments import guidance
+        result['experiment_guidance'] = guidance(selected_stages)
         if comparison:
             result['absent'] = [row for row in result['absent'] if row['decision']['stage'] in {s['stage'] for s in selected_stages}]
             for key in ('not-observed', 'not-evaluated'):
@@ -325,6 +357,8 @@ class ReviewModel:
         selected_artifacts = {identity(a) for a in stage['artifacts'].values()}
         result['related_diagnostics'] = [{'key': r['key'], 'mode': other['mode'], 'stage': other['stage']} for r in self.review['findings'] if r['key'] != row['key'] and r['finding']['subject'] == row['finding']['subject'] and r['finding']['location'] == row['finding']['location'] for other in [self._stages[r['run_id'], r['stage_index']][1]] if other['stage'] == stage['stage'] and other['mode'] == 'isolated' and any(identity(a) in selected_artifacts for a in other['artifacts'].values())]
         result['experiments'] = [dict(run_id=run, stage_index=index, **{key: deepcopy(value) for key, value in s.items() if key != 'findings'}) for (run, index), (_, s, _) in self._stages.items() if s['scope'].get('replay', {}).get('origin') == row['key']]
+        from .stage_experiments import guidance
+        result['experiment_guidance'] = guidance(result['experiments'], report=root.name, finding=row['finding']['id'])
         result['supporting_observations'] = [self._rows[key]['finding'] for key in row['supporting_keys']]
         return result
 

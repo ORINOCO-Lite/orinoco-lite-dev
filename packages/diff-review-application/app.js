@@ -12,6 +12,7 @@ const json = value => JSON.stringify(value, null, 2);
 const pretty = value => String(value || '').replaceAll('-', ' ');
 const locationText = location => location?.length ? location.map(part => typeof part === 'number' ? `[${part}]` : part).join(' / ') : '(whole subject)';
 const views = [
+  ['differences', 'All differences', 'Classified and unclassified differences, with every occurrence available. Human decisions remain separate.'],
   ['queue', 'Changes to inspect', 'Differences not fully classified by a deterministic rule. Counts are independent of human decisions.'],
   ['recognized', 'Recognized patterns', 'Differences matching a named deterministic rule. Classification is not human acceptance.'],
   ['coverage', 'Capture coverage', 'Observed HTTP absences and files not retained in a capture remain distinct.'],
@@ -30,7 +31,7 @@ const phases = [
   ['projection', 'Projection', 'Pages & graph'], ['assembly', 'Assembly', 'Hugo input tree'],
   ['rendering', 'Rendering', 'HTML & assets'], ['site-check', 'Site checks', 'Targets & browser'],
 ];
-const state = {overview: null, view: 'queue', stage: '', query: '', pattern: '', group: '', comparison: '', offset: 0, limit: 50, items: [], total: 0,
+const state = {overview: null, view: 'differences', stage: '', query: '', pattern: '', group: '', comparison: '', offset: 0, limit: 50, items: [], total: 0,
   selected: null, tab: 'values', edits: new Map(), draftsByKey: new Map(), formCache: new Map(), dirtyForms: new Set(),
   rawDecisions: new Map(), preview: null, previewSerialized: null, author: '', listRequest: 0, detailRequest: 0, artifactRequest: 0};
 let toastTimer;
@@ -76,6 +77,7 @@ function viewCount(view) {
   const counts = {...state.overview.counts, ...state.overview.difference_states};
   if (view === 'files') return null;
   if (view === 'problems') return state.overview.stages.some(s => s.stage === 'site-check') ? state.overview.presentation_counts?.problems || 0 : null;
+  if (view === 'differences') return state.overview.classification_counts?.differences || 0;
   if (view === 'queue') return state.overview.classification_counts?.unclassified || 0;
   if (view === 'recognized') return state.overview.classification_counts?.recognized || 0;
   if (view === 'coverage') return state.overview.classification_counts?.coverage || 0;
@@ -115,6 +117,7 @@ function renderStages() {
       if (available.some(stage => stage.mode === mode)) modes.append(el('span', 'tag', label));
     }
     button.append(modes); button.title = `${description}. ${available.map(stage => `${stage.mode}: ${stage.status}`).join('; ') || 'No report supplied'}`;
+    button.disabled = Boolean(state.overview.metadata_only);
     button.addEventListener('click', () => setStage(selected ? '' : name)); return button;
   }));
   $('#stage-scope-note').textContent = 'Complete path follows the actual retained outputs into these two builds. Isolated-stage diagnostics test one boundary separately; their results do not replace the complete path.';
@@ -139,11 +142,12 @@ function renderComparisons() {
   const choose = (key, label, target = buttons) => {
     const button = el('button', `comparison-button${state.comparison === key ? ' active' : ''}`, label);
     button.type = 'button'; button.setAttribute('aria-pressed', String(state.comparison === key));
+    button.disabled = Boolean(state.overview.metadata_only);
     button.onclick = () => chooseComparison(key);
     target.append(button);
   };
   for (const [key, pair] of pairs) {
-    if (pair.deployment || !hasDeployments) choose(key, `${pair.label} (${fmt(pair.counts.unclassified)})`);
+    if (pair.deployment || !hasDeployments) choose(key, `${pair.label} (${fmt(pair.counts.differences)})`);
 
   }
   if (!hasDeployments) choose('', 'All comparisons');
@@ -171,6 +175,9 @@ function renderComparisons() {
     if (target.branch_url) item.append(el('p', 'inline-note', 'The linked branch provides source context; its current head may differ from the deployed commit.'));
     panel.append(item);
   }
+  $('#comparison-purpose').textContent = selected?.purpose ? `What it establishes: ${selected.purpose.establishes} ${selected.purpose.limits}` : '';
+  const guide = $('#experiment-content'); guide.replaceChildren();
+  renderExperiments(guide, state.overview.experiment_guidance);
   renderSnapshotScope();
   if (!selected) panel.append(el('p', 'inline-note', 'Choose a comparison above to see its websites, source references, and capture details.'));
 }
@@ -179,26 +186,41 @@ async function chooseComparison(key) {
   stashEditor(); state.selected = null; ++state.detailRequest; state.comparison = key; state.stage = 'rendering'; state.pattern = ''; state.group = ''; state.query = ''; state.offset = 0;
   $('#search').value = '';
   try {
-    const overview = await api(`/api/review?${new URLSearchParams({comparison:key,stage:state.stage})}`);
+    let overview = await api(`/api/review?${new URLSearchParams({comparison:key,stage:state.stage})}`);
     if (state.comparison !== key) return;
+    if (!overview.stages.some(s => s.stage === state.stage)) {
+      state.stage = '';
+      overview = await api(`/api/review?${new URLSearchParams({comparison:key})}`);
+      if (state.comparison !== key) return;
+    }
     state.overview = overview;
-    if (!overview.stages.some(s => s.stage === state.stage)) state.stage = '';
     renderNavigation(); renderComparisons(); renderStages(); await loadFindings();
   } catch (error) {toast(error.message);}
 }
+function renderExperiments(target, items) {
+  for (const item of items || []) {
+    const card = el('details', 'json-details');
+    card.append(el('summary', '', `${item.question} · ${item.status}`));
+    for (const [key, label] of [['fixed','Hold fixed'],['varied','Change'],['requires','Requires'],['establishes','What it establishes'],['limits','Limits'],['prepare','Prepare']]) card.append(el('p', 'inline-note', `${label}: ${item[key]}`));
+    card.append(el('pre', '', item.command_text), el('p', 'inline-note', item.command_note), el('p', 'inline-note', item.status_note));
+    target.append(card);
+  }
+}
 function renderPatternSummary() {
   const target = $('#pattern-summary'); target.replaceChildren();
-  if (state.view === 'recognized') {
-    target.append(el('h3', '', 'Deterministically recognized changes'), el('p', 'inline-note', 'These rules organize evidence; they do not establish correctness or human acceptance.'));
-    const options = [['', 'All recognized patterns'], ...Object.entries(state.overview.pattern_rules).filter(([key]) => state.overview.classification_counts.patterns[key]).map(([key, rule]) => [key, rule.label])];
+  if (['differences', 'recognized', 'queue'].includes(state.view)) {
+    target.append(el('h3', '', 'Difference categories'), el('p', 'inline-note', 'Categories can be investigated and reviewed independently.'));
+    const options = [['', 'All categories in this view'], ...Object.entries(state.overview.pattern_rules).filter(([key]) => state.view !== 'queue' && state.overview.classification_counts.patterns[key]).map(([key, rule]) => [key, rule.label])];
     for (const [value, label] of options) {
-      const count = value ? state.overview.classification_counts.patterns[value] || 0 : state.overview.classification_counts.recognized;
+      const count = value ? state.overview.classification_counts.patterns[value] || 0 : viewCount(state.view);
       const button = el('button', 'comparison-button', `${label} (${fmt(count)})`); button.type = 'button'; button.setAttribute('aria-pressed', String(state.pattern === value));
       button.onclick = () => {state.pattern = value; state.group = ''; state.offset = 0; state.selected = null; loadFindings();}; target.append(button);
     }
-    for (const [key, rule] of Object.entries(state.overview.pattern_rules)) if (state.overview.classification_counts.patterns[key] && (!state.pattern || state.pattern === key)) target.append(el('h4', '', rule.label), el('p', 'inline-note', rule.criteria));
-    if (!state.pattern || state.pattern === 'repeated-html-edit') {
-      const groups = el('details', 'json-details'); groups.append(el('summary', '', `Repeated edit groups (${state.overview.pattern_groups.length}) · inspect examples or select all occurrences`));
+    const descriptions = el('details', 'json-details'); descriptions.append(el('summary', '', 'Heuristic descriptions'));
+    for (const [key, rule] of Object.entries(state.overview.pattern_rules)) if (rule.criteria && state.overview.classification_counts.patterns[key] && (!state.pattern || state.pattern === key)) descriptions.append(el('h4', '', rule.label), el('p', 'inline-note', rule.criteria));
+    if (descriptions.children.length > 1) target.append(descriptions);
+    if (state.view !== 'recognized' && (!state.pattern || state.pattern === 'repeated-html-edit')) {
+      const groups = el('details', 'json-details'); groups.append(el('summary', '', `Unclassified repeated edit groups (${state.overview.pattern_groups.length}) · inspect examples or select all occurrences`));
       for (const group of state.overview.pattern_groups) {
         const item = el('details', 'json-details');
         const sample = group.after?.[0] || group.before?.[0] || [];
@@ -208,7 +230,8 @@ function renderPatternSummary() {
       }
       target.append(groups);
     }
-    target.append(el('p', 'inline-note', 'Each result below is a matched example with its exact diff. Pagination exposes all matches.'));
+    target.append(el('p', 'inline-note', 'Select a category to inspect its occurrences. Repetition alone does not classify a change.'));
+    target.append(details('Python heuristic and rule order', state.overview.heuristic));
   }
   if (state.view === 'coverage') {
     $('#target-context').open = true;
@@ -219,7 +242,7 @@ function renderPatternSummary() {
 async function setStage(value) {
   stashEditor(); state.selected = null; ++state.detailRequest; state.stage = value;
   const selectedStage = state.overview.stages.find(s => value === `${s.run_id}/${s.stage_index}` || value === s.stage);
-  if (selectedStage) state.view = selectedStage.stage === 'site-check' ? 'problems' : 'queue';
+  if (selectedStage) state.view = selectedStage.stage === 'site-check' ? 'problems' : 'differences';
   state.pattern = ''; state.group = '';
   state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison,stage:state.stage})}`);
   renderNavigation(); renderComparisons(); state.offset = 0; renderStages(); loadFindings();
@@ -237,6 +260,12 @@ function matchesStage(row) {
 }
 async function loadFindings() {
   const request = ++state.listRequest;
+  if (state.overview.metadata_only) {
+    $('#findings').replaceChildren(el('p', 'notice', 'Findings require the retained evidence. This saved overview does not mean there are no differences.'));
+    $('#findings').setAttribute('aria-busy', 'false');
+    $('#detail').replaceChildren(el('h3', '', 'Retrieve and verify evidence'), el('pre', '', json(state.overview.evidence_command)));
+    return;
+  }
   renderPatternSummary();
   $('#findings').setAttribute('aria-busy', 'true');
   $('#findings').replaceChildren(el('p', 'list-empty', 'Loading findings…'));
@@ -250,7 +279,7 @@ async function loadFindings() {
       result = await api(`/api/original-files?${new URLSearchParams({comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit})}`);
       result.items = result.items.map(item => ({...item, original: true, state: 'file', finding: {subject: item.subject, location: ['Original-file diff'], change: item.change}}));
     } else {
-      const params = new URLSearchParams({state: ['queue', 'recognized', 'coverage', 'problems'].includes(state.view) ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: state.view === 'all' ? 'true' : 'false', classification: state.view === 'queue' ? 'unclassified' : ['recognized','coverage'].includes(state.view) ? state.view : 'all', pattern: state.pattern, group: state.group, comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
+      const params = new URLSearchParams({state: ['differences', 'queue', 'recognized', 'coverage', 'problems'].includes(state.view) ? 'all' : state.view, category: state.view === 'problems' ? 'problems' : 'differences', raw: state.view === 'all' ? 'true' : 'false', classification: state.view === 'queue' ? 'unclassified' : ['recognized','coverage'].includes(state.view) ? state.view : 'all', pattern: state.pattern, group: state.group, comparison: state.comparison, stage: state.stage, q: state.query, offset: state.offset, limit: state.limit});
       result = await api(`/api/findings?${params}`);
     }
     if (request !== state.listRequest) return;
@@ -353,7 +382,7 @@ function renderDetail() {
         const file = result.items.find(item => item.subject === finding.subject);
         if (file) renderOriginal({...file,returnFinding:row}); else toast('No original-file difference for this subject.');
       }; body.append(originals);
-      if (row.classification?.category === 'recognized' || row.classification?.category === 'coverage') body.append(el('h4', '', row.classification.label), el('p', 'inline-note', row.classification.criteria), details('Exact classification evidence', row.classification));
+      if (row.classification?.category === 'recognized' || row.classification?.category === 'coverage') body.append(el('h4', '', row.classification.label), el('p', 'inline-note', row.classification.criteria || ''), details('Exact classification evidence', row.classification));
       renderAnnotations(body, row);
       if (row.returnFinding) {const back = el('button','button','Back to selected difference'); back.onclick = () => {state.selected = row.returnFinding; renderDetail();}; body.prepend(back);}
       for (const related of row.related_diagnostics || []) {
@@ -376,6 +405,7 @@ function renderDetail() {
             renderArtifacts(panel, experiment, row); inspect.remove();
           }); effects.append(inspect);
         }
+        const guide = el('details', 'json-details'); guide.append(el('summary', '', 'Plan an investigation')); renderExperiments(guide, row.experiment_guidance); effects.append(guide);
         body.append(effects);
       }
       if (finding.representation_equivalence) body.append(el('p', 'inline-note', `Supported representation rule: ${finding.representation_equivalence}. This rule never accepts a resulting page change.`));
@@ -648,7 +678,7 @@ function wire() {
   $('#page-next').addEventListener('click', () => { state.offset += state.limit; loadFindings(); });
   $('#draft-open').addEventListener('click', () => { stashEditor(); renderDraft(); $('#draft-dialog').showModal(); });
   $('#context-open').addEventListener('click', () => { renderContext(); $('#context-dialog').showModal(); });
-  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'queue'; state.query = ''; $('#search').value = ''; setStage(''); });
+  $('[aria-label="Orinoco review home"]').addEventListener('click', event => { event.preventDefault(); state.view = 'differences'; state.query = ''; $('#search').value = ''; setStage(''); });
   for (const button of $$('[data-close]')) button.addEventListener('click', () => document.getElementById(button.dataset.close).close());
   $('#draft-preview').addEventListener('click', () => previewDraft()); $('#draft-export').addEventListener('click', () => previewDraft(true));
   window.addEventListener('beforeunload', event => { if (state.edits.size || state.dirtyForms.size) { event.preventDefault(); event.returnValue = ''; } });
@@ -656,8 +686,13 @@ function wire() {
 async function init() {
   try {
     state.overview = await api('/api/review');
+    if (state.overview.metadata_only) {
+      $('#evidence-status').hidden = false; $('#evidence-status').textContent = state.overview.evidence_status;
+      for (const id of ['draft-open','state-filter','stage-filter','stage-reset','search','page-prev','page-next']) $('#' + id).disabled = true;
+    }
     state.comparison = state.overview.comparisons.find(p => p.deployment)?.id || state.overview.comparisons[0]?.id || '';
     state.stage = state.overview.comparisons.some(p => p.deployment) ? 'rendering' : '';
+    if (state.overview.metadata_only) {state.comparison = ''; state.stage = '';}
     if (state.comparison) state.overview = await api(`/api/review?${new URLSearchParams({comparison:state.comparison,stage:state.stage})}`);
     $('#review-title').textContent = state.overview.title || 'Staged comparison'; document.title = `${state.overview.title || 'Change review'} · Orinoco`;
 

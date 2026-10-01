@@ -65,7 +65,7 @@ const options = JSON.parse(fs.readFileSync(0, 'utf8'));
     page.on('pageerror', error => pageErrors.push(error.message));
     await page.goto(options.url);
     await page.locator('#findings[aria-busy="false"]').waitFor();
-    if (await page.getByRole('button', {name:'All comparisons',exact:true}).count()) await page.getByRole('button', {name:'All comparisons',exact:true}).click();
+    if (await page.getByRole('button', {name:'All comparisons',exact:true}).count() && await page.getByRole('button', {name:'All comparisons',exact:true}).isEnabled()) await page.getByRole('button', {name:'All comparisons',exact:true}).click();
     await page.locator('#findings[aria-busy="false"]').waitFor();
 """ + script + """
     assert.deepEqual(pageErrors, []);
@@ -396,7 +396,7 @@ def test_site_buttons_and_sidebar_are_scoped_to_one_pair(tmp_path, browser_node)
         assert.equal(await page.getByText('Supporting investigations',{exact:true}).count(), 0);
         const first = options.pairs[0], second = options.pairs[1];
         for (const pair of [second, first]) {
-          await page.getByRole('button',{name:pair.label+' ('+pair.counts.unclassified+')',exact:true}).click();
+          await page.getByRole('button',{name:pair.label+' ('+pair.counts.differences+')',exact:true}).click();
           await page.locator('#findings[aria-busy="false"]').waitFor();
           assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(), String(pair.counts.unclassified));
           assert.equal(await page.locator('#view-nav button').filter({hasText:'Recognized patterns'}).locator('.nav-count').innerText(), String(pair.counts.recognized));
@@ -439,16 +439,18 @@ def test_complete_site_stage_pattern_diff_evidence_and_return(tmp_path, browser_
     with review_servers(model,port=0) as server:
         browser(browser_node,server,'''
         assert.match(await page.locator('#selected-comparison').innerText(), /Locally built Orinoco → Locally built Lite/);
-        assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(),'0');
+        assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(),'2');
         await page.locator('#stage-flow button').filter({hasText:'Projection'}).click();
         await page.locator('#findings[aria-busy="false"]').waitFor();
         await page.waitForFunction(() => document.querySelector('#scope-label').textContent.endsWith('projection'));
         assert.equal(await page.locator('#view-nav button').filter({hasText:'Changes to inspect'}).locator('.nav-count').innerText(),'1');
         await page.locator('#stage-flow button').filter({hasText:'Rendering'}).click();
         await page.waitForFunction(() => document.querySelector('#scope-label').textContent.endsWith('rendering'));
-        await page.getByRole('button',{name:/^Recognized patterns/}).click();
+        await page.getByRole('button',{name:/^Changes to inspect/}).click();
         await page.locator('#findings[aria-busy="false"]').waitFor();
-        await page.locator('#pattern-summary button').filter({hasText:'Repeated HTML edits'}).click();
+        await page.locator('#pattern-summary > details').filter({hasText:'Unclassified repeated edit groups'}).locator('summary').first().click();
+        await page.locator('#pattern-summary details details summary').first().click();
+        await page.getByRole('button',{name:'Show every occurrence of this edit',exact:true}).first().click();
         await page.locator('#findings[aria-busy="false"]').waitFor();
         await page.locator('#findings .finding-row').first().click();
         await page.getByLabel('Unified diff',{exact:true}).waitFor();
@@ -461,5 +463,44 @@ def test_complete_site_stage_pattern_diff_evidence_and_return(tmp_path, browser_
         assert.equal(await page.locator('#findings .finding-row').count(),2);
         await page.getByRole('tab',{name:'Artifacts',exact:true}).click();
         assert.equal(await page.locator('#scope-label').innerText(),selectedScope);
+        console.log('{}');
+        ''')
+
+
+def test_default_all_differences_and_experiment_guidance(tmp_path, browser_node):
+    source, _ = report(tmp_path, 'classified', [finding('known', 'one'), finding('unknown', 'two')])
+    heuristic = tmp_path/'heuristic.py'
+    heuristic.write_text("def rule(finding, stage):\n    return 'a-category' if finding['subject'] == 'known' else None\nRULES = [rule]\n")
+    output = tmp_path/'bundle'; bundle([source], output, heuristic=heuristic)
+    with review_servers(ReviewModel(output), port=0) as server:
+        browser(browser_node, server, '''
+        assert.equal(await page.locator('#state-filter').inputValue(), 'differences');
+        assert.equal(await page.locator('#findings .finding-row').count(), 2);
+        assert.match(await page.locator('#pattern-summary').innerText(), /a-category/);
+        await page.locator('#experiment-guide > summary').click();
+        assert.match(await page.locator('#experiment-content').innerText(), /What changes when the software changes/);
+        assert.match(await page.locator('#experiment-content').innerText(), /not run in this review/);
+        await page.locator('#experiment-content details').filter({hasText:'What changes when the software changes?'}).locator('summary').click();
+        assert.match(await page.locator('#experiment-content').innerText(), /Hold fixed: Captured records/);
+        assert.match(await page.locator('#experiment-content').innerText(), /--experiment software-change/);
+        console.log('{}');
+        ''')
+
+
+def test_saved_overview_browser_needs_no_artifact_bytes(tmp_path, browser_node):
+    from orinoco_lite.stage_evidence import ReviewOverview
+    source, _ = report(tmp_path, 'overview', [finding('one', 'new')])
+    output = tmp_path/'bundle'; bundle([source], output)
+    shutil.rmtree(output/'reports')
+    with review_servers(ReviewOverview(output), port=0) as server:
+        # Metadata overview deliberately disables comparison selection.
+        browser(browser_node, server, '''
+        assert.match(await page.locator('#evidence-status').innerText(), /not been retrieved or verified/);
+        assert.match(await page.locator('#findings').innerText(), /does not mean there are no differences/);
+        assert.equal(await page.locator('#draft-open').isDisabled(), true);
+        await page.locator('#experiment-guide > summary').click();
+        assert.match(await page.locator('#experiment-content').innerText(), /Can this existing downstream adopt the update/);
+        const response = await page.request.get(options.url+'api/findings');
+        assert.equal(response.status(), 400);
         console.log('{}');
         ''')

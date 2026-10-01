@@ -101,6 +101,7 @@ def diff_text(finding, stage, root):
 def render_rows(rows, stages, *, category='differences', subject='', raw=False):
     """Plain output suitable for a pager, grep, or redirection; no ANSI controls."""
     lines = []
+    rows = sorted(rows, key=lambda row: (row.get('classification', {}).get('category', ''), row.get('classification', {}).get('subtype', '')))
     for row in rows:
         if category != 'all' and row['category'] != category:
             continue
@@ -113,6 +114,9 @@ def render_rows(rows, stages, *, category='differences', subject='', raw=False):
         lines += [f"# {finding['stage']}: {finding['subject']} [{finding['id']}]",
                   f"# {stage['mode']} · {stage['status']}",
                   '# Targets: ' + json.dumps(targets(stage), ensure_ascii=False, sort_keys=True)]
+        from .stage_experiments import comparison_purpose
+        purpose = comparison_purpose(stage)
+        lines += ['# Question: ' + purpose['question'], '# What it establishes: ' + purpose['establishes'], '# Limits: ' + purpose['limits']]
         if row['category'] == 'problems':
             lines += [f"Possible problem ({finding.get('problem_status', 'not compared across targets')}): {' / '.join(map(str, finding['location']))}",
                       json.dumps(finding['after'], ensure_ascii=False, sort_keys=True)]
@@ -120,7 +124,7 @@ def render_rows(rows, stages, *, category='differences', subject='', raw=False):
             lines.append(diff_text(finding, stage, root))
             if row['supporting_keys']:
                 lines.append(f"# {len(row['supporting_keys'])} supporting observations retained (--raw)")
-        if row.get('classification', {}).get('category') in {'recognized', 'coverage'}:
+        if row.get('classification'):
             lines.append('# Classification: ' + json.dumps(row['classification'], ensure_ascii=False))
         for effect in row.get('effects', []):
             lines.append('# ' + effect['conclusion'])

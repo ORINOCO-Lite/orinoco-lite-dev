@@ -15,6 +15,9 @@ def register(commands):
     options(compare, replace=False)
     compare.add_argument('--name', required=True, help='new report name')
     compare.add_argument('--stage', choices=('storage', 'projection', 'assembly', 'rendering'), default='rendering')
+    from .stage_experiments import EXPERIMENTS
+    compare.add_argument('--experiment', choices=tuple(EXPERIMENTS), default='snapshot',
+                         help='question and controls for this comparison; declaring a design does not verify its controls')
     compare.add_argument('--check-links', action='store_true', help='also compare local-link problems, in a separate report')
     compare.add_argument('--left-base-url', default='/')
     compare.add_argument('--right-base-url', default='/')
@@ -36,6 +39,8 @@ def register(commands):
     replay.add_argument('--assembly', required=True, type=Path, help='retained right-side Hugo input tree')
     replay.add_argument('--name', required=True, help='new rendering report name; outputs retained beside it')
     replay.add_argument('--base-url', default='/')
+    for parser in (compare, replay):
+        parser.add_argument('--heuristic', type=Path, help='trusted Python classification heuristic with ordered RULES')
     replay.add_argument('--flavor', choices=('upstream', 'lite'), default='lite', help='same rendering operation used for every replay build')
 
 
@@ -64,6 +69,7 @@ def execute(args, root):
             findings, names = compare_trees(left, right, rendered=args.stage == 'rendering')
             comparator = 'site-files/1' if args.stage == 'rendering' else 'content-files/1'
             scope = {'complete': True, 'subjects': names, 'all_locations': True}
+        scope['experiment'] = getattr(args, 'experiment', 'snapshot')
         if args.check_links and args.stage != 'rendering':
             raise ConfigurationError('--check-links requires --stage rendering')
         if args.check_links:
@@ -131,6 +137,12 @@ def execute(args, root):
     from .stage_review import summarize, load_decisions
     from .stage_presentation import render_rows
     result = summarize([output], load_decisions(None))
+    from .stage_patterns import classifications, load_heuristic
+    selected = getattr(args, 'heuristic', None)
+    heuristic = load_heuristic(explicit_path(args, selected) if selected else None)
+    classified = classifications([(report, output)], heuristic)
+    for row in result['findings']:
+        row['classification'] = classified[row['key']]
     stages = {f"{report['run_id']}/{f['id']}": (s, output) for s in report['stages'] for f in s['findings']}
     print(render_rows(result['findings'], stages) or 'No differences.')
     if args.review_command == 'replay':

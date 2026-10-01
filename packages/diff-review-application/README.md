@@ -48,21 +48,47 @@ For durable acquisitions, run the public capture command through the downstream'
 
 ## Read differences and investigate effects
 
-`dev review show` prints unclassified normalized structured diffs with context.
-Use `--classification recognized` for deterministic patterns, `--classification coverage` for capture gaps, or `--classification all` for every category.
-These categories do not accept changes or alter human decisions.
-Declared URL-prefix rules require identical remaining paths, queries, fragments, and other attributes.
-A separate rule groups identical complete HTML edits repeated across at least two files, including mixed asset, integrity, and template changes; repetition does not establish correctness or cause.
-Both CLI and web retain the rules, counts, and every underlying diff.
+`dev review show` prints classified and unclassified structured differences by default.
+Use `--classification unclassified`, `recognized`, or `coverage` to narrow the view.
+Classification does not change original evidence, AI annotations, or human dispositions.
+Identical unknown HTML edits can be grouped across files, but remain unclassified.
+
+The default Python heuristic is `src/orinoco_lite/review_heuristic.py`.
+Its ordered `RULES` classify complete differences; the first match wins, with specific adaptations before general representation rules.
+A rule receives `(finding, stage)` and returns a category name, a dictionary with a `rule` name, or `None`.
+Labels and explanations are optional.
+For a downstream-specific heuristic, compose ordinary Python functions:
+
+```python
+from orinoco_lite.review_heuristic import RULES as shared_rules
+
+
+def site_change(finding, stage):
+    if (finding['subject'] == 'title.txt'
+            and finding['before'] == 'Old title'
+            and finding['after'] == 'New title'):
+        return 'site-title-change'
+    return None
+
+
+RULES = (site_change, *shared_rules)
+```
+
+Select trusted Python explicitly with `--heuristic FILE` on `compare`, `replay`, `show`, `bundle`, or `serve`.
+The Python file executes with the caller's privileges.
+`show` and `serve` can reclassify retained evidence without rebuilding the sites.
+Bundles retain classifications and heuristic identity; opening a bundle never executes its saved heuristic selection.
+Retain custom heuristic source and its environment with the investigation when rerunning its classification matters.
+This separation follows [HeuDiConv's Python heuristic approach](https://heudiconv.readthedocs.io/en/latest/heuristics.html); rule precedence is explicit here.
 
 The web starts with buttons for two coherent site outputs.
-Each button shows the unclassified count across its linked stages; sidebar counts and contents follow the selected pair and stage.
+Each button shows the total difference count across its linked stages; sidebar counts and contents follow the selected pair and stage.
 The default is the complete local Orinoco → Lite site comparison when supplied.
 Stages are associated through exact artifact digests and producing-operation links, not display labels.
 Stage choices sit directly below the comparison buttons; unavailable stages are explicit.
 Related isolated-stage diagnostics and replay evidence open from their relevant change without switching the selected sites.
-Recognized patterns show their criteria and repeated-edit examples with access to all occurrences.
-Rules are ordered in `src/orinoco_lite/stage_patterns.py`: missing capture evidence first, narrow URL and metadata matches next, then exact repeated HTML edits; unmatched hunks remain unclassified.
+Categories expose all their occurrences, with explanations when supplied.
+Capture coverage and supporting size observations are identified separately before applying the selected heuristic.
 Capture coverage describes the saved snapshot: selected routes, saved files, successful responses, HTTP-confirmed absence, and errors or unknown outcomes.
 Routes outside the selection may never have been requested; their absence is not a verdict on the live site.
 `dev review show --view files` compares every original retained file, independently of findings and decisions.
@@ -90,6 +116,16 @@ A repeated baseline must agree before the result supports an effect claim.
 Retained inputs and outputs connect the result to the original finding in both CLI and web review.
 This tests that substitution for those inputs and that renderer, not every deployment.
 Files with multiple semantic changes require a more focused investigation.
+
+## Plan an investigation
+
+`dev review experiments` describes the questions, controls, prerequisites, preparation, commands, and limits shared with the website's **Questions and experiments** view.
+It works before any reports exist; `--format json` supplies structured guidance for agents.
+Each comparison also exposes what it establishes.
+Use `compare --experiment software-change` (or another listed design) to record the intended question when comparing prepared outputs.
+The flag does not run builds or prove that the controls were met.
+Statuses describe supplied comparison runs; a missing experiment remains visible without being required for every update.
+Selected differences link to the same guidance under **Plan an investigation**.
 
 ## Add an agent investigation
 
@@ -139,6 +175,44 @@ Use `--directory PATH` for another investigation.
 It does not run missing stages.
 Create retained record comparisons with `records diff all --report sourcedata/reports`.
 Select particular comparisons by name when needed, such as `review bundle downloaded-vs-yaml-jsonl rdf rdf-records`.
+
+## Retain evidence with Git Annex
+
+A separate DataLad dataset can retain investigations and be selected by a Git submodule in an engineering checkout.
+Keep small human-authored decisions, annotations, scripts, and environment selections in Git.
+Large captures, finding payloads, and outputs can use Annex; configure a content remote before relying on another clone to retrieve them.
+Record acquisitions and transformations with native `datalad run`; use `datalad save` when ingesting supplied historical bytes whose generating environment is unavailable.
+Do not relabel historical dirty-checkout evidence as a reproducible software selection.
+Save the child dataset before advancing the parent's gitlink.
+
+`review bundle` also writes a derived `overview.json` for browsing without artifact content.
+Keep that file in ordinary Git; full `review.json`, report payloads, and artifacts may be annexed.
+For example, an evidence dataset can use these `.gitattributes` entries:
+
+```text
+* annex.largefiles=anything
+.gitattributes annex.largefiles=nothing
+*.py annex.largefiles=nothing
+*.toml annex.largefiles=nothing
+*.lock annex.largefiles=nothing
+**/overview.json annex.largefiles=nothing
+decisions.json annex.largefiles=nothing
+annotations.json annex.largefiles=nothing
+```
+
+With a bundle under `evidence/run/bundle`, browse its saved overview or explicitly retrieve and verify a full review:
+
+```sh
+orinoco-lite dev review serve --directory evidence/run --metadata-only
+orinoco-lite dev review materialize evidence/run/bundle build/review/bundle --get
+orinoco-lite dev review serve --directory build/review
+```
+
+Metadata-only viewing marks the saved counts as unverified in this session and disables evidence inspection and decision editing.
+`materialize --get` runs DataLad retrieval for the selected bundle; omit `--get` to require local content.
+It resolves only recognized Annex file links, copies ordinary files into a fresh destination, and verifies the resulting reports before exposing the output.
+The ordinary comparison engine and full review continue to require ordinary verified files.
+This engineering evidence storage does not change downstream canonical metadata or introduce an Annex dependency into ordinary site builds.
 
 ## Draft and apply decisions
 
