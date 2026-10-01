@@ -23,8 +23,7 @@ def test_failed_hugo_output_retains_explicit_failure(tmp_path, monkeypatch, fail
     monkeypatch.setattr(dev_site, "build_hugo", fail)
     command = ["--root", str(tmp_path), "dev", "hugo", "build", "upstream"]
     if isinstance(failure, KeyboardInterrupt):
-        with pytest.raises(KeyboardInterrupt):
-            cli.main(command)
+        assert cli.main(command) == 130
     else:
         assert cli.main(command) == 2
     assert (output / "index.html").read_text() == "partial"
