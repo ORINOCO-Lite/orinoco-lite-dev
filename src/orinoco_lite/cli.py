@@ -229,7 +229,14 @@ def _update_projection(args, workspace, resources) -> int:
 
 
 def _build(args: argparse.Namespace) -> int:
+    from .annex_media import netlify_media_checkout
+
     workspace, resources = _resolve(args)
+    with netlify_media_checkout(workspace):
+        return _build_workspace(args, workspace, resources)
+
+
+def _build_workspace(args, workspace, resources) -> int:
     preview_environment = _netlify_preview_environment()
     repository_value = args.github_repository or preview_environment.get(
         "ORINOCO_GITHUB_REPOSITORY"

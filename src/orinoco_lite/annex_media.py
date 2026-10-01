@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from contextlib import contextmanager
 from collections.abc import Callable
 from pathlib import Path
 import subprocess
@@ -121,3 +123,31 @@ def prepare_media(workspace) -> dict[Path, Path]:
     site = workspace.path("site")
     return {site / path: location for path, location in
             retrieve_and_verify(site, workspace_annex_files(workspace)).items()}
+
+
+@contextmanager
+def netlify_media_checkout(workspace):
+    """Leave an opted-in Netlify cache usable before Pixi is on PATH."""
+    if os.environ.get("NETLIFY") != "true" or not workspace.annex_media:
+        yield
+        return
+    site = workspace.path("site")
+    # Do not let Git fall back to the parent repository for a missing submodule.
+    root = _git(site, "rev-parse", "--show-toplevel") if site.is_dir() else None
+    if root is None or root.returncode or Path(root.stdout.strip()).resolve() != site.resolve():
+        raise ConfigurationError("media.annex requires an initialized site-specific submodule")
+    result = _git(site, "config", "--local", "core.hooksPath", os.devnull)
+    if result.returncode:
+        raise DriverError(f"Cannot prepare Netlify media checkout: {result.stderr.strip()}")
+    try:
+        yield
+    finally:
+        # Annex init installs filters in local Git config. Netlify reuses that
+        # config while checking out the next build, before it installs Pixi.
+        filters = _git(site, "config", "--local", "--get-regexp", r"^filter\.annex\.")
+        if filters.returncode == 0:
+            result = _git(site, "config", "--local", "--remove-section", "filter.annex")
+            if result.returncode:
+                raise DriverError(f"Cannot clean Netlify media checkout: {result.stderr.strip()}")
+        elif filters.returncode != 1:
+            raise DriverError(f"Cannot inspect Netlify media filters: {filters.stderr.strip()}")
