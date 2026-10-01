@@ -30,7 +30,8 @@ def _parser() -> argparse.ArgumentParser:
         description="Maintain your site's metadata and build a static website with Orinoco Lite.",
         epilog=("Run from your website repository. For a local preview, run 'orinoco-lite build' "
                 "followed by 'orinoco-lite serve'. Use COMMAND --help for options and "
-                "'orinoco-lite dev --help' when contributing package or template changes."),
+                "'orinoco-lite dev --help' when contributing package or template changes. "
+                "Interrupted work exits 130; a closed output pipe exits 141."),
     )
     parser.add_argument("--root", type=Path, help="directory containing pyproject.toml")
     parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
@@ -212,7 +213,7 @@ def _validate(args: argparse.Namespace) -> int:
     if not args.structural_only:
         resources = resolve_resources()
         status = invoke_driver("validate", workspace, resources,
-                               extra_arguments=("--no-cache",) if args.no_cache else ())
+                               extra_arguments=("--quiet", "--no-cache") if args.no_cache else ("--quiet",))
         if status:
             return status
         report["package_version"] = __version__
@@ -353,7 +354,7 @@ def _run(args: argparse.Namespace) -> int:
     )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
@@ -416,3 +417,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.exit(2, f"orinoco-lite: {error}\n")
     parser.error(f"Unknown command: {args.command}")
     return 2
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Render process-level stream failures and cancellation without tracebacks."""
+    try:
+        try:
+            return _main(argv)
+        finally:
+            # Catch errors deferred until buffered output reaches the pipe.
+            sys.stdout.flush()
+    except BrokenPipeError:
+        # Prevent another failed flush during interpreter shutdown.
+        with open(os.devnull, "w") as sink:
+            os.dup2(sink.fileno(), sys.stdout.fileno())
+        return 141
+    except KeyboardInterrupt:
+        print("orinoco-lite: interrupted", file=sys.stderr, flush=True)
+        return 130

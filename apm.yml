@@ -12,7 +12,7 @@ dependencies:
     - git: danyuchn/asd-ste100-skill
       ref: 6f7bb361ae9b97a9fcb5f5c57cbac40eacf2d438
     - git: leej3/skills-workshop
-      ref: 8ce3cca67da9aa4809ea7edc02cc346d71072489
+      ref: 57d3269a86c6512654685de15ae942bfcea0806f
       skills:
         - unix-cli-design
   mcp: []

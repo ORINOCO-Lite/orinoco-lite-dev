@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T15:23:15.616541+00:00'
+generated_at: '2026-10-01T15:34:39.840103+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: danyuchn/asd-ste100-skill
@@ -28,8 +28,8 @@ dependencies:
 - repo_url: leej3/skills-workshop
   name: workshop-skills
   host: github.com
-  resolved_commit: 8ce3cca67da9aa4809ea7edc02cc346d71072489
-  resolved_ref: 8ce3cca67da9aa4809ea7edc02cc346d71072489
+  resolved_commit: 57d3269a86c6512654685de15ae942bfcea0806f
+  resolved_ref: 57d3269a86c6512654685de15ae942bfcea0806f
   version: 0.1.0
   package_type: apm_package
   deployed_files:
@@ -37,7 +37,7 @@ dependencies:
   - .agents/skills/unix-cli-design/SKILL.md
   deployed_file_hashes:
     .agents/skills/unix-cli-design/SKILL.md: sha256:7ab157de646a9068d518938ee98d895cde26ce4a2cc331664d849cbcd4e9ca4d
-  content_hash: sha256:c8f169f7e3c4b7b158d183747c7cfdbfcf24651543a6334e1ff7a73691c1c83c
+  content_hash: sha256:72a9d363b1718aaf3c0efc2dbbe2c129902821acaf376d5583c5bed2bf4f209d
   skill_subset:
   - unix-cli-design
 deployments:

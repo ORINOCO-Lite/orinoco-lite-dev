@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from copy import deepcopy
 import hashlib
 import json
@@ -307,26 +308,30 @@ def register(subparsers: Any) -> None:
         description="Convert a JSONL dump into site-specific/metadata. Only metadata/records "
                     "and metadata/overlays/machine-provenance-annotations are replaced; use --force for existing metadata.")
     options(parser)
-    parser.add_argument("--source", type=Path, help="JSONL input (default: DIRECTORY/downloaded/records.jsonl)")
+    parser.add_argument("--source", help="JSONL input; - reads stdin (spooled to a temporary file); default: DIRECTORY/downloaded/records.jsonl")
     parser.add_argument("--destination", type=Path, default=Path("site-specific"),
                         help="site-input directory (default: %(default)s)")
     parser.set_defaults(records_action="jsonl-to-yaml")
     parser = subparsers.add_parser("yaml-to-jsonl", help="rejoin YAML records and annotations into JSONL",
         description="Rejoin site-specific metadata into sourcedata/yaml-jsonl/records.jsonl. "
-                    "Use --source and --output for other paths; existing output requires --force.")
+                    "Use --source and --output for other paths; existing output requires --force.",
+        epilog="Example: orinoco-lite dev records yaml-to-jsonl --output - | jq -c . "
+               "Use shell pipefail when the pipeline must detect producer failures. "
+               "A failed export may leave incomplete data in a pipe; check its exit status.")
     options(parser)
     parser.add_argument("--source", type=Path, default=Path("site-specific"),
                         help="site-input directory containing metadata (default: %(default)s)")
-    parser.add_argument("--output", type=Path, help="JSONL destination (default: DIRECTORY/yaml-jsonl/records.jsonl)")
+    parser.add_argument("--output", help="JSONL destination; - writes UTF-8 JSONL to stdout after validation, ordered by class and PID (default: DIRECTORY/yaml-jsonl/records.jsonl)")
     parser.set_defaults(records_action="yaml-to-jsonl")
     parser = subparsers.add_parser("diff", help="compare two representations of the records",
         description="Compare sourcedata/downloaded/records.jsonl with site-specific metadata by default. "
-                    "Pass two paths to compare other JSONL files or site-input directories. "
-                    "Print differences without writing files, downloading, or changing inputs. "
+                    "Pass two paths to compare other JSONL files or site-input directories; use - for one stdin input. "
+                    "Inputs are read completely before comparison; stdin is spooled temporarily. Inputs are never changed. "
                     "Exit 0 means equal, 1 means differences, and 2 means an error.")
-    parser.add_argument("left", nargs="?", type=Path, help="JSONL file or site-input directory (default: DIRECTORY/downloaded/records.jsonl)")
-    parser.add_argument("right", nargs="?", type=Path, default=Path("site-specific"),
+    parser.add_argument("left", nargs="?", help="JSONL file or site-input directory (default: DIRECTORY/downloaded/records.jsonl)")
+    parser.add_argument("right", nargs="?", default="site-specific",
                         help="JSONL file or site-input directory (default: %(default)s)")
+    parser.add_argument("--json", action="store_true", help="emit one JSON report with complete selected findings and total counts; --record/--field select findings, --summary/--limit/--full-values affect only text; exit status covers all records")
     parser.add_argument("--summary", action="store_true", help="show counts without individual differences")
     parser.add_argument("--limit", type=_limit, default=30, help="maximum displayed differences (default: 30)")
     parser.add_argument("--record", action="append", help="select a record identifier; repeat for several")
@@ -336,6 +341,21 @@ def register(subparsers: Any) -> None:
     parser.set_defaults(records_action="diff")
 
 
+@contextmanager
+def _record_input(args, value):
+    """Spool stdin for the existing path-based, repeated-read record operations."""
+    from .diagnostics import explicit_path
+
+    if value != "-":
+        yield explicit_path(args, Path(value))
+        return
+    with tempfile.TemporaryDirectory(prefix="orinoco-stdin-") as temporary:
+        path = Path(temporary) / "stdin.jsonl"
+        with path.open("w", encoding="utf-8") as stream:
+            shutil.copyfileobj(sys.stdin, stream)
+        yield path
+
+
 def execute(args: argparse.Namespace) -> int:
     from .diagnostics import directory, explicit_path, require
 
@@ -343,7 +363,7 @@ def execute(args: argparse.Namespace) -> int:
     try:
         data = directory(args)
         if action == "jsonl-to-yaml":
-            source = explicit_path(args, args.source) if args.source else require(data / "downloaded/records.jsonl", "records get")
+            source = args.source if args.source is not None else require(data / "downloaded/records.jsonl", "records get")
             site_inputs = explicit_path(args, args.destination)
             # Never delete the enclosing site directory: it may be a subdataset.
             for name in ("metadata/records", "metadata/overlays/machine-provenance-annotations"):
@@ -351,12 +371,20 @@ def execute(args: argparse.Namespace) -> int:
                 _safe_output(target)
                 if target.exists() and not args.force:
                     raise ConfigurationError(f"Metadata output already exists: {target}; use --force to replace it")
-            with progress("Converting JSONL records to YAML"):
-                result = jsonl_to_yaml(source, site_inputs)
+            with progress("Converting JSONL records to YAML"), _record_input(args, source) as source_path:
+                result = jsonl_to_yaml(source_path, site_inputs)
             print(f"Converted {result['record_count']} records (YAML): {site_inputs}")
         elif action == "yaml-to-jsonl":
             site_inputs = explicit_path(args, args.source)
-            output = explicit_path(args, args.output) if args.output else data / "yaml-jsonl/records.jsonl"
+            if args.output == "-":
+                with progress("Exporting YAML records to JSONL"), tempfile.TemporaryDirectory(prefix="orinoco-stdout-") as temporary:
+                    output = Path(temporary) / "records.jsonl"
+                    joined = yaml_to_jsonl(site_inputs, output)
+                    with output.open(encoding="utf-8") as stream:
+                        shutil.copyfileobj(stream, sys.stdout)
+                print(f"Wrote {len(joined)} records (JSONL) to stdout", file=sys.stderr)
+                return 0
+            output = explicit_path(args, Path(args.output)) if args.output else data / "yaml-jsonl/records.jsonl"
             _safe_output(output)
             if output.exists() and not args.force:
                 raise ConfigurationError(f"JSONL output already exists: {output}; use --force to replace it")
@@ -364,16 +392,27 @@ def execute(args: argparse.Namespace) -> int:
                 joined = yaml_to_jsonl(site_inputs, output)
             print(f"Wrote {len(joined)} records (JSONL): {output}")
         elif action == "diff":
-            left_path = explicit_path(args, args.left) if args.left else require(data / "downloaded/records.jsonl", "records get")
-            right_path = explicit_path(args, args.right)
+            if args.left == "-" and args.right == "-":
+                raise ConfigurationError("Only one diff input may read stdin (-)")
+            left_input = args.left if args.left is not None else require(data / "downloaded/records.jsonl", "records get")
             def read(path):
                 if path.is_dir():
                     with tempfile.TemporaryDirectory() as temporary:
                         return yaml_to_jsonl(path, Path(temporary) / "records.jsonl")
                 return snapshot.load_jsonl(path)
-            with progress("Reading and comparing records"):
+            with progress("Reading and comparing records"), _record_input(args, left_input) as left_path, _record_input(args, args.right) as right_path:
                 left, right = read(left_path), read(right_path)
                 findings = compare_records(left, right)
+            selected = [item for item in findings if
+                        (not args.record or item['subject'] in args.record) and
+                        (not args.field or (item['location'] and item['location'][0] == args.field))]
+            if args.json:
+                print(json.dumps({"records_before": len(left), "records_after": len(right),
+                                  "records_differ": len({item["subject"] for item in findings}),
+                                  "total_findings": len(findings), "findings": selected}, ensure_ascii=False))
+                return 1 if findings else 0
+            left_path = "stdin" if args.left == "-" else left_path
+            right_path = "stdin" if args.right == "-" else right_path
             print(f"Before: {left_path}\nAfter:  {right_path}")
             print(f"{len(left)} records before; {len(right)} after; {len({item['subject'] for item in findings})} records differ.")
             fields = defaultdict(set)
@@ -381,9 +420,6 @@ def execute(args: argparse.Namespace) -> int:
                 fields[str(item["location"][0]) if item["location"] else '<whole record>'].add(item['subject'])
             for field, subjects in sorted(fields.items(), key=lambda item: (-len(item[1]), item[0])):
                 print(f"  {field}: {len(subjects)} records")
-            selected = [item for item in findings if
-                        (not args.record or item['subject'] in args.record) and
-                        (not args.field or (item['location'] and item['location'][0] == args.field))]
             shown = [] if args.summary else selected[:args.limit]
             for item in shown:
                 location = _display_location(item["location"])
@@ -409,6 +445,8 @@ def execute(args: argparse.Namespace) -> int:
             return 1 if findings else 0
         else:
             raise ValueError(f"unknown record operation: {action}")
+    except BrokenPipeError:
+        raise
     except (OSError, ValueError, ConfigurationError, snapshot.SnapshotError, storage.StorageProjectionError) as error:
         print(f"records {action}: {error}", file=sys.stderr)
         return 2

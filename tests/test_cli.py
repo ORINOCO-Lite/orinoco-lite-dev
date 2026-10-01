@@ -163,7 +163,7 @@ def test_validate_checks_inputs_without_generating_projection():
         assert cli._validate(args) == 0
     assert invoke.call_count == 1
     assert invoke.call_args.args[0] == "validate"
-    assert invoke.call_args.kwargs["extra_arguments"] == ("--no-cache",)
+    assert invoke.call_args.kwargs["extra_arguments"] == ("--quiet", "--no-cache")
 
 
 @pytest.mark.parametrize("status", [0, 1])
@@ -184,3 +184,33 @@ def test_build_bundle_is_optional_and_only_created_after_success(tmp_path, statu
         prepare.assert_called_once_with(tmp_path, "projection-commit", "build/site", "build/publication.bundle")
     else:
         prepare.assert_not_called()
+
+
+def test_validate_json_has_one_document_across_driver_process(tmp_path, monkeypatch, capfd):
+    import json
+    import subprocess
+    from orinoco_lite import driver
+
+    workspace = SimpleNamespace(root=tmp_path, config_path=tmp_path / "pyproject.toml",
+                                base_url="/", environment=lambda: {}, site_name="Test",
+                                path=lambda name: tmp_path / name)
+    monkeypatch.setattr(cli, "_workspace", lambda _: workspace)
+    monkeypatch.setattr(cli, "resolve_resources", lambda: SimpleNamespace(root=tmp_path))
+    monkeypatch.setattr(cli, "validate_workspace", lambda _: {"records": 1})
+    real_run = subprocess.run
+
+    def run_validation(command, **kwargs):
+        # Keep the real driver process and renderer; stub only semantic work.
+        code = (
+            "from orinoco_lite import validate_resources as v; "
+            "v.load_config_path = lambda _: None; "
+            "v.validate_inputs = lambda *a, **k: {'semantic': True}; "
+            "raise SystemExit(v.main())"
+        )
+        return real_run([command[0], "-c", code, *command[3:]], **kwargs)
+
+    monkeypatch.setattr(driver.subprocess, "run", run_validation)
+    assert cli.main(["validate", "--json"]) == 0
+    output = capfd.readouterr()
+    assert json.loads(output.out)["records"] == 1
+    assert not output.err
