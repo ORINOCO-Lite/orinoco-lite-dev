@@ -4,104 +4,25 @@ Active build specification for maintainers implementing the comparison commands 
 Updated 29 September 2026; retire implementation sequencing when the system is delivered and promote lasting contracts.
 The [application README](../../packages/diff-review-application/README.md) describes the later web interface for reviewers.
 The [design charter](../project-design.md) supplies project constraints; this document specifies the planned interfaces, behavior, and delivery sequence.
-The commands and application described here are implementation targets.
+The staged CLI commands and a small terminal review are implemented; the web application remains a later target.
 The [exploration](provenance-comparison-exploration.md) records the research behind the [investigation procedure](../../.agents/skills/compare-orinoco-provenance/SKILL.md).
 
-## Psychoinformatics downstream update plan
+## Current review sequence
 
-The next integration target is [psychoinformatics-downstream](https://github.com/ORINOCO-Lite/psychoinformatics-downstream).
-Prepare updates as a sequence of DataLad-recorded operations and propose their commits in a draft pull request.
-John may use the comparison commands locally when a change warrants investigation; comparison reports and the review application are not prerequisites for every update.
-This section plans the integration work; it does not authorize resetting downstream history, adopting mirror refs, merging pull requests, or deploying a site.
+Record and RDF preparation are merged through #199; #170 is superseded.
+Review #171 (service and terminal review), #172 (website stages), and #173 (local review application) in that order.
+The branches retain separate changes above current `main`; earlier comparison counts are historical evidence, not validation of the rebased stack.
 
-### Prerequisites and order
-
-1. Apply the review principles proposed in [#190](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/190): explain meaningful differences and justify retained adaptations independently of passing checks.
-   Keep findings and check outcomes separate, with existing issues and commits providing the explanation.
-   No new decision registry or mandatory comparison pipeline is needed.
-2. Resolve [#180](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/180) while rebasing [#170](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/170) onto current `main`.
-   Remove the date-marker reader workaround and use the selected upstream converter directly, as decided below.
-   Projection now validates with the selected upstream writer and preserves source records; it no longer requires lossless RDF readback.
-   Keep editor readback diagnostic and retain the test demonstrating upstream's omission.
-3. Address [#182](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/182) and [#189](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/189).
-   [Template #88](https://github.com/ORINOCO-Lite/orinoco-lite-template/pull/88) exercises minimal second-lab inputs, supplied portrait media, and same-path authored overrides for #182.
-   It fixes the starter person association and selects the existing page homepage layout; no new presentation framework is needed.
-   For #189, make the exact imported `www-from-model` revision available as a Git submodule/DataLad input and pass that checkout explicitly to import.
-   Derive its revision from the package's controlled upstream selection; the downstream gitlink records the input used rather than introducing an independently selected upstream version.
-   Verify retrieval from a fresh clone, including required Annex content, and include the subdataset among the run's declared inputs.
-4. Complete [#188](https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/188) using the existing preparation, projection, build, and publication operations.
-   Preserve preparation-only setup as the default and add an explicit way to continue through projection and a complete build.
-   Reuse [#191](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/191)'s recorded projection and publication bundle where applicable; preparing a bundle must not itself deploy or push publication refs.
-   Verify the full retained-input path after the #180, #182, and #189 changes.
-   The prerequisite implementation uses `--build` and a fixed `sourcedata/www-from-model` subdataset; it does not add a stage dispatcher.
-5. Rebase the unique changes in [#171](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171), [#172](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/172), and [#173](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/173) in order.
-   Keep RDF, service, website, and local review functionality separately reviewable.
-   Reuse the useful behavior and review findings from the predecessor PRs listed below; do not resurrect their separate renderer or deployment harness.
-   Repeat affected checks on the rebased commits; earlier successful runs do not validate the new stack.
-
-### Initial dataset and recurring updates
-
-Use a disposable dataset to prove setup and one subsequent update before replacing the existing downstream history.
-Use `setup-upstream` with exact, recoverable package and template selections, retained capture bytes or a recorded acquisition, and the explicit upstream input from #189.
-Keep acquisition, record conversion, authored-site import, and generated projection separately identifiable in DataLad history.
-Dataset creation, saved supplied inputs, and human conflict resolutions may be ordinary DataLad saves; do not fabricate run records for commands that were not executed.
-
-The recurring comparison update belongs in `orinoco-lite-dev` CI and composes existing commands.
-The generic downstream template updater remains responsible for template updates.
-Fresh setup applies initialization defaults; recurring updates preserve existing site state except for explicitly refreshed imported surfaces.
-Matching version selections alone does not imply identical final trees.
-
-The engineering workflow should:
-
-1. Start an update branch from the accepted downstream commit and resolve the requested template and package selections to immutable commits.
-2. Use [#192](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/192)'s `orinoco-lite template update` to record the Copier transformation and any package override.
-   Preserve the site-owned settings, content, extensions, and submodule selections protected by [#198](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/198).
-   Start a fresh locked Pixi invocation before running the selected package.
-3. When an upstream-input refresh is requested, record that subdataset's new selection and rerun the relevant import and conversion operations.
-   A template-only update must not implicitly refetch live Pool data or replace site inputs.
-   Recompute against retained captures by default for this comparison site; a live refresh is a separate acquisition with its own recorded outputs.
-4. Validate and build the candidate, then publish its existing DataLad commits in draft PRs from a separate trusted publishing job.
-   Keep `site-specific` in [its existing repository](https://github.com/ORINOCO-Lite/psychoinformatics-site-specific).
-   Publish changed child commits before proposing parent gitlinks, preserving their SHAs.
-   The [engineering workflow](upstream-comparison-updates.md) retains the parent pin by default and requires an explicit selection to advance it.
-   Configure publication credentials before exercising the live PR path.
-   Keep upstream-comparison orchestration and its authorization out of the generic template and curation service.
-   Leave conflicts and failed checks visible, skip empty updates, and leave acceptance and deployment to their existing review workflows.
-5. When useful, inspect the candidate locally with #170–#173's comparisons.
-   Record conclusions with the relevant change; keep generated diagnostic reports outside tracked state by default.
-
-Reserve **mirror rebase** for replaying retained Orinoco commits onto an accepted upstream base under the existing `main`, `latest-upstream`, and `orinoco-lite-diff` convention.
-That operation produces candidate dependency commits before downstream repinning; it must not rewrite accepted downstream DataLad history.
-An automated observer advances `latest-upstream` only; adopting a rebased mirror layer remains a reviewed operation.
-Validate nested pins and required content before downstream adoption, and retain adopted commits on maintained default branches or release tags.
-PR-only commits remain temporary test candidates.
-
-Use `datalad rerun --report` before replaying a selected range.
-Historical reproduction restores the recorded environment and subdataset revisions; updated recomputation selects and records the new versions first.
-Do not replay template selection or live acquisition accidentally as part of a transformation range.
-Installed DataLad help warns that `rerun --onto` does not reset subdataset worktrees, so restore those explicitly.
-
-### Acceptance and history choices
-
-Before rollout, demonstrate a fresh setup, one template update, one retained-input recomputation, and replay from a fresh clone at another location without the original workspace.
-Inspect the run commands, environment selections, declared inputs and outputs, child commits, and parent gitlinks.
-Exercise unchanged selections and a real conflict or failed-build boundary; the workflow must report each honestly and retain reviewable commits.
-Inspect the draft PR to verify that the recorded commits survived publication and that no build or publishing step silently added unrelated source changes.
-
-Preserve individual DataLad run commits when accepting update PRs; squash merging collapses the replayable sequence.
-A merge commit can retain those records but does not produce a strictly linear history.
-If a strictly linear chain is required, agree on and test an acceptance method that retains the run records and any referenced commit identities.
-Keep generated projection and website publication refs under the existing #191 lifecycle rather than adding built files to the source branch merely to show completion.
-
-Decide the downstream reset, preservation of its existing PRs and input repositories, and the final acceptance method after the disposable rehearsal.
-The present request expresses an intention to consider a reset, not permission to perform it.
+The [engineering update workflow](upstream-comparison-updates.md) prepares DataLad commits and proposes updates to the separately published parent and `site-specific` datasets.
+Comparison commands are available for local investigation; they are not required for every update.
 
 ## Earlier comparison implementation sequence
 
 The letters identify proposed PRs, not GitHub PR numbers.
 Cleanup #160 and the upstream comparison charter principle in #162 are merged.
-The terminology charter principle in #167 and this specification remain separate PRs against `main`.
-After agreeing on the plan, start the capture PR from `main`.
+The specification merged in #161; the terminology charter principle in #167 remains separate.
+The CLI implementation stacks capture (#169), record conversion (#170), service and review (#171), then the website stages.
+Stages E–H share one reviewable change because projection, assembly, and rendering exercise the same website boundaries.
 Later command PRs may stack on their predecessor until it merges.
 Then rebase their unique changes onto `main` and repeat the affected checks.
 
@@ -124,8 +45,17 @@ Reviewers must be able to follow the data flow and assess each stage without a b
 
 Introduce CLI decision matching with D and extend it with subsequent stage reports.
 After H, validate complete-path comparison, scoped decision reuse across two runs, and report compatibility through the CLI.
+CLI summaries expose validated data-flow links and complete-path reports, but leave the overall integration judgment to the reviewer (`integration: not-established`).
+A matching decision or a collection of passing isolated stages never automatically approves the complete website.
 Only after maintainers have reviewed that behavior should a separate application PR add portable bundling, serving, viewers, and decision editing over the established reports.
 The application must reuse the CLI comparison and matching behavior.
+
+The initial terminal interface is `dev review inspect REPORT... --decisions FILE --author NAME`.
+It uses the same validated reports and matcher, previews decisions, requires an explicit save, and refuses to overwrite a decision file changed during review.
+`dev review decide` provides the same operation for a selected finding without an interactive terminal.
+These commands write only the selected decision file; agents identify themselves as the reviewer.
+Generated summaries show bounded examples, counts, and raw-evidence links rather than repeating every large value.
+The JSON reports retain every raw finding and full value.
 
 Review each stage's implementation and comparison outputs before merging its PR.
 Keep the existing #152 discussion available while extracting its changes.
@@ -149,9 +79,10 @@ Git selections and locks remain authoritative.
 Reports record the revisions and inputs used to produce their evidence.
 
 Operations write only their declared outputs.
-In the later review phase, comparisons accept `--report DIRECTORY` and produce a machine-readable report alongside a readable summary.
-Expose `dev review summarize REPORT... --decisions FILE --output DIRECTORY` before the application phase to validate report compatibility and produce readable and machine-readable decision-matching results.
-Omit `--decisions` for an initial review; all findings then have no prior decision.
+Website comparisons write a machine-readable report and a readable summary within the investigation directory.
+Record comparisons retain a report only when `--report DIRECTORY` is supplied.
+Use `dev review summarize` to validate existing comparisons and produce readable and machine-readable results.
+When the investigation has no `decisions.json`, findings have no prior decision.
 Maintainers can edit the scoped decision file directly and inspect its Git diff, then rerun this command to validate and apply the decisions to the reports.
 This command neither runs transformations nor changes the reports or decision file.
 Exit codes are 0 for a completed comparison without raw differences, 1 for completed comparisons with raw differences, and 2 for execution or validation failure.
@@ -172,7 +103,8 @@ A bundle may contain failed and skipped stages, but must display failed, skipped
 | Rendering | Same assembled tree through both build operations | Routes, HTML, assets, browser differences, and site-check failures |
 | Complete paths | Each path consumes its own preceding outputs | Integrated effects and interactions absent from isolated comparisons |
 
-Hugo layouts, assets, and the Congo theme come from the selected `www-from-model` gitlink and that revision's dependency declarations.
+Hugo layouts, assets, and the Congo theme come from the package-selected `www-from-model` gitlink and that revision's dependency declarations.
+Authored-input diagnostics read the independently selected `sourcedata/www-from-model` gitlink; preparing its media does not advance the software selection.
 The template layers its adaptation and bounded assets over it; site-specific settings and overrides apply afterward.
 Authored content overlays generated content.
 Importing site data does not copy the Hugo dependency tree into a downstream.
@@ -301,6 +233,8 @@ Whole-run IDs and dependency SHAs do not by themselves prevent reuse after a rep
 When a dependency-specific condition is required, save and evaluate it explicitly.
 
 Broader recurring patterns require a named, versioned comparator rule with behavioral tests and a reviewed decision selecting it.
+The implemented `annotation-representation-v1` rule recognizes compact/expanded annotation and PAV spelling differences only when the complete record's annotation semantic view is equal, preserving list order, multiplicity, values, and attribution. An explicit decision may select this rule for a complete all-record comparison within one stage and compatible schema/comparator versions.
+It does not accept downstream consequences or changes outside that equivalence.
 Do not offer executable browser predicates, unrestricted regular-expression suppression, or automatic widening of scopes.
 When applicability cannot be established, present the previous decision as context and require renewed review.
 Multiple conflicting matches, changed values, ambiguous identity, and incompatible versions require review rather than choosing a match arbitrarily.
@@ -423,48 +357,41 @@ orinoco-lite dev review summarize
 Select individual comparisons by name, such as `review summarize downloaded-vs-yaml-jsonl rdf rdf-records`.
 `review inspect` reviews findings in the terminal; `review decide` previews a decision and saves it only with `--write`.
 Decisions live in the investigation directory and are not metadata curation decisions.
-Website and review commands below are proposed interfaces pending review of their owning stages.
+### Website stages
 
-### Site-data import and Hugo projection
-
-```console
-orinoco-lite dev inputs import site-specific
-orinoco-lite dev inputs diff site-specific
-orinoco-lite dev hugo project upstream build/upstream/projection --records sourcedata/yaml-jsonl/records.jsonl
-orinoco-lite dev hugo project lite build/lite/projection --records sourcedata/yaml-jsonl/records.jsonl
-orinoco-lite dev content diff build/upstream/projection build/lite/projection
-```
-
-The import reads selected site data from `www-from-model` and any referenced file sources, preserving required page-resource placement.
-Its diff compares those inputs with their imported forms in `site-specific`, including settings mapped into `pyproject.toml` (`tool.orinoco.site`).
-Hugo projection produces pages and graph data from the same joined records on both sides.
-The content diff reports page and graph differences separately.
-
-### Hugo assembly and build
-
-These examples assemble both sets of Hugo inputs from the upstream generated content.
+From a downstream using the candidate package, run the selected upstream and Lite operations with the same records:
 
 ```console
-orinoco-lite dev hugo assemble upstream build/upstream/projection build/upstream/assembly --inputs site-specific
-orinoco-lite dev hugo assemble lite build/upstream/projection build/lite/assembly --inputs site-specific
-orinoco-lite dev content diff build/upstream/assembly build/lite/assembly
+orinoco-lite dev inputs import
+orinoco-lite dev inputs diff
+orinoco-lite dev hugo project upstream
+orinoco-lite dev hugo project lite
+orinoco-lite dev content diff
+orinoco-lite dev hugo assemble upstream
+orinoco-lite dev hugo assemble lite
+orinoco-lite dev content diff assembly
+orinoco-lite dev hugo build upstream
+orinoco-lite dev hugo build lite
+orinoco-lite dev site diff
+orinoco-lite dev site check upstream
+orinoco-lite dev site check lite
 ```
 
-Then use the upstream Hugo input tree for the build comparison.
+Site inputs are copied from the selected presentation into the investigation, leaving curated inputs untouched.
+The selected upstream query commands use a temporary Pool populated from the retained records; the selected client and service own lookup behavior.
+Projection selects the service's existing `sqlite+stl` backend so incoming-link queries apply search patterns in storage.
+On the retained 5,030 records, this produced byte-identical native projection files in 68 seconds versus 704 seconds with the default file backend.
+The separate service-preservation controls retain their default file backend.
+Prepare maintainer dependencies and required upstream asset bytes before running diagnostics; commands use the active environment and do not invoke Pixi or Git Annex.
 
-```console
-orinoco-lite dev hugo build upstream build/upstream/assembly build/upstream/site --base-url /
-orinoco-lite dev hugo build lite build/upstream/assembly build/lite/site --base-url /
-orinoco-lite dev site diff build/upstream/site build/lite/site
-orinoco-lite dev site check build/upstream/site
-orinoco-lite dev site check build/lite/site
-```
+Assembly and build default to identical upstream inputs on both sides to isolate each operation.
+Repeat the Hugo commands and comparisons with `--mode complete-path` to use each side's preceding outputs, starting upstream projection from downloaded JSONL and Lite projection from JSONL produced through YAML.
+Those outputs and reports have separate conventional locations, so this does not replace the isolated comparisons.
+`inputs import` is shared by both modes.
 
-`dev hugo build` consumes the supplied Hugo input tree without reassembling it.
-The ordinary `orinoco-lite build` runs projection, assembly, and the website build together.
-For the final comparison, project upstream content from the raw retained capture and Lite content from the converted records.
-Give each path its own generated content and Hugo input tree, then compare the rendered sites.
-This required final run checks how the reviewed steps work together, including interactions that same-input comparisons cannot expose.
+The diagnostic build checks Hugo rendering and the selected output adapter.
+It does not bind editor/review applications; missing application routes remain visible in site checks.
+Only an ordinary `orinoco-lite build` checks that integration, so diagnostic completion does not establish whole-site agreement.
 
 ## Carrying a decision forward
 
@@ -532,13 +459,18 @@ Check portability by cloning into a different directory and rerunning a recorded
 Use the downstream and its pinned site-specific submodule together as the rerun unit.
 Reuse the downstream tool lock and record both the input change and the parent submodule pointer.
 
+Source resolution uses the registered `sourcedata/www-from-model` submodule when present, requiring the package-selected upstream revision and its pinned dependencies.
+Ordinary downstreams without that submodule use the source cache.
+Prepare missing media with `dev upstream populate --reuse-dump` in the maintainer environment; diagnostics require ordinary file bytes and do not retrieve Annex content.
+Recorded conversion from a retained capture does not have this local-source requirement.
+
 ## Existing PRs and review
 
 | Existing PR | Place in this work |
 | --- | --- |
 | [Terminology charter #167](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/167) | One sentence on upstream terminology and operation reuse under the existing reuse principle. |
 | [Comparison charter #162](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/162) | Merged. One sentence on upstream comparison under the existing reuse principle. |
-| [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | This specification and detailed agent guidance, proposed directly against `main`. |
+| [Plan #161](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/161) | Merged. This specification and detailed agent guidance. |
 | [Cleanup #160](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/160) | Merged. Retains reusable operations and removes the old preview orchestration. |
 | [Package #152](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/152) | Source for the split. Retain its discussion until replacement PRs cover the useful changes. |
 | [Package #154](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/154) | Tool research for H. Promote the chosen procedure, then retire the dated report. |
@@ -573,7 +505,7 @@ No comments were present on #142 or #154 during the initial review.
   Expose Lite Hugo projection through the existing projection code, with an explicit record input.
 - Extract shared Hugo input assembly and build functions from `site.py`.
   Ordinary `build` should call them too.
-  Its current implementation recreates the assembly before invoking Hugo.
+  The diagnostic build consumes an existing assembly; ordinary build composes these operations before binding applications.
 - `pixi run setup-upstream` selects a remotely fetchable immutable package and switches once into the downstream environment.
   Package-owned `dev upstream populate` composes recorded Bash operations; individual commands remain independent of DataLad.
   Generic capture stays at `dev records get`; `dev upstream import-from-www` follows the package's upstream pins.
@@ -592,8 +524,5 @@ No comments were present on #142 or #154 during the initial review.
   Pagination completeness checks do not detect every concurrent source edit.
 - The legacy capture contains 5,030 records.
   The initial local review found exact agreement with retained upstream YAML. #152 and site-input #1 preserve the date marker after annotation normalization.
-- Initial extraction checks passed 19 capture tests and 19 record-preservation tests.
-  Content-generation changes applied cleanly.
-  Service round-trip and content-tree comparisons remain implementation work.
 - Template #75 and #76 are merged.
   Read the selected template from the downstream rather than adding another template PR by default.

@@ -1,0 +1,327 @@
+"""Observable boundaries of import, comparison, assembly and rendering."""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import subprocess
+from types import SimpleNamespace
+
+import pytest
+
+from orinoco_lite import dev_site, site
+from orinoco_lite.errors import DriverError
+from orinoco_lite.site_compare import check_site, compare_trees
+from orinoco_lite.site_inputs import import_site_inputs
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+def source(tmp_path):
+    root = tmp_path / "source"
+    write(root / "config/_default/languages.en.toml", 'title="Research"\n[params]\ndescription="Research site"\n')
+    write(root / "config/_default/hugo.toml", 'baseURL="https://example.org"\n')
+    write(root / "config/_default/params.toml", 'colorScheme="fire"\ndefaultAppearance="light"\n[header]\nlayout="hybrid"\n')
+    write(root / "config/_default/menus.en.toml", '[[main]]\nname="Projects"\npageRef="projects"\n')
+    write(root / "content/_index.md", "generated homepage")
+    write(root / "content/projects/_index.md", "authored section body")
+    write(root / "content/projects/one/_index.md", "generated entity")
+    write(root / "content/projects/one/logo.svg", "page resource")
+    write(root / "content/posts/news/index.md", "authored post")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    return root
+
+
+def test_import_preserves_authored_sections_resources_and_existing_records(tmp_path):
+    upstream = source(tmp_path)
+    output = tmp_path / "site-specific"
+    write(output / "metadata/records/Thing/one.yaml", "human record")
+    write(output / "sources/capture.jsonl", "raw capture")
+    write(output / "content/local.md", "local page")
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
+    assert (output / "content/projects/_index.md").read_text() == "authored section body"
+    assert (output / "content/projects/one/logo.svg").read_text() == "page resource"
+    assert (output / "content/posts/news/index.md").read_text() == "authored post"
+    assert not (output / "content/projects/one/_index.md").exists()
+    assert not (output / "content/_index.md").exists()
+    assert (output / "metadata/records/Thing/one.yaml").read_text() == "human record"
+    assert (output / "sources/capture.jsonl").read_text() == "raw capture"
+    assert not (output / "content/local.md").exists()
+
+
+def test_missing_import_resource_leaves_existing_inputs_untouched(tmp_path):
+    upstream = source(tmp_path)
+    (upstream / "content/projects/one/logo.svg").write_text("/annex/objects/not-present")
+    output = tmp_path / "site-specific"
+    write(output / "site.yaml", "original")
+    config = tmp_path / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    with pytest.raises(DriverError, match="Annex pointer"):
+        import_site_inputs(upstream, output, config_path=config, force=True)
+    assert (output / "site.yaml").read_text() == "original"
+    assert list(output.iterdir()) == [output / "site.yaml"]
+
+
+@pytest.mark.parametrize("state", ["prepared", "missing", "pointer", "symlink", "revision"])
+def test_input_diagnostics_use_prepared_selected_media_without_annex(tmp_path, monkeypatch, capsys, state):
+    from orinoco_lite import cli, www_from_model
+
+    selected = source(tmp_path)
+    relative = "content/projects/one/logo.svg"
+    pointer = "/annex/objects/SHA256E-s5--example.svg\n"
+    (selected / relative).write_text(pointer)
+    (selected / ".gitattributes").write_text(f"{relative} filter=annex\n")
+
+    def git(root, *args):
+        return subprocess.run(["git", "-C", str(root), "-c", "user.name=Test",
+                               "-c", "user.email=test@example.invalid", "-c", "core.hooksPath=/dev/null",
+                               *args], check=True, capture_output=True, text=True)
+
+    git(selected, "add", ".")
+    git(selected, "commit", "-qm", "test: selected source")
+    prepared = tmp_path / "sourcedata/www-from-model"
+    git(tmp_path, "init", "-q")
+    git(tmp_path, "-c", "protocol.file.allow=always", "submodule", "add", str(selected), "sourcedata/www-from-model")
+    media = prepared / relative
+    media.write_text("<svg/>")
+    if state == "missing":
+        media.unlink()
+    elif state == "pointer":
+        media.write_text(pointer)
+    elif state == "symlink":
+        media.unlink()
+        target = Path(git(prepared, "rev-parse", "--absolute-git-dir").stdout.strip()) / "annex/objects/example.svg"
+        write(target, "<svg/>")
+        media.symlink_to(target)
+    elif state == "revision":
+        git(prepared, "commit", "--allow-empty", "-qm", "test: wrong revision")
+    # A Git cleanliness check must not accidentally invoke the Annex filter.
+    invoked = tmp_path / "annex-invoked"
+    git(prepared, "config", "filter.annex.process", f"touch '{invoked}'; exit 1")
+    monkeypatch.setattr(dev_site, "resolve_resources", lambda: SimpleNamespace(root=tmp_path / "resources"))
+    # Authored-input diagnostics must not resolve or require software selections.
+    monkeypatch.setattr(www_from_model, "resolve_engineering_source",
+                        lambda *_: pytest.fail("Input diagnostics resolved software"))
+    command = ["--root", str(tmp_path), "dev", "inputs"]
+    if state == "prepared":
+        assert cli.main([*command, "import"]) == 0
+        assert (tmp_path / "sourcedata/site-inputs" / relative).read_text() == "<svg/>"
+        assert cli.main([*command, "diff"]) == 0
+    else:
+        assert cli.main([*command, "import"]) == 2
+        expected = {"missing": "unavailable", "pointer": "Annex pointer",
+                    "symlink": "Annex pointer", "revision": "does not match"}[state]
+        captured = capsys.readouterr()
+        assert expected in captured.out + captured.err
+        assert not (tmp_path / "sourcedata/site-inputs" / relative).exists()
+    assert not invoked.exists()
+    assert (selected / relative).read_text() == pointer
+
+
+def test_input_comparison_accepts_system_temporary_directory_symlink(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from orinoco_lite import cli
+
+    upstream = source(tmp_path)
+    output = tmp_path / "sourcedata/site-inputs"
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
+    real_temporary = tmp_path / "real-temporary"
+    real_temporary.mkdir()
+    temporary_alias = tmp_path / "temporary-alias"
+    temporary_alias.symlink_to(real_temporary, target_is_directory=True)
+
+    @contextmanager
+    def temporary_directory(**kwargs):
+        yield str(temporary_alias)
+
+    monkeypatch.setattr(dev_site.tempfile, "TemporaryDirectory", temporary_directory)
+    monkeypatch.setattr(dev_site, "_selection", lambda args: (tmp_path / "resources", upstream))
+    assert cli.main(["--root", str(tmp_path), "dev", "inputs", "diff"]) == 0
+
+
+def test_content_diff_keeps_typed_order_duplicates_null_and_raw_changes(tmp_path):
+    left, right = tmp_path / "left", tmp_path / "right"
+    write(left / "static/graph.json", '{"nodes":[true,1,1],"optional":null}')
+    write(right / "static/graph.json", '{"nodes":[1,true]}')
+    write(left / "content/page.md", '---\ntitle: Before\ndate: 2026-09-18\n---\nold body\n')
+    write(right / "content/page.md", '---\ntitle: After\ndate: 2026-09-18\n---\nnew body\n')
+    changes, names = compare_trees(left, right)
+    assert ["json", "nodes"] in [item["location"] for item in changes]
+    removed = next(item for item in changes if item["location"] == ["json", "optional"])
+    assert removed["before_present"] and removed["before"] is None
+    assert not removed["after_present"]
+    assert ["frontmatter", "title"] in [item["location"] for item in changes]
+    assert ["markdown"] in [item["location"] for item in changes]
+    assert any(item["location"][0] == "bytes" for item in changes)
+    json.dumps(changes)  # Dates must remain portable report values.
+
+
+def test_html_diff_preserves_unicode_doctype_and_added_removed_routes(tmp_path):
+    left, right = tmp_path / "left", tmp_path / "right"
+    write(left / "index.html", '<!DOCTYPE html><p>café</p>')
+    write(right / "index.html", '<!DOCTYPE html><p>cafe</p>')
+    write(left / "gone/index.html", 'old')
+    write(right / "new/index.html", 'new')
+    changes, _ = compare_trees(left, right, rendered=True)
+    assert any(item["location"][:2] == ["html", "events"] for item in changes)
+    assert any(item["subject"] == "gone/index.html" and item["change"] == "removed" for item in changes)
+    assert any(item["subject"] == "new/index.html" and item["change"] == "added" for item in changes)
+
+
+def test_site_check_resolves_routes_resources_and_fragments(tmp_path):
+    write(tmp_path / "index.html", '<a href="/about/#intro">ok</a><a href="/about/#gone">bad</a><img src="/logo.svg"><a href="https://external.invalid">outside</a>')
+    write(tmp_path / "about/index.html", '<h1 id="intro">About</h1><a href="../missing/">bad</a>')
+    write(tmp_path / "logo.svg", '<svg/>')
+    findings, scope = check_site(tmp_path)
+    assert len(findings) == 2
+    assert {item["after"]["error"] for item in findings} == {"missing fragment", "missing local target"}
+    assert scope["local_links_checked"] == 4
+
+
+def test_build_consumes_supplied_tree_without_mutating_it(tmp_path, monkeypatch):
+    assembly, output = tmp_path / "assembly", tmp_path / "site"
+    write(assembly / "content/_index.md", "explicit content")
+    workspace = SimpleNamespace(root=tmp_path)
+    def run(command, *, cwd):
+        source = Path(command[command.index("--source") + 1])
+        assert (source / "content/_index.md").read_text() == "explicit content"
+        write(source / ".hugo_build.lock", "created by Hugo")
+        write(output / "index.html", "built")
+        return ""
+    monkeypatch.setattr(site, "_run", run)
+    site.build_hugo(workspace, tmp_path, assembly, output, "/", flavor="upstream")
+    assert not (assembly / ".hugo_build.lock").exists()
+    assert (output / "index.html").read_text() == "built"
+    with pytest.raises(DriverError, match="already exists"):
+        site.build_hugo(workspace, tmp_path, assembly, output, "/", flavor="upstream")
+
+
+def test_cli_comparison_exit_codes_and_portable_report(tmp_path):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=tmp_path)
+    commands = parser.add_subparsers(dest="dev_command")
+    dev_site.register(commands)
+    write(tmp_path / "sourcedata/upstream/projection/a.json", '{"value":true}')
+    write(tmp_path / "sourcedata/lite/projection/a.json", '{"value":1}')
+    args = parser.parse_args(["content", "diff"])
+    assert dev_site.execute(args) == 1
+    assert (tmp_path / "sourcedata/reports/projection/report.json").is_file()
+    args = parser.parse_args(["site", "diff"])
+    assert dev_site.execute(args) == 2
+
+
+def test_diagnostic_lite_build_does_not_read_records_or_bind_apps(tmp_path, monkeypatch):
+    assembly, output = tmp_path / "assembly", tmp_path / "site"
+    write(assembly / "content/_index.md", "supplied content")
+    workspace = SimpleNamespace(root=tmp_path)
+    def run(command, *, cwd):
+        assert command[0] == "hugo"
+        write(output / "index.html", "rendered")
+        return ""
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Diagnostic Hugo build must not bind metadata applications")
+    monkeypatch.setattr(site, "_run", run)
+    monkeypatch.setattr(site, "bind_editor", unexpected)
+    monkeypatch.setattr(site, "bind_review", unexpected)
+    result = site.build_hugo(workspace, tmp_path / "resources", assembly, output, "/", flavor="lite")
+    assert "application binding excluded" in result["scope"]
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["assembly", "site"]
+
+
+def test_import_preserves_source_identity_settings_without_shadowing_site_yaml(tmp_path):
+    import tomllib
+    upstream = source(tmp_path)
+    with (upstream / "config/_default/params.toml").open("a") as stream:
+        stream.write('logo="img/logo.png"\nlogoDark="img/dark.svg"\n[footer]\nshowCopyright=true\n')
+    with (upstream / "config/_default/languages.en.toml").open("w") as stream:
+        stream.write('title="Research"\ncopyright="Selected source copyright"\n[params]\ndescription="Research site"\n')
+    write(upstream / "static/site.webmanifest", '{"name":"Selected","icons":[{"src":"/favicon.png"}]}')
+    subprocess.run(["git", "-C", str(upstream), "add", "."], check=True)
+    output = tmp_path / "inputs"
+    write(output / "overrides/config/params.toml", '[article]\nshowDate=true\n')
+    config = output / "pyproject.toml"
+    write(config, "[tool.orinoco]\n")
+    import_site_inputs(upstream, output, config_path=config, force=True)
+    settings = tomllib.loads((output / "overrides/config/params.toml").read_text())
+    assert settings == {"article": {"showDate": True}, "header": {"logo": "img/logo.png", "logoDark": "img/dark.svg"}, "footer": {"showCopyright": True}}
+    language = tomllib.loads((output / "overrides/config/languages.en.toml").read_text())
+    assert language == {"copyright": "Selected source copyright"}
+    assert (output / "static/site.webmanifest").read_bytes() == (upstream / "static/site.webmanifest").read_bytes()
+
+
+def test_partial_site_config_overrides_preserve_selected_tables_and_replace_arrays(tmp_path):
+    import tomllib
+    selected, overrides = tmp_path / "selected", tmp_path / "overrides"
+    write(selected / "params.toml", 'colorScheme="fire"\n[header]\nlogo=""\nlayout="hybrid"\n[article]\nshowDate=false\n[custom]\nitems=["old","old"]\n')
+    write(overrides / "params.toml", '[header]\nlogo="img/logo.png"\n[custom]\nitems=["new"]\n')
+    site._overlay_config(overrides, selected)
+    settings = tomllib.loads((selected / "params.toml").read_text())
+    assert settings["header"] == {"logo": "img/logo.png", "layout": "hybrid"}
+    assert settings["colorScheme"] == "fire"
+    assert settings["article"] == {"showDate": False}
+    assert settings["custom"]["items"] == ["new"]
+
+
+@pytest.mark.parametrize("base_url", ["/", "/demo/", "https://example.org/demo/"])
+def test_site_check_uses_deployment_base_for_links_and_fragments(tmp_path, base_url):
+    from urllib.parse import urlsplit
+    prefix = urlsplit(base_url).path
+    write(tmp_path / "index.html", (
+        f'<a href="{prefix}about/#intro">About</a><img src="{prefix}logo.svg">'
+        f'<a href="{base_url}about/#gone">Missing fragment</a>'
+        '<a href="https://external.invalid/missing">External</a>'))
+    write(tmp_path / "about/index.html", '<h1 id="intro">About</h1><a href="../missing/">Missing</a>')
+    write(tmp_path / "logo.svg", '<svg/>')
+    findings, scope = check_site(tmp_path, base_url=base_url)
+    assert len(findings) == 2
+    assert {f["after"]["error"] for f in findings} == {"missing fragment", "missing local target"}
+    assert scope["local_links_checked"] == 4
+    assert scope["base_url"] == base_url
+
+
+def test_site_check_cli_uses_retained_build_url_and_allows_override(tmp_path):
+    from orinoco_lite.cli import main
+    from orinoco_lite.stage_reports import write_operation
+    output = tmp_path / "sourcedata/isolated/lite/website"
+    write(output / "index.html", '<a href="/demo/about/">About</a>')
+    write(output / "about/index.html", '<h1>About</h1>')
+    write_operation(output, operation="hugo-build-lite", inputs={}, context={"base_url": "/demo/"})
+    command = ["--root", str(tmp_path), "dev", "site", "check"]
+    assert main(command) == 0
+    assert main([*command, "--base-url", "/", "--force"]) == 1
+
+
+def test_browser_server_mounts_site_at_base_path(tmp_path):
+    from functools import partial
+    from http.server import ThreadingHTTPServer
+    from threading import Thread
+    from urllib.request import urlopen
+    from urllib.error import HTTPError
+    from orinoco_lite.site_browser import _Handler
+    write(tmp_path / "index.html", '<a href="/demo/about/">About</a>')
+    write(tmp_path / "about/index.html", 'About')
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Handler, directory=str(tmp_path), base_path="/demo/"))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        with urlopen(origin + "/demo/about") as response:
+            assert response.url == origin + "/demo/about/"
+            assert response.read() == b"About"
+        with urlopen(origin + "/demo/") as response:
+            assert b"/demo/about/" in response.read()
+        with pytest.raises(HTTPError) as error:
+            urlopen(origin + "/about/")
+        assert error.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
