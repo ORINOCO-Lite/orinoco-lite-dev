@@ -33,3 +33,16 @@ records-get = "datalad run --explicit --output sourcedata/downloaded/records.jso
 build-package = "python -m build --outdir build/package"
 setup-upstream = "bash tools/setup-upstream.sh"
 install-hooks = "git config core.hooksPath .githooks"
+
+[feature.skills.dependencies]
+python = ">=3.12,<3.13"
+
+[feature.skills.pypi-dependencies]
+apm-cli = "==0.31.0"
+
+[feature.skills.tasks]
+setup-skills = "apm install --frozen"
+audit-skills = "apm audit --ci"
+
+[environments]
+skills = { features = ["skills"], no-default-feature = true }

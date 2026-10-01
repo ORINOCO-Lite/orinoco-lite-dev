@@ -62,6 +62,10 @@
 
 ## CLI feedback
 
+- Use the APM-managed `unix-cli-design` skill when designing or reviewing CLI behavior.
+  Restore it with `pixi run -e skills setup-skills` before starting an agent task; verify it with `pixi run -e skills audit-skills`.
+  Edit reusable skill source in Skills Workshop, not its generated deployment.
+
 - Keep help and argument parsing fast; defer expensive imports until execution.
 - Use `orinoco_lite.progress.progress` around potentially slow, silent operations.
   It emits one flushed stderr note after one second; quick operations stay quiet and stdout remains available for results, JSON, and pipes.
