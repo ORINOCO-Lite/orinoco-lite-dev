@@ -33,7 +33,7 @@ def test_record_consumers_reject_incomplete_inputs_before_side_effects(tmp_path,
     def unexpected(*args, **kwargs):
         pytest.fail("Incomplete input reached a downstream operation")
 
-    monkeypatch.setattr(projection, "load_contract", unexpected)
+    monkeypatch.setattr(projection, "reject_projection_override", unexpected)
     monkeypatch.setattr(dev_site, "load_workspace", unexpected)
     if consumer.startswith("cli-"):
         args = Namespace(root=tmp_path, dev_command="hugo", hugo_command="project",
