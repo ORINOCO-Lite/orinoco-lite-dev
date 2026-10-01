@@ -396,6 +396,11 @@ Repeat the Hugo commands and comparisons with `--mode complete-path` to use each
 Those outputs and reports have separate conventional locations, so this does not replace the isolated comparisons.
 `inputs import` is shared by both modes.
 
+Individual-stage commands call the same projection, assembly, and Hugo operations used by ordinary builds.
+For complete-build comparisons, run `orinoco-lite build` in each selected downstream checkout and compare its output with `dev review compare --stage rendering`.
+Use identical base URLs and explicit build timestamps; include the normal publication-bundle option when publication is under review.
+The staged `--mode complete-path` commands remain a diagnostic chain and do not establish complete-build equivalence.
+
 The diagnostic build checks Hugo rendering and the selected output adapter.
 It does not bind editor/review applications; missing application routes remain visible in site checks.
 Only an ordinary `orinoco-lite build` checks that integration, so diagnostic completion does not establish whole-site agreement.

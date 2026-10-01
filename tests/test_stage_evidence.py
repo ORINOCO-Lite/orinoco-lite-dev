@@ -68,6 +68,8 @@ def test_annex_retrieval_from_separate_clone(evidence, tmp_path):
     git('commit', '-m', 'test fixture')
     clone = tmp_path/'clone'
     subprocess.run(['git', 'clone', str(root), str(clone)], check=True, capture_output=True)
+    git('config', 'user.name', 'Test Fixture', cwd=clone)
+    git('config', 'user.email', 'fixture@example.invalid', cwd=clone)
     git('annex', 'init', 'test clone', cwd=clone)
     assert ReviewOverview(clone/'bundle').overview()['metadata_only']
     with pytest.raises(ConfigurationError, match='not available locally'):
