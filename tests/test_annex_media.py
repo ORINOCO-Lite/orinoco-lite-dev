@@ -163,3 +163,43 @@ def test_missing_submodule_repository_never_initializes_parent_annex(workspace, 
     with pytest.raises(ConfigurationError, match='initialized'):
         prepare_media(workspace)
     assert not (workspace.root / '.git/annex').exists()
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_netlify_cache_checkout_without_annex(workspace, monkeypatch, tmp_path, failed):
+    from orinoco_lite.annex_media import netlify_media_checkout
+
+    site = workspace.path("site")
+    monkeypatch.setenv("NETLIFY", "true")
+    # This command must never be invoked during the subsequent plain checkout.
+    git(site, "config", "filter.annex.process", "missing-annex-for-checkout-test")
+    (site / '.gitattributes').write_text('* filter=annex\n')
+    try:
+        with netlify_media_checkout(workspace):
+            if failed:
+                raise RuntimeError("build failed")
+    except RuntimeError:
+        assert failed
+    git(site, "checkout-index", "--all", "--force")
+    assert prepare_media(workspace)[site / 'static/image.png'].read_bytes() == b'fixture image bytes'
+
+
+def test_netlify_annexless_does_not_touch_git(monkeypatch):
+    from types import SimpleNamespace
+    from orinoco_lite import annex_media
+
+    monkeypatch.setenv("NETLIFY", "true")
+    monkeypatch.setattr(annex_media, "_git", lambda *args: pytest.fail("annexless build invoked Git cleanup"))
+    with annex_media.netlify_media_checkout(SimpleNamespace(annex_media=False)):
+        pass
+
+
+def test_local_build_keeps_annex_filters(workspace, monkeypatch):
+    from orinoco_lite.annex_media import netlify_media_checkout
+
+    monkeypatch.delenv("NETLIFY", raising=False)
+    site = workspace.path("site")
+    before = git(site, 'config', '--local', '--get-regexp', r'^filter\.annex\.')
+    with netlify_media_checkout(workspace):
+        prepare_media(workspace)
+    assert git(site, 'config', '--local', '--get-regexp', r'^filter\.annex\.') == before
