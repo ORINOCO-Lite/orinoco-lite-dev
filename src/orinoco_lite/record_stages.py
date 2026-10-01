@@ -33,8 +33,17 @@ from .annotations import assertion_sha256, _check_overlay_path
 from .errors import ConfigurationError
 
 
+COMPARATOR = "records-v1"
 SCHEMA_RELATIVE = Path("schema/demo-research-information/unreleased.yaml")
 _MISSING = object()
+
+
+RECORD_STATES = {
+    "downloaded": ("downloaded", "Downloaded records (JSONL)"),
+    "yaml-jsonl": ("yaml-jsonl", "Records after YAML → JSONL"),
+    "downloaded-pool-jsonl": ("downloaded-pool-jsonl", "Downloaded records after temporary Pool upload and download (JSONL)"),
+    "yaml-jsonl-pool-jsonl": ("yaml-jsonl-pool-jsonl", "Records after YAML → JSONL → temporary Pool upload and download (JSONL)"),
+}
 
 
 def _limit(value):
@@ -334,7 +343,8 @@ def register(subparsers: Any) -> None:
     parser.add_argument("--record", action="append", help="select a record identifier; repeat for several")
     parser.add_argument("--field", help="show differences within this top-level field")
     parser.add_argument("--full-values", action="store_true", help="print complete before/after values instead of abbreviating them")
-    options(parser, replace=False)
+    parser.add_argument("--report", type=Path, help="optionally retain a review report; with all, use as the parent directory")
+    options(parser)
     parser.set_defaults(records_action="diff")
 
 
@@ -354,11 +364,42 @@ def _record_input(args, value):
 
 
 def execute(args: argparse.Namespace) -> int:
-    from .diagnostics import directory, explicit_path, require
+    from .diagnostics import directory, explicit_path, require, record_path, prepare_output
+    from .stage_reports import write_report
 
     action = args.records_action
     try:
         data = directory(args)
+        if action == "diff" and str(args.left) == "all":
+            if args.right != Path("site-specific"):
+                raise ConfigurationError("Use 'diff all' without a second state")
+            available = set()
+            results = []
+            print("Record states in this investigation:")
+            for name, (previous, label) in RECORD_STATES.items():
+                try:
+                    path = record_path(data, previous)
+                except ConfigurationError as error:
+                    if (data / previous).exists():
+                        print(f"  {name}: incomplete output. {error}")
+                        results.append(2)
+                    else:
+                        print(f"  {name}: not written")
+                else:
+                    available.add(name)
+                    print(f"  {name}: {label}\n    {path}")
+            pairs = [("downloaded", "yaml-jsonl")]
+            for operation in ("pool",):
+                pairs.extend((source, f"{source}-{operation}-jsonl") for source in ("downloaded", "yaml-jsonl"))
+                pairs.append(("downloaded", f"yaml-jsonl-{operation}-jsonl"))
+                pairs.append((f"downloaded-{operation}-jsonl", f"yaml-jsonl-{operation}-jsonl"))
+            for left, right in pairs:
+                if left in available and right in available:
+                    print()
+                    results.append(execute(argparse.Namespace(**{**vars(args), "left": Path(left), "right": Path(right), "report": args.report / f"{left}-vs-{right}" if args.report else None})))
+            if not results:
+                raise ConfigurationError("No pair of record states is available. Run 'records get', 'records jsonl-to-yaml', and 'records yaml-to-jsonl' first.")
+            return max(results)
         if action == "jsonl-to-yaml":
             source = args.source if args.source is not None else require(data / "downloaded/records.jsonl", "records get")
             site_inputs = explicit_path(args, args.destination)
@@ -391,15 +432,44 @@ def execute(args: argparse.Namespace) -> int:
         elif action == "diff":
             if args.left == "-" and args.right == "-":
                 raise ConfigurationError("Only one diff input may read stdin (-)")
-            left_input = args.left if args.left is not None else require(data / "downloaded/records.jsonl", "records get")
+            def selected_input(value, default):
+                if value is None:
+                    return default
+                if str(value) in RECORD_STATES:
+                    return record_path(data, str(value))
+                return value
+            left_input = selected_input(args.left, None) if args.left else record_path(data, "downloaded")
+            right_input = selected_input(args.right, "site-specific")
+            report = explicit_path(args, args.report) if args.report else None
+            if report and report.is_symlink():
+                raise ConfigurationError(f"Report must not be a symbolic link: {report}")
             def read(path):
                 if path.is_dir():
                     with tempfile.TemporaryDirectory() as temporary:
                         return yaml_to_jsonl(path, Path(temporary) / "records.jsonl")
                 return snapshot.load_jsonl(path)
-            with progress("Reading and comparing records"), _record_input(args, left_input) as left_path, _record_input(args, args.right) as right_path:
+            with progress("Reading and comparing records"), _record_input(args, left_input) as left_path, _record_input(args, right_input) as right_path:
+                if report and any(path.resolve().is_relative_to(report.resolve()) for path in (left_path, right_path)):
+                    raise ConfigurationError("Comparison report must not contain an input")
+                for path in (left_path, right_path):
+                    if path.is_file():
+                        _check_record_input(path)
                 left, right = read(left_path), read(right_path)
                 findings = compare_records(left, right)
+                if report:
+                    if report.exists() and not args.force:
+                        print(f"Existing report kept: {report}; use --force to replace it.", file=sys.stderr)
+                    else:
+                        prepare_output(report, args.force)
+                        service = any(str(value).endswith("-pool-jsonl") for value in (args.left, args.right))
+                        write_report(report, stage="service" if service else "storage",
+                                     left=left_path, right=right_path, findings=findings,
+                                     comparator=COMPARATOR,
+                                     mode="complete-path" if str(args.left) == "downloaded" and str(args.right).startswith("yaml-jsonl-") else "isolated",
+                                     scope={"complete": True, "subjects": sorted({item.pid for item in [*left, *right]}),
+                                            "all_locations": True, "selection": "all records", "exclusions": []},
+                                     command=getattr(args, "invocation", []))
+                        print(f"Report: {report}", file=sys.stderr)
             selected = [item for item in findings if
                         (not args.record or item['subject'] in args.record) and
                         (not args.field or (item['location'] and item['location'][0] == args.field))]

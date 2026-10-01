@@ -137,3 +137,28 @@ def test_help_without_workspace_or_stdin(tmp_path, args):
     assert result.returncode == 0
     assert result.stdout and not result.stderr
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("machine", [False, True])
+def test_piped_diff_retains_report_evidence(tmp_path, machine):
+    original = source(tmp_path)
+    report = tmp_path / "comparison"
+    args = ["dev", "records", "diff", "-", str(original), "--report", str(report)]
+    if machine:
+        args.append("--json")
+    result = run(tmp_path, *args, input=original.read_text())
+    assert result.returncode == 0, result.stderr
+    if machine:
+        assert json.loads(result.stdout)["findings"] == []
+    else:
+        assert "Before: stdin" in result.stdout
+    from orinoco_lite.stage_reports import load_report
+    data, _ = load_report(report)
+    artifact = data["stages"][0]["artifacts"]["left"]["path"]
+    assert (report / artifact).read_bytes() == original.read_bytes()
+    assert "Report:" in result.stderr
+    repeated = run(tmp_path, *args, input=original.read_text())
+    assert repeated.returncode == 0, repeated.stderr
+    if machine:
+        assert json.loads(repeated.stdout)["findings"] == []
+    assert "Existing report kept" in repeated.stderr

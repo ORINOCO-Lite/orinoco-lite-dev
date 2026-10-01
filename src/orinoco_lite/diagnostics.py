@@ -1,6 +1,7 @@
 """Default data paths and explicit command paths."""
 
 from pathlib import Path
+import shutil
 
 from .errors import ConfigurationError
 
@@ -34,11 +35,18 @@ def explicit_path(args, path):
     return (root / path).absolute() if not path.is_absolute() else path
 
 
-def prepare_output(path):
+def prepare_output(path, force=None):
     if path.is_symlink():
         raise ConfigurationError(f"Output must not be a symbolic link: {path}")
     if path.exists():
-        raise ConfigurationError(f"Output already exists: {path}; choose a fresh --report directory")
+        if force is None:
+            raise ConfigurationError(f"Output already exists: {path}; choose a fresh --report directory")
+        if not force:
+            raise ConfigurationError(f"Output already exists: {path}. Use --force to replace it, or --directory for another investigation.")
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
     return path
 
 
@@ -47,6 +55,22 @@ def record_path(root, name):
         path, command = root / name / "records.jsonl", "records get"
     elif name == "yaml-jsonl":
         path, command = root / name / "records.jsonl", "records yaml-to-jsonl"
+    elif name.endswith("-pool-jsonl"):
+        source, operation = name.rsplit("-", 2)[:2]
+        command = f"records roundtrip {source}"
+        path = root / name / "records.jsonl"
     else:
         raise ConfigurationError(f"Unknown record state: {name}")
     return require(path, command)
+
+
+def report_paths(root, names):
+    if not names:
+        paths = sorted((root / "reports").glob("*/report.json"))
+        if not paths:
+            raise ConfigurationError("No comparisons found. Run 'orinoco-lite dev records diff' with the same --directory first.")
+        return paths
+    for name in names:
+        if Path(name).name != name or name in {".", ".."}:
+            raise ConfigurationError("Select a comparison name, such as downloaded-vs-yaml-jsonl, rather than a path")
+    return [require(root / "reports" / name / "report.json", "records diff") for name in names]
