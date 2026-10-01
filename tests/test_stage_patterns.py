@@ -165,3 +165,42 @@ def test_graph_patterns_are_available_in_review_without_accepting_findings(tmp_p
     assert all(r['state']=='new' and r['unified_diff'] for r in rows)
     assert model.original_files()['total']==1
     assert not model.decisions['decisions']
+
+
+def editor_sample(base='/'):
+    query='sh%3ANodeShape=dlthings%3AThing&pid=xyzrins%3Apersons%2Fexample&edit=true'
+    before=[['start','div',[['class','text-xs']]],['start','a',[
+        ['class','text-primary-500'],['target','_blank'],
+        ['href','https://pool.psychoinformatics.de/ui/?'+query]]]]
+    after=[['start','div',[['class','orinoco-record-editor-link text-xs']]],['start','a',[
+        ['class','text-primary-500'],['target','_blank'],['rel','noopener noreferrer'],
+        ['href',base+'edit/?'+query]]]]
+    return {'location':['html','events',0,2],'before_present':True,'after_present':True,
+            'before':before,'after':after}, {'stage':'rendering','targets':{'right':{'url':base}},'artifacts':{}}
+
+
+@pytest.mark.parametrize('base',['/','/demo/','https://lite.example/demo/'])
+def test_editor_link_recognition_uses_declared_base(base):
+    from orinoco_lite.stage_patterns import editor_link_pattern
+    f,s=editor_sample(base)
+    assert editor_link_pattern(f,s)['subtype']=='record-editor-link'
+
+
+@pytest.mark.parametrize('mutation',['pid','query-order','extra-query','wrapper','rel','target','extra-event','unknown-host','unknown-base','fragment'])
+def test_editor_link_rule_does_not_absorb_additional_changes(mutation):
+    from orinoco_lite.stage_patterns import editor_link_pattern
+    f,s=editor_sample('/demo/')
+    if mutation=='pid':f['after'][1][2][-1][1]=f['after'][1][2][-1][1].replace('example','another')
+    elif mutation=='query-order':
+        url=f['after'][1][2][-1][1];head,query=url.split('?');f['after'][1][2][-1][1]=head+'?'+'&'.join(reversed(query.split('&')))
+    elif mutation=='extra-query':
+        f['before'][1][2][-1][1]+='&extra=true';f['after'][1][2][-1][1]+='&extra=true'
+    elif mutation=='wrapper':f['after'][0][2][0][1]+=' extra'
+    elif mutation=='rel':f['after'][1][2][2][1]='noopener'
+    elif mutation=='target':f['after'][1][2][1][1]='_self'
+    elif mutation=='extra-event':f['after'].append(['text','extra'])
+    elif mutation=='unknown-host':f['before'][1][2][-1][1]=f['before'][1][2][-1][1].replace('pool.psychoinformatics.de','other.example')
+    elif mutation=='unknown-base':s['targets']['right'].pop('url')
+    else:
+        f['before'][1][2][-1][1]+='#part';f['after'][1][2][-1][1]+='#part'
+    assert editor_link_pattern(f,s) is None

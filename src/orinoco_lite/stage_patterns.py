@@ -14,7 +14,7 @@ match or hides a remainder. Recognition changes neither evidence nor decisions.
 from collections import Counter
 from copy import deepcopy
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qsl
 from .stage_presentation import targets
 from .stage_reports import safe_artifact, canonical, json_digest
 
@@ -113,6 +113,44 @@ def graph_pattern(finding):
     return None
 
 
+def editor_link_pattern(finding, stage):
+    """Match the complete upstream-to-Lite link edit, including raw query bytes."""
+    if finding['location'][:2] != ['html', 'events'] or not all(
+            finding.get(k) for k in ('before_present', 'after_present')):
+        return None
+    before, after = finding['before'], finding['after']
+    base = prefix(stage, 'right')
+    if not base or not isinstance(before, list) or len(before) != 2:
+        return None
+    anchor = before[1]
+    if not isinstance(anchor, list) or len(anchor) != 3 or anchor[:2] != ['start', 'a']:
+        return None
+    attrs = anchor[2]
+    if not isinstance(attrs, list) or len(attrs) != 3 or attrs[:2] != [
+            ['class', 'text-primary-500'], ['target', '_blank']]:
+        return None
+    if len(attrs[2]) != 2 or attrs[2][0] != 'href' or not isinstance(attrs[2][1], str):
+        return None
+    href = attrs[2][1]
+    source = 'https://pool.psychoinformatics.de/ui/?'
+    if not href.startswith(source) or urlsplit(href).fragment:
+        return None
+    query = href[len(source):]
+    pairs = parse_qsl(query, keep_blank_values=True)
+    fields = dict(pairs)
+    if len(pairs) != 3 or set(fields) != {'sh:NodeShape', 'pid', 'edit'} or (
+            fields['sh:NodeShape'] != 'dlthings:Thing' or not fields['pid'] or fields['edit'] != 'true'):
+        return None
+    if before[0] != ['start', 'div', [['class', 'text-xs']]]:
+        return None
+    expected = [['start', 'div', [['class', 'orinoco-record-editor-link text-xs']]],
+        ['start', 'a', [['class', 'text-primary-500'], ['target', '_blank'],
+        ['rel', 'noopener noreferrer'], ['href', base + 'edit/?' + query]]]]
+    if after == expected:
+        return recognized('record-editor-link')
+    return None
+
+
 def named_html_pattern(finding):
     """Recognize complete, bounded edits before generic exact repetition."""
     if finding['location'][:2] != ['html', 'events'] or not all(
@@ -195,7 +233,7 @@ def classify(row, stage, indexes):
                     'side': side, 'url': url, 'http_status': status,
                     'criteria': 'A retained 404/410 establishes absence at capture time. Other missing files do not establish absence online.'}
     return (url_pattern(finding, stage) or url_pattern(finding, stage, metadata=True)
-            or graph_pattern(finding) or named_html_pattern(finding) or {'category': 'unclassified'})
+            or graph_pattern(finding) or editor_link_pattern(finding, stage) or named_html_pattern(finding) or {'category': 'unclassified'})
 
 
 def classifications(reports):
@@ -241,6 +279,7 @@ PATTERNS = {
     'link-target-removal': {'label': 'Link target attribute removal', 'criteria': 'The entire hunk removes only target="_blank" from an anchor; its URL and every other attribute are unchanged. This changes the browsing context and is not automatically accepted.'},
     'navigation-title': {'label': 'Navigation title addition', 'criteria': 'The complete anchor event changes only its empty title to Outputs. Its empty href is preserved.'},
     'navigation-label': {'label': 'Navigation label markup addition', 'criteria': 'The complete known hunk adds Collaboration hub text with its span and whitespace changes.'},
+    'record-editor-link': {'label': 'Record editor link adaptation', 'criteria': 'The complete two-event hunk replaces the upstream knowledge-pool editor URL with edit/ under the declared destination base, adds the orinoco-record-editor-link wrapper class and rel="noopener noreferrer", and preserves the raw three-field record query, target, and anchor class exactly. Wording is classified separately; editor operation and acceptance are not established.'},
     'edit-link-text': {'label': 'Record edit-link text change', 'criteria': 'The complete known hunk removes the trailing knowledge-pool wording and newline. Editor URL changes are separate.'},
     'graph-script-version': {'label': 'Graph script version query addition', 'criteria': 'Only a 64-character hexadecimal v parameter is added to /graph.js in the complete script event. Other attributes match; script contents and the version value are not verified by this rule.'},
     'contact-navigation-removal': {'label': 'Contact navigation removal', 'criteria': 'The complete known Contact and location navigation subtree is removed. This does not describe the whole footer or accept the removal.'},
