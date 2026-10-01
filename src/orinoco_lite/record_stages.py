@@ -308,30 +308,27 @@ def register(subparsers: Any) -> None:
         description="Convert a JSONL dump into site-specific/metadata. Only metadata/records "
                     "and metadata/overlays/machine-provenance-annotations are replaced; use --force for existing metadata.")
     options(parser)
-    parser.add_argument("--source", help="JSONL input; - reads stdin (spooled to a temporary file); default: DIRECTORY/downloaded/records.jsonl")
+    parser.add_argument("--source", help="JSONL input (default: DIRECTORY/downloaded/records.jsonl)")
     parser.add_argument("--destination", type=Path, default=Path("site-specific"),
                         help="site-input directory (default: %(default)s)")
     parser.set_defaults(records_action="jsonl-to-yaml")
     parser = subparsers.add_parser("yaml-to-jsonl", help="rejoin YAML records and annotations into JSONL",
         description="Rejoin site-specific metadata into sourcedata/yaml-jsonl/records.jsonl. "
-                    "Use --source and --output for other paths; existing output requires --force.",
-        epilog="Example: orinoco-lite dev records yaml-to-jsonl --output - | jq -c . "
-               "Use shell pipefail when the pipeline must detect producer failures. "
-               "A failed export may leave incomplete data in a pipe; check its exit status.")
+                    "Use --source and --output for other paths; existing output requires --force.")
     options(parser)
     parser.add_argument("--source", type=Path, default=Path("site-specific"),
                         help="site-input directory containing metadata (default: %(default)s)")
-    parser.add_argument("--output", help="JSONL destination; - writes UTF-8 JSONL to stdout after validation, ordered by class and PID (default: DIRECTORY/yaml-jsonl/records.jsonl)")
+    parser.add_argument("--output", help="JSONL destination (default: DIRECTORY/yaml-jsonl/records.jsonl)")
     parser.set_defaults(records_action="yaml-to-jsonl")
     parser = subparsers.add_parser("diff", help="compare two representations of the records",
         description="Compare sourcedata/downloaded/records.jsonl with site-specific metadata by default. "
-                    "Pass two paths to compare other JSONL files or site-input directories; use - for one stdin input. "
-                    "Inputs are read completely before comparison; stdin is spooled temporarily. Inputs are never changed. "
+                    "Pass two paths to compare other JSONL files or site-input directories. "
+                    "Print differences without downloading or changing inputs. "
                     "Exit 0 means equal, 1 means differences, and 2 means an error.")
     parser.add_argument("left", nargs="?", help="JSONL file or site-input directory (default: DIRECTORY/downloaded/records.jsonl)")
     parser.add_argument("right", nargs="?", default="site-specific",
                         help="JSONL file or site-input directory (default: %(default)s)")
-    parser.add_argument("--json", action="store_true", help="emit one JSON report with complete selected findings and total counts; --record/--field select findings, --summary/--limit/--full-values affect only text; exit status covers all records")
+    parser.add_argument("--json", action="store_true", help="print complete selected findings and total counts as JSON; text limits do not apply")
     parser.add_argument("--summary", action="store_true", help="show counts without individual differences")
     parser.add_argument("--limit", type=_limit, default=30, help="maximum displayed differences (default: 30)")
     parser.add_argument("--record", action="append", help="select a record identifier; repeat for several")

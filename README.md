@@ -69,10 +69,6 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-Restore pinned agent skills with `pixi run -e skills setup-skills` before starting an agent task.
-Run `pixi run -e skills audit-skills` to check installed skills against their lock.
-APM tooling has its own Pixi environment; `apm.yml` declares the external skill sources.
-
 In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
 
 ```console

@@ -30,8 +30,7 @@ def _parser() -> argparse.ArgumentParser:
         description="Maintain your site's metadata and build a static website with Orinoco Lite.",
         epilog=("Run from your website repository. For a local preview, run 'orinoco-lite build' "
                 "followed by 'orinoco-lite serve'. Use COMMAND --help for options and "
-                "'orinoco-lite dev --help' when contributing package or template changes. "
-                "Interrupted work exits 130; a closed output pipe exits 141."),
+                "'orinoco-lite dev --help' when contributing package or template changes."),
     )
     parser.add_argument("--root", type=Path, help="directory containing pyproject.toml")
     parser.add_argument("--version", action="version", version=f"orinoco-lite {__version__}")
