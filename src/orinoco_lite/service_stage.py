@@ -11,7 +11,7 @@ from dump_things_pyclient import communicate
 
 from .errors import ConfigurationError
 from . import upstream_snapshot
-from .upstream_service import local_service
+from .upstream_service import local_service, selected_schema
 from .stage_reports import artifact_digest, write_json, write_operation
 
 
@@ -21,17 +21,6 @@ def register(subparsers) -> None:
         description="Upload the selected existing JSONL records to a temporary Pool and download them. Retain output under STATE-pool-jsonl/. Existing output requires --force.")
     options(parser)
     parser.add_argument("source_state", nargs="?", default="yaml-jsonl", choices=("downloaded", "yaml-jsonl"), help="input records (default: yaml-jsonl)")
-
-
-def selected_schema() -> Path:
-    from .resources import resolve_resources
-    path = resolve_resources().root / "schema" / "src" / "demo-research-information" / "unreleased.yaml"
-    if not path.is_file():
-        # The bundled schema is the selected package schema, never a newer generated replacement.
-        path = resolve_resources().root / "schema" / "demo-research-information" / "unreleased.yaml"
-    if not path.is_file():
-        raise ConfigurationError("Pinned Things Schema is missing; run dev prepare-resources")
-    return path
 
 
 def roundtrip(source: Path, output: Path, *, scratch: Path | None = None,
