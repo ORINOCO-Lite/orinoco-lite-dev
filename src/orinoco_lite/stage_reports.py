@@ -91,11 +91,38 @@ def receipt_path(path: Path) -> Path:
     return path.with_name(path.name + ".operation.json")
 
 
+def retained_input(path: Path):
+    """Recover metadata for an exact, unchanged artifact in a copied report."""
+    path = Path(path).absolute()
+    root = path.parent.parent
+    if path.parent.name != 'artifacts' or not (root / 'report.json').is_file():
+        return None
+    report = read_json(root / 'report.json')
+    if not isinstance(report, dict) or report.get('schema_version') != VERSION:
+        raise ConfigurationError(f'Unsupported retained report: {root}')
+    matches = [(stage, role) for stage in report.get('stages', [])
+               for role, artifact in stage.get('artifacts', {}).items()
+               if safe_artifact(root, artifact['path']) == path]
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise ConfigurationError(f'Ambiguous retained artifact metadata: {path}')
+    stage, role = matches[0]
+    if artifact_digest(path) != stage['artifacts'][role]['digest']:
+        return None  # Edited bytes no longer have the original producer attribution.
+    validate_report(report, root)
+    return stage, role, root
+
+
 def operation_receipt(path: Path, *, allow_failed: bool = False) -> dict | None:
     receipt = receipt_path(path)
-    if not receipt.is_file():
-        return None
-    data = read_json(receipt)
+    if receipt.is_file():
+        data = read_json(receipt)
+    else:
+        retained = retained_input(path)
+        data = retained[0]['artifacts'][retained[1]].get('operation') if retained else None
+        if data is None:
+            return None
     if not isinstance(data, dict) or data.get("schema_version") != VERSION:
         raise ConfigurationError(f"Unsupported operation receipt at {receipt}")
     if not isinstance(data.get("operation"), str) or not isinstance(data.get("inputs"), dict):
@@ -169,7 +196,7 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
                  mode: str = "isolated", status: str = "complete",
                  diagnostics: list[str] | None = None,
                  command: list[str] | None = None,
-                 evidence: dict[str, Path] | None = None) -> dict:
+                 evidence: dict[str, Path] | None = None, targets: dict | None = None) -> dict:
     if mode not in {"isolated", "complete-path"} or status not in {"complete", "failed", "skipped"}:
         raise ConfigurationError("Invalid comparison mode or stage status")
     report_dir = Path(report_dir).absolute()
@@ -201,6 +228,21 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
              "scope": scope or {"complete": False}, "comparator": comparator,
              "artifacts": artifacts, "findings": rows,
              "diagnostics": diagnostics or [], "command": command or [], "links": []}
+    if targets is None:
+        retained_targets = {}
+        for side, source in [('left', left), ('right', right)]:
+            retained = retained_input(source) if source.exists() else None
+            if retained:
+                source_stage, source_role, _ = retained
+                if source_role in source_stage.get('targets', {}):
+                    retained_targets[side] = source_stage['targets'][source_role]
+        if retained_targets:
+            from .stage_presentation import targets as describe_targets
+            targets = {side: {key: value for key, value in target.items() if value is not None}
+                       for side, target in describe_targets(entry).items()}
+            targets.update(retained_targets)
+    if targets is not None:
+        entry["targets"] = targets
     report = {"schema_version": VERSION, "run_id": str(uuid.uuid4()),
               "context": execution_context(), "stages": [entry]}
     # Validate before publishing the report, including every copied artifact.
@@ -219,16 +261,15 @@ def write_report(report_dir: Path, *, stage: str, left: Path, right: Path,
     lines += ["", *diagnostics] if diagnostics else [""]
     categories = Counter(row.get("representation_equivalence", "unclassified raw changes") for row in rows)
     lines.append("Finding categories: " + canonical(dict(categories)))
-    shown = sorted(rows, key=lambda row: ("representation_equivalence" in row, row["id"]))[:50]
-    def brief(value):
-        text = canonical(value)
-        return text if len(text) <= 400 else text[:397] + "... (full value in report.json)"
-    for row in shown:
-        lines += [f"- {row['id']} {row['subject']} {canonical(row['location'])}: {row['change']}",
-                  f"  before: {brief(row.get('before')) if row.get('before_present', True) else '<missing>'}",
-                  f"  after: {brief(row.get('after')) if row.get('after_present', True) else '<missing>'}"]
-    if len(rows) > len(shown):
-        lines.append(f"Showing {len(shown)} of {len(rows)}; report.json retains all raw findings and values.")
+    from .stage_presentation import group_supporting_observations, render_rows
+    presented = group_supporting_observations([{'key': row['id'], 'report': str(report_dir), 'finding': row} for row in rows])
+    visible = [row for row in presented if not row['supporting']]
+    lines += ["", "```diff", render_rows(visible[:50], {row['key']: (entry, report_dir) for row in presented}, category='differences'), "```"]
+    problems = render_rows(visible[:50], {row['key']: (entry, report_dir) for row in presented}, category='problems')
+    if problems:
+        lines += ["", "## Possible problems", "", problems]
+    if len(visible) > 50:
+        lines.append(f"Showing 50 of {len(visible)} changes/checks; dev review show and report.json retain the full evidence.")
     (report_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report
 
@@ -266,6 +307,14 @@ def validate_report(report: dict, root: Path) -> None:
             raise ConfigurationError("Stage requires artifacts and findings")
         if stage["status"] == "complete" and not {"left", "right"} <= stage["artifacts"].keys():
             raise ConfigurationError("Complete stage requires left and right artifacts")
+        if 'targets' in stage:
+            targets = stage['targets']
+            if not isinstance(targets, dict) or set(targets) != {'left', 'right'}:
+                raise ConfigurationError('Comparison targets must describe left and right')
+            for target in targets.values():
+                if not isinstance(target, dict) or not target.get('label') or any(
+                        not isinstance(value, str) or not value.strip() for value in target.values()):
+                    raise ConfigurationError('Target fields must be nonempty text with a label')
         for artifact in stage["artifacts"].values():
             if not isinstance(artifact, dict) or not isinstance(artifact.get("media_type"), str):
                 raise ConfigurationError("Artifact requires path, digest, and media_type")

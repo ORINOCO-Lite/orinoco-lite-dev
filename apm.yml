@@ -15,6 +15,8 @@ dependencies:
       ref: 57d3269a86c6512654685de15ae942bfcea0806f
       skills:
         - unix-cli-design
+    - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max#a339a9418822609b77fe3bcfe5efd7c7c6105391
+    - leej3/agentic-awesome-skills/skills/ui-ux-designer#8fec5f9ebf4f885a00f2a526c2ca79aa834511b3
   mcp: []
 includes: auto
 scripts: {}

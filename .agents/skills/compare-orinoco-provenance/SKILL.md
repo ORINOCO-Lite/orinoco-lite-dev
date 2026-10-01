@@ -1,6 +1,6 @@
 ---
 name: compare-orinoco-provenance
-description: Compare Orinoco metadata and generated outputs across upstream and Lite paths or revisions, locate transformation boundaries that introduce differences, verify propagated effects through controlled replay, and carry scoped human decisions forward. Use for staged semantic comparison, unexplained metadata loss, and reviewing retained adaptations; not ordinary source-adapter candidate curation or generic code review.
+description: Compare Orinoco metadata and generated outputs across upstream and Lite paths or revisions, locate transformation boundaries that introduce differences, verify propagated effects through controlled replay, annotate investigations with inspectable evidence, and carry scoped human decisions forward. Use for staged semantic comparison, unexplained metadata loss, and reviewing retained adaptations; not ordinary source-adapter candidate curation or generic code review.
 ---
 
 # Compare Orinoco provenance
@@ -136,6 +136,40 @@ Choose tooling for the comparison, not to reproduce this vocabulary.
 Use focused pytest checks when inputs, comparison, and assertions fit naturally; constrain expected failures to the known cause and use strict XPASS handling to prompt review.
 For exploratory, expensive, or multi-stage comparisons, existing commands and inspectable reports may be more appropriate.
 No pytest suite or new reporting framework is required merely to use these outcome labels.
+
+## Annotate the investigation separately from the human disposition
+
+Start with the final difference and ask: what differs overall, where does it first arise, and does the selected change explain an observed downstream effect?
+Trace earlier-stage candidates, compare operations with the same inputs, and replay selectively when uncertainty warrants it.
+The single-file substitution command is one bounded experiment, not a limit on the investigation.
+For other questions, retain a small custom script or an ordinary command alongside its inputs and outputs rather than adding a dedicated CLI operation for each experiment.
+
+Keep three layers inspectable: programmatic differences, attributed agent annotations, and human dispositions.
+An annotation can contain tags, an explanation, a hypothesis, evidence references, a conclusion, author, and limits without classifying the behavior as intended or tolerated.
+Even an opinion must identify the data used to establish it.
+Do not turn confidence, tags, or prose into verification or acceptance.
+For unresolved changes, explain what the evidence establishes and what test would distinguish the remaining hypotheses; do not fabricate a conclusion.
+
+Preserve access to every original-file diff, including formatting changes, additions, deletions, and binary changes.
+Distinguish this view from normalized structured differences and explain the comparator's normalization.
+Do not call a text-only change formatting-only unless the comparator establishes that interpretation.
+Grouping and human decisions never remove original evidence.
+For partial site captures, distinguish an observed HTTP absence from a file outside capture coverage.
+
+Separate comparing retained artifacts from reproducing an experiment.
+Link the actual input and output bytes, the comparison, and a runnable command or retained script.
+Use versioned package selections and locks, a clean available software revision, and paths relative to the retained experiment.
+Make reruns choose a fresh output directory instead of depending on an unused hard-coded name.
+Exercise the instructions from a separate directory when claiming recoverability.
+Preserve historical dirty-checkout evidence as historical; create a new run rather than relabeling the old one.
+A no-effect conclusion covers only the selected substitution, renderer, inputs, outputs, and comparison that were tested.
+It does not establish general irrelevance, absence of other effects, or human acceptance.
+
+The review CLI accepts an optional annotation JSON file with `review show --annotations` and `review bundle --annotations`.
+Each entry identifies the exact finding, author, explanation, limits, and labeled local evidence paths; optional tags, hypothesis, conclusion, and command argument lists add context.
+Evidence paths are relative to the annotation file and are copied into the portable bundle.
+Inspect installed help and the implemented annotation validator for the current fields before authoring one.
+Prefer CLI composition for tests and exploration; UI-specific investigation can still be appropriate.
 
 ## Present and repeat
 

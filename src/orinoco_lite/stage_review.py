@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 import uuid
 
@@ -16,6 +17,14 @@ def register(subparsers) -> None:
     from .diagnostics import options
     review = subparsers.add_parser("review", help="review staged comparisons and scoped decisions")
     commands = review.add_subparsers(dest="review_command", required=True)
+    materialize = commands.add_parser('materialize', help='copy a retained bundle, resolving Annex files, and verify it for review')
+    materialize.add_argument('source', type=Path)
+    materialize.add_argument('destination', type=Path, help='fresh output bundle directory')
+    materialize.add_argument('--get', action='store_true', help='retrieve selected bundle content with DataLad first')
+    experiments = commands.add_parser('experiments', help='show investigation questions, controls, missing comparisons, and commands')
+    experiments.add_argument('reports', nargs='*', help='comparison names; without reports the experimental guidance is still available')
+    options(experiments, replace=False)
+    experiments.add_argument('--format', choices=('text', 'json'), default='text')
     summarize = commands.add_parser("summarize", help="validate evidence and carry decisions into this review")
     summarize.add_argument("reports", nargs="*", help="comparison names (default: all existing reports)")
     options(summarize)
@@ -37,6 +46,33 @@ def register(subparsers) -> None:
     apply = commands.add_parser("apply", help="preview or apply decision edits against their original digest")
     options(apply, replace=False)
     apply.add_argument("--write", action="store_true")
+    bundle = commands.add_parser("bundle", help="copy validated reports and decisions into a portable web review")
+    bundle.add_argument("reports", nargs="*", help="comparison names (default: all existing reports)")
+    options(bundle)
+    bundle.add_argument("--title", default="Staged comparison review")
+    show = commands.add_parser("show", help="print unified diffs or possible problems without an interactive session")
+    show.add_argument("reports", nargs="*", help="comparison names (default: all reports)")
+    options(show, replace=False)
+    show.add_argument('--view', choices=('structured', 'files'), default='structured', help='normalized structured differences or every original-file difference, independent of decisions')
+    for parser in (show, bundle):
+        parser.add_argument('--annotations', type=Path, help='optional authored investigation notes with evidence; separate from human decisions')
+    show.add_argument("--category", choices=("differences", "problems", "all"), default="differences")
+    show.add_argument('--classification', choices=('unclassified', 'recognized', 'coverage', 'all'), default='all', help='filter heuristic classifications (default: all); human decisions are separate')
+    show.add_argument("--subject", default="", help="limit to subjects containing this text")
+    show.add_argument("--raw", action="store_true", help="include supporting size and fingerprint observations")
+    show.add_argument("--format", choices=("diff", "json"), default="diff")
+    from .stage_investigation import register as register_investigation
+    register_investigation(commands)
+    from .stage_capture import register as register_capture
+    register_capture(commands)
+    serve = commands.add_parser("serve", help="open a portable review on a local web server")
+    options(serve, replace=False)
+    for parser in (show, bundle, serve):
+        parser.add_argument('--heuristic', type=Path,
+                            help='execute a trusted Python file defining ordered RULES; default: built-in heuristic (serve uses bundled classifications when present)')
+    serve.add_argument('--metadata-only', action='store_true', help='browse saved overview.json without loading evidence; no decision editing')
+    serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument("--open", action="store_true", help="open the local review in your browser")
 
 
 def expected(finding: dict) -> dict:
@@ -198,13 +234,19 @@ def summarize(paths: list[Path], decisions: dict) -> dict:
         absent.append({"decision": decision, "state": "not-observed" if evaluated else "not-evaluated"})
     links, incompatibilities = data_flow(entries)
     groups, attribution_diagnostics = causal_groups(reports, findings)
+    from .stage_presentation import group_supporting_observations, targets
+    group_supporting_observations(findings)
+    from .stage_investigation import effects
+    replay_effects = effects(reports)
+    for row in findings:
+        row['effects'] = replay_effects.get(row['key'], [])
     counts = Counter(row["state"] for row in findings + absent)
     return {"schema_version": VERSION, "reports": [{"run_id": r["run_id"], "context": r["context"]}
                                                    for r, _ in reports],
             "decisions_digest": json_digest(decisions), "findings": findings,
             "absent": absent, "counts": dict(counts), "groups": groups,
             "stages": [{"run_id": r["run_id"], "stage": s["stage"], "status": s["status"],
-                        "scope": s["scope"], "mode": s["mode"]} for r, s in entries],
+                        "scope": s["scope"], "mode": s["mode"], "targets": targets(s)} for r, s in entries],
             "data_flow": links, "incompatibilities": incompatibilities + attribution_diagnostics,
             "integration": "not-established",
             "integration_reason": "Inspect explicit links and complete-path evidence; isolated agreement alone is insufficient."}
@@ -344,15 +386,20 @@ def render_summary(result: dict) -> str:
         lines.append(f"Attribution ({group['status']}): {group['origin']} -> {group['effect']}")
     for problem in result["incompatibilities"]:
         lines.append(f"INCOMPLETE: {problem}")
-    def brief(value):
-        text = canonical(value)
-        return text if len(text) < 400 else text[:397] + "... (full value in raw evidence)"
-
+    from .stage_presentation import diff_text
+    evidence_stages = {}
+    for source in dict.fromkeys(row['report'] for row in result['findings']):
+        report, root = load_report(Path(source))
+        for stage in report['stages']:
+            for finding in stage['findings']:
+                evidence_stages[f"{report['run_id']}/{finding['id']}"] = (stage, root)
     matched_rules = Counter(row["decision"]["id"] for row in result["findings"]
                             if row.get("decision") and row["decision"].get("rule"))
     displayed_rules, displayed = set(), Counter()
     for row in result["findings"]:
         finding, decision = row["finding"], row["decision"]
+        if row.get("supporting"):
+            continue
         if decision and decision.get("rule"):
             if decision["id"] in displayed_rules:
                 continue
@@ -373,9 +420,11 @@ def render_summary(result: dict) -> str:
             continue
         lines += ["", f"## {label}: {finding['subject']} {canonical(finding['location'])}",
                   f"First causal boundary: {finding['first_boundary']}; change: {finding['change']}",
-                  "Before: " + (brief(finding.get("before")) if finding.get("before_present", True) else "<missing>"),
-                  "After: " + (brief(finding.get("after")) if finding.get("after_present", True) else "<missing>"),
+                  ("Possible problem: " + canonical(finding['after']) if row.get('category') == 'problems'
+                   else "```diff\n" + diff_text(finding, *evidence_stages[row['key']]) + "```"),
                   f"Evidence: {row['raw_evidence']}; finding {finding['id']}"]
+        for effect in row.get('effects', []):
+            lines.append(effect['conclusion'])
         if decision:
             lines += [f"Decision by {decision['author']}: {decision['rationale']}",
                       f"Reconsider when: {decision['reconsider_when']}"]
@@ -391,12 +440,109 @@ def render_summary(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def apply_changes(decisions: dict, changes: dict) -> dict:
+    """Validate an exported edit document and return a new decision snapshot."""
+    validate_decisions(decisions)
+    if (not isinstance(changes, dict) or type(changes.get("schema_version")) is not int
+            or changes["schema_version"] != VERSION or changes.get("base_digest") != json_digest(decisions)):
+        raise ConfigurationError("Decision edits are stale or unsupported; reopen against the current decision file")
+    if not isinstance(changes.get("edits"), list):
+        raise ConfigurationError("Decision edits must be a list")
+    by_id = {d["id"]: deepcopy(d) for d in decisions["decisions"]}
+    touched = set()
+    for edit in changes["edits"]:
+        if not isinstance(edit, dict):
+            raise ConfigurationError("Each decision edit must be an object")
+        key, action = edit.get("id"), edit.get("action")
+        if not isinstance(key, str) or not key.strip() or key in touched:
+            raise ConfigurationError("Each decision edit must have one unique ID")
+        touched.add(key)
+        if action == "remove" and key in by_id:
+            del by_id[key]
+            continue
+        if not ((action == "add" and key not in by_id) or (action == "update" and key in by_id)):
+            raise ConfigurationError(f"Invalid {action} for decision {key}")
+        value = edit.get("decision")
+        if not isinstance(value, dict) or value.get("id") != key:
+            raise ConfigurationError("Edit ID differs from decision ID")
+        by_id[key] = deepcopy(value)
+    updated = {"schema_version": VERSION, "decisions": list(by_id.values())}
+    validate_decisions(updated)
+    return updated
+
+
 def execute(args) -> int:
     from .diagnostics import directory, report_paths, prepare_output, require
+    if args.review_command == 'materialize':
+        from .stage_evidence import materialize
+        from .diagnostics import explicit_path
+        print(materialize(explicit_path(args, args.source), explicit_path(args, args.destination), get=args.get))
+        return 0
     root = directory(args)
+    if args.review_command == "capture":
+        from .stage_capture import execute as capture
+        return capture(args, root)
+    if args.review_command in {"compare", "replay"}:
+        from .stage_investigation import execute as investigate
+        return investigate(args, root)
+    if args.review_command == 'experiments':
+        from .stage_experiments import guidance, render_guidance
+        paths = report_paths(root, args.reports) if args.reports or any((root / 'reports').glob('*/report.json')) else []
+        stages = [dict(s, run_id=r['run_id']) for path in paths for r, _ in [load_report(path)] for s in r['stages']]
+        items = guidance(stages, directory=root)
+        print(canonical(items) if args.format == 'json' else render_guidance(items))
+        return 0
+    if getattr(args, 'heuristic', None) is not None:
+        from .diagnostics import explicit_path
+        args.heuristic = explicit_path(args, args.heuristic)
     args.decisions = root / "decisions.json"
-    if args.review_command in {"summarize", "inspect"}:
+    if args.review_command in {"summarize", "inspect", "bundle", "show"}:
         args.reports = report_paths(root, args.reports)
+    if args.review_command == "show":
+        from .stage_presentation import render_rows
+        from .stage_annotations import load_annotations
+        loaded = [load_report(path) for path in args.reports]
+        notes = load_annotations(getattr(args, 'annotations', None), loaded)
+        if getattr(args, 'view', 'structured') == 'files':
+            from .stage_originals import original_files, original_diff
+            items = [original_diff(item, stage, base) for report, base in loaded
+                     for index, stage in enumerate(report['stages'])
+                     for item in original_files(report, stage, base, index) if args.subject in item['subject']]
+            print(canonical({'files': items, 'annotations': notes}) if args.format == 'json' else
+                  '\n'.join(f"# {item['change']}: {item['subject']}\n{item['unified_diff']}" for item in items) or 'No original-file differences.')
+            return 0
+        result = summarize(args.reports, load_decisions(args.decisions))
+        from .stage_presentation import target_provenance
+        for summary, stage in zip(result['stages'], [s for report, _ in loaded for s in report['stages']]):
+            summary['target_provenance'] = target_provenance(stage)
+        stages = {f"{r['run_id']}/{f['id']}": (s, base)
+                  for path in args.reports for r, base in [load_report(path)]
+                  for s in r['stages'] for f in s['findings']}
+        from .stage_patterns import classifications, counts, load_heuristic
+        heuristic = load_heuristic(getattr(args, 'heuristic', None))
+        classified = classifications(loaded, heuristic)
+        result['heuristic'] = heuristic.info
+        for row in result['findings']:
+            row['classification'] = classified[row['key']]
+        result['classification_counts'] = counts(result['findings'])
+        rows = [row for row in result['findings']
+                if (row['category'] == 'problems' or getattr(args, 'classification', 'all') == 'all' or row['classification']['category'] == args.classification)
+                and (args.category == 'all' or row['category'] == args.category)
+                and (args.raw or not row['supporting'])
+                and args.subject in row['finding']['subject']]
+        if args.format == 'json':
+            from .stage_presentation import diff_text
+            print(canonical({**result, 'annotations': notes, 'findings': [
+                {**row, 'unified_diff': (diff_text(row['finding'], *stages[row['key']])
+                                       if row['category'] == 'differences' else None)}
+                for row in rows]}))
+        else:
+            print('# Classification counts: ' + canonical(result['classification_counts']))
+            text = render_rows(rows, stages, category=args.category, raw=args.raw)
+            print(text or f"No {args.category} in the selected reports.")
+            for note in notes:
+                print('Agent annotation (authored claim; not a human decision): ' + canonical(note))
+        return 0
     if args.review_command == "summarize":
         args.output = root / "review"
         if not args.decisions.exists():
@@ -406,6 +552,19 @@ def execute(args) -> int:
         args.report = report_paths(root, [args.report])[0]
     elif args.review_command == "apply":
         args.changes = require(root / "decision-edits.json", "review")
+    if args.review_command == "bundle":
+        args.output = root / "bundle"
+        if not args.decisions.exists():
+            args.decisions = None
+        prepare_output(args.output, args.force)
+        from .stage_bundle import bundle
+        print(canonical(bundle(args.reports, args.output, decisions=args.decisions, title=args.title, annotations=getattr(args, "annotations", None), heuristic=getattr(args, "heuristic", None))))
+        print(f"Review bundle: {args.output}. Open it with 'orinoco-lite dev review serve' using the same --directory.")
+        return 0
+    if args.review_command == "serve":
+        from .stage_web import serve
+        serve(require(root / "bundle", "review bundle"), port=args.port, open_browser=args.open, heuristic=getattr(args, "heuristic", None), metadata_only=getattr(args, "metadata_only", False))
+        return 0
     if args.review_command == "inspect":
         return inspect_review(args.reports, args.decisions, args.author)
     decisions = load_decisions(args.decisions)
@@ -440,28 +599,7 @@ def execute(args) -> int:
                                 rule=getattr(args, "equivalence_rule", None))
         updated = {"schema_version": VERSION, "decisions": [*decisions["decisions"], decision]}
     else:
-        changes = read_json(args.changes)
-        if changes.get("schema_version") != VERSION or changes.get("base_digest") != json_digest(decisions):
-            raise ConfigurationError("Decision edits are stale or unsupported; reopen against the current decision file")
-        by_id = {d["id"]: d for d in decisions["decisions"]}
-        touched = set()
-        for edit in changes.get("edits", []):
-            key = edit.get("id")
-            action = edit.get("action")
-            if not isinstance(key, str) or key in touched:
-                raise ConfigurationError("Each decision edit must have one unique ID")
-            touched.add(key)
-            if action == "add" and key not in by_id:
-                by_id[key] = edit["decision"]
-            elif action == "update" and key in by_id:
-                by_id[key] = edit["decision"]
-            elif action == "remove" and key in by_id:
-                del by_id[key]
-            else:
-                raise ConfigurationError(f"Invalid {action} for decision {key}")
-            if action != "remove" and by_id[key].get("id") != key:
-                raise ConfigurationError("Edit ID differs from decision ID")
-        updated = {"schema_version": VERSION, "decisions": list(by_id.values())}
+        updated = apply_changes(decisions, read_json(args.changes))
     validate_decisions(updated)
     print(canonical(updated))
     if args.write:
@@ -480,7 +618,7 @@ def inspect_review(paths: list[Path], decision_path: Path, author: str) -> int:
     position = 0
     while True:
         result = summarize(paths, decisions)
-        rows = [row for row in result["findings"] if selected_stage is None or row["finding"]["stage"] == selected_stage]
+        rows = [row for row in result["findings"] if not row["supporting"] and (selected_stage is None or row["finding"]["stage"] == selected_stage)]
         rows.sort(key=lambda row: ({"new": 0, "changed": 1, "matched": 2}[row["state"]], row["key"]))
         print("\nReview states: " + canonical(result["counts"]))
         print("Stages: " + ", ".join(sorted({s["stage"] for s in result["stages"]})))
@@ -490,7 +628,10 @@ def inspect_review(paths: list[Path], decision_path: Path, author: str) -> int:
             finding = row["finding"]
             print(f"[{position + 1}/{len(rows)}] {row['state']} " + canonical({
                 "stage": finding["stage"], "subject": finding["subject"], "location": finding["location"]}))
-            print("Before/after: " + canonical(expected(finding)))
+            from .stage_presentation import diff_text
+            selected_report, selected_root = load_report(Path(row['report']))
+            stage = next(s for s in selected_report['stages'] if any(f['id'] == finding['id'] for f in s['findings']))
+            print('Possible problem: ' + canonical(finding['after']) if row['category'] == 'problems' else diff_text(finding, stage, selected_root))
             print("Evidence: " + row["raw_evidence"])
             if row["decision"]:
                 print("Decision: " + canonical(row["decision"]))
