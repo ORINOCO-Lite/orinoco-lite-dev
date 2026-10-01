@@ -1,5 +1,4 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T16:47:47.882130+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: danyuchn/asd-ste100-skill
@@ -34,6 +33,17 @@ dependencies:
   virtual_path: skills/ui-ux-designer
   is_virtual: true
   package_type: hybrid
+  deployed_files:
+  - .agents/skills/ui-ux-designer
+  - .agents/skills/ui-ux-designer/LICENSE
+  - .agents/skills/ui-ux-designer/SKILL.md
+  - .agents/skills/ui-ux-designer/apm.yml
+  - .agents/skills/ui-ux-designer/resources/implementation-playbook.md
+  deployed_file_hashes:
+    .agents/skills/ui-ux-designer/LICENSE: sha256:af98370a7edc0f00ec46979d049517833c9a7fa2ba74e3cf8cc42f7db557299d
+    .agents/skills/ui-ux-designer/SKILL.md: sha256:d3c97a6c052ef48193e883411e3f39745e3ef8a108d7ef7e8c9d2c0c012d557f
+    .agents/skills/ui-ux-designer/apm.yml: sha256:24c6902b65a43642af893a435c95db8158bf6c06a16b22cc1af355155f66481b
+    .agents/skills/ui-ux-designer/resources/implementation-playbook.md: sha256:76e78c81d28762de3899b6015c9f90a5cf7700caa8976dced67b8ab6ef4e7662
   content_hash: sha256:b196a5fbafa0cbe386ebef5ced3379aa014963c9f7c430ef6fdda387f445437f
 - repo_url: leej3/skills-workshop
   name: workshop-skills
@@ -59,6 +69,159 @@ dependencies:
   virtual_path: .claude/skills/ui-ux-pro-max
   is_virtual: true
   package_type: hybrid
+  deployed_files:
+  - .agents/skills/ui-ux-pro-max
+  - .agents/skills/ui-ux-pro-max/LICENSE
+  - .agents/skills/ui-ux-pro-max/SKILL.md
+  - .agents/skills/ui-ux-pro-max/apm.yml
+  - .agents/skills/ui-ux-pro-max/data/app-interface.csv
+  - .agents/skills/ui-ux-pro-max/data/catalog-summary.json
+  - .agents/skills/ui-ux-pro-max/data/charts.csv
+  - .agents/skills/ui-ux-pro-max/data/colors.csv
+  - .agents/skills/ui-ux-pro-max/data/data-provenance.json
+  - .agents/skills/ui-ux-pro-max/data/google-font-licenses.json
+  - .agents/skills/ui-ux-pro-max/data/google-fonts.csv
+  - .agents/skills/ui-ux-pro-max/data/icons.csv
+  - .agents/skills/ui-ux-pro-max/data/landing.csv
+  - .agents/skills/ui-ux-pro-max/data/motion.csv
+  - .agents/skills/ui-ux-pro-max/data/phosphor-icons-upstream.json
+  - .agents/skills/ui-ux-pro-max/data/products.csv
+  - .agents/skills/ui-ux-pro-max/data/react-performance.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/angular.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/astro.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/avalonia.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/flutter.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/javafx.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/laravel.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/nextjs.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/nuxtjs.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/react-native.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/react.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/shadcn.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/svelte.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/swiftui.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/threejs.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/uno.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/uwp.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/vue.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/winui.csv
+  - .agents/skills/ui-ux-pro-max/data/stacks/wpf.csv
+  - .agents/skills/ui-ux-pro-max/data/styles.csv
+  - .agents/skills/ui-ux-pro-max/data/typography.csv
+  - .agents/skills/ui-ux-pro-max/data/ui-reasoning.csv
+  - .agents/skills/ui-ux-pro-max/data/ux-guidelines.csv
+  - .agents/skills/ui-ux-pro-max/references/pro-rules.md
+  - .agents/skills/ui-ux-pro-max/references/quick-reference.md
+  - .agents/skills/ui-ux-pro-max/scripts/core.py
+  - .agents/skills/ui-ux-pro-max/scripts/design_system.py
+  - .agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py
+  - .agents/skills/ui-ux-pro-max/scripts/search.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-api.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-catalog.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-existing.csv
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-metadata.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-overrides.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/icons-curated.csv
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-core.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-package.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-exports.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-package.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-baseline.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-cases.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-thresholds.json
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_refresh.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_summary_line_endings.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_core.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_core_data_quality.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_data_contracts.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_mode.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_stack.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_native_desktop_stack_freshness.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_relevance_evaluator.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_skill_script_paths.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_style_taxonomy.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py
+  - .agents/skills/ui-ux-pro-max/scripts/tests/test_web_stack_freshness.py
+  - .agents/skills/ui-ux-pro-max/scripts/validate_data.py
+  deployed_file_hashes:
+    .agents/skills/ui-ux-pro-max/LICENSE: sha256:738f69dfa83db5c347c678fb9d90e560877059f0de93a327c39001bff92dc014
+    .agents/skills/ui-ux-pro-max/SKILL.md: sha256:ea087c341bfb5b23195c7302027268ede86da802554c18a5c4896a6017b439f9
+    .agents/skills/ui-ux-pro-max/apm.yml: sha256:83b436c24db3d0c4840b9539ee7f974e43e16ee4ac797232e4bf32ce41dad2a8
+    .agents/skills/ui-ux-pro-max/data/app-interface.csv: sha256:331e7cf2c0b222d80c566c5f255c63cb339f65bfd02e471a720f28e4864a9f08
+    .agents/skills/ui-ux-pro-max/data/catalog-summary.json: sha256:6638da97231c07fb5cef3cd9d3ce483ca7b2f9748980f8c27490eb03968d8894
+    .agents/skills/ui-ux-pro-max/data/charts.csv: sha256:4115cf1120680f2cedef0676cb648f30c7ef4699e2a947535d4113e71ed3b12a
+    .agents/skills/ui-ux-pro-max/data/colors.csv: sha256:8162429222bce22df62b564085946a30d07cc9722c58d0a3a494bd0d1d00841c
+    .agents/skills/ui-ux-pro-max/data/data-provenance.json: sha256:e82fb33ed49375a300e93d9c11ccd1c1493c999e84ee7ee295e527634786e2e0
+    .agents/skills/ui-ux-pro-max/data/google-font-licenses.json: sha256:35688523f2955795caa1a47c53b83099e60c1708461476f9cc3a050cf3b0148a
+    .agents/skills/ui-ux-pro-max/data/google-fonts.csv: sha256:1c8c3b2ea1faf6a1012da463756def8b3889db33f2226f0343bb4daa80307d03
+    .agents/skills/ui-ux-pro-max/data/icons.csv: sha256:50816c6012030178195a16ee481ebf58b47bd985d70e8ec58886cc83f6eddafc
+    .agents/skills/ui-ux-pro-max/data/landing.csv: sha256:9a2edd3bb676c2a58f00ade7a062e285222d4297bfd847c8d5b056f0dbbf52d0
+    .agents/skills/ui-ux-pro-max/data/motion.csv: sha256:381affe8df8ea1f66fbbda2598827f9f54299107bbe6a1b4e9b68f6b62091ceb
+    .agents/skills/ui-ux-pro-max/data/phosphor-icons-upstream.json: sha256:2399325233b277b5c97a80e6a5e8941154f5d057beee4e7613db87c87d700236
+    .agents/skills/ui-ux-pro-max/data/products.csv: sha256:42473f75e8dde5987bdf89ce55d8c168091b80a356cae691dd60247d80720b70
+    .agents/skills/ui-ux-pro-max/data/react-performance.csv: sha256:3d925802539abac5afeb63ae8aa1960b7229ad271b3a47caed40ab2d97ad0734
+    .agents/skills/ui-ux-pro-max/data/stacks/angular.csv: sha256:704be83f2bad30c7e6de01afb113ffa01e0c458762f48b7102f31ba2367b5553
+    .agents/skills/ui-ux-pro-max/data/stacks/astro.csv: sha256:2c2f55fadaafc05e04cc321c8194a1a28b656e6757fe2ba316f41b16428299c6
+    .agents/skills/ui-ux-pro-max/data/stacks/avalonia.csv: sha256:442fca14675a020683473e7e49f08abb27b9df0765c80efe54aef61f1a4ac258
+    .agents/skills/ui-ux-pro-max/data/stacks/flutter.csv: sha256:64dba0ac17349f28bce517a0f5f48c54d9ed2e487ec0c0258303463b382f41a0
+    .agents/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv: sha256:d05a581d20af57b8ca0104a6d31d90a07c437d500662a96c3029fc2f9a4678ee
+    .agents/skills/ui-ux-pro-max/data/stacks/javafx.csv: sha256:2e819b8d5abdd23ad4dae0991650fdb57af497aabd68b37463aa9c442944c869
+    .agents/skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv: sha256:699de218b286948eaec7d15767b6e1350ee299167e49bf476d82e3ff58724e0a
+    .agents/skills/ui-ux-pro-max/data/stacks/laravel.csv: sha256:854ea4daa5fc61292d22235ad33b49ba3fe22423c3de8d3cb03758ffed3b59f9
+    .agents/skills/ui-ux-pro-max/data/stacks/nextjs.csv: sha256:ecd2c27b2ea0127d203ae726060efcdd7335b5e83f96b99e4f3befbbfeebd5a4
+    .agents/skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv: sha256:fce682a338cfcdbf35d318d20e5befbe7b5d81b05abc37f87677a6d9cde84dc6
+    .agents/skills/ui-ux-pro-max/data/stacks/nuxtjs.csv: sha256:3d9b54ed2d151bd9c86e9e5609b8a6f88a00c4c52fa601a30af96c49b2c4d176
+    .agents/skills/ui-ux-pro-max/data/stacks/react-native.csv: sha256:ba31dd9c0c04da6bc02a74448bf121f9c0728ae5ba3b4d47b487778b0a1135b5
+    .agents/skills/ui-ux-pro-max/data/stacks/react.csv: sha256:4dd176a9787e5c6306b5df94158d75955adcdc6edab41ce5286641a5842303c1
+    .agents/skills/ui-ux-pro-max/data/stacks/shadcn.csv: sha256:e56cfde5b74907836ac3582a4779d5b7f3d206a702ab81b8669a1b668c3eeb51
+    .agents/skills/ui-ux-pro-max/data/stacks/svelte.csv: sha256:f6e379ba802941ba26b01d4ffbe3cd39120f2587659a1d93851c707f66bc13db
+    .agents/skills/ui-ux-pro-max/data/stacks/swiftui.csv: sha256:bdd9231ff3ad658f4e7c063e1eb49df2fd09ac8d90631a86df899b39833b9623
+    .agents/skills/ui-ux-pro-max/data/stacks/threejs.csv: sha256:155d583b9c64da0df4b6c6cb060c02eab222505e0734d6353da02c9e2b5d982b
+    .agents/skills/ui-ux-pro-max/data/stacks/uno.csv: sha256:a0474363e4225b5367214d5675fd3e075f137026f9500f0d04357882ef4f6d48
+    .agents/skills/ui-ux-pro-max/data/stacks/uwp.csv: sha256:c409f08c1fbba1f1029f1acaa554e7b4471cc85517a5751c9f2e62465badcd5c
+    .agents/skills/ui-ux-pro-max/data/stacks/vue.csv: sha256:b655f1ebb9dff2652d15981f31b1784c8a6d4759efd2815a14f3088257569f95
+    .agents/skills/ui-ux-pro-max/data/stacks/winui.csv: sha256:e676dc1c13ee6c205c40b0746f1335150a346c7a49a0616d2545bc3d2c930c85
+    .agents/skills/ui-ux-pro-max/data/stacks/wpf.csv: sha256:9781a9950b20333637b30a02e498b7efca21b618a3eeb8665836f3ac6e974da7
+    .agents/skills/ui-ux-pro-max/data/styles.csv: sha256:a93a4d9d7025856575d7b7583bda020be9043013432c5af7c58af9dbdfb206b7
+    .agents/skills/ui-ux-pro-max/data/typography.csv: sha256:321fc446e89024488ebae96dda93efc4d2307bd8bddb240857ad51364f6782c8
+    .agents/skills/ui-ux-pro-max/data/ui-reasoning.csv: sha256:f0774dd741cecdad5eec842034bd6d5e9ea50e9f220a1910069748daa0bb8e9a
+    .agents/skills/ui-ux-pro-max/data/ux-guidelines.csv: sha256:ff81ec613f70ba9fc3fcce52dbe4ae35d44b2079dbe6dc066d2d6e38c28facd5
+    .agents/skills/ui-ux-pro-max/references/pro-rules.md: sha256:d28442d61c310b49c054a4ea736f89fb3008beebdbbc38c4b3a540b8f7fadf23
+    .agents/skills/ui-ux-pro-max/references/quick-reference.md: sha256:0609bc7c89dacb40472465d8fc14257b56b2c43439660fc8d6fa3b8c022e1876
+    .agents/skills/ui-ux-pro-max/scripts/core.py: sha256:c3be4b23e7150e6b45095213158cfa3c8ad96502f01dde3f6ffff9de64a4f481
+    .agents/skills/ui-ux-pro-max/scripts/design_system.py: sha256:e7d1c94c4b2eada17c5551157668362659ccf9626d34dbd58e68142410f90103
+    .agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py: sha256:b8bac1af82aa280d3e06f00aabaeac4337e632996b07fed874e2b6ee6e9c5913
+    .agents/skills/ui-ux-pro-max/scripts/search.py: sha256:d54e648fe0ec2932cac66684220cc17be4bd4b4eba1d23d3195d509d398db374
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-api.json: sha256:22d8dc81a7d6827b7e8b64b53e7d184210fb9759e8e294e0d5133c81cc460176
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-catalog.json: sha256:c608ad5c4084ebc50a4bbbfb69ea2456c01fd5519c457e18410fffd250ae948f
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-existing.csv: sha256:4e0761b839dc6b2187a370e82eddc0aed8a7ff10c09e28dd814bb3656dac595b
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-metadata.json: sha256:30bffc29ae348416a2de2f9c6c418e768e4578f136b0f4bac5d2f70124f2e9ba
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-overrides.json: sha256:6243a48a4619986768c4628e2d0c98ff195beba71ba9be5df8f0c52fc6d90c0b
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/icons-curated.csv: sha256:68362c9a700c13b96f000784a0198c1c7e117a7088a01c85744e44233038fe9d
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-core.json: sha256:ae4d0bb076240824e1b643c2270d1f8cc0952a69502ec1e622b7dedd85b930bb
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-package.json: sha256:500588c757d6de03e3d7e69b27a8b8b1f88ccf6bb0333e4c1e9b0d6a4f112475
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-exports.json: sha256:d79f2ee0afdbc2f87776733e145df3538a16a25d7c2fba0056bb48295dad0ded
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-package.json: sha256:1c57a1d76bcc0cdd3632d4c18b9c0e79576b4591df39831c9607e5d0eb4f2cec
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-baseline.json: sha256:0df200fc54c1cb97a52d6775e7f501509163cea8f8b73fd7268429bc1f835afe
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-cases.json: sha256:e77d36eebbf6ddc2860946a02cdb659351da6c09f2688f1ed30939a418099646
+    .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-thresholds.json: sha256:8099be287b13a01ef499091b99220692e85a3a652efa308e8a33b6b9fcd57ea6
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_refresh.py: sha256:3e2ca5d12702318f641ae62d0c14f22a3bcc84d84e79b863c0e947d475604adb
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_summary_line_endings.py: sha256:fa6ff09f0ec2c99013588c77397f5082dddebe8f467e94c5f8378ec9595f4989
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_core.py: sha256:3527fe2f4b852f69f07c17ddc0d615d9a6e025c924e45a33985579a94a8d2118
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_core_data_quality.py: sha256:3ffc6b4905c9ea26d7ac4527ab154d153584231aee71b2ae4bd017977fa09cc5
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_data_contracts.py: sha256:0360d6e10080c0bca214f2b0bbad582ba50702a542ce21013351aca54938df3a
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_mode.py: sha256:95ad2c154349f7021f55a558f8dcdd71df1a24fcf531a4364a8e49526a0865ef
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_stack.py: sha256:83d09ffe8cfbf7b265f362129f061dfe8e5e167ce5db43adaead197cabc9ca38
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_native_desktop_stack_freshness.py: sha256:3942845712b9a829323cd3568511483135f2a8c7cd79ccf61679da4b0f624dbb
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_relevance_evaluator.py: sha256:2fe56a4d6fe5fff15ff592274b0eeaba925146cefea6c0fa29d8f1b77c9aca1f
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_skill_script_paths.py: sha256:7cec24b94be771bc60bc84f8993e614bb16d4047930e1dd3d3bed91628311d44
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_style_taxonomy.py: sha256:cd14d0092e8a454d213aa104b53e4e70ba698491fa00fde9fdec5ca8a3d70011
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py: sha256:b51d32ee8a15505b87cb81957fb2d1b385e041e8beb4463c311d236bfd29ebd4
+    .agents/skills/ui-ux-pro-max/scripts/tests/test_web_stack_freshness.py: sha256:74897571398585f27e2c35d09d81b0a531c8c774f4a2967e5e1b1d1b05a483d9
+    .agents/skills/ui-ux-pro-max/scripts/validate_data.py: sha256:a599aa256049cf30954d1f164721b99e453eb7e4cb8241bcab2d5573e6cf58b8
   content_hash: sha256:6d87151237f4cbce826721705021b343b4246766aa85d80bb4213195fce2998e
 deployments:
 - kind: project-relative
@@ -124,6 +287,735 @@ deployments:
   - danyuchn/asd-ste100-skill
   active_owner: danyuchn/asd-ste100-skill
   content_hash: sha256:c2c2013476d1a4737db91f6e44c9f89554b3df28f91547deac8638b13437c55f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-designer
+  runtime: null
+  scope: project
+  owners:
+  - leej3/agentic-awesome-skills/skills/ui-ux-designer
+  active_owner: leej3/agentic-awesome-skills/skills/ui-ux-designer
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-designer/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - leej3/agentic-awesome-skills/skills/ui-ux-designer
+  active_owner: leej3/agentic-awesome-skills/skills/ui-ux-designer
+  content_hash: sha256:af98370a7edc0f00ec46979d049517833c9a7fa2ba74e3cf8cc42f7db557299d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-designer/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/agentic-awesome-skills/skills/ui-ux-designer
+  active_owner: leej3/agentic-awesome-skills/skills/ui-ux-designer
+  content_hash: sha256:d3c97a6c052ef48193e883411e3f39745e3ef8a108d7ef7e8c9d2c0c012d557f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-designer/apm.yml
+  runtime: null
+  scope: project
+  owners:
+  - leej3/agentic-awesome-skills/skills/ui-ux-designer
+  active_owner: leej3/agentic-awesome-skills/skills/ui-ux-designer
+  content_hash: sha256:24c6902b65a43642af893a435c95db8158bf6c06a16b22cc1af355155f66481b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-designer/resources/implementation-playbook.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/agentic-awesome-skills/skills/ui-ux-designer
+  active_owner: leej3/agentic-awesome-skills/skills/ui-ux-designer
+  content_hash: sha256:76e78c81d28762de3899b6015c9f90a5cf7700caa8976dced67b8ab6ef4e7662
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:738f69dfa83db5c347c678fb9d90e560877059f0de93a327c39001bff92dc014
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:ea087c341bfb5b23195c7302027268ede86da802554c18a5c4896a6017b439f9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/apm.yml
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:83b436c24db3d0c4840b9539ee7f974e43e16ee4ac797232e4bf32ce41dad2a8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/app-interface.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:331e7cf2c0b222d80c566c5f255c63cb339f65bfd02e471a720f28e4864a9f08
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/catalog-summary.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:6638da97231c07fb5cef3cd9d3ce483ca7b2f9748980f8c27490eb03968d8894
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/charts.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:4115cf1120680f2cedef0676cb648f30c7ef4699e2a947535d4113e71ed3b12a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/colors.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:8162429222bce22df62b564085946a30d07cc9722c58d0a3a494bd0d1d00841c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/data-provenance.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:e82fb33ed49375a300e93d9c11ccd1c1493c999e84ee7ee295e527634786e2e0
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/google-font-licenses.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:35688523f2955795caa1a47c53b83099e60c1708461476f9cc3a050cf3b0148a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/google-fonts.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:1c8c3b2ea1faf6a1012da463756def8b3889db33f2226f0343bb4daa80307d03
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/icons.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:50816c6012030178195a16ee481ebf58b47bd985d70e8ec58886cc83f6eddafc
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/landing.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:9a2edd3bb676c2a58f00ade7a062e285222d4297bfd847c8d5b056f0dbbf52d0
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/motion.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:381affe8df8ea1f66fbbda2598827f9f54299107bbe6a1b4e9b68f6b62091ceb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/phosphor-icons-upstream.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:2399325233b277b5c97a80e6a5e8941154f5d057beee4e7613db87c87d700236
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/products.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:42473f75e8dde5987bdf89ce55d8c168091b80a356cae691dd60247d80720b70
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/react-performance.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3d925802539abac5afeb63ae8aa1960b7229ad271b3a47caed40ab2d97ad0734
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/angular.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:704be83f2bad30c7e6de01afb113ffa01e0c458762f48b7102f31ba2367b5553
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/astro.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:2c2f55fadaafc05e04cc321c8194a1a28b656e6757fe2ba316f41b16428299c6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/avalonia.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:442fca14675a020683473e7e49f08abb27b9df0765c80efe54aef61f1a4ac258
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/flutter.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:64dba0ac17349f28bce517a0f5f48c54d9ed2e487ec0c0258303463b382f41a0
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:d05a581d20af57b8ca0104a6d31d90a07c437d500662a96c3029fc2f9a4678ee
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/javafx.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:2e819b8d5abdd23ad4dae0991650fdb57af497aabd68b37463aa9c442944c869
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:699de218b286948eaec7d15767b6e1350ee299167e49bf476d82e3ff58724e0a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/laravel.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:854ea4daa5fc61292d22235ad33b49ba3fe22423c3de8d3cb03758ffed3b59f9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/nextjs.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:ecd2c27b2ea0127d203ae726060efcdd7335b5e83f96b99e4f3befbbfeebd5a4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:fce682a338cfcdbf35d318d20e5befbe7b5d81b05abc37f87677a6d9cde84dc6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/nuxtjs.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3d9b54ed2d151bd9c86e9e5609b8a6f88a00c4c52fa601a30af96c49b2c4d176
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/react-native.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:ba31dd9c0c04da6bc02a74448bf121f9c0728ae5ba3b4d47b487778b0a1135b5
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/react.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:4dd176a9787e5c6306b5df94158d75955adcdc6edab41ce5286641a5842303c1
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/shadcn.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:e56cfde5b74907836ac3582a4779d5b7f3d206a702ab81b8669a1b668c3eeb51
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/svelte.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:f6e379ba802941ba26b01d4ffbe3cd39120f2587659a1d93851c707f66bc13db
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/swiftui.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:bdd9231ff3ad658f4e7c063e1eb49df2fd09ac8d90631a86df899b39833b9623
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/threejs.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:155d583b9c64da0df4b6c6cb060c02eab222505e0734d6353da02c9e2b5d982b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/uno.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:a0474363e4225b5367214d5675fd3e075f137026f9500f0d04357882ef4f6d48
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/uwp.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:c409f08c1fbba1f1029f1acaa554e7b4471cc85517a5751c9f2e62465badcd5c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/vue.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:b655f1ebb9dff2652d15981f31b1784c8a6d4759efd2815a14f3088257569f95
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/winui.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:e676dc1c13ee6c205c40b0746f1335150a346c7a49a0616d2545bc3d2c930c85
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/stacks/wpf.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:9781a9950b20333637b30a02e498b7efca21b618a3eeb8665836f3ac6e974da7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/styles.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:a93a4d9d7025856575d7b7583bda020be9043013432c5af7c58af9dbdfb206b7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/typography.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:321fc446e89024488ebae96dda93efc4d2307bd8bddb240857ad51364f6782c8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/ui-reasoning.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:f0774dd741cecdad5eec842034bd6d5e9ea50e9f220a1910069748daa0bb8e9a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/data/ux-guidelines.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:ff81ec613f70ba9fc3fcce52dbe4ae35d44b2079dbe6dc066d2d6e38c28facd5
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/references/pro-rules.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:d28442d61c310b49c054a4ea736f89fb3008beebdbbc38c4b3a540b8f7fadf23
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/references/quick-reference.md
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:0609bc7c89dacb40472465d8fc14257b56b2c43439660fc8d6fa3b8c022e1876
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/core.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:c3be4b23e7150e6b45095213158cfa3c8ad96502f01dde3f6ffff9de64a4f481
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/design_system.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:e7d1c94c4b2eada17c5551157668362659ccf9626d34dbd58e68142410f90103
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:b8bac1af82aa280d3e06f00aabaeac4337e632996b07fed874e2b6ee6e9c5913
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/search.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:d54e648fe0ec2932cac66684220cc17be4bd4b4eba1d23d3195d509d398db374
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-api.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:22d8dc81a7d6827b7e8b64b53e7d184210fb9759e8e294e0d5133c81cc460176
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-catalog.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:c608ad5c4084ebc50a4bbbfb69ea2456c01fd5519c457e18410fffd250ae948f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-existing.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:4e0761b839dc6b2187a370e82eddc0aed8a7ff10c09e28dd814bb3656dac595b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-metadata.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:30bffc29ae348416a2de2f9c6c418e768e4578f136b0f4bac5d2f70124f2e9ba
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-overrides.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:6243a48a4619986768c4628e2d0c98ff195beba71ba9be5df8f0c52fc6d90c0b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/icons-curated.csv
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:68362c9a700c13b96f000784a0198c1c7e117a7088a01c85744e44233038fe9d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-core.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:ae4d0bb076240824e1b643c2270d1f8cc0952a69502ec1e622b7dedd85b930bb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-package.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:500588c757d6de03e3d7e69b27a8b8b1f88ccf6bb0333e4c1e9b0d6a4f112475
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-exports.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:d79f2ee0afdbc2f87776733e145df3538a16a25d7c2fba0056bb48295dad0ded
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-package.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:1c57a1d76bcc0cdd3632d4c18b9c0e79576b4591df39831c9607e5d0eb4f2cec
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-baseline.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:0df200fc54c1cb97a52d6775e7f501509163cea8f8b73fd7268429bc1f835afe
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-cases.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:e77d36eebbf6ddc2860946a02cdb659351da6c09f2688f1ed30939a418099646
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/fixtures/relevance-thresholds.json
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:8099be287b13a01ef499091b99220692e85a3a652efa308e8a33b6b9fcd57ea6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_refresh.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3e2ca5d12702318f641ae62d0c14f22a3bcc84d84e79b863c0e947d475604adb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_summary_line_endings.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:fa6ff09f0ec2c99013588c77397f5082dddebe8f467e94c5f8378ec9595f4989
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_core.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3527fe2f4b852f69f07c17ddc0d615d9a6e025c924e45a33985579a94a8d2118
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_core_data_quality.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3ffc6b4905c9ea26d7ac4527ab154d153584231aee71b2ae4bd017977fa09cc5
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_data_contracts.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:0360d6e10080c0bca214f2b0bbad582ba50702a542ce21013351aca54938df3a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_mode.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:95ad2c154349f7021f55a558f8dcdd71df1a24fcf531a4364a8e49526a0865ef
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_stack.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:83d09ffe8cfbf7b265f362129f061dfe8e5e167ce5db43adaead197cabc9ca38
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_native_desktop_stack_freshness.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:3942845712b9a829323cd3568511483135f2a8c7cd79ccf61679da4b0f624dbb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_relevance_evaluator.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:2fe56a4d6fe5fff15ff592274b0eeaba925146cefea6c0fa29d8f1b77c9aca1f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_skill_script_paths.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:7cec24b94be771bc60bc84f8993e614bb16d4047930e1dd3d3bed91628311d44
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_style_taxonomy.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:cd14d0092e8a454d213aa104b53e4e70ba698491fa00fde9fdec5ca8a3d70011
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:b51d32ee8a15505b87cb81957fb2d1b385e041e8beb4463c311d236bfd29ebd4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/tests/test_web_stack_freshness.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:74897571398585f27e2c35d09d81b0a531c8c774f4a2967e5e1b1d1b05a483d9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ui-ux-pro-max/scripts/validate_data.py
+  runtime: null
+  scope: project
+  owners:
+  - leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  active_owner: leej3/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max
+  content_hash: sha256:a599aa256049cf30954d1f164721b99e453eb7e4cb8241bcab2d5573e6cf58b8
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/unix-cli-design
