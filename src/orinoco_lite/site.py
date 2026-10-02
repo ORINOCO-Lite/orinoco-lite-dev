@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from collections.abc import Mapping
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -15,6 +17,7 @@ from typing import Any, Sequence
 from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+import tomlkit
 
 from .progress import progress
 from .config import github_repository, load_config_path
@@ -82,6 +85,37 @@ def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | Non
         elif candidate.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(candidate, target)
+
+
+def _overlay_config(source: Path, destination: Path) -> None:
+    """Apply authored TOML settings without dropping other selected tables."""
+    if source.is_symlink():
+        raise DriverError(f"Configuration source cannot be a symlink: {source}")
+    if not source.is_dir():
+        return
+
+    def merge(base, override):
+        for key, value in override.items():
+            if isinstance(value, Mapping) and isinstance(base.get(key), Mapping):
+                merge(base[key], value)
+            else:
+                base[key] = deepcopy(value)
+
+    for path in sorted(source.rglob("*")):
+        if path.is_symlink():
+            raise DriverError(f"Configuration override cannot be a symlink: {path}")
+        if not path.is_file():
+            continue
+        target = destination / path.relative_to(source)
+        if target.is_file() and path.suffix == ".toml":
+            try:
+                document = tomlkit.parse(target.read_text())
+                merge(document, tomlkit.parse(path.read_text()))
+                target.write_text(tomlkit.dumps(document))
+            except (ValueError, TypeError) as error:
+                raise DriverError(f"Cannot apply TOML configuration override {path}: {error}") from error
+        else:
+            _copy_file(path, target)
 
 
 def _copy_file(source: Path, destination: Path) -> None:
@@ -383,7 +417,7 @@ def _assemble(
     (assembly / "config" / "con" / "module.toml").unlink(missing_ok=True)
     _render_site_surfaces(workspace, adapter, upstream, assembly)
     overrides = workspace.path("site") / "overrides"
-    _copy_tree(overrides / "config", assembly / "config" / "con")
+    _overlay_config(overrides / "config", assembly / "config" / "con")
     _copy_tree(overrides / "layouts", assembly / "layouts")
     _copy_tree(overrides / "static", assembly / "static")
     _copy_tree(workspace.path("site") / "assets", assembly / "assets", media=media)

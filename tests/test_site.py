@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -70,6 +71,46 @@ def _www_from_model(root: Path) -> Path:
 
 
 class HugoCompatibilityTests(unittest.TestCase):
+    def test_partial_config_override_preserves_other_site_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "pyproject.toml"
+            config.write_text(CONFIG, encoding="utf-8")
+            _write_site_data(root)
+            selected = root / "site-specific/config/params.toml"
+            selected.parent.mkdir(parents=True)
+            selected.write_text(
+                'colorScheme = "fire"\n'
+                '[header]\nlogo = ""\nlayout = "hybrid"\n'
+                '[article]\nshowDate = true\nshowAuthor = true\n'
+                '[custom]\nitems = ["old", "old"]\n',
+                encoding="utf-8",
+            )
+            override = root / "site-specific/overrides/config/params.toml"
+            override.parent.mkdir(parents=True)
+            override.write_text(
+                '[header]\nlogo = "img/logo.png"\n'
+                '[article]\nshowDate = false\n'
+                '[custom]\nitems = ["new"]\n',
+                encoding="utf-8",
+            )
+            assembly = root / "build/assembly"
+            site._assemble(
+                load_config_path(config), root / "resources", assembly,
+                www_from_model=_www_from_model(root),
+            )
+            settings = tomllib.loads(
+                (assembly / "config/con/params.toml").read_text(encoding="utf-8")
+            )
+            self.assertEqual(settings["colorScheme"], "fire")
+            self.assertEqual(settings["header"], {
+                "logo": "img/logo.png", "layout": "hybrid",
+            })
+            self.assertEqual(settings["article"], {
+                "showDate": False, "showAuthor": True,
+            })
+            self.assertEqual(settings["custom"]["items"], ["new"])
+
     def test_build_provenance_footer_links_immutable_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
