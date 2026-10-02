@@ -145,15 +145,17 @@ def test_update_mode_selects_only_its_operation(tmp_path, mode):
     executable.chmod(0o755)
     arguments = tmp_path / 'arguments'
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ['PATH'],
-               UPDATE_MODE=mode, WWW_REVISION='a' * 40, ARGS=str(arguments))
+               UPDATE_MODE=mode, WWW_REVISION='a' * 40, ARGS=str(arguments),
+               GITHUB_WORKSPACE=str(tmp_path))
     result = step('prepare', 'Prepare selected upstream inputs', tmp_path, env)
     assert result.returncode == 0, result.stderr
     args = arguments.read_text().splitlines()
+    assert args[:3] == ['run', '--manifest-path', str(tmp_path / 'downstream/pixi.toml')]
+    assert args[3:7] == ['orinoco-lite', 'dev', 'upstream', 'populate']
     if mode == 'Software only':
-        assert args == ['run', 'orinoco-lite', 'dev', 'upstream', 'populate', '--reuse-dump', '--records-only']
+        assert args[7:] == ['--reuse-dump', '--records-only']
     else:
-        assert args == ['exec', '--spec', 'git-annex==10.20260601', '--', 'pixi', 'run',
-                        'orinoco-lite', 'dev', 'upstream', 'populate', '--www-revision', 'a' * 40]
+        assert args[7:] == ['--www-revision', 'a' * 40]
 
 
 @pytest.mark.parametrize(('conflicts', 'validation', 'succeeds'), [

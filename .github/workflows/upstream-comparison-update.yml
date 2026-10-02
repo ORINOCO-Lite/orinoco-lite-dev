@@ -70,6 +70,7 @@ jobs:
         with:
           locked: true
           manifest-path: engineering/pixi.toml
+          activate-environment: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ORINOCO-Lite/psychoinformatics-downstream
@@ -112,7 +113,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/comparison"
           cp sourcedata/downloaded/records.jsonl "$RUNNER_TEMP/comparison/base-capture.jsonl"
-          pixi run orinoco-lite dev records yaml-to-jsonl --output "$RUNNER_TEMP/comparison/base-records.jsonl"
+          pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev records yaml-to-jsonl --output "$RUNNER_TEMP/comparison/base-records.jsonl"
       - name: Record template and package update
         id: update
         if: inputs.update_mode == 'Software only'
@@ -133,9 +134,9 @@ jobs:
         run: |
           case "$UPDATE_MODE" in
             'Software only')
-              pixi run orinoco-lite dev upstream populate --reuse-dump --records-only ;;
+              pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev upstream populate --reuse-dump --records-only ;;
             'Data refresh')
-              pixi exec --spec 'git-annex==10.20260601' -- pixi run orinoco-lite dev upstream populate --www-revision "$WWW_REVISION" ;;
+              pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev upstream populate --www-revision "$WWW_REVISION" ;;
             *) echo 'Choose Software only or Data refresh.'; exit 2 ;;
           esac
       - name: Validate in the selected environment
@@ -144,8 +145,8 @@ jobs:
         continue-on-error: true
         working-directory: downstream
         run: |
-          pixi run build
-          pixi run orinoco-lite verify-site build/site
+          pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" build
+          pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite verify-site build/site
       - name: Report input and conversion changes
         if: inputs.update_mode == 'Data refresh' || steps.update.outputs.conflicts == '0'
         working-directory: downstream
@@ -154,11 +155,11 @@ jobs:
           SITE_BASE: ${{ steps.base.outputs.site }}
         run: |
           report="$RUNNER_TEMP/comparison"
-          pixi run orinoco-lite dev records yaml-to-jsonl --output "$report/selected-records.jsonl"
+          pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev records yaml-to-jsonl --output "$report/selected-records.jsonl"
           for stage in capture records; do
             if [[ "$stage" == capture ]]; then selected=sourcedata/downloaded/records.jsonl; else selected="$report/selected-records.jsonl"; fi
             status=0
-            pixi run orinoco-lite dev records diff "$report/base-$stage.jsonl" "$selected" --limit 100 --full-values > "$report/$stage.txt" || status=$?
+            pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev records diff "$report/base-$stage.jsonl" "$selected" --limit 100 --full-values > "$report/$stage.txt" || status=$?
             [[ "$status" -le 1 ]] || exit "$status"
           done
           git diff "$PARENT_BASE" HEAD -- .copier-answers.yml pixi.toml pyproject.toml sourcedata/www-from-model > "$report/selections.patch"
@@ -172,7 +173,6 @@ jobs:
           if-no-files-found: warn
       - name: Export recorded update
         id: bundle
-        shell: pixi exec --spec git-annex==10.20260601 -- bash -e {0}
         env:
           PARENT_BASE: ${{ steps.base.outputs.parent }}
           SITE_BASE: ${{ steps.base.outputs.site }}
