@@ -272,6 +272,8 @@ function proposalMatchesGrant(proposal) {
 }
 
 async function startShacl(session) {
+  setStatus("Checking GitHub access and repository operation settings…");
+  await requestJson("/api/shacl/access", { method: "POST", headers: { "X-CSRF-Token": session.csrf_token } });
   const listener = async (event) => {
     if (
       finished || requestAccepted || event.source !== source || event.origin !== target.client_origin ||
@@ -319,6 +321,7 @@ async function startShacl(session) {
     setStatus(result.error === null ? "GitHub created the proposal." : result.error);
   };
   window.addEventListener("message", listener);
+  post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-access-verified-v1" });
   post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-ready-v1" });
   setStatus("Connected. Return to the downstream editor. This window closes automatically after GitHub responds.");
 }

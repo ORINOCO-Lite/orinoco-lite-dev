@@ -178,10 +178,10 @@ def _apply_submission_accessibility_patch(
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
         or source.count(REVIEW_BUNDLE_DISPATCH) != 2
-        or source.count(REVIEW_BUNDLE_PROPOSAL) != 1
+        or source.count(REVIEW_BUNDLE_PROPOSAL) != 2
         or source.count("Propose via GitHub") != 1
         or source.count("Upload review bundle") != 1
-        or "GitHub App access is required" not in source
+        or "Check GitHub access" not in source
         or "restoreReviewBundle" not in source
         or "return recordSubmissionLabel({" not in source
         or "recordIri: record.node_iri" not in source

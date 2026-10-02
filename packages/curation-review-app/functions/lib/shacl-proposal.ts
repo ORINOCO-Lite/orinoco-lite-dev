@@ -147,17 +147,8 @@ async function prepareHandoff(
   }
   await github.requireInstallationAccess(proposal.repository);
   await github.requireInstallationAccess(submodule.repository);
-  let repository;
-  try {
-    await github.requireCurator(submodule.repository, login);
-    repository = await github.repository(submodule.repository);
-  } catch {
-    throw new HttpError(
-      403,
-      "metadata_access_required",
-      `Install the GitHub App on ${submodule.repository} and give the signed-in curator write access before retrying.`,
-    );
-  }
+  await github.requireCurator(submodule.repository, login);
+  const repository = await github.repository(submodule.repository);
   const base = await github.branchHead(
     submodule.repository,
     repository.defaultBranch,
@@ -301,6 +292,54 @@ async function requireTrustedEditorDeployment(
       ? "Open the editor from the repository's configured site before proposing."
       : "GitHub does not show a successful Netlify deploy preview for this exact pull-request commit and editor origin.",
   );
+}
+
+/** Read-only prerequisites; proposal creation repeats its authoritative checks. */
+export async function checkShaclAccess(
+  github: GitHubClient,
+  grant: ShaclGrant,
+  serviceOrigin: string,
+  requireAutomation: () => void,
+): Promise<void> {
+  const repository = grant.repository;
+  await github.requireInstallationAccess(repository);
+  const user = await github.currentUser();
+  await github.requireCurator(repository, user.login);
+  const repo = await github.repository(repository);
+  const base = await github.branchHead(repository, repo.defaultBranch);
+  const pull =
+    grant.pull_request === null
+      ? null
+      : parsePullRequest(
+          await github.pullRequest(repository, grant.pull_request),
+          repository,
+          grant.pull_request,
+        );
+  if (pull !== null && pull.headSha !== grant.expected_head_sha) {
+    throw new HttpError(
+      409,
+      "stale_shacl_proposal",
+      "The draft head changed. Reopen the editor from the current deployment.",
+    );
+  }
+  await requireTrustedEditorDeployment(
+    github,
+    repository,
+    pull?.baseSha ?? base.sha,
+    grant,
+    serviceOrigin,
+    pull,
+  );
+  const submodule = await github.siteSubmodule(
+    repository,
+    pull?.headSha ?? base.sha,
+  );
+  if (submodule !== null) {
+    await github.requireInstallationAccess(submodule.repository);
+    await github.requireCurator(submodule.repository, user.login);
+    requireAutomation();
+  }
+  await requireOperation(github, repository, "shacl_materialization");
 }
 
 export async function createShaclProposal(

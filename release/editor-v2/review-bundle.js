@@ -192,14 +192,21 @@ export function isFramedContext(target = window) {
     }
 }
 
-export function beginReviewBundleProposal(value, target = window) {
+export function beginReviewBundleProposal(
+    value,
+    target = window,
+    { checkOnly = false } = {},
+) {
     if (isFramedContext(target)) {
         throw new Error(
             'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
         );
     }
-    const { repository, serviceOrigin, target: proposalTarget } =
-        reviewProposalCoordinates(value);
+    const {
+        repository,
+        serviceOrigin,
+        target: proposalTarget,
+    } = reviewProposalCoordinates(value);
     setupUrl(value);
     installUrl(value);
     const sourceOrigin = editorOrigin(target);
@@ -210,7 +217,10 @@ export function beginReviewBundleProposal(value, target = window) {
     url.searchParams.set('editor_origin', sourceOrigin);
     url.searchParams.set('handoff_nonce', nonce);
     if (proposalTarget.kind === 'pull_request') {
-        url.searchParams.set('pull_request', String(proposalTarget.pull_request));
+        url.searchParams.set(
+            'pull_request',
+            String(proposalTarget.pull_request),
+        );
         url.searchParams.set(
             'expected_head_sha',
             proposalTarget.expected_head_sha,
@@ -225,6 +235,7 @@ export function beginReviewBundleProposal(value, target = window) {
     let started = false;
     let resolveProposal;
     let rejectProposal;
+    let terminalError;
 
     function dispose({ reject } = {}) {
         target.removeEventListener('message', receive);
@@ -238,14 +249,20 @@ export function beginReviewBundleProposal(value, target = window) {
         proposal = undefined;
         if (!settled && reject) {
             settled = true;
-            rejectProposal?.(
-                reject instanceof Error ? reject : new Error(reject),
-            );
+            terminalError =
+                reject instanceof Error ? reject : new Error(reject);
+            rejectProposal?.(terminalError);
         }
     }
 
     function sendIfReady() {
-        if (!ready || proposal === undefined || popup?.closed || started)
+        if (
+            checkOnly ||
+            !ready ||
+            proposal === undefined ||
+            popup?.closed ||
+            started
+        )
             return;
         popup.postMessage(
             {
@@ -375,7 +392,7 @@ export function beginReviewBundleProposal(value, target = window) {
                 const error = new Error(
                     `${message} GitHub did not confirm that it created a pull ` +
                         'request. Check the repository first. If no pull request ' +
-                        'exists, install or authorize the GitHub App, then retry.',
+                        'exists, retry after resolving the reported problem.',
                 );
                 error.code =
                     typeof event.data.error_code === 'string'
@@ -389,10 +406,28 @@ export function beginReviewBundleProposal(value, target = window) {
             return;
         }
         if (
+            checkOnly &&
+            event.data?.format === 'orinoco-lite-shacl-access-verified-v1' &&
+            exactKeys(event.data, ['format', 'handoff_nonce', 'repository'])
+        ) {
+            settled = true;
+            dispose();
+            resolveProposal?.({ ready: true });
+            return;
+        }
+        if (
             event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
             !exactKeys(event.data, ['format', 'handoff_nonce', 'repository']) ||
             ready
         ) {
+            return;
+        }
+        if (checkOnly) {
+            const error = new Error(
+                'This curation service does not support access checks yet. Ask its operator to update it.',
+            );
+            error.code = 'access_check_unavailable';
+            dispose({ reject: error });
             return;
         }
         ready = true;
@@ -413,11 +448,9 @@ export function beginReviewBundleProposal(value, target = window) {
         () =>
             dispose({
                 reject: started
-                    ? (
-                        'GitHub did not confirm that it created a pull request. ' +
-                        'Check the repository first. If no pull request exists, ' +
-                        'install or authorize the GitHub App, then retry.'
-                    )
+                    ? 'GitHub did not confirm that it created a pull request. ' +
+                      'Check the repository first. If no pull request exists, ' +
+                      'retry after resolving the reported problem.'
                     : 'The GitHub proposal transport expired before writing.',
             }),
         HANDOFF_TIMEOUT_MS,
@@ -426,11 +459,9 @@ export function beginReviewBundleProposal(value, target = window) {
         if (popup.closed) {
             dispose({
                 reject: started
-                    ? (
-                        'GitHub did not confirm that it created a pull request. ' +
-                        'Check the repository first. If no pull request exists, ' +
-                        'install or authorize the GitHub App, then retry.'
-                    )
+                    ? 'GitHub did not confirm that it created a pull request. ' +
+                      'Check the repository first. If no pull request exists, ' +
+                      'retry after resolving the reported problem.'
                     : 'The GitHub proposal window was closed before writing.',
             });
         }
@@ -442,7 +473,8 @@ export function beginReviewBundleProposal(value, target = window) {
         deliver(reviewProposal) {
             if (proposal !== undefined || settled) {
                 return Promise.reject(
-                    new Error('The GitHub proposal was already delivered'),
+                    terminalError ??
+                        new Error('The GitHub proposal was already delivered'),
                 );
             }
             // Vue exposes the editor state through reactive Proxy objects.
@@ -678,4 +710,19 @@ export function reviewBundleFilename(records) {
         records.length === 1 ? records[0].pid : `${records.length}-records`;
     const safe = label.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-|-$/g, '');
     return `orinoco-review-${safe || 'records'}.json`;
+}
+
+// HTTP status alone cannot distinguish policy, identity, installation, or trust failures.
+export function proposalFailureGuidance(code) {
+    if (code === 'installation_access_required') return 'installation';
+    if (code === 'operation_disabled') return 'operation';
+    if (['authentication_required', 'shacl_grant_required'].includes(code))
+        return 'signin';
+    if (
+        ['curator_permission_required', 'metadata_access_required'].includes(
+            code,
+        )
+    )
+        return 'permission';
+    return 'other';
 }

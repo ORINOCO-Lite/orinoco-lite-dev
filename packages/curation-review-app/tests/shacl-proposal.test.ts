@@ -3,6 +3,7 @@ import type {
   ShaclProposalRequest,
   ShaclReviewBundle,
 } from "../shared/contracts";
+import { HttpError } from "../functions/lib/http";
 import { GitHubClient } from "../functions/lib/github";
 import { createShaclProposal } from "../functions/lib/shacl-proposal";
 import {
@@ -742,11 +743,16 @@ describe("site-specific submodule handoff", () => {
   it("reports missing metadata access before any write", async () => {
     const github = client();
     vi.mocked(github.requireCurator).mockImplementation(async (repository) => {
-      if (repository === "example/metadata") throw new Error("forbidden");
+      if (repository === "example/metadata")
+        throw new HttpError(
+          403,
+          "curator_permission_required",
+          "Write access required",
+        );
     });
     await expect(
       createProposal(github, request({ kind: "standalone" })),
-    ).rejects.toMatchObject({ code: "metadata_access_required" });
+    ).rejects.toMatchObject({ code: "curator_permission_required" });
     expect(github.createBranch).not.toHaveBeenCalled();
   });
 
