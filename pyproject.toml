@@ -12,9 +12,12 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Center for Open Neuroscience" }]
+
+# TODO: relax dependencies below. Exact versions are target for .lock files! here declare compatibility!
 dependencies = [
-  "dump-things-pyclient @ git+https://github.com/ORINOCO-Lite/dump-things-pyclient.git@1e79391195ad4412286344189dc5f81a06accb90",
-  "dump-things-service==6.3.6",
+  "dump-things-pyclient",    #   @ git+https://github.com/ORINOCO-Lite/dump-things-pyclient.git@1e79391195ad4412286344189dc5f81a06accb90",
+  "dump-things-service~=6.3.6",  # ==6.3.6",
+  "things-enrichment-tools", #  @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
   "Jinja2==3.1.6",
   "linkml==1.11.1",
   "linkml-runtime==1.11.1",
@@ -24,7 +27,6 @@ dependencies = [
   "PyYAML==6.0.2",
   "tomlkit>=0.13,<1",
   "rdflib==7.6.0",
-  "things-enrichment-tools @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

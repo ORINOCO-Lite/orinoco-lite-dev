@@ -11,14 +11,15 @@ hugo = "==0.154.5"
 nodejs = ">=22,<23"
 make = "==4.4.1"
 
-[target.linux-64.dependencies]
-git-annex = "==10.20260601"
+# [target.linux-64.dependencies]
+# git-annex = "==10.20260601"
+# [target.osx-arm64-macos-14-0.pypi-dependencies]
+# git-annex = "==10.20260601"
 
-[target.osx-arm64-macos-14-0.pypi-dependencies]
-git-annex = "==10.20260601"
-
+# TODO: similarly to how ranges in "dependencies", relax dependencies here. Exact versions are for .lock files
+# Question: why they need to be duplicated from pyproject.toml at all???? duplication is evil!
 [pypi-dependencies]
-orinoco-lite = { path = ".", editable = true }
+# core
 build = "==1.6.0"
 snapper-fmt = "==0.10.0"
 pre-commit = "==4.3.0"
@@ -26,6 +27,14 @@ pytest = ">=9,<10"
 datalad = "==1.6.2"
 click-option-group = ">=0.5, <0.6"
 copier = "==9.10.3"
+git-annex = ">=10" #  TODO: see https://github.com/ORINOCO-Lite/orinoco-lite-dev/issues/225
+
+# TODO: make consistently "enable'able" with the template - pixi run dev-enable
+# Development mode: this package and submodules -- make them editable
+orinoco-lite = { path = ".", editable = true }
+dump-things-pyclient = { path = "submodules/dump-things-pyclient", editable = true }
+dump-things-service = { path = "submodules/dump-things-service", editable = true }
+things-enrichment-tools = { path = "submodules/things-enrichment-tools", editable = true }
 
 [tasks]
 records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"
