@@ -33,6 +33,36 @@ A framed editor refuses direct GitHub submission while retaining bundle download
 Shared `github.io` deployments display a clear origin-wide security warning and custom-domain guidance.
 Unique and custom origins use the normal flow.
 
+## Access checks and error reporting
+
+The editor MUST NOT imply that App installation failed before checking it.
+Before authentication, it offers **Check GitHub access**, which opens the existing service popup for sign-in and read-only checks.
+The service checks App access and curator permission independently for the website and its resolved metadata repository, including repositories in different organizations.
+It also checks trusted deployment configuration and current default-branch operation policy before accepting a bundle for submission.
+A successful check is advisory; submission MUST still enforce its authoritative checks.
+No access check creates a branch, commit, or pull request or consumes the submission grant.
+
+| Earliest observation | State | User-facing response and next action |
+| --- | --- | --- |
+| Local editor | No changed records | “Nothing to submit”; keep access checks and bundle upload available. |
+| Local editor | Embedded editor or popup blocked | Open the standalone editor or allow its popup; retain edits. |
+| Before sign-in | Access unknown | Offer sign-in and access checking; do not show an installation warning. |
+| Sign-in | Cancelled, expired, or missing session/grant | Explain that sign-in must be repeated from this editor. |
+| Authenticated GitHub reads | `installation_access_required` | Show the affected repository and App configuration link. |
+| Authenticated GitHub reads | `curator_permission_required` | Explain the signed-in user's required repository permission. |
+| Trusted configuration read | `operation_disabled` or `invalid_operation_policy` | Identify the required default-branch configuration; do not suggest reinstalling the App. |
+| Deployment verification | Wrong service/origin, unverified preview, or changed draft | Explain the failed check; direct the user to the configured or current deployed editor. |
+| Access or submission reads | GitHub denied access, unavailable resource, rate limit, network or service failure | Preserve the specific error; unknown access is not proof of a missing installation. |
+| Bundle validation and current-head reads | Invalid bundle, stale source/gitlink, or pending handoff | Preserve the bundle and explain the required correction or existing proposal inspection. |
+| Service preparation | Automation unavailable | Direct the service operator to repair configuration; do not ask the curator to reinstall. |
+| After a write starts | Incomplete handoff, failed cleanup, lost response, timeout, or closed popup | Explain that a write may exist and identify known drafts/branches; require inspection before another attempt. |
+| After proposal creation | Workflow validation or materialization failed | Link the draft; report workflow failure separately from successful proposal creation. |
+
+The UI MUST select remediation by error code, never by HTTP status alone.
+In particular, HTTP 403 does not establish an installation failure.
+A check stops at its first blocking failure; later prerequisites remain unverified.
+Bundle downloads remain available without authentication, and an access check MUST preserve pending edits.
+
 ## Git handoff
 
 After explicit confirmation, the service creates or updates a same-repository draft pull request with one temporary fixed-path bundle commit.

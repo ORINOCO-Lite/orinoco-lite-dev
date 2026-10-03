@@ -133,6 +133,8 @@ describe("minimal downstream OAuth transport", () => {
     };
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/shacl/access")
+          return Response.json({ ready: true });
         if (String(input) === "/api/session") {
           return Response.json({
             authenticated: true,
@@ -210,7 +212,7 @@ describe("minimal downstream OAuth transport", () => {
       source: { value: opener },
     });
     dom.window.dispatchEvent(wrong);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const message = new dom.window.Event("message");
     Object.defineProperties(message, {
@@ -227,7 +229,7 @@ describe("minimal downstream OAuth transport", () => {
     });
     dom.window.dispatchEvent(message);
 
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(opener.postMessage).toHaveBeenCalledWith(
       {
         format: "orinoco-lite-shacl-proposal-started-v1",
@@ -258,6 +260,8 @@ describe("minimal downstream OAuth transport", () => {
     const response = await transport(context(new Request(shaclUrl())));
     const opener = { closed: false, postMessage: vi.fn() };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/shacl/access")
+        return Response.json({ ready: true });
       if (String(input) === "/api/session") {
         return Response.json({
           authenticated: true,
@@ -342,6 +346,55 @@ describe("minimal downstream OAuth transport", () => {
         CLIENT_ORIGIN,
       ),
     );
+    dom.window.close();
+  });
+  it.each([
+    "operation_disabled",
+    "installation_access_required",
+    "github_error",
+  ])("reports %s before accepting a bundle", async (code) => {
+    const response = await transport(context(new Request(shaclUrl())));
+    const opener = { closed: false, postMessage: vi.fn() };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/session")
+        return Response.json({
+          authenticated: true,
+          csrf_token: "csrf-token",
+          login: "curator",
+          shacl_grant: {
+            editor_origin: CLIENT_ORIGIN,
+            expected_head_sha: null,
+            handoff_nonce: NONCE,
+            pull_request: null,
+            repository: "example/site",
+          },
+        });
+      if (String(input) === "/api/shacl/access")
+        return Response.json(
+          { error: { code, message: "Specific prerequisite failed." } },
+          { status: 403 },
+        );
+      throw new Error("Must not submit a bundle after a failed check");
+    });
+    const dom = new JSDOM(await response.text(), {
+      beforeParse(window: Window & typeof globalThis) {
+        Object.defineProperty(window, "opener", { value: opener });
+        window.fetch = fetchMock as unknown as typeof window.fetch;
+      },
+      runScripts: "dangerously",
+      url: shaclUrl(),
+    });
+    await vi.waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          format: "orinoco-lite-transport-error-v1",
+          code,
+        }),
+        CLIENT_ORIGIN,
+      ),
+    );
+    expect(opener.postMessage).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     dom.window.close();
   });
 });
