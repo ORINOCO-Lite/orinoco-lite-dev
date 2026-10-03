@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - codex/stage-*
+      - codex/site-projection-editor
   push:
     branches:
       - main
@@ -39,6 +40,7 @@ jobs:
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
+            submodules/dump-things-pyclient \
             submodules/www-from-model \
             submodules/things-schemas
           git -C submodules/pool.psychoinformatics.de-ui submodule update \

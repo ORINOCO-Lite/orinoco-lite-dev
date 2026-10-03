@@ -16,6 +16,7 @@ dependencies = [
   "dump-things-pyclient @ git+https://github.com/ORINOCO-Lite/dump-things-pyclient.git@1e79391195ad4412286344189dc5f81a06accb90",
   "dump-things-service==6.3.6",
   "Jinja2==3.1.6",
+  "click-option-group>=0.5,<0.6",
   "linkml==1.11.1",
   "linkml-runtime==1.11.1",
   "packaging==26.3",
@@ -41,7 +42,7 @@ package-dir = { "" = "src" }
 script-files = ["scripts/orinoco-lite-populate-upstream.sh"]
 
 [tool.setuptools.package-data]
-orinoco_lite = ["default_projection.yaml", "_resources/**/*"]
+orinoco_lite = ["_resources/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

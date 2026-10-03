@@ -39,6 +39,7 @@ def local_service(
     *,
     port: int,
     timeout: float = 120,
+    backend: str = "record_dir+stl",
 ) -> Iterator[LocalService]:
     """Start a fresh loopback Pool; stop it when the caller leaves the context.
 
@@ -67,6 +68,7 @@ def local_service(
                 "curated": "public/curated",
                 "incoming": "public/incoming",
                 "schema": str(schema),
+                "backend": {"type": backend},
                 "auth_sources": [{"type": "config"}],
             },
         },
@@ -397,3 +399,16 @@ def delete_incoming_record(
         token,
         missing_ok=True,
     )
+
+
+def selected_schema(resources_root: Path | None = None) -> Path:
+    from .errors import ConfigurationError
+    from .resources import resolve_resources
+    resources_root = resources_root or resolve_resources().root
+    path = resources_root / "schema" / "src" / "demo-research-information" / "unreleased.yaml"
+    if not path.is_file():
+        # The bundled schema is the selected package schema, never a newer generated replacement.
+        path = resources_root / "schema" / "demo-research-information" / "unreleased.yaml"
+    if not path.is_file():
+        raise ConfigurationError("Pinned Things Schema is missing; run dev prepare-resources")
+    return path
