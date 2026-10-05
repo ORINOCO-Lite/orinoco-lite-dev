@@ -10,7 +10,8 @@ platforms = [{ platform = "osx-arm64", macos = "14.0" }, { platform = "linux-64"
 [dependencies]
 python = "*"
 git = "*"
-hugo = "*"
+# The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
+hugo = "<0.156"
 
 [pypi-dependencies]
 # Python requirements and editable submodule sources come from pyproject.toml.
