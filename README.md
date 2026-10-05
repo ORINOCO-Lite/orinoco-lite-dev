@@ -9,15 +9,15 @@ The package reuses an exact upstream website revision, [`orinoco-lite-template`]
 ## Repository roles
 
   -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Repository                                                                                             Role
+Repository                                                                                             Role
   ------------------------------------------------------------------------------------------------------ ------------------------------------------------------------------------------
-  [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev)                                 Package development, release assembly, and engineering tests
+[`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev)                                 Package development, release assembly, and engineering tests
 
-  [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model)                                     Submodule-pinned Hugo and projection source
+[`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model)                                     Submodule-pinned Hugo and projection source
 
-  [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template)                       Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks
+[`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template)                       Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks
 
-  `<github-user>/orinoco-lite-demo`                                                                      Optional user-owned site for autonomous GitHub-workflow experiments
+`<github-user>/orinoco-lite-demo`                                                                      Optional user-owned site for autonomous GitHub-workflow experiments
 
   [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website)   Human-gated reference downstream
   -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

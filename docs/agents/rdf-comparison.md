@@ -77,7 +77,8 @@ Store subtraction, SPARQL `MINUS`, serialization byte equality, and RDFLib's `si
 The selected pyclient's Turtle extra resolves Dump Things Service 6.3.6 (`9f101d9`), which selects LinkML/Runtime 1.11.1; the active environment resolves RDFLib 7.6.0.
 The selected Things Schema is `cb6c791`, including its recursive imports.
 
-**Annotation representation.** Compact and expanded annotations produce isomorphic RDF.
+**Annotation representation.**
+Compact and expanded annotations produce isomorphic RDF.
 The service's generated Pydantic model retains compact values, but its dataclass loader expands them through patched `_normalize_inlined` before RDF writing.
 The reader reconstructs annotation objects and JSONDumper emits their expanded form.
 RDF preserves the valid tag/value example but cannot recover which JSON shape was supplied, because both inputs map to the same graph. See the selected [converter](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/converter.py), [normalizer patch](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/patches/yamlutils.py), and [reader patch](https://github.com/ORINOCO-Lite/dump-things-service/blob/9f101d97c7f15d491f602db5a9c33ad9a19ad8bf/dump_things_service/patches/rdflib_loader.py).
@@ -87,11 +88,13 @@ Direct SimpleDict slot normalization instead lost scalar entries in a mixed-map 
 These functions remain unchanged at inspected main `b4c3261`.
 Use a scoped upstream composition only after validating key/tag consistency and edge cases; do not introduce a parallel compactor or hide raw findings. Sources: [selected validator](https://github.com/linkml/linkml/blob/v1.11.1/packages/linkml_runtime/src/linkml_runtime/processing/referencevalidator.py), [current validator](https://github.com/linkml/linkml/blob/b4c3261fddcad14f0221ba980f6e84f9d88eb873/packages/linkml_runtime/src/linkml_runtime/processing/referencevalidator.py).
 
-**Ordering and duplicates.** No induced slot in the selected schema closure declares `list_elements_ordered`.
+**Ordering and duplicates.**
+No induced slot in the selected schema closure declares `list_elements_ordered`.
 The selected writer emits repeated predicate/object triples and the reader uses graph iteration order. `inlined_as_list` is a JSON container choice, not sequence semantics. Repeated URI values collapse into one triple, while separately allocated inline blank nodes can preserve repeated objects. The retained six-to-three `obo:NCIT_C19924.close_mappings` change merges CURIE/full-IRI spellings of three resources: JSON occurrences are lost without distinct RDF assertions being lost.
 The [publication template](https://github.com/ORINOCO-Lite/www-from-model/blob/a2e4534bc38a6dc0f30effed354773f1da984a18/page_templates/publication.md.j2) consumes author order and first matching dates/identifiers, so absence of schema ordering cannot justify ignoring these sequences.
 
-**Available versus pending.** LinkML [PR #3407](https://github.com/linkml/linkml/pull/3407), merged as `88afd7a`, adds a PyOxigraph canonical graph serializer, absent selected 1.11.1.
+**Available versus pending.**
+LinkML [PR #3407](https://github.com/linkml/linkml/pull/3407), merged as `88afd7a`, adds a PyOxigraph canonical graph serializer, absent selected 1.11.1.
 This is a useful future upstream replacement for applicable serialization work; it does not solve ordering or offer general dataset comparison.
 Ordered-list [PR #3693](https://github.com/linkml/linkml/pull/3693), inspected at `b7ff88d`, remains unmerged and addresses writer, reader, and SHACL paths; [issue #3531](https://github.com/linkml/linkml/issues/3531) tracks the gap.
 The service replaces reader methods, so a LinkML upgrade alone will not enable that implementation.

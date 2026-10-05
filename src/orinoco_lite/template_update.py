@@ -95,12 +95,11 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
 
 def record_apply(root: Path, revision: str, repository: str, package_revision: str, message: str) -> None:
     environment = os.environ.get("ORINOCO_UPDATE_ENVIRONMENT")
-    replay = (f"Execution environment: {environment} (pixi.toml).\n"
+    replay = (f"Execution environment: {environment} (pixi.toml and pixi.lock).\n"
               if environment else "Restore the parent commit's Pixi environment before historical replay.\n")
-    replay += "Development dependency resolution is not retained; replay resolves from the declarations.\n"
     subprocess.run([
         "datalad", "run", "--explicit", "--input", ".copier-answers.yml",
-        "--input", "pixi.toml", "--output", ".",
+        "--input", "pixi.toml", "--input", "pixi.lock", "--output", ".",
         "-m", message + "\n\n"
         + replay +
         "Conflict markers, when present, require a separate human resolution.",

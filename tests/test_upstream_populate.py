@@ -144,7 +144,7 @@ raise SystemExit(cli.main())
             record = json.loads(body.split("=== Do not change lines below ===\n", 1)[1].split("\n^^^", 1)[0])
             runs[record["cmd"]] = sha
             assert str(tmp_path) not in record["cmd"]
-            assert "pixi.lock" not in record["inputs"]
+            assert "pixi.lock" in record["inputs"]
             assert not record["cmd"].startswith("cp ")
             if "import-from-www" in record["cmd"]:
                 assert "pyproject.toml" in record["inputs"]

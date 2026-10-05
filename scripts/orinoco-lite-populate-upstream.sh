@@ -48,6 +48,7 @@ then
   exit 2
 fi
 dump_path=$directory/downloaded/records.jsonl
+[[ -f pixi.lock ]] || { echo "Populate requires the local Pixi lock." >&2; exit 2; }
 git ls-files --error-unmatch -- pixi.toml >/dev/null 2>&1 &&
   git diff --quiet HEAD -- pixi.toml || {
   echo 'Record the package selection before populating the downstream.' >&2; exit 2;
@@ -94,13 +95,13 @@ The original acquisition was not executed by this workflow." -- "${saved_dump[@]
 
 elif ! $reuse_dump; then
   datalad run --explicit -m "chore: download records dump" \
-    --input pixi.toml \
+    --input pixi.toml --input pixi.lock \
     --output "$dump_path" --output "$dump_path.manifest.json" -- \
     orinoco-lite dev records get --output "$dump_path" --api "$api" --force
 fi
 
 datalad run --explicit -m "chore: convert records dump" \
-  --input pixi.toml --input "$dump_path" \
+  --input pixi.toml --input pixi.lock --input "$dump_path" \
   --output "$destination/metadata" -- \
   orinoco-lite dev records jsonl-to-yaml \
     --source "$dump_path" --destination "$destination" --force
@@ -114,7 +115,7 @@ datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upst
 # The importer retrieves and verifies selected Annex media; do not get the whole site.
 datalad run --explicit -m "chore: import upstream site inputs" \
   --input "$upstream_submodule" --assume-ready inputs \
-  --input pixi.toml \
+  --input pixi.toml --input pixi.lock \
   --input pyproject.toml --output pyproject.toml --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
