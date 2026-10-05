@@ -12,7 +12,7 @@ permissions:
   attestations: write
 
 env:
-  PIXI_LOCKED: "true"
+  PIXI_LOCKED: "false"
 
 jobs:
   release-artifacts:
@@ -42,7 +42,7 @@ jobs:
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: true
-          locked: true
+          locked: false
 
       - name: Build twice and compare release artifacts
         env:
@@ -58,7 +58,7 @@ jobs:
       - name: Test the installed release wheel
         run: |
           wheels=(release/dist/*.whl)
-          env -u PIXI_LOCKED pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run orinoco-lite --version
           pixi run orinoco-lite --help
           pixi run python - <<'PY'
@@ -84,7 +84,7 @@ jobs:
           pixi run python -m orinoco_lite.release_package --environment \
             --revision "$GITHUB_SHA" --repository-url "$RELEASE_REPOSITORY" \
             > release/dist/pixi.toml
-          env -u PIXI_LOCKED pixi lock --manifest-path release/dist/pixi.toml
+          pixi lock --manifest-path release/dist/pixi.toml
           consumer=$(mktemp -d)
           cp release/dist/pixi.toml release/dist/pixi.lock "$consumer/"
           pixi install --locked --manifest-path "$consumer/pixi.toml"

@@ -8,13 +8,19 @@ The package reuses an exact upstream website revision, [`orinoco-lite-template`]
 
 ## Repository roles
 
-| Repository | Role |
-| --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev) | Package development, release assembly, and engineering tests |
-| [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Submodule-pinned Hugo and projection source |
-| [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template) | Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks |
-| `<github-user>/orinoco-lite-demo` | Optional user-owned site for autonomous GitHub-workflow experiments |
-| [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website) | Human-gated reference downstream |
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Repository                                                                                             Role
+  ------------------------------------------------------------------------------------------------------ ------------------------------------------------------------------------------
+  [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev)                                 Package development, release assembly, and engineering tests
+
+  [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model)                                     Submodule-pinned Hugo and projection source
+
+  [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template)                       Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks
+
+  `<github-user>/orinoco-lite-demo`                                                                      Optional user-owned site for autonomous GitHub-workflow experiments
+
+  [`test-orinoco-downstream-website`](https://github.com/ORINOCO-Lite/test-orinoco-downstream-website)   Human-gated reference downstream
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 The package resolves and composes the upstream website, while the template owns only the Orinoco-specific adaptation and downstream scaffold.
 A downstream provides declarative `site-specific/` inputs and optional overrides, plus site-specific executable metadata adapters under `extensions/`.
@@ -28,36 +34,36 @@ See [dependency management](docs/dependency-management.md) for editable submodul
 
 Use Pixi 0.76 or newer; CI always installs the latest Pixi.
 Older local versions receive best-effort support without a formal version matrix.
-Use `pixi run --locked <command>` to reject stale dependency locks without rewriting them.
+The development `pixi.lock` is local and untracked; Pixi updates it when dependency declarations change.
 Before running the commands below, enter that repository's environment:
 
-```console
-export PIXI_LOCKED=true
+``` console
+unset PIXI_LOCKED
 pixi shell
 ```
 
-`PIXI_LOCKED` prevents lock-file updates and checks that the manifest matches the lock before synchronizing the environment.
 To leave an already installed environment and its lock unchanged, use `pixi shell --as-is` instead.
 See the [Pixi shell options](https://pixi.prefix.dev/latest/reference/cli/pixi/shell/).
 Run installed commands directly inside the shell; use `exit` before switching repositories and activating another environment.
 For noninteractive execution, use `pixi run <command>`.
-For a deliberate dependency update, run `env -u PIXI_LOCKED pixi lock`, then review and commit the manifest and lock changes.
+Commit dependency declarations and submodule selections, not the development lock.
+Release consumer locks are generated and tested by the release workflow.
 
 ## Downstream interface
 
 Site maintainers run these commands in their downstream's environment:
 
-```console
+``` console
 orinoco-lite validate
 orinoco-lite build --base-url /
 orinoco-lite serve
 ```
 
 The downstream selects its Orinoco Lite package and template versions and chooses when to update either one.
-`orinoco-lite template update` selects the latest tagged release (including release candidates) and applies a Copier update recorded through DataLad, using the selected template’s package declaration by default.
+`orinoco-lite template update` selects the latest tagged release (including release candidates) and applies a Copier update recorded through DataLad, using the selected template's package declaration by default.
 Use `--revision main` or an exact commit to select development work.
 Explicit `--package-revision` and `--package-repository` overrides are recorded separately.
-The template’s **Update downstream template** GitHub workflow calls this command and opens a draft pull request; see the [downstream update guide](https://github.com/ORINOCO-Lite/orinoco-lite-template/blob/main/copier-template/docs/template-updates.md).
+The template's **Update downstream template** GitHub workflow calls this command and opens a draft pull request; see the [downstream update guide](https://github.com/ORINOCO-Lite/orinoco-lite-template/blob/main/copier-template/docs/template-updates.md).
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 Source-adapter tasks use DataLad to record run provenance in Git.
 Sites that opt into [Annex media](docs/agents/annex-media.md) require Git Annex; other downstream builds and adapter tasks do not.
@@ -73,7 +79,7 @@ Precise interfaces and normative engineering behavior are documented in:
 
 In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
 
-```console
+``` console
 git submodule update --init -- \
   submodules/pool.psychoinformatics.de-ui submodules/things-schemas \
   submodules/query-things submodules/www-from-model
@@ -89,7 +95,7 @@ Release tags use `v` followed by a Python package version; manually dispatched a
 
 Create an inspectable downstream populated from the upstream Pool:
 
-```console
+``` console
 pixi run setup-upstream ../orinoco-lite-test-downstream
 ```
 
@@ -121,7 +127,7 @@ Introduce dependency management only when the project first consumes an independ
 
 Initialize the remaining engineering submodules only when broader cross-component work needs them:
 
-```console
+``` console
 python tools/checkout_submodules.py
 ```
 

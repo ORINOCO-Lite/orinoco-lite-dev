@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  PIXI_LOCKED: "true"
+  PIXI_LOCKED: "false"
 
 jobs:
   package:
@@ -47,11 +47,11 @@ jobs:
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
-      - name: Install the locked package environment
+      - name: Resolve the package development environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: true
-          locked: true
+          locked: false
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files
@@ -77,7 +77,7 @@ jobs:
         run: |
           pixi run build-package
           wheels=(build/package/*.whl)
-          env -u PIXI_LOCKED pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run python - <<'PY'
           from importlib.metadata import distribution
           import json

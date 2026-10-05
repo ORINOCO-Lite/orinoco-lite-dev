@@ -1,8 +1,3 @@
----
-name: datalad-provenance
-description: Design or review DataLad capture, save, run, and rerun workflows in Orinoco Lite; assess their recoverability using STAMPED principles. Use for supplied snapshots, recorded transformations, historical replay, or recomputation with updated software or data. Not an installation guide or an automatic publication audit.
----
-
 # DataLad provenance
 
 Use DataLad's existing operations.
@@ -37,7 +32,9 @@ Use the project's Pixi environment.
 A Bash workflow launched through Pixi can call bare `datalad` and package executables until an explicit environment switch is needed.
 Do not repeat `pixi run` mechanically inside that shell.
 
-Keep the package selection and lock committed.
+Keep the package selection committed.
+Development locks are local and untracked, so their exact third-party resolution is not recoverable from Git.
+Do not declare pixi.lock as a development run input.
 A run record does not capture its outer launcher automatically or restore software on rerun.
 Record an exceptional bootstrap invocation in the run message when necessary.
 Avoid editable/local-only software for a claimed independently recoverable result; exact available commits are sufficient without requiring releases or additional ledgers.

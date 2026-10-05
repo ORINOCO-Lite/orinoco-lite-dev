@@ -42,8 +42,9 @@
 ## Minimum machinery
 
 - Across the package and template, CI installs the latest Pixi without a version pin; manifests require `>=0.76` without an upper bound.
-  Set `PIXI_LOCKED=true` in CI and local shells, and use locked installation rather than frozen execution or lock-file byte comparisons.
-  Unset `PIXI_LOCKED` only for deliberate dependency updates; do not restore Pixi pins to work around lock serialization changes.
+  Keep the package development `pixi.lock` local and untracked; allow Pixi to resolve dependencies in development and engineering CI.
+  Unset inherited `PIXI_LOCKED` in development shells.
+  Generate and test release consumer locks with locked installation; do not restore Pixi pins to work around lock serialization changes.
 - Use `.agents/skills/review-terminology/SKILL.md` before establishing or changing shared component or interface terminology, or when a term denotes different things across code, configuration, and guidance.
   Delegate its exploratory review to a sub-agent and use the returned recommendations to resolve naming before implementation depends on it.
 - Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.
@@ -67,8 +68,10 @@
   Edit external skills in their canonical source repositories, not their generated deployments.
 
 - Keep help and argument parsing fast; defer expensive imports until execution.
+
 - Use `orinoco_lite.progress.progress` around potentially slow, silent operations.
   It emits one flushed stderr note after one second; quick operations stay quiet and stdout remains available for results, JSON, and pipes.
+
 - Name the current operation, including an upstream program when it owns the work.
   Report distinct stages at their owning boundary; avoid duplicate outer timers when inner stages already report progress.
   Flush immediate setup and server-ready messages to stderr.
@@ -79,16 +82,23 @@
 
 - Treat `docs/project-design.md` as the durable project design charter.
   Use it for intended design; keep implementation status and sequencing in active plans.
+
 - Keep human-facing docs as concise orientation and CLIs unsurprising.
   Put option details and necessary caveats in CLI help; omit narration of obvious interactions.
   Revise existing guidance instead of appending notes for each change; Git and PRs carry change history.
+
 - Keep `AGENTS.md`, `README.md`, and `docs/project-design.md` concise.
+
 - In `docs/project-design.md`, name concrete actors, artifacts, and Git operations.
   Prefer terms such as commit, comment, pull request, and merge over abstract workflow language when they describe the actual action, and omit conclusions already evident from the flow.
+
 - Follow the project `organize-project-docs` skill when placing or reorganizing documentation.
+
 - Read the relevant active contract under `docs/agents/contract/` before changing metadata, source adapters, review, editing, authentication, or automated GitHub writes.
+
 - Detailed plans, decisions, and reports belong under `docs/agents/` only while active.
   Retire them at milestone boundaries.
+
 - Delete retired documents from the active tree after promoting any lasting guidance.
   Use Git when historical context is specifically needed.
 

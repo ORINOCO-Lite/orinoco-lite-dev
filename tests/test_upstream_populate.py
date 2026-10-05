@@ -144,7 +144,7 @@ raise SystemExit(cli.main())
             record = json.loads(body.split("=== Do not change lines below ===\n", 1)[1].split("\n^^^", 1)[0])
             runs[record["cmd"]] = sha
             assert str(tmp_path) not in record["cmd"]
-            assert "pixi.lock" in record["inputs"]
+            assert "pixi.lock" not in record["inputs"]
             assert not record["cmd"].startswith("cp ")
             if "import-from-www" in record["cmd"]:
                 assert "pyproject.toml" in record["inputs"]
@@ -209,7 +209,7 @@ def test_setup_refuses_unpublished_candidate_before_creating_destination(tmp_pat
     assert "Cannot fetch" in result.stderr
 
 
-@pytest.mark.parametrize("selection", ["untracked-manifest", "untracked-lock", "modified", "staged"])
+@pytest.mark.parametrize("selection", ["untracked-manifest", "modified", "staged"])
 def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection):
     run(tmp_path, "git", "init", "-q")
     run(tmp_path, "git", "config", "user.name", "Test")
@@ -217,21 +217,20 @@ def test_population_requires_saved_pixi_files_before_writes(tmp_path, selection)
     manifest, lock = tmp_path / "pixi.toml", tmp_path / "pixi.lock"
     manifest.write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
     lock.write_text("saved lock\n")
-    tracked = (lock if selection == "untracked-manifest" else
-               manifest if selection == "untracked-lock" else None)
+    tracked = lock if selection == "untracked-manifest" else None
     if tracked:
         run(tmp_path, "git", "add", tracked.name)
         run(tmp_path, "git", "commit", "-qm", "test: partially saved selection")
     else:
         commit(tmp_path, "test: saved selection")
-        lock.write_text("modified lock\n")
+        manifest.write_text(manifest.read_text() + "# changed selection\n")
         if selection == "staged":
-            run(tmp_path, "git", "add", "pixi.lock")
+            run(tmp_path, "git", "add", "pixi.toml")
     before = run(tmp_path, "git", "status", "--porcelain")
     result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-dump"], cwd=tmp_path,
                             capture_output=True, text=True)
     assert result.returncode == 2, result.stdout + result.stderr
-    assert "Record the package selection and lock" in result.stderr
+    assert "Record the package selection" in result.stderr
     assert run(tmp_path, "git", "status", "--porcelain") == before
     assert not (tmp_path / "site-specific").exists()
     assert not (tmp_path / "sourcedata").exists()
@@ -282,3 +281,17 @@ def test_population_rejects_non_downstream_before_writes(tmp_path, manifest):
     assert "Populate requires an Orinoco Lite downstream" in result.stderr
     assert "pixi run setup-upstream" in result.stderr
     assert set(tmp_path.iterdir()) == before
+
+
+def test_population_accepts_untracked_development_lock(tmp_path):
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Test")
+    run(tmp_path, "git", "config", "user.email", "test@example.com")
+    (tmp_path / "pixi.toml").write_text('[workspace]\nname="fixture"\n[pypi-dependencies]\norinoco-lite="*"\n')
+    (tmp_path / ".gitignore").write_text("pixi.lock\n")
+    commit(tmp_path, "test: development selection")
+    (tmp_path / "pixi.lock").write_text("local lock\n")
+    result = subprocess.run(["orinoco-lite", "dev", "upstream", "populate", "--reuse-dump"], cwd=tmp_path,
+                            capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "Missing retained dump" in result.stderr

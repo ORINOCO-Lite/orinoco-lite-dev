@@ -19,6 +19,10 @@ def downstream(tmp_path, remote, monkeypatch):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Template update test")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.invalid")
     url, package_commit = remote
+    # Plumbum snapshots the environment before pytest configures the Git fixture.
+    from plumbum import local
+    for key in ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"):
+        monkeypatch.setitem(local.env, key, os.environ[key])
     source = tmp_path / "published"
     (source / "copier.yml").write_text(yaml.safe_dump({
         "_subdirectory": "template", "_skip_if_exists": ["site-specific/**", "extensions/**", "pyproject.toml"],

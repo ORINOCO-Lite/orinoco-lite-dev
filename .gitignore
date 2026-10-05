@@ -16,3 +16,6 @@ apm_modules/
 
 # APM-generated skill dependencies
 /.agents/skills/unix-cli-design/
+
+# Locally resolved development environment.
+/pixi.lock

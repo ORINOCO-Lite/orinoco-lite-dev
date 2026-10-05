@@ -6,7 +6,7 @@ platforms = [{ platform = "osx-arm64", macos = "14.0" }, { platform = "linux-64"
 
 # Prefer "*"; bound known incompatibilities; use == only as a last resort.
 # Explain exceptions beside their declaration.
-# pixi.lock retains resolved versions; update it deliberately.
+# pixi.lock is a local, untracked development resolution.
 [dependencies]
 python = "*"
 git = "*"
