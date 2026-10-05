@@ -26,6 +26,7 @@ make = "*"
 
 [feature.dev.pypi-dependencies]
 build = "*"
+setuptools = "*"
 snapper-fmt = "*"
 pre-commit = "*"
 pytest = "*"

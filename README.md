@@ -125,7 +125,9 @@ Initialize the remaining engineering submodules only when broader cross-componen
 python tools/checkout_submodules.py
 ```
 
-Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag; the workflow applies that version only to its copied package source.
+Release artifacts are assembled by [`orinoco-release.yml`](.github/workflows/orinoco-release.yml) from a `v<version>` tag or an explicitly dispatched commit.
+Wheels carry the gitlink-selected Python dependency revisions; source archives retain those requirements for rebuilding.
+Downstreams can select a tag or exact commit with `orinoco-lite package update --revision TAG_OR_COMMIT`.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.
 
 ## Boundaries

@@ -1,6 +1,7 @@
 # Dependency management
 
-[`pyproject.toml`](../pyproject.toml) declares Python requirements and nested editable sources through `[tool.uv.sources]`.
+[`pyproject.toml`](../pyproject.toml) declares Python requirements in `[dependency-groups].runtime` and nested editable sources through `[tool.uv.sources]`.
+The build backend derives `[project].dependencies` from those requirements and the committed gitlinks; revision pins are not maintained in a second list.
 [`pixi.toml`](../pixi.toml) selects the package checkout, external tools, and engineering tools; `pixi.lock` retains resolved versions.
 `query-things` declares a normal client dependency; the package selects its editable source, so downstreams need no client override.
 Git submodules record source revisions, while editable installations use working-tree edits.
@@ -57,9 +58,26 @@ Enable itself relaxes locking for its install without changing the caller's envi
 Normal build and validation commands continue to use locked execution.
 Generated editor and schema resources still need `orinoco-lite dev prepare-resources` after their source changes.
 
-## Releases
+## Package commits and release artifacts
 
-The exact commits and git remote are injected during [releases](../.github/workflows/orinoco-release.yml).
-Downstream users need no editable installations or software submodules.
+Select a release tag or a full package commit from the downstream:
 
-Distribution of `www-from-model` software/assets and downstream submodule setup still need work; data import is deferred.
+```console
+pixi run orinoco-lite package update --revision TAG_OR_COMMIT
+pixi install --locked
+```
+
+`--repository` selects another HTTPS or SSH repository, including a fork.
+The command resolves the revision to a fetchable full SHA, updates `pixi.toml`, and refreshes `pixi.lock`; the next install or `pixi run` uses it.
+A release is not required.
+If the current development environment cannot launch the command, use `env -u PIXI_LOCKED pixi run --as-is orinoco-lite package update --revision TAG_OR_COMMIT`.
+
+Wheels declare exact Git requirements for the five Python source dependencies selected by the package commit's gitlinks and `.gitmodules`.
+Source archives contain those resolved requirements in standard `[project].dependencies`, so rebuilding a wheel does not require the original Git checkout.
+Editable source installs continue to use local paths through `[tool.uv.sources]`.
+Git installs may represent nested dependencies as subdirectories of the selected package commit; that commit's gitlinks fix their source revisions.
+Registry dependencies are resolved by the downstream lock, and Hugo remains a Pixi dependency.
+Downstreams need no repeated Python source pins or overrides.
+
+The [release workflow](../.github/workflows/orinoco-release.yml) checks reproducible artifacts, installed wheel dependency commits, and a clean Git-based consumer environment.
+It uploads release candidates as Actions artifacts; publication to a package index or GitHub Release is a separate step.

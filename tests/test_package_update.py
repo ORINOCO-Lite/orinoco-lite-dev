@@ -1,7 +1,5 @@
 from pathlib import Path
-import socket
 import subprocess
-import time
 import tomllib
 
 import pytest
@@ -15,7 +13,7 @@ def git(root, *args):
 
 
 @pytest.fixture
-def remote(tmp_path):
+def remote(tmp_path, monkeypatch):
     source = tmp_path / "published"
     source.mkdir()
     git(source, "init", "-q")
@@ -26,37 +24,23 @@ def remote(tmp_path):
     git(source, "commit", "-qm", "test: published revision")
     commit = git(source, "rev-parse", "HEAD")
     git(source, "tag", "release-fixture")
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
-    server = subprocess.Popen(["git", "daemon", "--reuseaddr", "--export-all",
-                               f"--base-path={tmp_path}", "--listen=127.0.0.1", f"--port={port}"],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        for attempt in range(100):
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=.1):
-                    break
-            except OSError:
-                time.sleep(.02)
-        else:
-            pytest.fail("Fixture Git server did not start")
-        yield f"git://127.0.0.1:{port}/published", commit
-    finally:
-        server.terminate()
-        server.wait(timeout=5)
+    url = "https://package-fixture.invalid/published.git"
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{source.as_uri()}.insteadOf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", url)
+    yield url, commit
 
 
 def test_remote_tag_resolves_to_commit_and_unknown_commit_fails(remote):
     url, commit = remote
     assert package_update.resolve_commit(url, "release-fixture") == commit
     assert package_update.resolve_commit(url, commit) == commit
-    with pytest.raises(ConfigurationError, match="Publish the commit"):
+    with pytest.raises(ConfigurationError, match="Use a full commit SHA"):
         package_update.resolve_commit(url, "f" * 40)
 
 
 def test_local_repositories_are_not_treated_as_published(tmp_path):
-    for value in (str(tmp_path), "../local", tmp_path.as_uri()):
+    for value in (str(tmp_path), "../local", tmp_path.as_uri(), "git://example.org/repo.git"):
         with pytest.raises(ConfigurationError, match="remote"):
             package_update.remote_url(value)
     assert package_update.remote_url("git@github.com:owner/repo.git") == "ssh://git@github.com/owner/repo.git"
