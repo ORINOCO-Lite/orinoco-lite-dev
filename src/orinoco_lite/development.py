@@ -1,4 +1,4 @@
-"""Switch a downstream between its pinned package and an editable submodule."""
+"""Enable editable package development in a downstream environment."""
 
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ SUBMODULE = "submodule/orinoco-lite-dev"
 FILES = ("pixi.toml", "pixi.lock")
 EDITABLE = {"path": SUBMODULE, "editable": True}
 CLIENT = "dump-things-pyclient"
-CLIENT_SOURCE = {"path": f"{SUBMODULE}/submodules/{CLIENT}", "editable": True}
-RECOVERY = "env -u PIXI_LOCKED pixi run --as-is orinoco-lite dev disable"
 
 
 def run(*arguments: str | Path, cwd: Path, env: dict[str, str] | None = None) -> None:
@@ -42,63 +40,17 @@ def check_workspace(root: Path) -> None:
         raise ConfigurationError("Run development commands at the downstream repository root.")
     if not (root / "pixi.toml").is_file():
         raise ConfigurationError("The downstream has no pixi.toml.")
-    if git(root, "status", "--porcelain", "--", *FILES):
-        raise ConfigurationError("Commit or stash changes to pixi.toml and pixi.lock first.")
 
 
-def previous_environment(root: Path) -> tuple[object, str]:
-    # Keep the source checkout when disabling. Each enable transition is instead
-    # recoverable from the manifest's ordinary Git history, including repeat cycles.
-    for commit in git(root, "log", "--first-parent", "--format=%H", "--", "pixi.toml").splitlines():
-        document = tomlkit.parse(git(root, "show", f"{commit}:pixi.toml"))
-        selection = document.get("pypi-dependencies", {}).get("orinoco-lite")
-        parents = git(root, "rev-list", "--parents", "-n", "1", commit).split()[1:]
-        if selection != EDITABLE or not parents:
-            continue
-        try:
-            previous = tomlkit.parse(git(root, "show", f"{parents[0]}:pixi.toml"))
-        except subprocess.CalledProcessError:
-            continue
-        selection = previous.get("pypi-dependencies", {}).get("orinoco-lite")
-        if selection is not None and selection != EDITABLE:
-            return previous, git(root, "show", f"{parents[0]}:pixi.lock") + "\n"
-    raise ConfigurationError("Cannot recover the previous package selection from Git history.")
-
-
-def apply(root: Path, action: str) -> None:
+def apply(root: Path) -> None:
     manifest = root / "pixi.toml"
     document = tomlkit.parse(manifest.read_text())
-    selection = document.get("pypi-dependencies", {}).get("orinoco-lite")
-    options = document.setdefault("pypi-options", tomlkit.table())
-    overrides = options.setdefault("dependency-overrides", tomlkit.table())
-    previous_lock = None
-    if action == "disable":
-        if selection != EDITABLE or overrides.get(CLIENT) != CLIENT_SOURCE:
-            raise ConfigurationError("The development selection changed; refusing to overwrite it.")
-        previous, previous_lock = previous_environment(root)
-        replacement = previous["pypi-dependencies"]["orinoco-lite"]
-        previous_override = previous.get("pypi-options", {}).get("dependency-overrides", {}).get(CLIENT)
-        if previous_override is None:
-            del overrides[CLIENT]
-        else:
-            overrides[CLIENT] = previous_override
-        if not overrides:
-            del options["dependency-overrides"]
-        if not options:
-            del document["pypi-options"]
-    else:
-        if selection is None or (isinstance(selection, dict) and "path" in selection):
-            raise ConfigurationError("Select a non-editable package before enabling development.")
-        replacement = EDITABLE
-        overrides[CLIENT] = CLIENT_SOURCE
-    document["pypi-dependencies"]["orinoco-lite"] = replacement
+    document["pypi-dependencies"]["orinoco-lite"] = EDITABLE
     # Pixi may update a lock before installation fails. Restore our files and
     # retain the source checkout, including all of the developer's edits.
     saved = {name: (root / name).read_bytes() if (root / name).exists() else None for name in FILES}
     try:
         manifest.write_text(tomlkit.dumps(document))
-        if previous_lock is not None:
-            (root / "pixi.lock").write_text(previous_lock)
         run("pixi", "install", "--manifest-path", manifest, cwd=root, env=unlocked_environment())
     except BaseException:
         for name, content in saved.items():
@@ -111,16 +63,20 @@ def apply(root: Path, action: str) -> None:
         raise
 
 
-def prepare_submodule(root: Path, repository: str | None, revision: str | None) -> Path:
+def prepare_checkout(root: Path, repository: str | None, revision: str | None) -> Path:
     checkout = root / SUBMODULE
-    entry = git(root, "ls-files", "--stage", "--", SUBMODULE)
-    if checkout.is_symlink() or (entry and not entry.startswith("160000 ")):
-        raise ConfigurationError(f"{SUBMODULE} must be a real Git submodule.")
-    if not entry:
-        if checkout.exists():
-            raise ConfigurationError(f"Register {SUBMODULE} as a Git submodule before enabling development.")
-        if git(root, "status", "--porcelain", "--", ".gitmodules"):
-            raise ConfigurationError("Commit or stash changes to .gitmodules before adding the software submodule.")
+    if checkout.is_symlink():
+        raise ConfigurationError(f"{SUBMODULE} must be a real source checkout, not a symlink.")
+    if not git(root, "ls-files", "--", SUBMODULE):
+        exclude = Path(git(root, "rev-parse", "--git-path", "info/exclude"))
+        if not exclude.is_absolute():
+            exclude = root / exclude
+        pattern = f"/{SUBMODULE}/"
+        content = exclude.read_text() if exclude.exists() else ""
+        if pattern not in content.splitlines():
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text(content + ("\n" if content and not content.endswith("\n") else "") + pattern + "\n")
+    if not checkout.exists():
         document = tomlkit.parse((root / "pixi.toml").read_text())
         selection = document["pypi-dependencies"]["orinoco-lite"]
         if isinstance(selection, dict):
@@ -131,16 +87,15 @@ def prepare_submodule(root: Path, repository: str | None, revision: str | None) 
             revision = source_commit(resolve_resources().root)
         if revision.startswith("-"):
             raise ConfigurationError("Supply a Git revision, not a command option.")
-        with progress("Cloning the Orinoco Lite development submodule with Git"):
-            run("git", "submodule", "add", "--", repository or PACKAGE_REPOSITORY, SUBMODULE, cwd=root)
+        with progress("Cloning the Orinoco Lite development source with Git"):
+            checkout.parent.mkdir(parents=True, exist_ok=True)
+            run("git", "clone", "--", repository or PACKAGE_REPOSITORY, checkout, cwd=root)
             run("git", "checkout", "--detach", revision, cwd=checkout)
             run("git", "submodule", "update", "--init", "--recursive", cwd=checkout)
-            run("git", "add", "--", SUBMODULE, cwd=root)
     elif repository is not None or revision is not None:
         raise ConfigurationError(f"{SUBMODULE} already exists; use Git inside it to select another revision.")
-    elif not (checkout / ".git").exists():
-        with progress("Initializing the Orinoco Lite development submodule with Git"):
-            run("git", "submodule", "update", "--init", "--recursive", "--", SUBMODULE, cwd=root)
+    if not (checkout / ".git").exists():
+        raise ConfigurationError(f"Not a Git source checkout: {checkout}")
     # Do not reset existing source or nested dependency worktrees on re-enable.
     if any(line.startswith("-") for line in git(checkout, "submodule", "status", "--recursive").splitlines()):
         raise ConfigurationError(f"Initialize missing dependencies with git -C {SUBMODULE} "
@@ -169,21 +124,11 @@ def enable(root: Path, repository: str | None = None, revision: str | None = Non
     check_workspace(root)
     document = tomlkit.parse((root / "pixi.toml").read_text())
     selection = document.get("pypi-dependencies", {}).get("orinoco-lite")
-    if selection is None or (isinstance(selection, dict) and "path" in selection):
-        raise ConfigurationError("Select a non-editable package before enabling development.")
+    if selection is None or (isinstance(selection, dict) and "path" in selection and selection != EDITABLE):
+        raise ConfigurationError("Select a package revision or the development checkout before enabling development.")
     print("Enabling editable Orinoco Lite...", file=sys.stderr, flush=True)
-    checkout = prepare_submodule(root, repository, revision)
+    checkout = prepare_checkout(root, repository, revision)
     prepare_resources(checkout)
-    apply(root, "enable")
+    apply(root)
     print(f"Editable Orinoco Lite source: {checkout}\n"
-          f"Commit pixi.toml, pixi.lock, .gitmodules and {SUBMODULE} before disabling.\n"
-          f"If the lock later becomes stale, recover with: {RECOVERY}", file=sys.stderr, flush=True)
-
-
-def disable(root: Path) -> None:
-    root = root.resolve()
-    check_workspace(root)
-    print("Restoring the previous package selection...", file=sys.stderr, flush=True)
-    apply(root, "disable")
-    print("Previous package restored; the development submodule and its edits were retained.",
-          file=sys.stderr, flush=True)
+          "Updated pixi.toml and pixi.lock locally; no files were staged.", file=sys.stderr, flush=True)

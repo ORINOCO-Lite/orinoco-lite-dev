@@ -113,22 +113,16 @@ def _parser() -> argparse.ArgumentParser:
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser(
-        "enable", help="install the package and its nested sources editable from a Git submodule",
-        description="Initialize submodule/orinoco-lite-dev, prepare its resources, and install "
-        "its Python dependencies editable in the downstream environment. An existing source "
-        "checkout and its edits are preserved. Commit the manifest, lock, .gitmodules and "
-        "software gitlink before disabling. This command does not create a commit.",
+        "enable", help="install the package and its nested sources editable from a local checkout",
+        description="Clone submodule/orinoco-lite-dev locally, prepare its resources, and install "
+        "its Python dependencies editable in the downstream environment. The new checkout is "
+        "excluded locally from Git; no submodule is registered and no files are staged. "
+        "pixi.toml and pixi.lock are updated without requiring a commit. Re-running preserves "
+        "existing source edits. If a stale lock prevents launch, use: "
+        "env -u PIXI_LOCKED pixi run --as-is orinoco-lite dev enable.",
     )
-    enable.add_argument("--repository", help="repository for a new submodule (default: selected package repository)")
-    enable.add_argument("--revision", help="revision for a new submodule (default: selected package commit)")
-    dev_commands.add_parser(
-        "disable", help="restore the package selection used before editable development",
-        description="Restore the package selection used before editable development, preserving "
-        "downstream additions and the source submodule's edits. This command does not create a commit. "
-        "If a stale lock prevents Pixi from starting it, use: "
-        "env -u PIXI_LOCKED pixi run --as-is orinoco-lite dev disable. "
-        "Only this recovery invocation bypasses synchronization; the switch then updates and installs the environment.",
-    )
+    enable.add_argument("--repository", help="repository for a new checkout (default: selected package repository)")
+    enable.add_argument("--revision", help="revision for a new checkout (default: selected package commit)")
     from . import upstream, pool_capture, record_stages, rdf_stages
     upstream.register(dev_commands)
     records = dev_commands.add_parser("records", help="capture, convert, and compare records")
@@ -395,12 +389,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
         if args.command == "dev" and args.dev_command == "upstream":
             from . import upstream
             return upstream.execute(args)
-        if args.command == "dev" and args.dev_command in {"enable", "disable"}:
+        if args.command == "dev" and args.dev_command == "enable":
             from . import development
-            if args.dev_command == "enable":
-                development.enable(args.root or Path.cwd(), args.repository, args.revision)
-            else:
-                development.disable(args.root or Path.cwd())
+            development.enable(args.root or Path.cwd(), args.repository, args.revision)
             return 0
         if args.command == "dev" and args.dev_command == "prepare-resources":
             from .prepare_resources import main as prepare_resources

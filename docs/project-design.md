@@ -63,7 +63,7 @@ Each workspace's `pixi.toml` selects its environment, including external tools a
 
 Orinoco Lite's `pyproject.toml` declares Python requirements and nested editable sources through `[tool.uv.sources]`.
 A downstream can switch its package selection to `submodule/orinoco-lite-dev` while continuing to run all website and adapter commands in its own Pixi environment.
-Disabling development restores the prior package selection and retains source edits.
+Development uses a locally ignored source checkout; enabling it updates the downstream environment without staging files or requiring a commit.
 Releases distribute the Python artifact with a mixed Conda/PyPI manifest and lock through the downstream template; installing the Python artifact alone does not install the stack.
 The release workflow derives its manifest from the maintained Pixi configuration, replacing editable submodule paths with repository URLs and exact commits from the release's gitlinks, then generates the release lock.
 Published dependency selections remain unchanged; the generated manifest is not maintained independently.

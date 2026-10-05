@@ -100,10 +100,9 @@ The engineering **Update upstream comparison** workflow updates the existing psy
 See [comparison updates](docs/agents/upstream-comparison-updates.md) for inputs and publication setup.
 See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
-In an existing downstream, `pixi run orinoco-lite dev enable` initializes `submodule/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
-Commit the manifest, lock, `.gitmodules`, and software gitlink before using `pixi run orinoco-lite dev disable` to restore the previous package selection.
-Disabling retains the source checkout and its edits.
-See [dependency management](docs/dependency-management.md) for stale-lock recovery and recording the switch.
+In an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `submodule/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
+The checkout is locally ignored; manifest and lock changes need no commit.
+See [dependency management](docs/dependency-management.md) for source selection and re-running enable.
 
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 

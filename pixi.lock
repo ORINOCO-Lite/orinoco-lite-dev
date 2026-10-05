@@ -1937,7 +1937,7 @@ packages:
   requires_dist:
   - click
   - click-option-group
-  - dump-things-pyclient @ git+https://hub.psychoinformatics.de/orinoco/dump-things-pyclient.git@master
+  - dump-things-pyclient
   - jinja2
   - pyyaml
   requires_python: '>=3.11'

@@ -16,11 +16,6 @@ hugo = "*"
 # Python requirements and editable submodule sources come from pyproject.toml.
 orinoco-lite = { path = ".", editable = true }
 
-# query-things depends on dump-things-pyclient through a Git URL.
-# Override that dependency with the selected dump-things-pyclient submodule.
-[pypi-options.dependency-overrides]
-dump-things-pyclient = { path = "submodules/dump-things-pyclient", editable = true }
-
 [tasks]
 records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"
 records-get = "datalad run --explicit --output sourcedata/downloaded/records.jsonl --output sourcedata/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
