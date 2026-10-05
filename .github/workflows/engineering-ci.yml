@@ -50,7 +50,7 @@ jobs:
       - name: Resolve the package development environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
-          cache: true
+          cache: false
           locked: false
 
       - name: Verify pre-commit formatting
