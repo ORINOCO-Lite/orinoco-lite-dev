@@ -56,11 +56,14 @@ This development loop must work with representative site inputs; establishing ho
 
 ### Dependency management
 
-Orinoco Lite uses a Git-submodule/Pixi workspace. Git gitlinks select source revisions. The root `pixi.toml` specifies the complete environment, including editable installations of Python submodules, third-party libraries, and development/build tools.
+Orinoco Lite uses a Git-submodule/Pixi workspace.
+Git gitlinks select source revisions.
+Each workspace's `pixi.toml` selects its environment, including external tools and editable source installations.
 `pixi.lock` records the resolved environment.
 
-Orinoco Lite's `pyproject.toml` contains Python packaging metadata and build-system requirements, without runtime dependency declarations.
-Pixi installs local sources editable for development.
+Orinoco Lite's `pyproject.toml` declares Python requirements and nested editable sources through `[tool.uv.sources]`.
+A downstream can switch its package selection to `submodule/orinoco-lite-dev` while continuing to run all website and adapter commands in its own Pixi environment.
+Disabling development restores the prior package selection and retains source edits.
 Releases distribute the Python artifact with a mixed Conda/PyPI manifest and lock through the downstream template; installing the Python artifact alone does not install the stack.
 The release workflow derives its manifest from the maintained Pixi configuration, replacing editable submodule paths with repository URLs and exact commits from the release's gitlinks, then generates the release lock.
 Published dependency selections remain unchanged; the generated manifest is not maintained independently.
@@ -264,11 +267,12 @@ The normative contracts define the precise behavior:
 - **Preserve GitHub’s security model.** The curation App follows GitHub’s current security guidance, uses least privilege, protects operator credentials, and never trades user authorization or repository protections for a simpler setup.
 - **Keep people and Git in control.** Automation only reads external sources.
   It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
-- **Record each fact once.** Gitlinks record source revisions, `pixi.toml` declares the complete environment, and `pixi.lock` records its resolution.
+- **Record each fact once.** Gitlinks record source revisions, Python metadata declares Python requirements, `pixi.toml` selects the environment, and `pixi.lock` records its resolution.
   A separate release lock is unnecessary.
   Change history belongs in Git and GitHub.
   Do not add parallel ledgers or inventories merely for explanation or proof.
-- **Keep tool layers explicit.** Pixi supplies environments and convenient tasks; commands running in those environments must not invoke or wrap Pixi.
+- **Keep tool layers explicit.** Pixi supplies environments and convenient tasks.
+  Package-selection commands deliberately update those environments; ordinary website and adapter commands use the active downstream environment.
   Tasks should expose commands that users can run and modify directly.
   Compose DataLad around operations at the task or caller boundary; avoid commands that invoke DataLad to rerun themselves with recursion-suppression flags.
   Repository owners control DataLad storage policy.

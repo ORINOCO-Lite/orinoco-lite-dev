@@ -302,10 +302,10 @@ def _package_source(resources_root: Path) -> tuple[str, str]:
 
 def resolve_engineering_source(workspace: Path, resources_root: Path) -> tuple[Path, str]:
     """Read package-owned Gitlinks without checking out a second website."""
-    from .development import LINK
+    from .development import SUBMODULE
 
     repository, commit = _package_source(resources_root)
-    candidates = [workspace / LINK, Path(__file__).resolve().parents[2]]
+    candidates = [workspace / SUBMODULE, Path(__file__).resolve().parents[2]]
     for candidate in candidates:
         if not (candidate / ".git").exists():
             continue

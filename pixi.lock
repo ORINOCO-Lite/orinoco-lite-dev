@@ -1878,6 +1878,25 @@ packages:
   timestamp: 1786599629846
 - pypi: ./
   name: orinoco-lite
+  requires_dist:
+  - datalad
+  - git-annex
+  - copier
+  - click-option-group
+  - dump-things-pyclient @ ./submodules/dump-things-pyclient
+  - dump-things-service @ ./submodules/dump-things-service
+  - things-enrichment-tools @ ./submodules/things-enrichment-tools
+  - query-things @ ./submodules/query-things
+  - datalad-concepts @ ./submodules/things-schemas
+  - jinja2
+  - linkml
+  - linkml-runtime
+  - packaging
+  - pydantic
+  - pyoxigraph
+  - pyyaml
+  - tomlkit
+  - rdflib
   requires_python: '>=3.12'
 - pypi: ./submodules/dump-things-pyclient
   name: dump-things-pyclient

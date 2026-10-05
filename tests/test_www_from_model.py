@@ -268,8 +268,8 @@ class WwwFromModelResolverTests(unittest.TestCase):
 
     def test_registered_source_reuses_prepared_checkout_without_duplicate(self):
         source = self._register_website()
-        (self.workspace / ".orinoco-lite").mkdir()
-        (self.workspace / ".orinoco-lite/dev").symlink_to(self.engineering)
+        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
+             str(self.engineering), "submodule/orinoco-lite-dev")
         with patch("orinoco_lite.www_from_model._package_source",
                    return_value=(str(self.engineering), self.engineering_commit)):
             self.assertEqual(resolve_www_from_model(self.workspace, self.root), source.resolve())

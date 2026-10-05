@@ -13,33 +13,11 @@ git = "*"
 hugo = "*"
 
 [pypi-dependencies]
-datalad = "*"
-click-option-group = "*"
-copier = "*"
-git-annex = "*"
-
-Jinja2 = "*"
-linkml = "*"
-linkml-runtime = "*"
-packaging = "*"
-pydantic = "*"
-pyoxigraph = "*"
-PyYAML = "*"
-tomlkit = "*"
-rdflib = "*"
-
-# Install this checkout and its selected submodules editable.
-# Release generation converts these paths to repository URLs and committed revisions.
+# Python requirements and editable submodule sources come from pyproject.toml.
 orinoco-lite = { path = ".", editable = true }
-dump-things-pyclient = { path = "submodules/dump-things-pyclient", editable = true }
-dump-things-service = { path = "submodules/dump-things-service", editable = true }
-things-enrichment-tools = { path = "submodules/things-enrichment-tools", editable = true }
-query-things = { path = "submodules/query-things", editable = true }
-datalad-concepts = { path = "submodules/things-schemas", editable = true }
 
 # query-things depends on dump-things-pyclient through a Git URL.
 # Override that dependency with the selected dump-things-pyclient submodule.
-# Keep the direct entries above: an override alone is not installed editable.
 [pypi-options.dependency-overrides]
 dump-things-pyclient = { path = "submodules/dump-things-pyclient", editable = true }
 

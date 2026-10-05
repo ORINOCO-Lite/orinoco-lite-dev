@@ -36,8 +36,8 @@ Version overrides (optional):
   -h, --help                Show this help
 
 Paths are relative to the engineering directory. Publish selected commits
-before setup. For uncommitted edits, use `pixi run orinoco-lite dev enable PATH`
-in an existing downstream; `dev disable` restores its previous package.
+before setup. In an existing downstream, `pixi run orinoco-lite dev enable`
+installs submodule/orinoco-lite-dev editable; `dev disable` restores its previous package.
 
 HELP
 }

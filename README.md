@@ -100,13 +100,15 @@ The engineering **Update upstream comparison** workflow updates the existing psy
 See [comparison updates](docs/agents/upstream-comparison-updates.md) for inputs and publication setup.
 See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
 
-In an existing downstream, use `pixi run dev-enable [PATH]` to connect an editable package checkout and `pixi run dev-disable` to restore its previous selection.
-These tasks record the package selection and development link with DataLad; direct `orinoco-lite dev enable` and `dev disable` calls leave committing to the caller.
+In an existing downstream, `pixi run orinoco-lite dev enable` initializes `submodule/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
+Commit the manifest, lock, `.gitmodules`, and software gitlink before using `pixi run orinoco-lite dev disable` to restore the previous package selection.
+Disabling retains the source checkout and its edits.
+See [dependency management](docs/dependency-management.md) for stale-lock recovery and recording the switch.
 
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
 The CLI owns operation sequencing: `orinoco-lite build` updates projection before validation and building.
-Pixi's downstream tasks supply convenient arguments and wrap development switches with DataLad.
+Pixi's downstream tasks supply convenient arguments.
 Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
 The replacement-metadata test uses `../orinoco-lite-template`, including local edits; set `ORINOCO_TEST_TEMPLATE` to select another checkout.
 It skips only when neither selection is available locally; CI supplies the template's `main` checkout explicitly.
