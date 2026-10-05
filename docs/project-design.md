@@ -46,13 +46,30 @@ The system has three layers: development sources, reusable components, and each 
 
 | Part | Role | Boundary |
 | --- | --- | --- |
-| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact `www-from-model` revision. It also publishes optional releases. | Downstreams do not receive its multi-repository engineering structure. |
+| [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/) | Develops Orinoco Lite and selects the exact `www-from-model` revision. It also publishes optional releases. | A downstream source installation uses this repository as a submodule with its nested dependencies. |
 | [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model) | Supplies Hugo layouts and assets, page templates, the graph producer, and its exact Congo theme selection. | Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets. |
 
 Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
 An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco Hugo adaptations belong in the template.
 Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
 This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
+
+### Dependency management
+
+Orinoco Lite uses a Git-submodule/Pixi workspace. Git gitlinks select source revisions. The root `pixi.toml` specifies the complete environment, including editable installations of Python submodules, third-party libraries, and development/build tools.
+`pixi.lock` records the resolved environment.
+
+Orinoco Lite's `pyproject.toml` contains Python packaging metadata and build-system requirements, without runtime dependency declarations.
+Pixi installs local sources editable for development.
+Releases distribute the Python artifact with a mixed Conda/PyPI manifest and lock through the downstream template; installing the Python artifact alone does not install the stack.
+The release workflow derives its manifest from the maintained Pixi configuration, replacing editable submodule paths with repository URLs and exact commits from the release's gitlinks, then generates the release lock.
+Published dependency selections remain unchanged; the generated manifest is not maintained independently.
+We do not maintain Conda packages for Orinoco Lite or its Python dependencies.
+See [dependency management](dependency-management.md) for setup and exact-commit exceptions.
+
+Preserve dependencies declared by upstream submodules and let Pixi incorporate them into the complete solve.
+If those declarations conflict with the selected stack, investigate the conflict explicitly.
+Do not introduce another dependency-selection mechanism.
 
 ### Reusable components
 
@@ -181,7 +198,7 @@ These generated files are not canonical inputs and do not enter the downstream's
 
 Upon a merge into the default branch, a GitHub Action deploys the website:
 
-1. The downstream lock selects exact versions of Orinoco Lite and the template.
+1. Git records the selected Orinoco Lite source and template revision; the downstream Pixi lock records the resolved environment.
 2. Orinoco Lite uses ORINOCO components to convert the metadata records into a graph.
    It validates and projects the graph for the website.
 3. Orinoco Lite combines that projection with the upstream website and template.
@@ -247,7 +264,7 @@ The normative contracts define the precise behavior:
 - **Preserve GitHub’s security model.** The curation App follows GitHub’s current security guidance, uses least privilege, protects operator credentials, and never trades user authorization or repository protections for a simpler setup.
 - **Keep people and Git in control.** Automation only reads external sources.
   It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
-- **Record each fact once.** Source revisions belong in dependency declarations, ordinary tool locks, package metadata, and Gitlinks.
+- **Record each fact once.** Gitlinks record source revisions, `pixi.toml` declares the complete environment, and `pixi.lock` records its resolution.
   A separate release lock is unnecessary.
   Change history belongs in Git and GitHub.
   Do not add parallel ledgers or inventories merely for explanation or proof.

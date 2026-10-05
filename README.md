@@ -24,6 +24,8 @@ The central curation service, or an optional replacement, provides only GitHub a
 
 ## Command environment
 
+See [dependency management](docs/dependency-management.md) for editable submodule setup and release requirements.
+
 Use Pixi 0.76 or newer; CI always installs the latest Pixi.
 Older local versions receive best-effort support without a formal version matrix.
 Use `pixi run --locked <command>` to reject stale dependency locks without rewriting them.
