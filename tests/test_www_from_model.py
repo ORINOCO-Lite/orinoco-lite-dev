@@ -182,7 +182,7 @@ class WwwFromModelResolverTests(unittest.TestCase):
                 "www-from-model fixture\n",
             )
 
-    def test_www_from_model_cache_supports_offline_reuse_and_rejects_tampering(
+    def test_www_from_model_cache_supports_offline_reuse_and_repairs_worktree(
         self,
     ) -> None:
         resources = self._resources(repository=self.engineering)
@@ -207,8 +207,8 @@ class WwwFromModelResolverTests(unittest.TestCase):
             (second / "page_templates/record.md").write_text(
                 "offline tampering\n", encoding="utf-8"
             )
-            with self.assertRaisesRegex(IntegrityError, "repair failed"):
-                resolve_www_from_model(self.workspace, resources)
+            resolve_www_from_model(self.workspace, resources)
+            self.assertEqual((second / "page_templates/record.md").read_text(), "www-from-model fixture\n")
 
     def test_fixed_annex_cache_is_reused_and_can_be_repaired(self):
         from orinoco_lite.annex_media import prepare_hugo_assets
@@ -234,6 +234,55 @@ class WwwFromModelResolverTests(unittest.TestCase):
             (source / "page_templates/record.md").write_text("tampered\n")
             repaired = resolve_www_from_model(self.workspace, self.root)
             self.assertEqual((repaired / "page_templates/record.md").read_text(), "www-from-model fixture\n")
+
+    def test_revision_switches_retain_annex_content_offline_and_after_cache_restore(self):
+        import shutil
+        from orinoco_lite.annex_media import prepare_hugo_assets
+
+        _git(self.website, "annex", "init", "fixture")
+        asset = self.website / "static/graph.js"
+        asset.parent.mkdir()
+        asset.write_text("asset A\n")
+        _git(self.website, "annex", "add", "static/graph.js")
+        _git(self.website, "commit", "-qm", "asset A")
+        first_commit = _git(self.website, "rev-parse", "HEAD")
+        with patch("orinoco_lite.www_from_model.upstream_source") as selection:
+            selection.return_value = (str(self.website), first_commit)
+            source = resolve_www_from_model(self.workspace, self.root)
+            first_object = prepare_hugo_assets(source)[source / "static/graph.js"]
+            first_bytes = first_object.read_bytes()
+            object_inode = first_object.stat().st_ino
+            git_inode = (source / ".git").stat().st_ino
+
+            _git(self.website, "annex", "unlock", "static/graph.js")
+            asset.write_text("asset B\n")
+            _git(self.website, "annex", "add", "static/graph.js")
+            (self.congo / "layouts/base.html").write_text("theme B\n")
+            _git(self.congo, "commit", "-qam", "theme B")
+            theme_b = _git(self.congo, "rev-parse", "HEAD")
+            _git(self.website, "update-index", "--cacheinfo", "160000", theme_b, "themes/congo")
+            _git(self.website, "commit", "-qm", "asset B")
+            second_commit = _git(self.website, "rev-parse", "HEAD")
+            selection.return_value = (str(self.website), second_commit)
+            self.assertEqual(resolve_www_from_model(self.workspace, self.root), source)
+            self.assertEqual(prepare_hugo_assets(source)[source / "static/graph.js"].read_text(), "asset B\n")
+            self.assertEqual(_git(source / "themes/congo", "rev-parse", "HEAD"), theme_b)
+            self.assertEqual(first_object.stat().st_ino, object_inode)
+            self.assertEqual((source / ".git").stat().st_ino, git_inode)
+
+            self.sources.rename(self.root / "offline-sources")
+            for commit, expected in [(first_commit, first_bytes), (second_commit, b"asset B\n")]:
+                selection.return_value = (str(self.website), commit)
+                self.assertEqual(resolve_www_from_model(self.workspace, self.root), source)
+                self.assertEqual(prepare_hugo_assets(source)[source / "static/graph.js"].read_bytes(), expected)
+                self.assertEqual(_git(source / "themes/congo", "rev-parse", "HEAD"), self.congo_commit if commit == first_commit else theme_b)
+
+            # Simulate a CI archive restored at a different absolute workspace path.
+            restored = self.root / "restored"
+            shutil.copytree(self.workspace, restored, symlinks=True)
+            selection.return_value = (str(self.website), first_commit)
+            restored_source = resolve_www_from_model(restored, self.root)
+            self.assertEqual(prepare_hugo_assets(restored_source)[restored_source / "static/graph.js"].read_bytes(), first_bytes)
 
     def test_editable_uses_nested_working_source_without_resource_stamp(self):
         _git(self.engineering, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")

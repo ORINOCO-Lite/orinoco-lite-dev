@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 from pathlib import Path
 import re
@@ -149,7 +148,7 @@ def _verify_checkout(www_from_model: Path, expected_commit: str) -> Path:
         operation="verify www-from-model checkout cleanliness",
     ).stdout
     if dirty:
-        raise IntegrityError("Cached www-from-model dependency closure is not clean")
+        raise IntegrityError(f"Cached www-from-model dependency closure is not clean: {dirty.decode('utf-8', 'replace')!r}")
     return www_from_model.resolve()
 
 
@@ -170,6 +169,10 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
         ),
         operation=f"clone {repository}",
     )
+    return _select_checkout(destination, commit)
+
+
+def _select_checkout(destination: Path, commit: str) -> Path:
     available = _git(
         destination,
         ("cat-file", "-e", f"{commit}^{{commit}}"),
@@ -177,17 +180,21 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
         check=False,
     )
     if available.returncode:
-        # Pull-request merge commits are not included in a normal branch clone.
-        _git(
-            destination,
-            ("fetch", "--quiet", "--no-tags", "origin", commit),
-            operation=f"fetch upstream commit {commit}",
-        )
+        # Fetch normal refs too: git-annex records locations for newly added assets.
+        _git(destination, ("fetch", "--quiet", "--no-tags", "origin"), operation="fetch upstream history and Annex locations")
+        if _git(destination, ("cat-file", "-e", f"{commit}^{{commit}}"),
+                operation="locate selected upstream commit", check=False).returncode:
+            _git(destination, ("fetch", "--quiet", "--no-tags", "origin", commit),
+                 operation=f"fetch upstream commit {commit}")
+    _git(destination, ("reset", "--hard", "HEAD"), operation="reset cached source files")
     _git(
         destination,
         ("checkout", "--quiet", "--detach", "--force", commit),
         operation=f"check out www-from-model commit {commit}",
     )
+    # Remove obsolete working files, retaining Git and Annex objects in .git.
+    _git(destination, ("clean", "-ffd"), operation="remove obsolete cached source files")
+    _git(destination, ("submodule", "sync", "--recursive"), operation="synchronize upstream dependency URLs")
     _git(
         destination,
         (
@@ -199,23 +206,13 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
             "--init",
             "--recursive",
             "--checkout",
+            "--force",
         ),
         operation="resolve the www-from-model dependency closure",
     )
+    _git(destination, ("submodule", "foreach", "--recursive", "git clean -ffd"),
+         operation="remove obsolete dependency working files")
     return _verify_checkout(destination, commit)
-
-
-def _cache_name(repository: str, commit: str) -> str:
-    repository_id = hashlib.sha256(repository.encode("utf-8")).hexdigest()[:16]
-    return f"source-{repository_id}-{commit}"
-
-
-def _remove_cache_path(path: Path) -> None:
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        from datalad.utils import rmtree
-        rmtree(path)
 
 
 def _ensure_checkout(
@@ -224,38 +221,30 @@ def _ensure_checkout(
     repository: str,
     commit: str,
 ) -> Path:
-    cache = cache.resolve()
-    destination = cache / _cache_name(repository, commit)
-    mismatch: IntegrityError | None = None
-    if destination.exists() or destination.is_symlink():
+    if cache.is_symlink():
+        raise IntegrityError(f"Upstream cache must not be a symlink: {cache}")
+    destination = cache.resolve()
+    if destination.exists():
+        # Never replace an existing object store just to select another revision.
+        _repository_head(destination, label="Cached www-from-model checkout")
+        _git(destination, ("remote", "set-url", "origin", repository),
+             operation="select the upstream source repository")
         try:
             return _verify_checkout(destination, commit)
-        except IntegrityError as error:
-            mismatch = error
+        except IntegrityError:
+            with progress("Switching www-from-model and its dependencies"):
+                return _select_checkout(destination, commit)
 
-    cache.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=".source-", dir=cache))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=".source-", dir=destination.parent))
     fresh = temporary / "checkout"
     try:
         with progress("Fetching www-from-model and its dependencies"):
-            www_from_model = _clone_checkout(repository, commit, fresh)
-        relative_checkout = www_from_model.relative_to(fresh)
-        if destination.exists() or destination.is_symlink():
-            _remove_cache_path(destination)
+            _clone_checkout(repository, commit, fresh)
         os.replace(fresh, destination)
-    except Exception as error:
-        if mismatch is not None:
-            raise IntegrityError(
-                f"Cached www-from-model checkout failed verification ({mismatch}); "
-                f"repair failed: {error}"
-            ) from error
-        if isinstance(error, IntegrityError):
-            raise
-        raise IntegrityError(f"Could not resolve www-from-model checkout: {error}") from error
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
-    _verify_checkout(destination, commit)
-    return (destination / relative_checkout).resolve()
+    return _verify_checkout(destination, commit)
 
 
 def editable_package_checkout() -> Path | None:
