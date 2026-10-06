@@ -32,17 +32,16 @@ The template supplies the thin Orinoco Lite adaptation and downstream scaffold.
 Git and DataLad record the software selection, retained records, and preparation steps so changes can be inspected and repeated.
 See CLI help for input and candidate selection.
 
-In a downstream with the package already registered at `.orinoco-lite/orinoco-lite-dev` and its nested submodules initialized, prepare upstream inputs and build with:
+To prepare a fresh development downstream from upstream inputs and build it:
 
 ```console
-pixi run orinoco-lite dev enable
-pixi run orinoco-lite dev upstream populate --dump /path/to/records.jsonl
-pixi run orinoco-lite build --destination build/site --publication-bundle build/pages-publication.bundle
+pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --build
 ```
 
 `populate` imports from the same package-selected `www-from-model` checkout used for projection and builds.
-`setup-upstream --development` registers `.orinoco-lite/orinoco-lite-dev` as a downstream submodule and installs it editable.
-The helper currently enables development after its initial `populate`, so bootstrap with retained inputs through `--site-specific` and run upstream import only after development is enabled.
+Setup registers `.orinoco-lite/orinoco-lite-dev` as a downstream submodule and installs it editable before importing.
+Development mode is the default; `--development` may also be supplied explicitly.
+Use `--no-development --site-specific PATH` only to compare a fixed package installation against retained site inputs; this mode does not import upstream website files.
 The downstream records its package gitlink and editable manifest selection; `www-from-model` remains nested inside that tracked package.
 The import also records the local Pixi lock as an input.
 Native upstream instantiation can use `www-from-model` and its dependencies as nested Git submodules without installing Orinoco Lite.

@@ -141,3 +141,27 @@ def test_disable_is_not_a_command():
     with pytest.raises(SystemExit) as error:
         main(["dev", "disable"])
     assert error.value.code == 2
+
+
+def test_tracked_development_checkout_survives_reenable_and_fresh_clone(downstream, tmp_path):
+    selection = read(downstream)["pypi-dependencies"]["orinoco-lite"]
+    dev.git(downstream, "submodule", "add", selection["git"], dev.CHECKOUT)
+    commit(downstream, "test: track development package")
+    dev.git(downstream / dev.CHECKOUT, "submodule", "update", "--init", "--recursive")
+    dev.enable(downstream)
+    source = downstream / dev.CHECKOUT
+    assert (source / ".git").is_file()
+    assert dev.git(downstream, "ls-files", dev.CHECKOUT) == dev.CHECKOUT
+    client = source / "submodules/dump-things-pyclient/client.py"
+    client.write_text("value = 3\n")
+    dev.enable(downstream)
+    assert client.read_text() == "value = 3\n"
+    assert (source / ".git").is_file()
+    # Restore the experimental edit before recording the parent's manifest.
+    dev.git(client.parent, "checkout", "--", "client.py")
+    commit(downstream, "test: select editable tracked package")
+    restored = tmp_path / "restored-site"
+    subprocess.run(["git", "clone", "--quiet", "--recurse-submodules", str(downstream), str(restored)], check=True)
+    assert read(restored)["pypi-dependencies"]["orinoco-lite"] == dev.EDITABLE
+    assert (restored / dev.CHECKOUT / ".git").is_file()
+    assert (restored / dev.CHECKOUT / "submodules/dump-things-pyclient/client.py").read_text() == "value = 1\n"

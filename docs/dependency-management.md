@@ -48,7 +48,7 @@ The source checkout is excluded through Git's local `info/exclude`; enable does 
 Development locks stay local and untracked; release CI generates and tests a locked consumer environment.
 
 Upstream website reproduction always tracks `.orinoco-lite/orinoco-lite-dev` as a downstream Git submodule and installs it editable.
-Use `setup-upstream --development` to register and select it; `dev enable` alone does not register a submodule.
+The default `setup-upstream` workflow registers and selects it before import; `dev enable` alone does not register a submodule.
 Commit the package gitlink and editable manifest selection so another checkout can restore the selected source and its nested dependencies.
 Site-input import uses that nested `www-from-model` checkout, including authored content and Annex media.
 Ordinary downstream builds use the bundled rendering subset and require no upstream checkout.
