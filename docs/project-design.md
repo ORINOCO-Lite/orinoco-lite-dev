@@ -49,13 +49,13 @@ Part                                                                      Role  
   ------------------------------------------------------------------------- ------------------------------------------------------------------------------------------------------------- ----------------------------------------------------------------------------------------------------------------------------------------------
 [`orinoco-lite-dev`](https://github.com/ORINOCO-Lite/orinoco-lite-dev/)   Develops Orinoco Lite and selects the exact `www-from-model` revision.
 It also publishes optional releases.
-A downstream source installation uses this repository as a submodule with its nested dependencies.
+A downstream development installation uses a local checkout with its nested submodules.
 
   [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model)        Supplies Hugo layouts and assets, page templates, the graph producer, and its exact Congo theme selection.    Orinoco Lite reuses the selected revision and its declared dependencies. It does not copy German content, identity, or site-specific assets.
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
-An editable package connection lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco Hugo adaptations belong in the template.
+An editable package checkout lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco Hugo adaptations belong in the template.
 Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
 This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
 

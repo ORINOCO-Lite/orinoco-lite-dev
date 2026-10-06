@@ -46,7 +46,7 @@ def conflicts(root: Path) -> list[str]:
 
 
 @progress("Reading selected template dependencies")
-def template_environment(root: Path, source: str, revision: str) -> tuple[str, str, bytes]:
+def template_environment(root: Path, source: str, revision: str) -> tuple[str, str]:
     from copier import run_copy
 
     data = {key: value for key, value in answers(root).items()
@@ -55,7 +55,7 @@ def template_environment(root: Path, source: str, revision: str) -> tuple[str, s
         run_copy(source, temporary, vcs_ref=revision, data=data, defaults=True, quiet=True)
         declaration = tomllib.loads((Path(temporary) / "pixi.toml").read_text())
         selection = declaration["pypi-dependencies"]["orinoco-lite"]
-        return selection["git"], selection["rev"], (Path(temporary) / "pixi.lock").read_bytes()
+        return selection["git"], selection["rev"]
 
 
 def apply(root: Path, revision: str, package_repository: str, package_revision: str) -> None:
@@ -78,16 +78,12 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
     if unmerged:
         # Keep the conflict text as ordinary Git content so a browser can edit it.
         subprocess.run(["git", "add", "--", *unmerged], cwd=root, check=True)
+    subprocess.run(["git", "rm", "--cached", "--ignore-unmatch", "--", "pixi.lock"],
+                   cwd=root, check=True)
     unresolved = conflicts(root)
-    if "pixi.toml" not in unresolved:
-        # Start from the target's retained dependency choices, not a fresh solve
-        # against whatever versions happen to be available on the update day.
-        _, _, lock = template_environment(root, answers(root)["_src_path"], revision)
-        (root / "pixi.lock").write_bytes(lock)
-        environment = dict(os.environ)
-        environment.pop("PIXI_LOCKED", None)
-        subprocess.run(["pixi", "lock", "--manifest-path", "pixi.toml"],
-                       cwd=root, env=environment, check=True)
+    # The next Pixi invocation resolves the updated manifest. Keeping a file
+    # here would make DataLad save a formerly tracked lock again.
+    (root / "pixi.lock").unlink(missing_ok=True)
     if unresolved:
         print("Template update conflicts (recorded for deliberate resolution):")
         print("\n".join(unresolved))
@@ -95,11 +91,12 @@ def apply(root: Path, revision: str, package_repository: str, package_revision: 
 
 def record_apply(root: Path, revision: str, repository: str, package_revision: str, message: str) -> None:
     environment = os.environ.get("ORINOCO_UPDATE_ENVIRONMENT")
-    replay = (f"Execution environment: {environment} (pixi.toml and pixi.lock).\n"
-              if environment else "Restore the parent commit's Pixi environment before historical replay.\n")
+    replay = (f"Execution environment: {environment} (pixi.toml; the local lock is not retained).\n"
+              if environment else "Resolve the parent manifest before replay; the local lock is not retained.\n")
+    lock_input = ["--input", "pixi.lock"] if (root / "pixi.lock").is_file() else []
     subprocess.run([
         "datalad", "run", "--explicit", "--input", ".copier-answers.yml",
-        "--input", "pixi.toml", "--input", "pixi.lock", "--output", ".",
+        "--input", "pixi.toml", *lock_input, "--output", ".",
         "-m", message + "\n\n"
         + replay +
         "Conflict markers, when present, require a separate human resolution.",
@@ -136,7 +133,7 @@ def update(root: Path, revision: str = "latest", package_repository: str | None 
     if source.startswith("gh:"):
         source = "https://github.com/" + source[3:] + ".git"
     commit = resolve_template(source, revision)
-    repository, default_revision, _ = template_environment(root, source, commit)
+    repository, default_revision = template_environment(root, source, commit)
     default_commit = package_update.resolve_commit(repository, default_revision)
     # Resolve overrides before changing the repository, but apply them separately.
     override_repository = package_repository or repository

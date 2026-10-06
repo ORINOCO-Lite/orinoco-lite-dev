@@ -24,8 +24,7 @@ Check why the original source was required before removing it; retain actual com
 Prefer this correction over copying overrides into each environment: uv's `override-dependencies` is scoped to the workspace root and does not propagate from an installed dependency.
 If the declaring package cannot be corrected, document the reason for an environment override.
 
-Verify with a fresh downstream environment that has no override: confirm the client installs from the intended checkout and is editable.
-Refresh the lock deliberately, commit the dependency patch, and record its committed gitlink in the parent before sharing the change.
+Commit dependency fixes and update their parent gitlinks before sharing them.
 
 ## Working on the project
 
@@ -46,22 +45,12 @@ Run `pixi run orinoco-lite dev enable` from the downstream root.
 The command clones `.orinoco-lite/orinoco-lite-dev` locally, initializes the package's nested submodules, prepares resources, and installs its Python dependencies editable in the downstream environment.
 The source checkout is excluded through Git's local `info/exclude`; enable does not register a downstream submodule, stage files, or require a commit.
 `pixi.toml` remains a local modification visible in Git.
-Development downstreams can keep `/pixi.lock` untracked and ignored, with CI configured to resolve dependencies; deployment locks can be retained separately when required.
-Use the direct CLI rather than older template tasks that wrap enable in `datalad run`.
+Development locks stay local and untracked; release CI generates and tests a locked consumer environment.
 
 Use `--repository` and `--revision` to select a candidate when creating the checkout; use Git inside an existing checkout to change revisions.
-Re-running enable preserves uncommitted source edits and downstream dependencies.
-Hugo and other non-Python tools remain selected by the downstream manifest.
-Python code changes need no reinstall; changed dependency metadata requires a deliberate re-lock.
-If a stale lock prevents Pixi from launching enable, use the installed environment:
-
-``` console
-env -u PIXI_LOCKED pixi run --as-is orinoco-lite dev enable
-```
-
-Enable itself relaxes locking for its install without changing the caller's environment.
-Development commands allow lock updates; deployment can use a retained lock with `--locked`.
-Generated editor and schema resources still need `orinoco-lite dev prepare-resources` after their source changes.
+Re-running enable preserves uncommitted source edits.
+Python code changes need no reinstall; changed dependency declarations require a new resolution.
+Run `orinoco-lite dev prepare-resources` after editing schema or browser-interface sources.
 
 ## Package commits and release artifacts
 

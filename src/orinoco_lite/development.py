@@ -146,4 +146,5 @@ def enable(root: Path, repository: str | None = None, revision: str | None = Non
     if not branch:
         state += " (detached HEAD)"
     print(f"Editable Orinoco Lite enabled: {state}\n"
-          "Updated pixi.toml and pixi.lock locally.", file=sys.stderr, flush=True)
+          "Updated pixi.toml and pixi.lock locally; no files were staged.",
+          file=sys.stderr, flush=True)
