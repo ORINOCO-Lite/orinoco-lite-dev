@@ -1,7 +1,10 @@
-# Track an upstream website with Orinoco Lite
+# Instantiate and update the upstream website with Orinoco Lite
 
 This guide is for maintainers comparing Orinoco Lite with the selected upstream website or keeping a downstream deployment that follows it.
 The downstream imports upstream inputs and builds a fresh projection through Orinoco Lite; it does not publish upstream's existing generated pages.
+This is an engineering reproduction workflow, not ordinary downstream setup or package maintenance.
+Normal downstreams supply their own content and receive rendering functionality and required framework assets through the package.
+The engineering **Update upstream comparison** workflow proposes updates to the upstream instantiation; see [comparison updates](agents/upstream-comparison-updates.md).
 The [project design](project-design.md) describes the package, thin template adaptation, and downstream ownership.
 
 ```mermaid

@@ -25,7 +25,8 @@
   Pull-request-only commits are temporary test candidates; replace them with retained commits before adoption because deleting a branch can remove their only durable reference.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
-- Support the current package and template together.
+- Keep the template's minimum package requirement separate from its exact package pin.
+  Raise the minimum only when its adaptation or workflows require new functionality.
   Recreate downstream scaffolding around retained site inputs when that avoids compatibility or migration code.
 - Prefer one source of truth.
   Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.

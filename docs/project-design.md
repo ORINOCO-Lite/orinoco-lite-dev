@@ -217,7 +217,8 @@ Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-f
 Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
 Hugo assets come from the same checkout through Git Annex, without a template overlay.
 Editable development bypasses projection caches.
-The supported downstream uses the current package and template together.
+The template declares the minimum package version required by its adaptation and workflows; downstreams select an exact compatible package release or commit independently.
+Raise that minimum only when template functionality requires it.
 When their layout changes, update the template or recreate the scaffold while retaining site-owned inputs; do not maintain runtime paths for retired layouts.
 It does not change metadata during that step.
 These generated files are not canonical inputs and do not enter the downstream's default branch.

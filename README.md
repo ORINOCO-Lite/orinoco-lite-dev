@@ -94,18 +94,7 @@ Package versions come from Git tags through Versioneer.
 Normal downstream installations retain the version recorded at build time.
 Release tags use `v` followed by a Python package version; manually dispatched artifact builds use the selected ref's derived version.
 
-Create an inspectable downstream populated from the upstream Pool:
-
-``` console
-pixi run setup-upstream ../orinoco-lite-test-downstream
-```
-
-Setup uses the template's remote `main` and the engineering checkout's committed package version.
-Use `pixi run setup-upstream --help` for options.
-
-The engineering **Update upstream comparison** workflow updates the existing psychoinformatics parent and site-input datasets and proposes their DataLad commits as draft PRs.
-See [comparison updates](docs/agents/upstream-comparison-updates.md) for inputs and publication setup.
-See [upstream tracking](docs/upstream-tracking.md) for synchronization, comparison, and recovery.
+For the separate engineering task of reproducing and updating the upstream website, see [upstream instantiation](docs/upstream-tracking.md).
 
 In an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `submodule/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
 The checkout is locally ignored; manifest and lock changes need no commit.
@@ -117,7 +106,7 @@ The CLI owns operation sequencing: `orinoco-lite build` updates projection befor
 Pixi's downstream tasks supply convenient arguments.
 Use `pytest`, a test path, or pytest's selection flags to exercise code changes.
 The replacement-metadata test uses `../orinoco-lite-template`, including local edits; set `ORINOCO_TEST_TEMPLATE` to select another checkout.
-It skips only when neither selection is available locally; CI supplies the template's `main` checkout explicitly.
+It skips only when neither selection is available locally; CI explicitly selects its template candidate.
 This test uses the existing connected-record fixture and ordinary build CLI; upstream website fidelity is checked separately.
 The original upstream application retains its own native development commands.
 
