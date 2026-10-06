@@ -493,7 +493,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             "site-specific/metadata/records/Person",
             "site-specific/projection-templates",
             "site-specific/projection-tools",
-            "generated",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
         (self.root / "site-specific/metadata/records/Person/home.yaml").write_text(
@@ -595,7 +594,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.assertTrue(
             (
                 self.root
-                / "generated/projection/content/people/one/_index.md"
+                / "build/hugo-projection/content/people/one/_index.md"
             ).is_file()
         )
 
@@ -833,7 +832,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(DriverError, "original is preserved"):
                     update_projection(self.workspace, self.resources, no_cache=True)
-        backups = list((self.root / "generated").glob(".projection-backup-*"))
+        backups = list((self.root / "build").glob(".projection-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
 
@@ -847,7 +846,7 @@ class GenericProjectionContractTests(unittest.TestCase):
             update_projection(self.workspace, self.resources)
             validate_inputs(self.workspace, self.resources)
         assert semantic.call_count == 3
-        assert not (self.workspace.path("generated") / ".projection-cache.json").exists()
+        assert not (self.workspace.path("build") / ".projection-cache.json").exists()
 
     @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
     def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self, _editable):
@@ -866,7 +865,7 @@ class GenericProjectionContractTests(unittest.TestCase):
     def test_validate_does_not_generate_projection(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             assert validate_inputs(self.workspace, self.resources) == self.semantic
-            assert not list(self.workspace.path("generated").iterdir())
+            assert not self.workspace.path("build").exists()
             update_projection(self.workspace, self.resources)
             count = semantic.call_count
             validate_inputs(self.workspace, self.resources)
@@ -884,14 +883,14 @@ class GenericProjectionContractTests(unittest.TestCase):
                 contract.path,
                 contract.homepage.template,
                 self.resources / "schema/types/base.yaml",
-                self.workspace.path("generated") / "projection/records.jsonl",
+                self.workspace.path("build") / "hugo-projection/records.jsonl",
             ]
             # Whitespace is enough to invalidate without changing fixture meaning.
             for index, path in enumerate(paths, start=2):
                 path.write_text(path.read_text() + "\n")
                 update_projection(self.workspace, self.resources)
                 assert semantic.call_count == index
-            (self.workspace.path("generated") / ".projection-cache.json").write_text("broken")
+            (self.workspace.path("build") / ".projection-cache.json").write_text("broken")
             update_projection(self.workspace, self.resources)
             assert semantic.call_count == len(paths) + 2
 
@@ -917,7 +916,7 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
     path.write_text(content, encoding="utf-8")
 
     update_projection(workspace, resources)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     machine = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
     assert record in machine
     assert not (projection / "content/files/ancillary/_index.md").exists()
@@ -954,7 +953,7 @@ def test_upstream_date_readback_does_not_block_projection_or_edit_stored_input(t
     path.write_text(canonical_yaml(record))
     original = path.read_bytes()
     update_projection(workspace, resources)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     projected = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
     assert record in projected
     assert path.read_bytes() == original

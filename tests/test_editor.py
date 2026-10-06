@@ -55,7 +55,6 @@ class EditorBundleTests(unittest.TestCase):
             "site-specific/projection-templates",
             "site-specific/projection-tools",
             "extensions/adapters",
-            "generated",
             "extensions",
             "build",
         ):

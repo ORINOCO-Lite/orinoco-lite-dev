@@ -323,6 +323,10 @@ def _safe_destination(workspace, destination: Path) -> Path:
     build = workspace.path("build").resolve(strict=False)
     if build not in resolved.parents:
         raise ConfigurationError(f"Build destination must be below {build}: {resolved}")
+    for name in ("hugo-projection", "hugo-assembly"):
+        reserved = (build / name).resolve(strict=False)
+        if resolved == reserved or reserved in resolved.parents or resolved in reserved.parents:
+            raise ConfigurationError(f"Build destination overlaps {name}: {resolved}")
     return resolved
 
 
@@ -375,7 +379,7 @@ def _assemble(
     _copy_tree(overrides / "static", assembly / "static")
     _copy_tree(workspace.path("site") / "assets", assembly / "assets", media=media)
     _copy_tree(workspace.path("site") / "static", assembly / "static", media=media)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
     _copy_tree(workspace.path("editorial"), assembly / "content")
@@ -474,7 +478,7 @@ def build_site(
         else workspace.repository
     )
     parsed = urlsplit(base_url)
-    assembly = workspace.path("build") / "assembly"
+    assembly = workspace.path("build") / "hugo-assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)

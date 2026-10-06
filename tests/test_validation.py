@@ -46,7 +46,6 @@ class DownstreamValidationTests(unittest.TestCase):
             "site-specific/content",
             "site-specific",
             "extensions/adapters/zotero",
-            "generated",
             "extensions",
             "build",
         ):

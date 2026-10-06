@@ -174,7 +174,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 path = www_from_model / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
 
             site._assemble(
                 load_config_path(root / "pyproject.toml"),
@@ -273,7 +273,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 '{"name": {{ site.identity.title | json_string }}}\n',
                 encoding="utf-8",
             )
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
             workspace = load_config_path(config)
             www_from_model = _www_from_model(root)
             section = www_from_model / "content/section/_index.md"
@@ -311,7 +311,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             # Fresh metadata supplies a homepage and entity pages without any
             # authored scaffolding. A same-path authored file replaces all of it.
-            projection = root / "generated/projection/content"
+            projection = root / "build/hugo-projection/content"
             for name, value in {
                 "_index.md": "---\ntitle: Metadata home\n---\nMetadata introduction\n",
                 "projects/example/_index.md": "---\ntitle: Metadata entity\n---\nEntity description\n",
@@ -383,7 +383,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     workspace,
                     adapter,
                     _www_from_model(root),
-                    root / "build/assembly",
+                    root / "build/hugo-assembly",
                 )
 
     def test_assembly_copies_site_static_files(self) -> None:
@@ -395,7 +395,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text("static\n", encoding="utf-8")
             _write_site_data(root)
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
             workspace = load_config_path(config)
 
             site._assemble(
@@ -424,7 +424,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             forbidden = root / "extensions/layouts/term.html"
             forbidden.parent.mkdir(parents=True)
             forbidden.write_text("extension\n", encoding="utf-8")
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
 
             site._assemble(
                 load_config_path(config),
@@ -547,3 +547,22 @@ class HugoCompatibilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_build_destination_cannot_overwrite_intermediate_inputs(tmp_path):
+    from types import SimpleNamespace
+    from orinoco_lite.errors import ConfigurationError
+    from orinoco_lite.site import _safe_destination
+    import pytest
+
+    workspace = SimpleNamespace(root=tmp_path, path=lambda _: tmp_path / "build")
+    for name in ("hugo-projection", "hugo-assembly"):
+        protected = tmp_path / "build" / name
+        protected.mkdir(parents=True)
+        marker = protected / "input.txt"
+        marker.write_text("retained input")
+        for destination in (protected, protected / "nested"):
+            with pytest.raises(ConfigurationError, match="overlaps"):
+                _safe_destination(workspace, destination)
+        assert marker.read_text() == "retained input"
+    assert _safe_destination(workspace, Path("build/site")) == tmp_path / "build/site"

@@ -97,7 +97,7 @@ def _parser() -> argparse.ArgumentParser:
     projection = commands.add_parser(
         "projection", help="generate intermediate metadata pages and graph data",
         description=("Generate the Hugo pages, normalized records, and graph data under "
-                     "generated/projection for inspection or further processing. This does "
+                     "build/hugo-projection for inspection or further processing. This does "
                      "not build HTML. For a website preview, use build, which performs this step automatically."),
     )
     projection.add_argument("projection_command", choices=("update",))

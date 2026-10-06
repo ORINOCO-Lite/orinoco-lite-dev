@@ -810,7 +810,7 @@ def render_projection(
 
 
 def _cached_projection_report(workspace, key):
-    destination = workspace.path("generated") / "projection"
+    destination = workspace.path("build") / "hugo-projection"
     if destination.is_dir():
         try:
             saved = json.loads((destination.parent / ".projection-cache.json").read_text(encoding="utf-8"))
@@ -844,7 +844,7 @@ def update_projection(
 ) -> dict[str, Any]:
     from .www_from_model import editable_package_checkout
     no_cache = no_cache or editable_package_checkout() is not None
-    destination = workspace.path("generated") / "projection"
+    destination = workspace.path("build") / "hugo-projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
     contract = load_contract(workspace, _www_from_model_root(workspace, resources_root))
     key = None if no_cache else _projection_cache_key(workspace, contract, resources_root)
