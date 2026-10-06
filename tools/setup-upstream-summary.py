@@ -84,6 +84,8 @@ def main():
     parser.add_argument("--api", required=True)
     parser.add_argument("--site-layout", required=True)
     parser.add_argument("--build", choices=("true", "false"), required=True)
+    parser.add_argument("--from-downstream", default="")
+    parser.add_argument("--development", choices=("true", "false"), default="false")
     args = parser.parse_args()
     engineering, package_repository, package_commit = args.package
     template, template_repository, template_commit = args.template
@@ -117,7 +119,11 @@ def main():
         show_commit("Package", package_repository, package_commit, package_root, args.package_selection)
         show_commit("Template", template_repository, template_commit, template_root, args.template_selection)
         show_commit("www-from-model", upstream_repository, upstream_commit, upstream_root, "package gitlink")
-        if args.site_specific:
+        if args.from_downstream:
+            source = Path(args.from_downstream).resolve()
+            commit = git(source, "rev-parse", "HEAD").stdout.strip()
+            line(f"• Inputs: {source} @ {commit[:7]} (retained; no acquisition or import)", "36")
+        elif args.site_specific:
             line(f"• Inputs: {Path(args.site_specific).resolve()} (site-specific submodule)", "36")
         else:
             source = f"dump {Path(args.dump).resolve()}" if args.dump else args.api
@@ -131,6 +137,8 @@ def main():
         action = "Forced overwrite" if destination.exists() else "Create"
         line(f"{action}: {destination}", "31" if destination.exists() else None)
         line("Build: site + publication bundle" if args.build == "true" else "Build: skipped")
+        if args.development == "true":
+            line("Development: tracked .orinoco-lite/orinoco-lite-dev, editable installation")
         for label, entries in local_changes:
             show_changes(label, entries)
 
