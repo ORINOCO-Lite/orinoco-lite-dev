@@ -66,7 +66,8 @@ Explicit `--package-revision` and `--package-repository` overrides are recorded 
 The template's **Update downstream template** GitHub workflow calls this command and opens a draft pull request; see the [downstream update guide](https://github.com/ORINOCO-Lite/orinoco-lite-template/blob/main/copier-template/docs/template-updates.md).
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 Source-adapter tasks use DataLad to record run provenance in Git.
-Git Annex retrieves the selected upstream Hugo assets.
+Distribution builds use Git Annex to retrieve required upstream assets and bundle the rendering subset.
+Installed wheels build sites without an upstream checkout or upstream asset downloads; editable installs use the nested working source.
 Sites can also opt into [Annex media](docs/agents/annex-media.md) for their own media.
 
 Precise interfaces and normative engineering behavior are documented in:

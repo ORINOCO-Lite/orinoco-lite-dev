@@ -99,12 +99,11 @@ def retrieve_and_verify(
 
 def prepare_hugo_assets(repository: Path, *, editable: bool = False, remote: str | None = None) -> dict[Path, Path]:
     """Hydrate the selected checkout's Hugo assets as ordinary assembly inputs."""
-    from .site import HUGO_SURFACES, _is_annex_pointer
+    from .upstream_runtime import runtime_asset, _is_annex_pointer
 
     files = {
         path: key for path, key in annex_files(repository, initialize=True).items()
-        if len(path.parts) > 1 and path.parts[0] in HUGO_SURFACES
-        and path != Path("static/graph.json")
+        if runtime_asset(path)
     }
     # Unlocked editable files are working source, including unsaved changes.
     # Only missing payloads need retrieval; never replace these local bytes.

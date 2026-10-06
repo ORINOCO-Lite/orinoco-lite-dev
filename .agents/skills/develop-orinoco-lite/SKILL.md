@@ -18,7 +18,9 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    Git Annex is permitted for engineering repinning and explicit upstream-site media retrieval.
    Site-specific media go into downstream site inputs, not the generic template.
    Downstream records stay in Git.
-   Builds retrieve required upstream Hugo assets with Git Annex; downstream-owned Annex media remains opt-in.
+   Distribution builds bundle the required upstream rendering subset and retrieve its assets with Git Annex.
+   Fixed site builds use packaged files; editable builds use the nested working source.
+   Downstream-owned Annex media remains opt-in.
    Editable packages use their nested working checkout and bypass projection caches.
 2. Identify the package and template candidates and any downstream inputs to inject.
    Local candidate testing is the default.

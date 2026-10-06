@@ -2,13 +2,14 @@
 
 ## Current direction
 
-- Use one selected `www-from-model` checkout for Hugo, projection, and assets.
-  Fixed installs use the package gitlink; editable installs use the actual nested working checkout, including edits.
+- Use one selected `www-from-model` source for Hugo, projection, and assets.
+  Distributions bundle only the required rendering subset from the package gitlink and its exact nested dependencies; editable installs use the actual nested working checkout, including edits.
   Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in package or downstream configuration.
   The package owns generic source resolution, metadata, projection, and composition operations.
   Keep the template thin: it contains the Orinoco adaptation, Copier scaffold, workflows, and dependency locks, not a copied website.
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
-  Builds hydrate and verify required upstream Hugo assets and copy ordinary files into the assembly.
+  Package builds hydrate and verify required upstream Hugo assets.
+  Fixed site builds use ordinary bundled files without an upstream Git/Annex checkout; editable builds hydrate required assets from their working source.
   `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.
   Upstream asset preparation uses Git Annex independently of the downstream media opt-in.
   Opted-in `site-specific` submodules may use Annex only for `assets/` and `static/`; builds copy verified content into ordinary output files.

@@ -101,7 +101,7 @@ def _requirements(base, config_settings):
     requirements = base(config_settings)
     if _checkout() is not None:
         # Node and npm compile the bundled UIs; they are not Python runtime deps.
-        requirements.append("nodejs-wheel>=24.15,<25")
+        requirements.extend(["nodejs-wheel>=24.15,<25", "git-annex"])
     return requirements
 
 

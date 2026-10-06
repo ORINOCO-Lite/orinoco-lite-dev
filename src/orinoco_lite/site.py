@@ -23,28 +23,13 @@ from .editor import bind_editor
 from .integrity import sha256_file
 from .projection import load_contract
 from .www_from_model import resolve_www_from_model
+from .upstream_runtime import (
+    HUGO_SURFACES, _copy_tree, _copy_file, _reject_annex_pointers, copy_hugo_runtime,
+)
 from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
-HUGO_SURFACES = (
-    "archetypes",
-    "assets",
-    "config",
-    "data",
-    "i18n",
-    "layouts",
-    "static",
-)
-SITE_IDENTITY_IMAGE_SUFFIXES = {
-    ".gif",
-    ".ico",
-    ".jpeg",
-    ".jpg",
-    ".png",
-    ".svg",
-    ".webp",
-}
 GITHUB_REPOSITORY_URL = "https://github.com/"
 FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
   {{ with .engine }}
@@ -59,98 +44,6 @@ FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
   {{ end }}
 {{ end }}
 """
-
-
-def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | None = None) -> None:
-    if source.is_symlink():
-        raise DriverError(f"Static source cannot be a symlink: {source}")
-    if not source.is_dir():
-        return
-    for candidate in sorted(source.rglob("*")):
-        relative = candidate.relative_to(source)
-        if ".git" in relative.parts:
-            continue
-        target = destination / relative
-        if media and candidate in media:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(media[candidate], target)
-            continue
-        if candidate.is_symlink():
-            raise DriverError(f"Static source cannot contain symlinks: {candidate}")
-        if candidate.is_dir():
-            target.mkdir(parents=True, exist_ok=True)
-        elif candidate.is_file():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(candidate, target)
-
-
-def _copy_file(source: Path, destination: Path) -> None:
-    if not source.exists():
-        return
-    if source.is_symlink() or not source.is_file():
-        raise DriverError(f"Hugo source is not a regular file: {source}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, destination)
-
-
-def _is_annex_pointer(path: Path) -> bool:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
-        return False
-    try:
-        value = path.read_text(encoding="utf-8").strip()
-    except UnicodeDecodeError:
-        return False
-    return value.startswith(("/annex/objects/", ".git/annex/objects/"))
-
-
-def _reject_annex_pointers(root: Path) -> None:
-    pointers = [
-        path.relative_to(root).as_posix()
-        for path in sorted(root.rglob("*"))
-        if _is_annex_pointer(path)
-    ]
-    if pointers:
-        raise DriverError(
-            "Materialized Hugo assets are missing for upstream Annex "
-            "content: " + ", ".join(pointers[:10])
-        )
-
-
-def _remove_upstream_identity_images(static_root: Path) -> None:
-    """Leave root-level site identity images to the theme or downstream."""
-
-    if not static_root.is_dir():
-        return
-    for path in static_root.iterdir():
-        if path.is_file() and path.suffix.lower() in SITE_IDENTITY_IMAGE_SUFFIXES:
-            path.unlink()
-
-
-def _copy_upstream_section_frontmatter(source: Path, destination: Path) -> None:
-    """Retain section layout parameters without importing editorial bodies."""
-
-    if source.is_symlink():
-        raise DriverError(f"Upstream content root cannot be a symlink: {source}")
-    if not source.is_dir():
-        return
-    for path in sorted(source.glob("*/_index.md")):
-        if path.is_symlink() or not path.is_file():
-            raise DriverError(f"Upstream section metadata is not a file: {path}")
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        except UnicodeDecodeError as error:
-            raise DriverError(f"Upstream section metadata is not UTF-8: {path}") from error
-        if not lines or lines[0].strip() != "---":
-            raise DriverError(f"Upstream section has no YAML front matter: {path}")
-        closing = next(
-            (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
-            None,
-        )
-        if closing is None:
-            raise DriverError(f"Upstream section front matter is unclosed: {path}")
-        target = destination / path.parent.name / "_index.md"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("".join(lines[: closing + 1]).rstrip() + "\n", encoding="utf-8")
 
 
 def _render_template_tree(
@@ -345,27 +238,13 @@ def _assemble(
     upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
     adapter = workspace.root / ".orinoco-lite" / "hugo-adapter"
-    upstream_media = prepare_hugo_assets(
-        upstream, editable=editable_package_checkout() is not None,
+    upstream_media = (prepare_hugo_assets(
+        upstream, editable=True,
         remote="https://hub.psychoinformatics.de/www/www-from-model.git",
-    )
-
+    ) if editable_package_checkout() is not None else {})
+    copy_hugo_runtime(upstream, assembly, media=upstream_media)
     for name in HUGO_SURFACES:
-        _copy_tree(theme / name, assembly / "themes" / "congo" / name)
-    _copy_file(theme / "theme.toml", assembly / "themes" / "congo" / "theme.toml")
-    _copy_file(
-        theme / "LICENSE",
-        assembly / "static" / "LICENSES" / "congo-MIT.txt",
-    )
-
-    for name in HUGO_SURFACES:
-        _copy_tree(upstream / name, assembly / name, media=upstream_media)
-        if name == "static":
-            _remove_upstream_identity_images(assembly / "static")
         _copy_tree(adapter / name, assembly / name)
-    for name in ("fzj.svg", "hhu.svg", "logo.png"):
-        (assembly / "assets" / "img" / name).unlink(missing_ok=True)
-    _copy_upstream_section_frontmatter(upstream / "content", assembly / "content")
 
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
@@ -387,8 +266,7 @@ def _assemble(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",
     )
-    _copy_file(resources_root / "licenses/orinoco-lite-MIT.txt",
-               assembly / "static/LICENSES/materialized-hugo-assets.txt")
+
     _reject_annex_pointers(assembly)
 
 

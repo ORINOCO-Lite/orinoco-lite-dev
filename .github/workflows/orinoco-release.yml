@@ -38,6 +38,8 @@ jobs:
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
+          git -C submodules/www-from-model submodule update --init --recursive
+
       - name: Install the package environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:

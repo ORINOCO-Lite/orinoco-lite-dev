@@ -92,7 +92,7 @@ Part                                                                            
 [`orinoco-lite`](../src/orinoco_lite/)                                              Contains the code and data that validate metadata, derive projections, and assemble the site.
 It also adds the static `/edit/` and `/review/` interfaces.
 It includes the pinned Things Schema, generic drivers, static interface shells, licenses, and notices.
-It also records the engineering commit that selects `www-from-model`.
+It bundles the required `www-from-model` rendering subset and Congo, recording their exact source commits.
 It contains no organization content, organization policy, or copy of the upstream website.
 
   [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/)   Provides the Copier source that creates and updates downstream repositories.                                                                                It contains the scaffold, thin Orinoco Hugo adaptation, workflows, and helper tools. It does not contain a website copy, German content, or site identity.
@@ -213,7 +213,7 @@ Website composition does not load adapter code, captured execution state, or dep
 The generated site does not receive them.
 Reusable adapter primitives belong in Orinoco Lite or the template.
 
-Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` checkout to generate the graph and Hugo pages.
+Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` rendering resources to generate the graph and Hugo pages.
 Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
 Hugo assets come from the same checkout through Git Annex, without a template overlay.
 Editable development bypasses projection caches.
@@ -312,7 +312,7 @@ The normative contracts define the precise behavior:
   Compose DataLad around operations at the task or caller boundary; avoid commands that invoke DataLad to rerun themselves with recursion-suppression flags.
   Repository owners control DataLad storage policy.
 - **Give provenance tools distinct jobs.**
-  Git Annex retrieves and verifies required upstream assets and optional downstream media.
+  Git Annex retrieves and verifies required upstream assets during distribution preparation or editable builds, and optional downstream media during site builds.
   DataLad records downstream adapter runs in ordinary Git.
   Downstreams may opt in for media under a `site-specific` submodule's `assets/` and `static/`.
   Records, configuration, and editorial content remain ordinary Git files; builds materialize media as ordinary output files.
