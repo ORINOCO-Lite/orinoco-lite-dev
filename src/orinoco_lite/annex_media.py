@@ -69,7 +69,7 @@ def annex_files(repository: Path, *, initialize: bool = False) -> dict[Path, str
     return files
 
 
-@progress("Retrieving and verifying Annex media")
+@progress("Downloading required media")
 def retrieve_and_verify(
     repository: Path, files: dict[Path, str], *, remote: str | None = None,
     run_annex: Callable[..., str] | None = None,
@@ -97,7 +97,6 @@ def retrieve_and_verify(
     return locations
 
 
-@progress("Preparing upstream Hugo assets with Git Annex")
 def prepare_hugo_assets(repository: Path, *, editable: bool = False, remote: str | None = None) -> dict[Path, Path]:
     """Hydrate the selected checkout's Hugo assets as ordinary assembly inputs."""
     from .site import HUGO_SURFACES, _is_annex_pointer

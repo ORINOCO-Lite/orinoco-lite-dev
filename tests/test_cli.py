@@ -110,7 +110,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             self.assertEqual(
                 invoke.call_args_list,
                 [
-                    call("projection-update", workspace, resources),
+                    call("projection-update", workspace, resources, extra_arguments=("--quiet",)),
                     call(
                         "build",
                         workspace,
@@ -214,3 +214,31 @@ def test_validate_json_has_one_document_across_driver_process(tmp_path, monkeypa
     output = capfd.readouterr()
     assert json.loads(output.out)["records"] == 1
     assert not output.err
+
+
+@pytest.mark.parametrize("machine", [False, True])
+def test_build_report_output(machine, capsys):
+    import json
+    from orinoco_lite import site
+    report = {"files": 12, "version": 1}
+    arguments = ["--config", "site.toml", "--resources", "resources",
+                 "--destination", "build/site", "--base-url", "/"]
+    with patch.object(site, "build_site", return_value=report):
+        assert site.main(arguments + (["--json"] if machine else [])) == 0
+    output = capsys.readouterr().out
+    if machine:
+        assert json.loads(output) == report
+    else:
+        assert output == "Built website in build/site (12 files).\n"
+
+
+def test_quiet_projection_keeps_warnings(capsys):
+    from orinoco_lite import projection_cli
+    with patch.object(projection_cli, "load_config_path"), patch.object(
+        projection_cli, "update_projection", return_value={"dropped_graph_edges": 2}
+    ):
+        assert projection_cli.main(["--config", "site.toml", "--resources", "resources",
+                                    "update", "--quiet"]) == 0
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "omitted 2 graph relationships" in output.err

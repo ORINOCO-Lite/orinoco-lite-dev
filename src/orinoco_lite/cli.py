@@ -61,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--destination", type=Path, help="output directory under build/ (default: build/site)")
     build.add_argument("--publication-bundle", type=Path, metavar="PATH",
                        help="also save this build as a Git bundle at PATH under build/ for deployment history; commit input changes first (normally set by the Pages workflow)")
+    build.add_argument("--json", action="store_true", help="print the build report as one JSON document")
     build.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate metadata-derived pages and graph data; does not fetch new source data")
     build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"),
                        help="website URL, including any path prefix; use / for a local preview (default: ORINOCO_BASE_URL or your site configuration)")
@@ -265,7 +266,10 @@ def _build_workspace(args, workspace, resources) -> int:
         prepare_media(workspace)
         projection_commit = record_projection(workspace.root)
     else:
-        projection_status = _update_projection(args, workspace, resources)
+        projection_status = invoke_driver(
+            "projection-update", workspace, resources,
+            extra_arguments=("--quiet",) + (("--no-cache",) if getattr(args, "no_cache", False) else ()),
+        )
         if projection_status:
             return projection_status
     base_url = args.base_url or workspace.base_url
@@ -290,7 +294,7 @@ def _build_workspace(args, workspace, resources) -> int:
             ("--build-timestamp", build_timestamp)
             if build_timestamp is not None
             else ()
-        ),
+        ) + (("--json",) if getattr(args, "json", False) else ()),
     )
     if status == 0 and bundle is not None:
         from .publication import prepare

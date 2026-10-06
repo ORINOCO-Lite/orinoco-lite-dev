@@ -239,7 +239,7 @@ def _ensure_checkout(
     temporary = Path(tempfile.mkdtemp(prefix=".source-", dir=destination.parent))
     fresh = temporary / "checkout"
     try:
-        with progress("Fetching www-from-model and its dependencies"):
+        with progress("Fetching shared website assets"):
             _clone_checkout(repository, commit, fresh)
         os.replace(fresh, destination)
     finally:

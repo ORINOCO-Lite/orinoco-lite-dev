@@ -326,7 +326,7 @@ def _safe_destination(workspace, destination: Path) -> Path:
     return resolved
 
 
-@progress("Assembling the Hugo site")
+@progress("Preparing the website")
 def _assemble(
     workspace,
     resources_root: Path,
@@ -504,7 +504,7 @@ def build_site(
             cwd=workspace.root,
         )
     adapter = _site_adapter(resources_root)
-    with progress("Preparing the site editor and review pages"):
+    with progress("Preparing editing and review pages"):
         if adapter.is_file():
             _run(
                 [
@@ -560,6 +560,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--build-timestamp")
+    parser.add_argument("--json", action="store_true", help="print the build report as JSON")
     args = parser.parse_args(argv)
     try:
         report = build_site(
@@ -573,7 +574,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (ConfigurationError, DriverError, IntegrityError) as error:
         print(f"orinoco-lite build: {error}", file=sys.stderr)
         return 1
-    print(json.dumps(report, sort_keys=True))
+    if args.json:
+        print(json.dumps(report, sort_keys=True))
+    else:
+        print(f"Built website in {args.destination} ({report['files']} files).")
     return 0
 
 

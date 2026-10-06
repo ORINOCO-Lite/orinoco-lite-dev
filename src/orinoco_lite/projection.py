@@ -396,7 +396,7 @@ def _records(
     return records, {item["pid"] for item in records}
 
 
-@progress("Validating metadata semantics")
+@progress("Checking records")
 def validate_semantics(
     workspace: WorkspaceConfig,
     resources_root: Path,
