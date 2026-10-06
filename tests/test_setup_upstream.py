@@ -423,39 +423,6 @@ def test_public_template_records_https_source(setup, remote):
     assert copier[-2] == "https://github.com/ORINOCO-Lite/orinoco-lite-template.git"
 
 
-def test_recreation_retains_source_history_and_skips_acquisition(setup, tmp_path):
-    run, _, _, destination, *_ = setup
-    source = tmp_path / "retained downstream"
-    repository(source, "main")
-    git(source, "remote", "set-url", "origin", "https://github.com/example/psychoinformatics-downstream.git")
-    (source / ".copier-answers.yml").write_text("project_name: Orinoco Lite Site\n")
-    (source / "pyproject.toml").write_text('[tool.orinoco.site.identity]\ntitle = "Psychoinformatics"\n')
-    (source / "extensions").mkdir()
-    (source / "extensions/.gitkeep").touch()
-    (source / "sourcedata/downloaded").mkdir(parents=True)
-    (source / "sourcedata/downloaded/records.jsonl").write_text('{"pid":"retained"}\n')
-    (source / ".gitmodules").write_text(f'[submodule "site-specific"]\n path = site-specific\n url = {source}\n')
-    site_commit = git(source, "rev-parse", "HEAD")
-    git(source, "add", ".")
-    git(source, "update-index", "--add", "--cacheinfo", f"160000,{site_commit},site-specific")
-    git(source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-        "-c", "commit.gpgsign=false", "commit", "--no-verify", "-qm", "test: retained inputs")
-    head = git(source, "rev-parse", "HEAD")
-    run.env["GIT_ALLOW_PROTOCOL"] = "file"
-    result, calls = run("--from-downstream", str(source))
-    assert result.returncode == 0, result.stderr
-    assert git(destination, "rev-parse", "pre-reinstantiation") == head
-    assert not any("populate" in call for call in calls)
-    copier = next(call for call in calls if "copier" in call and "copy" in call)
-    assert copier[copier.index("--data-file") + 1] == ".copier-answers.yml"
-    install = next(call for call in calls if "chore: retain site-specific revision" in call)
-    assert install[-2:] == [".gitmodules", "site-specific"]
-    assert git(destination / "site-specific", "rev-parse", "HEAD") == site_commit
-    correction = next(call for call in calls if "fix: align Copier answers with retained site settings" in call)
-    assert correction[-1] == "psychoinformatics-downstream"
-    assert "no acquisition or import" in result.stdout
-
-
 def test_development_registers_the_selected_package_before_enable(setup):
     run, engineering, _, destination, package_commit, *_ = setup
     run.env["GIT_ALLOW_PROTOCOL"] = "file"
@@ -467,15 +434,3 @@ def test_development_registers_the_selected_package_before_enable(setup):
     enable = next(call for call in calls if "chore: enable editable Orinoco Lite" in call)
     assert enable[-2:] == ["dev", "enable"]
     assert calls.index(registration) < calls.index(enable)
-
-
-def test_recreation_rejects_missing_capture_before_replacing_destination(setup, tmp_path):
-    run, _, _, destination, *_ = setup
-    source = tmp_path / "empty-source"
-    repository(source, "main")
-    destination.mkdir()
-    sentinel = destination / "keep"
-    sentinel.write_text("keep")
-    result, _ = run("--from-downstream", str(source), "--force")
-    assert result.returncode != 0
-    assert sentinel.read_text() == "keep"

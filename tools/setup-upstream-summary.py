@@ -84,7 +84,6 @@ def main():
     parser.add_argument("--api", required=True)
     parser.add_argument("--site-layout", required=True)
     parser.add_argument("--build", choices=("true", "false"), required=True)
-    parser.add_argument("--from-downstream", default="")
     parser.add_argument("--development", choices=("true", "false"), default="false")
     args = parser.parse_args()
     engineering, package_repository, package_commit = args.package
@@ -119,11 +118,7 @@ def main():
         show_commit("Package", package_repository, package_commit, package_root, args.package_selection)
         show_commit("Template", template_repository, template_commit, template_root, args.template_selection)
         show_commit("www-from-model", upstream_repository, upstream_commit, upstream_root, "package gitlink")
-        if args.from_downstream:
-            source = Path(args.from_downstream).resolve()
-            commit = git(source, "rev-parse", "HEAD").stdout.strip()
-            line(f"• Inputs: {source} @ {commit[:7]} (retained; no acquisition or import)", "36")
-        elif args.site_specific:
+        if args.site_specific:
             line(f"• Inputs: {Path(args.site_specific).resolve()} (site-specific submodule)", "36")
         else:
             source = f"dump {Path(args.dump).resolve()}" if args.dump else args.api
