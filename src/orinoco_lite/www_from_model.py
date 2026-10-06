@@ -13,7 +13,7 @@ from typing import Sequence
 
 from .progress import progress
 from .errors import IntegrityError
-from .resources import SOURCE_REPOSITORY, source_commit
+from .resources import upstream_source
 
 
 _GIT_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
@@ -111,55 +111,20 @@ def _repository_head(repository: Path, *, label: str) -> str:
     return commit
 
 
-def _selected_www_from_model_commit(engineering: Path, commit: str) -> str:
-    output = _git_text(
-        engineering,
-        ("ls-tree", "--full-tree", commit, "--", _WWW_FROM_MODEL_GITLINK),
-        operation="read the selected www-from-model Gitlink",
-    )
-    match = re.fullmatch(
-        rf"160000 commit (?P<commit>[0-9a-f]{{40}})\t{re.escape(_WWW_FROM_MODEL_GITLINK)}",
-        output,
-    )
-    if match is None:
-        raise IntegrityError(
-            f"Engineering commit must select {_WWW_FROM_MODEL_GITLINK} as one Gitlink"
-        )
-    return match.group("commit")
-
-
-def _verify_engineering(engineering: Path, expected_commit: str) -> Path:
-    actual_commit = _repository_head(engineering, label="Cached engineering checkout")
-    if actual_commit != expected_commit:
-        raise IntegrityError(
-            f"Cached engineering checkout is {actual_commit}, expected {expected_commit}"
-        )
-    return engineering
-
-
-@progress("Checking upstream sources")
-def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
-    _verify_engineering(engineering, expected_commit)
-    selected_commit = _selected_www_from_model_commit(engineering, expected_commit)
-    www_from_model = engineering / _WWW_FROM_MODEL_GITLINK
-    if www_from_model.is_symlink() or not www_from_model.is_dir():
-        raise IntegrityError("Selected www-from-model submodule is not initialized")
-    if (
-        _repository_head(www_from_model, label="Selected www-from-model checkout")
-        != selected_commit
-    ):
-        raise IntegrityError("Selected www-from-model checkout does not match its Gitlink")
+def _verify_checkout(www_from_model: Path, expected_commit: str) -> Path:
+    if _repository_head(www_from_model, label="Cached www-from-model checkout") != expected_commit:
+        raise IntegrityError("Cached www-from-model checkout does not match the package selection")
 
     status = _git(
-        engineering,
-        ("submodule", "status", "--recursive", "--", _WWW_FROM_MODEL_GITLINK),
+        www_from_model,
+        ("submodule", "status", "--recursive"),
         operation="verify the www-from-model dependency closure",
     ).stdout
     try:
         lines = status.decode("utf-8", "strict").splitlines()
     except UnicodeDecodeError as error:
         raise IntegrityError("Git returned non-UTF-8 submodule status") from error
-    if not lines or any(not line.startswith(" ") for line in lines):
+    if any(not line.startswith(" ") for line in lines):
         raise IntegrityError(
             "www-from-model dependencies are missing or do not match their Gitlinks"
         )
@@ -172,7 +137,7 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
     filters = (("-c", "filter.annex.process=git-annex filter-process")
                if annex_directory.is_dir() else ())
     dirty = _git(
-        engineering,
+        www_from_model,
         (
             *filters,
             "status",
@@ -208,7 +173,7 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
     available = _git(
         destination,
         ("cat-file", "-e", f"{commit}^{{commit}}"),
-        operation="check whether the engineering commit was cloned",
+        operation="check whether the upstream commit was cloned",
         check=False,
     )
     if available.returncode:
@@ -216,12 +181,12 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
         _git(
             destination,
             ("fetch", "--quiet", "--no-tags", "origin", commit),
-            operation=f"fetch engineering commit {commit}",
+            operation=f"fetch upstream commit {commit}",
         )
     _git(
         destination,
         ("checkout", "--quiet", "--detach", "--force", commit),
-        operation=f"check out engineering commit {commit}",
+        operation=f"check out www-from-model commit {commit}",
     )
     _git(
         destination,
@@ -234,8 +199,6 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
             "--init",
             "--recursive",
             "--checkout",
-            "--",
-            _WWW_FROM_MODEL_GITLINK,
         ),
         operation="resolve the www-from-model dependency closure",
     )
@@ -244,7 +207,7 @@ def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
 
 def _cache_name(repository: str, commit: str) -> str:
     repository_id = hashlib.sha256(repository.encode("utf-8")).hexdigest()[:16]
-    return f"engineering-{repository_id}-{commit}"
+    return f"source-{repository_id}-{commit}"
 
 
 def _remove_cache_path(path: Path) -> None:
@@ -271,7 +234,7 @@ def _ensure_checkout(
             mismatch = error
 
     cache.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=".engineering-", dir=cache))
+    temporary = Path(tempfile.mkdtemp(prefix=".source-", dir=cache))
     fresh = temporary / "checkout"
     try:
         with progress("Fetching www-from-model and its dependencies"):
@@ -316,18 +279,6 @@ def editable_package_checkout() -> Path | None:
     return Path(unquote(url.path)).resolve()
 
 
-def _package_source(resources_root: Path) -> tuple[str, str]:
-    commit = source_commit(resources_root)
-    from .package_update import installed_git_source
-    installed = installed_git_source()
-    if installed:
-        repository, installed_commit = installed
-        if installed_commit != commit:
-            raise IntegrityError("Installed package source and bundled resource commit disagree")
-        return repository, commit
-    return SOURCE_REPOSITORY, commit
-
-
 def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) -> Path:
     """Use the installed package’s fixed revision or editable working source."""
 
@@ -342,9 +293,9 @@ def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) 
         if not (selected / ".git").exists():
             raise IntegrityError(f"Initialize the package's www-from-model submodule: {selected}")
         return selected.resolve()
-    engineering_repository, engineering_commit = _package_source(resources_root)
+    repository, commit = upstream_source(resources_root)
     return _ensure_checkout(
         workspace / ".orinoco" / "www-from-model",
-        repository=engineering_repository,
-        commit=engineering_commit,
+        repository=repository,
+        commit=commit,
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shlex
 from pathlib import Path
@@ -117,24 +118,24 @@ class WwwFromModelResolverTests(unittest.TestCase):
         return repository
 
     def _resources(self, *, repository: Path | None = None) -> Path:
+        from orinoco_lite.build_resources import selected_upstream
         root = self.root / "resources"
         root.mkdir()
-        (root / "source-commit.txt").write_text(self.engineering_commit + "\n")
-        self.source_repository = str(repository) if repository else ""
-        source_patch = patch("orinoco_lite.www_from_model.SOURCE_REPOSITORY", self.source_repository)
-        source_patch.start()
-        self.addCleanup(source_patch.stop)
+        (root / "www-from-model.json").write_text(json.dumps(
+            selected_upstream(self.engineering, self.engineering_commit)))
         return root
 
-    def test_package_uses_committed_gitlink_and_resolves_recursively(self) -> None:
+    def test_package_resolves_upstream_directly_and_recursively(self) -> None:
         (self.engineering / ".gitmodules").write_text(
             "working-tree tampering must not select www-from-model\n",
             encoding="utf-8",
         )
 
-        with patch("orinoco_lite.www_from_model._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+        with patch("orinoco_lite.www_from_model.upstream_source", return_value=(str(self.website), self.website_commit)):
             source = resolve_www_from_model(self.workspace, self.root / "resources")
 
+        self.assertFalse((source / "src/orinoco_lite").exists())
+        self.assertEqual(_git(source, "remote", "get-url", "origin"), str(self.website))
         self.assertEqual(
             (source / "page_templates/record.md").read_text(encoding="utf-8"),
             "www-from-model fixture\n",
@@ -152,24 +153,23 @@ class WwwFromModelResolverTests(unittest.TestCase):
         )
 
     def test_commit_on_pull_request_ref_is_fetched(self) -> None:
-        _git(self.engineering, "checkout", "--detach", "--quiet")
-        _git(self.engineering, "commit", "--allow-empty", "--quiet", "-m", "PR merge")
-        merge_commit = _git(self.engineering, "rev-parse", "HEAD")
-        _git(self.engineering, "update-ref", "refs/pull/148/merge", merge_commit)
-        _git(self.engineering, "checkout", "--quiet", "-")
+        _git(self.website, "checkout", "--detach", "--quiet")
+        _git(self.website, "commit", "--allow-empty", "--quiet", "-m", "PR merge")
+        merge_commit = _git(self.website, "rev-parse", "HEAD")
+        _git(self.website, "update-ref", "refs/pull/148/merge", merge_commit)
+        _git(self.website, "checkout", "--quiet", "-")
 
         with patch(
-            "orinoco_lite.www_from_model._package_source",
-            return_value=(str(self.engineering), merge_commit),
+            "orinoco_lite.www_from_model.upstream_source",
+            return_value=(str(self.website), merge_commit),
         ):
             source = resolve_www_from_model(self.workspace, self.root / "resources")
 
-        self.assertEqual(_git(source.parent.parent, "rev-parse", "HEAD"), merge_commit)
-        self.assertEqual(_git(source, "rev-parse", "HEAD"), self.website_commit)
+        self.assertEqual(_git(source, "rev-parse", "HEAD"), merge_commit)
         self.assertTrue((source / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
 
     def test_corrupt_cache_is_repaired(self) -> None:
-        with patch("orinoco_lite.www_from_model._package_source", return_value=(str(self.engineering), self.engineering_commit)):
+        with patch("orinoco_lite.www_from_model.upstream_source", return_value=(str(self.website), self.website_commit)):
             first = resolve_www_from_model(self.workspace, self.root / "resources")
             (first / "page_templates/record.md").write_text(
                 "tampered\n", encoding="utf-8"
@@ -222,8 +222,8 @@ class WwwFromModelResolverTests(unittest.TestCase):
         _git(self.engineering, "update-index", "--cacheinfo", "160000",
              _git(self.website, "rev-parse", "HEAD"), "submodules/www-from-model")
         _git(self.engineering, "commit", "-qm", "test: select Annex source")
-        with patch("orinoco_lite.www_from_model._package_source", return_value=(
-            str(self.engineering), _git(self.engineering, "rev-parse", "HEAD"),
+        with patch("orinoco_lite.www_from_model.upstream_source", return_value=(
+            str(self.website), _git(self.website, "rev-parse", "HEAD"),
         )):
             source = resolve_www_from_model(self.workspace, self.root)
             files = prepare_hugo_assets(source)
@@ -247,15 +247,30 @@ class WwwFromModelResolverTests(unittest.TestCase):
 
     def test_missing_package_source_commit_is_rejected(self) -> None:
         resources = self._resources()
-        (resources / "source-commit.txt").unlink()
+        (resources / "www-from-model.json").unlink()
         with patch.dict(
             os.environ,
             {},
         ):
-            with self.assertRaisesRegex(IntegrityError, "source commit"):
+            with self.assertRaisesRegex(IntegrityError, "source selection"):
                 resolve_www_from_model(self.workspace, resources)
 
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_build_metadata_uses_committed_source_without_initialized_submodules(tmp_path):
+    from orinoco_lite.build_resources import selected_upstream
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.name", "Fixture")
+    _git(tmp_path, "config", "user.email", "fixture@example.invalid")
+    (tmp_path / ".gitmodules").write_text('[submodule "website"]\npath = submodules/www-from-model\nurl = https://example.org/our-www.git\n')
+    _git(tmp_path, "add", ".gitmodules")
+    _git(tmp_path, "update-index", "--add", "--cacheinfo", "160000", "a" * 40, "submodules/www-from-model")
+    _git(tmp_path, "commit", "-qm", "fixture")
+    commit = _git(tmp_path, "rev-parse", "HEAD")
+    (tmp_path / ".gitmodules").write_text("uncommitted change")
+    _git(tmp_path, "update-index", "--cacheinfo", "160000", "b" * 40, "submodules/www-from-model")
+    assert selected_upstream(tmp_path, commit) == {"repository": "https://example.org/our-www.git", "commit": "a" * 40}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -37,7 +38,7 @@ def resolve_resources() -> PackageResources:
 
 
 def source_commit(root: Path) -> str:
-    """Read the source commit whose Gitlink selects www-from-model."""
+    """Read the package source commit recorded at build time."""
 
     try:
         commit = (root / SOURCE_COMMIT_NAME).read_text(encoding="ascii").strip()
@@ -65,3 +66,17 @@ def source_description(root: Path) -> str:
     ):
         raise IntegrityError("Package source description must be one bounded Git value")
     return description
+
+
+def upstream_source(root: Path) -> tuple[str, str]:
+    """Read the upstream selection baked into the installed package."""
+    try:
+        value = json.loads((root / "www-from-model.json").read_text(encoding="utf-8"))
+        repository, commit = value["repository"], value["commit"]
+        if not isinstance(repository, str) or not repository or repository.startswith("-"):
+            raise ValueError("invalid repository")
+        if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+            raise ValueError("invalid commit")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise IntegrityError("Package www-from-model source selection is missing or invalid") from error
+    return repository, commit

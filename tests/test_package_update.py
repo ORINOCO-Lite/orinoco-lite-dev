@@ -100,20 +100,3 @@ def test_transform_refuses_stale_installed_package(tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match='2'):
         cli.main(['--root', str(tmp_path), 'dev', 'records', 'jsonl-to-yaml'])
     assert not (tmp_path / 'upstream-diffing').exists()
-
-
-def test_installed_fork_selects_its_own_upstream_pin(tmp_path, monkeypatch):
-    import json
-    from types import SimpleNamespace
-    from orinoco_lite import www_from_model
-    from orinoco_lite.errors import IntegrityError
-    commit = 'a' * 40
-    (tmp_path / 'source-commit.txt').write_text(commit)
-    direct = {'url': 'https://example.org/fork.git', 'vcs_info': {'vcs': 'git', 'commit_id': commit}}
-    monkeypatch.setattr(package_update, 'distribution', lambda _: SimpleNamespace(read_text=lambda _: json.dumps(direct)))
-    assert www_from_model._package_source(tmp_path) == (direct['url'], commit)
-    direct['vcs_info']['commit_id'] = 'b' * 40
-    with pytest.raises(IntegrityError, match='disagree'):
-        www_from_model._package_source(tmp_path)
-    direct['vcs_info'] = {}
-    assert www_from_model._package_source(tmp_path) == (www_from_model.SOURCE_REPOSITORY, commit)

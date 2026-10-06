@@ -1,5 +1,6 @@
 """Compile the package's resources from an engineering checkout at install time."""
 
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,6 +14,24 @@ from .release_editor import build_editor
 from .release_review import build_review_shell
 from .release_schema import localize_schema
 from .stage_resources import stage_package_resources
+
+
+def selected_upstream(checkout: Path, commit: str) -> dict[str, str]:
+    """Derive runtime source coordinates from committed Git declarations."""
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(checkout), *args], text=True).strip()
+
+    path = "submodules/www-from-model"
+    entry = git("ls-tree", commit, "--", path).split()
+    if len(entry) != 4 or entry[:2] != ["160000", "commit"] or entry[3] != path:
+        raise DriverError("Package commit must select www-from-model as a Git submodule")
+    declarations = git("config", "--blob", f"{commit}:.gitmodules", "--get-regexp", r"^submodule\..*\.path$")
+    key = next(line.split(None, 1)[0] for line in declarations.splitlines()
+               if line.split(None, 1)[1] == path)
+    repository = git("config", "--blob", f"{commit}:.gitmodules", "--get", key[:-4] + "url")
+    if repository.startswith(("./", "../")):
+        raise DriverError("www-from-model requires an absolute repository URL for installed builds")
+    return {"repository": repository, "commit": entry[2]}
 
 
 def build_resources(checkout: Path, destination: Path) -> None:
@@ -76,6 +95,9 @@ def build_resources(checkout: Path, destination: Path) -> None:
         ready = scratch / "resources"
         stage_package_resources(
             staged_spec, ready, source_commit=commit, source_description=description,
+        )
+        (ready / "www-from-model.json").write_text(
+            json.dumps(selected_upstream(checkout, commit)) + "\n", encoding="utf-8",
         )
         previous = scratch / "previous"
         if destination.exists():
