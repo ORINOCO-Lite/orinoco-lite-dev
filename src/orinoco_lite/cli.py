@@ -229,8 +229,11 @@ def _update_projection(args, workspace, resources) -> int:
 
 def _build(args: argparse.Namespace) -> int:
     from .annex_media import netlify_media_checkout
+    from .www_from_model import editable_package_checkout
 
     workspace, resources = _resolve(args)
+    mode = "dev" if editable_package_checkout() is not None else "package"
+    print(f"orinoco-lite {__version__} ({mode})", file=sys.stderr, flush=True)
     with netlify_media_checkout(workspace):
         return _build_workspace(args, workspace, resources)
 

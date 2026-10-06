@@ -242,3 +242,22 @@ def test_quiet_projection_keeps_warnings(capsys):
     output = capsys.readouterr()
     assert output.out == ""
     assert "omitted 2 graph relationships" in output.err
+
+
+@pytest.mark.parametrize("checkout,mode", [(None, "package"), (Path("source"), "dev")])
+def test_build_announces_installed_version_and_mode_before_work(tmp_path, checkout, mode, capsys):
+    workspace = SimpleNamespace(root=tmp_path, annex_media=False)
+    args = cli._parser().parse_args(["build"])
+
+    def build(*_):
+        output = capsys.readouterr()
+        assert output.out == ""
+        assert output.err == f"orinoco-lite {cli.__version__} ({mode})\n"
+        return 0
+
+    with (
+        patch.object(cli, "_resolve", return_value=(workspace, "resources")),
+        patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=checkout),
+        patch.object(cli, "_build_workspace", side_effect=build),
+    ):
+        assert cli._build(args) == 0
