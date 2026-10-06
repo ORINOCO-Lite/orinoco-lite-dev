@@ -33,10 +33,9 @@ To prepare upstream inputs and build the complete candidate:
 pixi run setup-upstream ../psychoinformatics-candidate --dump /path/to/records.jsonl --build
 ```
 
-`populate` always tracks `sourcedata/www-from-model` in the downstream.
-Normal builds use the imported site files and do not require this source subdataset to be installed.
-It installs the package-selected revision, saves its gitlink with DataLad, and declares that checkout as input to the recorded site import.
-It does not introduce a separate choice of upstream version.
+`populate` imports from the same package-selected `www-from-model` checkout used for projection and builds.
+It records the package selection and local Pixi lock as inputs to the import; it creates no separate upstream subdataset.
+Native upstream instantiation can use `www-from-model` and its dependencies as nested Git submodules without installing Orinoco Lite.
 `--build` uses the ordinary build command and retains its recorded projection and website in `build/pages-publication.bundle`; it does not deploy or push publication refs.
 Without `--build`, setup ends after preparation.
 `--site-specific` installs existing site inputs and skips upstream import.

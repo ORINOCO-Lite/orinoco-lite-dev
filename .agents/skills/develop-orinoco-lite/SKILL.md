@@ -10,7 +10,7 @@ When more than one repository changes, use a downstream deploy preview with exac
 An exact-SHA Netlify preview may write only to its own open same-repository draft pull request after the service verifies GitHub's successful Netlify status for that exact head and origin.
 Do not cut a release merely to discover whether a package or template commit composes with a downstream.
 Reuse the submodule-selected `www-from-model` Hugo and projection source and resolve its dependencies through that revision's normal dependency mechanism.
-Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation, bounded materialized Hugo asset overlay, and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
+Keep generic source resolution, metadata, projection, and composition in the package; keep the Orinoco adaptation and downstream scaffold in the template; keep declarative site inputs under `site-specific/`; and keep site-specific executable metadata adapters under `extensions/`.
 
 ## Establish the live scope
 
@@ -18,7 +18,8 @@ Keep generic source resolution, metadata, projection, and composition in the pac
    Git Annex is permitted for engineering repinning and explicit upstream-site media retrieval.
    Site-specific media go into downstream site inputs, not the generic template.
    Downstream records stay in Git.
-   Only submodules opted into Annex media require Git Annex for builds and DataLad operations; metadata-only operations do not retrieve media.
+   Builds retrieve required upstream Hugo assets with Git Annex; downstream-owned Annex media remains opt-in.
+   Editable packages use their nested working checkout and bypass projection caches.
 2. Identify the package and template candidates and any downstream inputs to inject.
    Local candidate testing is the default.
    When useful, extend it into less constrained GitHub-workflow experimentation in a user-owned `<github-user>/orinoco-lite-demo`, where mandatory human review does not slow the exercise.

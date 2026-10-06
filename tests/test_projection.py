@@ -837,7 +837,20 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
 
-    def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self):
+    def test_editable_dependencies_bypass_projection_cache(self):
+        with (
+            patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=self.root),
+            patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic,
+            patch("orinoco_lite.projection._projection_cache_key", side_effect=AssertionError("development must not consult cache")),
+        ):
+            update_projection(self.workspace, self.resources)
+            update_projection(self.workspace, self.resources)
+            validate_inputs(self.workspace, self.resources)
+        assert semantic.call_count == 3
+        assert not (self.workspace.path("generated") / ".projection-cache.json").exists()
+
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             first = update_projection(self.workspace, self.resources)
             editorial = self.workspace.path("editorial") / "about.md"
@@ -849,7 +862,8 @@ class GenericProjectionContractTests(unittest.TestCase):
             update_projection(self.workspace, self.resources, no_cache=True)
             assert semantic.call_count == 2
 
-    def test_validate_does_not_generate_projection(self):
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_validate_does_not_generate_projection(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             assert validate_inputs(self.workspace, self.resources) == self.semantic
             assert not list(self.workspace.path("generated").iterdir())
@@ -860,7 +874,8 @@ class GenericProjectionContractTests(unittest.TestCase):
             validate_inputs(self.workspace, self.resources, no_cache=True)
             assert semantic.call_count == count + 1
 
-    def test_projection_cache_invalidates_changed_inputs_and_outputs(self):
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_projection_cache_invalidates_changed_inputs_and_outputs(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             update_projection(self.workspace, self.resources)
             contract = load_contract(self.workspace)

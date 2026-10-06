@@ -13,18 +13,14 @@ from .site_inputs import import_site_inputs
 def register(commands):
     upstream = commands.add_parser("upstream", help="import and record inputs for upstream comparison")
     groups = upstream.add_subparsers(dest="upstream_command", required=True)
-    checkout = groups.add_parser("checkout", description=(
-        "Install sourcedata/www-from-model at its retained authored-input revision. "
-        "The caller records the gitlink with DataLad; this command does not import site files. New datasets default to the package-selected revision."))
-    checkout.add_argument("--revision", help="explicitly select another authored-input revision")
     export = groups.add_parser("import-from-www", description=(
         "Create or refresh an upstream-derived site-input dataset for repinning, testing, "
         "and comparison with Orinoco Lite. "
         "Map upstream Hugo settings into root pyproject.toml and copy authored content, identity images, "
-        "and site overrides from the retained authored-input checkout. "
+        "and site overrides from the selected www-from-model checkout. "
         "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
         "are synchronized, including deletions; metadata is preserved. Use --force to replace or delete existing imported files."))
-    export.add_argument("--source", type=Path, help="upstream website checkout (default: sourcedata/www-from-model)")
+    export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected www-from-model)")
     export.add_argument("--media-remote", help="Annex source Git URL (default: upstream host for package-selected www; existing remotes with --source)")
     export.add_argument("--revision", help="require this Git revision at the source checkout's HEAD")
     export.add_argument("--destination", type=Path, help="site-input directory (default: site-specific)")
@@ -34,7 +30,7 @@ def register(commands):
     populate = groups.add_parser("populate", description=(
         "Download the public collection of a Dump Things service, convert records, and import site inputs as separate DataLad runs. "
         "Use --dump to retain a supplied dump, or --reuse-dump to transform "
-        "the retained records without refetching them; site and media import uses the retained authored-input revision. "
+        "the retained records without refetching them; site and media import uses the package-selected www-from-model checkout. "
         "Use --records-only to recompute metadata without changing site inputs or their source pin. "
         "Run individual record or import commands to repeat only that stage. Does not build, compare, or deploy."))
     populate.add_argument("--directory", type=Path, default=Path("sourcedata"), help="dump directory (default: sourcedata)")
@@ -43,7 +39,6 @@ def register(commands):
     acquisition.add_argument("--dump", type=Path, help="retain this JSONL dump instead of fetching")
     acquisition.add_argument("--reuse-dump", action="store_true", help="reuse DIRECTORY/downloaded/records.jsonl (must be committed and unchanged) without refetching records; still import site files")
     populate.add_argument("--records-only", action="store_true", help="convert retained records only; requires --reuse-dump and preserves authored inputs")
-    populate.add_argument("--www-revision", help="explicitly select the authored-input revision before importing site files")
     populate.add_argument("--api", default=DEFAULT_API, help="public Dump Things API for acquisition")
     populate.add_argument("--site-layout", choices=("submodule", "directory"), default="submodule", help="storage for a new site-input directory; existing layout is preserved")
     populate.add_argument("--site-specific", type=Path, help="install this existing dataset as a submodule; skip dump and imports")
@@ -52,8 +47,6 @@ def register(commands):
 
 def execute(args):
     root = (args.root or Path.cwd()).resolve()
-    if args.upstream_command == "checkout":
-        return checkout_upstream(root, args.revision)
     if args.upstream_command == "populate":
         # Public operations are recorded by the shared Bash workflow, not here.
         # Store paths relative to the dataset, even when callers supply absolutes.
@@ -65,20 +58,13 @@ def execute(args):
                    "--directory", relative(args.directory), "--destination", relative(args.destination),
                    "--api", args.api, "--site-layout", args.site_layout]
         if args.records_only:
-            if not args.reuse_dump or args.www_revision or args.site_specific:
+            if not args.reuse_dump or args.site_specific:
                 raise ConfigurationError("--records-only requires --reuse-dump and cannot select site inputs.")
             command.append("--records-only")
-        if args.www_revision:
-            command.extend(["--www-revision", args.www_revision])
         if args.dump:
             command.extend(["--dump", relative(args.dump)])
         if args.reuse_dump:
             command.append("--reuse-dump")
-        if not args.site_specific:
-            source = (root / "sourcedata/www-from-model").resolve()
-            destination = explicit_path(args, args.destination).resolve()
-            if source == destination or source.is_relative_to(destination) or destination.is_relative_to(source):
-                raise ConfigurationError("Upstream submodule and site-input destination must not overlap.")
         if args.site_specific:
             from .config import load_workspace
             load_workspace(root)
@@ -86,8 +72,9 @@ def execute(args):
                 raise ConfigurationError("Choose --site-specific or a dump input, not both.")
             command.extend(["--site-specific", relative(args.site_specific)])
         return subprocess.run(command, cwd=root).returncode
+    from .www_from_model import resolve_www_from_model, editable_package_checkout
     source = (explicit_path(args, args.source) if args.source else
-              root / "sourcedata/www-from-model")
+              resolve_www_from_model(root, resolve_resources().root))
     def git(*arguments):
         result = subprocess.run(["git", "-C", str(source), *arguments], capture_output=True, text=True)
         if result.returncode:
@@ -96,7 +83,8 @@ def execute(args):
     revision = git("rev-parse", "HEAD")
     if args.revision and git("rev-parse", f"{args.revision}^{{commit}}") != revision:
         raise ConfigurationError("Upstream site checkout does not match --revision")
-    git("diff", "--exit-code", "HEAD", "--", "config", "content", "assets", "static")
+    if args.source or editable_package_checkout() is None:
+        git("diff", "--exit-code", "HEAD", "--", "config", "content", "assets", "static")
     destination = (explicit_path(args, args.destination) if args.destination else
                    root / "site-specific")
     if (destination.resolve() == source.resolve()
@@ -108,46 +96,4 @@ def execute(args):
     result = import_site_inputs(source, destination, config_path=root / "pyproject.toml", retrieve_media=True,
                                 media_remote=media_remote, force=args.force, include_homepage=args.include_homepage)
     print(f"Exported {result['files']} site files; metadata was preserved.")
-    return 0
-
-
-def checkout_upstream(root: Path, revision: str | None = None) -> int:
-    """Use Git's submodule registration and the package's existing resolver."""
-    requested_revision = revision
-    destination = root / "sourcedata/www-from-model"
-    if (destination.is_symlink() or not destination.resolve().is_relative_to(root)
-            or destination.resolve() == root or ".git" in destination.relative_to(root).parts):
-        raise ConfigurationError("Upstream submodule must be a path inside the downstream.")
-    relative = destination.relative_to(root).as_posix()
-
-    def git(repository, *arguments):
-        result = subprocess.run(["git", "-C", str(repository), *arguments], text=True, capture_output=True)
-        if result.returncode:
-            raise ConfigurationError(f"Cannot select upstream submodule: {result.stderr.strip()}")
-        return result.stdout.strip()
-
-    entry = git(root, "ls-files", "--stage", "--", relative)
-    if entry:
-        if not entry.startswith("160000 ") or "\n" in entry:
-            raise ConfigurationError("Upstream destination is already tracked and is not one submodule.")
-        if (destination / ".git").exists() and git(destination, "status", "--porcelain"):
-            raise ConfigurationError("Commit upstream submodule changes before selecting another revision.")
-        git(root, "submodule", "update", "--init", "--", relative)
-        if git(destination, "status", "--porcelain"):
-            raise ConfigurationError("Commit upstream submodule changes before selecting another revision.")
-        if revision is None:
-            revision = entry.split()[1]
-    else:
-        if destination.exists():
-            raise ConfigurationError("Upstream destination already exists without a submodule gitlink.")
-        from .www_from_model import selected_www_from_model_source
-        repository, selected = selected_www_from_model_source(root, resolve_resources().root)
-        revision = revision or selected
-        git(root, "submodule", "add", "--", repository, relative)
-    if requested_revision is not None or not entry:
-        git(destination, "fetch", "origin", revision)
-        revision = git(destination, "rev-parse", "FETCH_HEAD^{commit}")
-    git(destination, "checkout", "--detach", revision)
-    git(destination, "submodule", "update", "--init", "--recursive")
-    print(f"Upstream submodule: {relative}\nCommit: {revision}")
     return 0

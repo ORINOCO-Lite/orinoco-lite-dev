@@ -24,6 +24,9 @@ def _git(repository: Path, *arguments: str) -> str:
 
 class WwwFromModelResolverTests(unittest.TestCase):
     def setUp(self) -> None:
+        editable = patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+        editable.start()
+        self.addCleanup(editable.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.sources = self.root / "sources"
@@ -207,47 +210,40 @@ class WwwFromModelResolverTests(unittest.TestCase):
             with self.assertRaisesRegex(IntegrityError, "repair failed"):
                 resolve_www_from_model(self.workspace, resources)
 
-    def test_registered_data_pin_can_differ_from_selected_software(self):
-        _git(self.workspace, "init", "--quiet")
-        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
-             str(self.website), "sourcedata/www-from-model")
-        prepared = self.workspace / "sourcedata/www-from-model"
-        retained = _git(prepared, "rev-parse", "HEAD")
-        # Advance both upstream software and its dependency closure.
-        (self.congo / "layouts/base.html").write_text("New theme\n")
-        _git(self.congo, "commit", "-qam", "test: new theme")
-        _git(self.website, "update-index", "--cacheinfo", "160000",
-             _git(self.congo, "rev-parse", "HEAD"), "themes/congo")
-        _git(self.website, "commit", "-qm", "test: select theme")
-        selected = _git(self.website, "rev-parse", "HEAD")
-        _git(self.engineering, "update-index", "--cacheinfo", "160000",
-             selected, "submodules/www-from-model")
-        _git(self.engineering, "commit", "-qm", "test: select software")
-        with patch("orinoco_lite.www_from_model._package_source", return_value=(
-                str(self.engineering), _git(self.engineering, "rev-parse", "HEAD"))):
-            source = resolve_www_from_model(self.workspace, self.root / "resources")
-        self.assertNotEqual(source, prepared)
-        self.assertEqual(_git(source, "rev-parse", "HEAD"), selected)
-        self.assertEqual((source / "themes/congo/layouts/base.html").read_text(), "New theme\n")
-        self.assertEqual(_git(prepared, "rev-parse", "HEAD"), retained)
-        self.assertIn(retained, _git(self.workspace, "ls-files", "--stage", "sourcedata/www-from-model"))
+    def test_fixed_annex_cache_is_reused_and_can_be_repaired(self):
+        from orinoco_lite.annex_media import prepare_hugo_assets
 
-    def test_matching_registered_checkout_is_reused_without_website_clone(self):
-        _git(self.workspace, "init", "--quiet")
-        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
-             str(self.website), "sourcedata/www-from-model")
-        prepared = self.workspace / "sourcedata/www-from-model"
-        _git(prepared, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
-        invoked = self.root / "annex-invoked"
-        _git(prepared, "config", "filter.annex.process", f"touch {shlex.quote(str(invoked))}; exit 1")
-        # Force Git to inspect bytes instead of trusting the index's stat cache.
-        os.utime(prepared / "page_templates/record.md", (0, 0))
+        _git(self.website, "annex", "init", "fixture")
+        asset = self.website / "static/graph.js"
+        asset.parent.mkdir()
+        asset.write_text("selected graph code\n")
+        _git(self.website, "annex", "add", "static/graph.js")
+        _git(self.website, "commit", "-qm", "test: add Annex asset")
+        _git(self.engineering, "update-index", "--cacheinfo", "160000",
+             _git(self.website, "rev-parse", "HEAD"), "submodules/www-from-model")
+        _git(self.engineering, "commit", "-qm", "test: select Annex source")
         with patch("orinoco_lite.www_from_model._package_source", return_value=(
-                str(self.engineering), self.engineering_commit)):
-            source = resolve_www_from_model(self.workspace, self.root / "resources")
-        self.assertEqual(source, prepared.resolve())
-        self.assertFalse(invoked.exists())
-        self.assertFalse(list((self.workspace / ".orinoco").rglob("themes")))
+            str(self.engineering), _git(self.engineering, "rev-parse", "HEAD"),
+        )):
+            source = resolve_www_from_model(self.workspace, self.root)
+            files = prepare_hugo_assets(source)
+            self.assertEqual(files[source / "static/graph.js"].read_text(), "selected graph code\n")
+            inode = (source / ".git").stat().st_ino
+            self.assertEqual(resolve_www_from_model(self.workspace, self.root), source)
+            self.assertEqual((source / ".git").stat().st_ino, inode)
+            (source / "page_templates/record.md").write_text("tampered\n")
+            repaired = resolve_www_from_model(self.workspace, self.root)
+            self.assertEqual((repaired / "page_templates/record.md").read_text(), "www-from-model fixture\n")
+
+    def test_editable_uses_nested_working_source_without_resource_stamp(self):
+        _git(self.engineering, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+        source = self.engineering / "submodules/www-from-model"
+        (source / "page_templates/record.md").write_text("local edit\n")
+        with patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=self.engineering):
+            resolved = resolve_www_from_model(self.workspace, self.root / "missing-resources")
+        self.assertEqual(resolved, source.resolve())
+        self.assertEqual((resolved / "page_templates/record.md").read_text(), "local edit\n")
+        self.assertFalse((self.workspace / ".orinoco").exists())
 
     def test_missing_package_source_commit_is_rejected(self) -> None:
         resources = self._resources()
@@ -259,47 +255,6 @@ class WwwFromModelResolverTests(unittest.TestCase):
             with self.assertRaisesRegex(IntegrityError, "source commit"):
                 resolve_www_from_model(self.workspace, resources)
 
-    def _register_website(self):
-        _git(self.workspace, "init", "-q")
-        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
-             str(self.website), "sourcedata/www-from-model")
-        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
-        return self.workspace / "sourcedata/www-from-model"
-
-    def test_registered_source_reuses_prepared_checkout_without_duplicate(self):
-        source = self._register_website()
-        _git(self.workspace, "-c", "protocol.file.allow=always", "submodule", "add",
-             str(self.engineering), "submodule/orinoco-lite-dev")
-        with patch("orinoco_lite.www_from_model._package_source",
-                   return_value=(str(self.engineering), self.engineering_commit)):
-            self.assertEqual(resolve_www_from_model(self.workspace, self.root), source.resolve())
-        self.assertFalse((self.workspace / ".orinoco").exists())
-
-    def test_incomplete_registered_dependencies_use_an_independent_checkout(self):
-        source = self._register_website()
-        _git(source / "themes/congo", "submodule", "deinit", "--force", "--all")
-        with patch("orinoco_lite.www_from_model._package_source",
-                   return_value=(str(self.engineering), self.engineering_commit)):
-            resolved = resolve_www_from_model(self.workspace, self.root)
-        self.assertNotEqual(resolved, source.resolve())
-        self.assertTrue((resolved / "themes/congo/vendor/leaf/assets/leaf.txt").is_file())
-        self.assertFalse((source / "themes/congo/vendor/leaf/assets/leaf.txt").exists())
-
-    def test_selected_relative_url_uses_engineering_origin_without_website_checkout(self):
-        from orinoco_lite.www_from_model import selected_www_from_model_source
-
-        _git(self.engineering, "config", "--file", ".gitmodules",
-             "submodule.submodules/www-from-model.url", "../www-from-model")
-        _git(self.engineering, "add", ".gitmodules")
-        _git(self.engineering, "commit", "-qm", "test: use relative upstream URL")
-        commit = _git(self.engineering, "rev-parse", "HEAD")
-        with patch("orinoco_lite.www_from_model._package_source",
-                   return_value=(str(self.engineering), commit)):
-            repository, revision = selected_www_from_model_source(self.workspace, self.root)
-        self.assertEqual(Path(repository).resolve(), self.website.resolve())
-        self.assertEqual(revision, self.website_commit)
-        cache = next((self.workspace / ".orinoco/www-from-model").glob("engineering-*"))
-        self.assertFalse((cache / "submodules/www-from-model/themes").exists())
 
 
 if __name__ == "__main__":

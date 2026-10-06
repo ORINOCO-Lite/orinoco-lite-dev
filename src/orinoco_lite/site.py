@@ -100,7 +100,7 @@ def _is_annex_pointer(path: Path) -> bool:
         value = path.read_text(encoding="utf-8").strip()
     except UnicodeDecodeError:
         return False
-    return value.startswith("/annex/objects/")
+    return value.startswith(("/annex/objects/", ".git/annex/objects/"))
 
 
 def _reject_annex_pointers(root: Path) -> None:
@@ -334,17 +334,16 @@ def _assemble(
     *,
     www_from_model: Path | None = None,
 ) -> None:
-    from .annex_media import prepare_media
+    from .annex_media import prepare_media, prepare_hugo_assets
+    from .www_from_model import editable_package_checkout
 
     media = prepare_media(workspace)
     upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
     adapter = workspace.root / ".orinoco-lite" / "hugo-adapter"
-    materialized = (
-        workspace.root
-        / ".orinoco-lite"
-        / "materialized-hugo-assets"
-        / "upstream"
+    upstream_media = prepare_hugo_assets(
+        upstream, editable=editable_package_checkout() is not None,
+        remote="https://hub.psychoinformatics.de/www/www-from-model.git",
     )
 
     for name in HUGO_SURFACES:
@@ -356,25 +355,13 @@ def _assemble(
     )
 
     for name in HUGO_SURFACES:
-        _copy_tree(upstream / name, assembly / name)
-        _copy_tree(materialized / name, assembly / name)
+        _copy_tree(upstream / name, assembly / name, media=upstream_media)
         if name == "static":
             _remove_upstream_identity_images(assembly / "static")
         _copy_tree(adapter / name, assembly / name)
     for name in ("fzj.svg", "hhu.svg", "logo.png"):
         (assembly / "assets" / "img" / name).unlink(missing_ok=True)
     _copy_upstream_section_frontmatter(upstream / "content", assembly / "content")
-
-    materialized_license = materialized.parent / "LICENSE"
-    if not materialized_license.is_file():
-        raise DriverError(
-            "The materialized Hugo asset overlay has no LICENSE: "
-            f"{materialized_license}"
-        )
-    _copy_file(
-        materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
-    )
 
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
@@ -396,10 +383,8 @@ def _assemble(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",
     )
-    _copy_file(
-        materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
-    )
+    _copy_file(resources_root / "licenses/orinoco-lite-MIT.txt",
+               assembly / "static/LICENSES/materialized-hugo-assets.txt")
     _reject_annex_pointers(assembly)
 
 

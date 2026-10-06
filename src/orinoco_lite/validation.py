@@ -200,7 +200,7 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
 
     links = _gitlinks(workspace.root)
     allowed_links = [link for link in links
-                     if link in ("site-specific", "sourcedata/www-from-model", SUBMODULE)]
+                     if link in ("site-specific", SUBMODULE)]
     if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
             "Downstream .gitmodules requires a site-input or development submodule"

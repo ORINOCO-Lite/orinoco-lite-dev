@@ -825,6 +825,8 @@ def _cached_projection_report(workspace, key):
 
 def validate_inputs(workspace, resources_root, *, no_cache=False):
     """Check semantic inputs without generating a projection or website."""
+    from .www_from_model import editable_package_checkout
+    no_cache = no_cache or editable_package_checkout() is not None
     www_from_model = _www_from_model_root(workspace, resources_root)
     contract = load_contract(workspace, www_from_model)
     if not no_cache:
@@ -840,10 +842,12 @@ def validate_inputs(workspace, resources_root, *, no_cache=False):
 def update_projection(
     workspace: WorkspaceConfig, resources_root: Path, *, no_cache: bool = False,
 ) -> dict[str, Any]:
+    from .www_from_model import editable_package_checkout
+    no_cache = no_cache or editable_package_checkout() is not None
     destination = workspace.path("generated") / "projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
     contract = load_contract(workspace, _www_from_model_root(workspace, resources_root))
-    key = _projection_cache_key(workspace, contract, resources_root)
+    key = None if no_cache else _projection_cache_key(workspace, contract, resources_root)
     cache = destination.parent / ".projection-cache.json"
     if not no_cache:
         report = _cached_projection_report(workspace, key)
@@ -899,9 +903,12 @@ def update_projection(
             shutil.rmtree(backup)
     # This is disposable cache state, never a canonical input or publication record.
     try:
-        cache.write_bytes(canonical_json_bytes({
-            "key": key, "output": tree_sha256(destination), "report": report,
-        }))
+        if no_cache:
+            cache.unlink(missing_ok=True)
+        else:
+            cache.write_bytes(canonical_json_bytes({
+                "key": key, "output": tree_sha256(destination), "report": report,
+            }))
     except OSError:
         pass
     return report

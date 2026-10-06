@@ -97,6 +97,28 @@ def retrieve_and_verify(
     return locations
 
 
+@progress("Preparing upstream Hugo assets with Git Annex")
+def prepare_hugo_assets(repository: Path, *, editable: bool = False, remote: str | None = None) -> dict[Path, Path]:
+    """Hydrate the selected checkout's Hugo assets as ordinary assembly inputs."""
+    from .site import HUGO_SURFACES, _is_annex_pointer
+
+    files = {
+        path: key for path, key in annex_files(repository, initialize=True).items()
+        if len(path.parts) > 1 and path.parts[0] in HUGO_SURFACES
+        and path != Path("static/graph.json")
+    }
+    # Unlocked editable files are working source, including unsaved changes.
+    # Only missing payloads need retrieval; never replace these local bytes.
+    local = {
+        path: repository / path for path in files
+        if editable and not (repository / path).is_symlink()
+        and (repository / path).is_file() and not _is_annex_pointer(repository / path)
+    }
+    required = {path: key for path, key in files.items() if path not in local}
+    objects = retrieve_and_verify(repository, required, remote=remote)
+    return {repository / path: source for path, source in (objects | local).items()}
+
+
 def workspace_annex_files(workspace) -> dict[Path, str]:
     """Enforce the opted-in submodule and ordinary-Git input boundary."""
     if not workspace.annex_media:

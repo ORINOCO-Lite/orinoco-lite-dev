@@ -63,9 +63,6 @@ def _www_from_model(root: Path) -> Path:
         "print('{\"nodes\": [], \"edges\": []}')\n",
         encoding="utf-8",
     )
-    materialized = root / ".orinoco-lite" / "materialized-hugo-assets"
-    materialized.mkdir(parents=True, exist_ok=True)
-    (materialized / "LICENSE").write_text("Template MIT\n", encoding="utf-8")
     return upstream
 
 
@@ -171,18 +168,12 @@ class HugoCompatibilityTests(unittest.TestCase):
                 ("layouts/term.html", "upstream layout\n"),
                 ("static/upstream-identity.png", "branded image\n"),
                 ("assets/img/fzj.svg", "institution brand\n"),
-                ("static/graph.js", "/annex/objects/MD5E-s12--graph.js\n"),
+                ("static/graph.js", "const graphClient = true;\n"),
                 ("layouts/.git/config", "must not ship\n"),
             ):
                 path = www_from_model / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
-            materialized = (
-                root
-                / ".orinoco-lite/materialized-hugo-assets/upstream/static/graph.js"
-            )
-            materialized.parent.mkdir(parents=True)
-            materialized.write_text("const graphClient = true;\n", encoding="utf-8")
             assembly = root / "build/assembly"
 
             site._assemble(
@@ -205,7 +196,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             self.assertFalse((assembly / "assets/img/fzj.svg").exists())
             self.assertFalse(any(path.name == ".git" for path in assembly.rglob("*")))
 
-            materialized.unlink()
+            (www_from_model / "static/graph.js").write_text("/annex/objects/missing\n")
             with self.assertRaisesRegex(
                 DriverError, "Materialized Hugo assets are missing"
             ):

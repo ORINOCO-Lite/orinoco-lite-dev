@@ -15,7 +15,7 @@ Repository                                                                      
 
 [`www-from-model`](https://github.com/ORINOCO-Lite/www-from-model)                                     Submodule-pinned Hugo and projection source
 
-[`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template)                       Thin Orinoco adaptation, materialized assets, scaffold, workflows, and locks
+[`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template)                       Thin Orinoco adaptation, scaffold, workflows, and locks
 
 `<github-user>/orinoco-lite-demo`                                                                      Optional user-owned site for autonomous GitHub-workflow experiments
 
@@ -66,7 +66,8 @@ Explicit `--package-revision` and `--package-repository` overrides are recorded 
 The template's **Update downstream template** GitHub workflow calls this command and opens a draft pull request; see the [downstream update guide](https://github.com/ORINOCO-Lite/orinoco-lite-template/blob/main/copier-template/docs/template-updates.md).
 Validation, building, previewing, deployment, bundle download, and editing do not require a continuously running metadata service.
 Source-adapter tasks use DataLad to record run provenance in Git.
-Sites that opt into [Annex media](docs/agents/annex-media.md) require Git Annex; other downstream builds and adapter tasks do not.
+Git Annex retrieves the selected upstream Hugo assets.
+Sites can also opt into [Annex media](docs/agents/annex-media.md) for their own media.
 
 Precise interfaces and normative engineering behavior are documented in:
 
@@ -143,5 +144,6 @@ Dependency locks and release inputs contain the versions required by the build; 
 - Canonical site metadata is the YAML below the configured records and annotation roots.
   Generated projection and website output are ignored.
 - The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in downstream configuration.
-  Maintainer repinning hydrates and verifies required Annex-backed content and may place assets required by retained functionality in a bounded licensed template overlay as ordinary files; downstreams do not hydrate them.
+  Builds retrieve required Annex assets from that same checkout and copy ordinary files into the assembly.
+  Editable installs use the package’s nested working checkout, including local edits, and bypass projection caches; fixed installs use the package’s committed gitlink.
 - Credentials, stores, caches, browser downloads, and build output are local state.

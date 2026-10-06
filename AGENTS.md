@@ -2,14 +2,15 @@
 
 ## Current direction
 
-- Reuse the exact German `www-from-model` revision selected by the controlled submodule gitlink as the Hugo and projection source.
+- Use one selected `www-from-model` checkout for Hugo, projection, and assets.
+  Fixed installs use the package gitlink; editable installs use the actual nested working checkout, including edits.
   Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in package or downstream configuration.
   The package owns generic source resolution, metadata, projection, and composition operations.
-  Keep the template thin: it contains the Orinoco adaptation, bounded materialized Hugo assets, Copier scaffold, workflows, and dependency locks, not a copied website.
+  Keep the template thin: it contains the Orinoco adaptation, Copier scaffold, workflows, and dependency locks, not a copied website.
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
-  It may hydrate and verify Annex-backed content required by the selected upstream functionality before ordinary files are copied into the licensed template overlay.
+  Builds hydrate and verify required upstream Hugo assets and copy ordinary files into the assembly.
   `dev upstream import-from-www` may retrieve upstream site media with Annex and copy ordinary files into `site-specific/`; those media do not belong in the generic template.
-  Downstreams without `tool.orinoco.media.annex = true` must not invoke or depend on Git Annex.
+  Upstream asset preparation uses Git Annex independently of the downstream media opt-in.
   Opted-in `site-specific` submodules may use Annex only for `assets/` and `static/`; builds copy verified content into ordinary output files.
   DataLad remains a downstream dependency for recording source-adapter run provenance; records and other structured inputs always remain in Git.
   DataLad operations in opted-in Annex submodules require the Annex executable even when saving ordinary Git records.
@@ -24,6 +25,8 @@
   Pull-request-only commits are temporary test candidates; replace them with retained commits before adoption because deleting a branch can remove their only durable reference.
   A user-owned `<github-user>/orinoco-lite-demo` may extend this into autonomous GitHub-workflow experimentation.
   Propose the downstream update to `ORINOCO-Lite/test-orinoco-downstream-website` for deliberate human review of its impact on downstream users.
+- Support the current package and template together.
+  Recreate downstream scaffolding around retained site inputs when that avoids compatibility or migration code.
 - Prefer one source of truth.
   Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.
 - Use commit identifiers where software requires them, such as dependency selections and concurrency checks.
@@ -107,7 +110,7 @@
 - Keep credentials, caches, downloads, browser output, and generated builds out of tracked state.
 - Do not copy the German website or its dependency trees into an Orinoco Lite release.
   Required upstream functionality includes its required assets automatically.
-  Materialize those assets as ordinary files only in a bounded template overlay that carries a license and applicable notices.
+  Materialize required assets as ordinary files in the build assembly and preserve their licenses and applicable notices.
 - Use Git and Git Annex state as the provenance for materialized assets.
   Do not add redundant per-asset coordinates or provenance inventories when tooling can derive precise information from the selected repositories.
 - Do not invent metadata semantics, identities, rights, or curation decisions.

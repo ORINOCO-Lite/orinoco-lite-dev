@@ -88,7 +88,7 @@ from types import SimpleNamespace
 from orinoco_lite import cli, upstream, www_from_model
 import subprocess
 upstream.resolve_resources = lambda: SimpleNamespace(root=Path("unused"))
-www_from_model.selected_www_from_model_source = lambda *args: (Path(os.environ["TEST_WWW"]).as_uri(), subprocess.check_output(["git", "-C", os.environ["TEST_WWW"], "rev-parse", "HEAD"], text=True).strip())
+www_from_model.resolve_www_from_model = lambda *args: Path(os.environ["TEST_WWW"])
 raise SystemExit(cli.main())
 ''')
     executable.chmod(0o755)
@@ -116,21 +116,16 @@ raise SystemExit(cli.main())
     assert scratch.read_text() == "untracked work\n"
     # A software-only recomputation keeps the saved capture and authored inputs,
     # even when a newer authored-input revision is available.
-    old_www = run(www, "git", "rev-parse", "HEAD")
     old_capture = dump.read_bytes()
     old_settings = (site / "pyproject.toml").read_bytes()
     (www / "content/contact.md").write_text("Reused dump import\n")
     commit(www, "test: update site before dump reuse")
     run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", "--records-only", env=env)
-    assert run(site, "git", "rev-parse", "HEAD:sourcedata/www-from-model") == old_www
     assert (site / "site-specific/content/contact.md").read_text() == "Version one\n"
     assert dump.read_bytes() == old_capture
     assert (site / "pyproject.toml").read_bytes() == old_settings
-    # Plain populate retains the authored-input pin too. Advancing it is explicit.
+    # Import follows the currently selected package source.
     run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", env=env)
-    assert (site / "site-specific/content/contact.md").read_text() == "Version one\n"
-    run(site, "orinoco-lite", "dev", "upstream", "populate", "--reuse-dump", "--www-revision",
-        run(www, "git", "rev-parse", "HEAD"), env=env)
     assert (site / "site-specific/content/contact.md").read_text() == "Reused dump import\n"
     assert note.read_text() == "unfinished note edit\n"
     assert scratch.read_text() == "untracked work\n"
@@ -155,10 +150,8 @@ raise SystemExit(cli.main())
     assert "# Preserved policy" in (site / "pyproject.toml").read_text()
     assert "template_updates = true" in (site / "pyproject.toml").read_text()
     assert "--force" in imported[0]
-    assert "--source sourcedata/www-from-model" in imported[0]
-    body = run(site, "git", "show", "-s", "--format=%B", imported[1])
-    assert '"sourcedata/www-from-model"' in body
-    assert run(site / "sourcedata/www-from-model", "git", "rev-parse", "HEAD") == run(www, "git", "rev-parse", "HEAD")
+    assert "--source" not in imported[0]
+    assert not (site / "sourcedata/www-from-model").exists()
     assert (site / "site-specific/.git").exists() == (layout == "submodule")
     # Identical inputs reproduce the content without acquisition.
     run(site, "datalad", "rerun", conversion[1], env=env)
@@ -169,8 +162,6 @@ raise SystemExit(cli.main())
     commit(www, "test: upstream two")
     (site / "pixi.lock").write_text("fixture version two\n")
     commit(site, "test: select second environment")
-    run(site, "orinoco-lite", "dev", "upstream", "checkout", "--revision", run(www, "git", "rev-parse", "HEAD"), env=env)
-    run(site, "datalad", "save", "-m", "test: select upstream revision", "--", ".gitmodules", "sourcedata/www-from-model", env=env)
     run(site, "datalad", "rerun", imported[1], env=env)
     assert (site / "site-specific/content/contact.md").read_text() == "Version two\n"
     assert not (site / "site-specific/content/persons/example/photo.png").exists()
@@ -181,12 +172,13 @@ raise SystemExit(cli.main())
     rows = list((site / "site-specific/metadata/records").rglob("*.yaml"))
     assert len(rows) == 1 and "Two" in rows[0].read_text()
     assert not run(site, "git", "status", "--porcelain")
-    # A fresh clone installs the recorded input without consulting the package
-    # resolver or the original working checkout at import time.
+    # A relocated downstream uses the same selected source resolver.
     clone = tmp_path / "relocated"
     run(tmp_path, "git", "clone", str(site), str(clone), env=env)
     run(clone, "git", "submodule", "update", "--init", "--recursive", env=env)
-    replay_env = dict(env, TEST_WWW=str(tmp_path / "unavailable"))
+    relocated_source = tmp_path / "relocated-www"
+    run(tmp_path, "git", "clone", str(www), str(relocated_source), env=env)
+    replay_env = dict(env, TEST_WWW=str(relocated_source))
     run(clone, "datalad", "rerun", imported[1], env=replay_env)
     assert (clone / "site-specific/content/contact.md").read_text() == "Version two\n"
     assert not run(clone, "git", "status", "--porcelain")

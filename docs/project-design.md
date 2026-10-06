@@ -95,7 +95,7 @@ It includes the pinned Things Schema, generic drivers, static interface shells, 
 It also records the engineering commit that selects `www-from-model`.
 It contains no organization content, organization policy, or copy of the upstream website.
 
-  [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/)   Provides the Copier source that creates and updates downstream repositories.                                                                                It contains the scaffold, thin Orinoco Hugo adaptation, bounded licensed assets, workflows, and helper tools. It does not contain a website copy, German content, or site identity.
+  [`orinoco-lite-template`](https://github.com/ORINOCO-Lite/orinoco-lite-template/)   Provides the Copier source that creates and updates downstream repositories.                                                                                It contains the scaffold, thin Orinoco Hugo adaptation, workflows, and helper tools. It does not contain a website copy, German content, or site identity.
   -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 The template creates a working site with the selected upstream's structure, without requiring downstream-authored pages or layout overrides.
@@ -213,7 +213,12 @@ Website composition does not load adapter code, captured execution state, or dep
 The generated site does not receive them.
 Reusable adapter primitives belong in Orinoco Lite or the template.
 
-Orinoco Lite combines `site-specific/metadata/` with the exact Gitlink-selected `www-from-model` revision to generate the graph and Hugo pages.
+Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` checkout to generate the graph and Hugo pages.
+Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
+Hugo assets come from the same checkout through Git Annex, without a template overlay.
+Editable development bypasses projection caches.
+The supported downstream uses the current package and template together.
+When their layout changes, update the template or recreate the scaffold while retaining site-owned inputs; do not maintain runtime paths for retired layouts.
 It does not change metadata during that step.
 These generated files are not canonical inputs and do not enter the downstream's default branch.
 

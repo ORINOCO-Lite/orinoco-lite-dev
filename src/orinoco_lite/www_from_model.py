@@ -1,4 +1,4 @@
-"""Resolve the exact www-from-model checkout selected by engineering Git."""
+"""Resolve the fixed or editable www-from-model source selected by the package."""
 
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ def _git(
         f"core.hooksPath={os.devnull}",
         "-c",
         "core.fsmonitor=false",
-        # Source resolution is a Git-only software operation, including when a
-        # maintainer has initialized Annex in a reusable authored-input checkout.
+        # Keep cloning independent of Annex hydration. Cleanliness checks below
+        # explicitly enable Annex’s clean filter for hydrated unlocked files.
         "-c", "filter.annex.process=",
         "-c", "filter.annex.clean=cat",
         "-c", "filter.annex.smudge=cat",
@@ -163,9 +163,18 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
         raise IntegrityError(
             "www-from-model dependencies are missing or do not match their Gitlinks"
         )
+    annex_directory = Path(_git_text(
+        www_from_model, ("rev-parse", "--git-path", "annex"),
+        operation="locate upstream Annex state",
+    ))
+    if not annex_directory.is_absolute():
+        annex_directory = www_from_model / annex_directory
+    filters = (("-c", "filter.annex.process=git-annex filter-process")
+               if annex_directory.is_dir() else ())
     dirty = _git(
         engineering,
         (
+            *filters,
             "status",
             "--porcelain=v1",
             "-z",
@@ -179,7 +188,7 @@ def _verify_checkout(engineering: Path, expected_commit: str) -> Path:
     return www_from_model.resolve()
 
 
-def _clone_checkout(repository: str, commit: str, destination: Path, *, with_website: bool = True) -> Path:
+def _clone_checkout(repository: str, commit: str, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     _git(
         destination.parent,
@@ -214,8 +223,6 @@ def _clone_checkout(repository: str, commit: str, destination: Path, *, with_web
         ("checkout", "--quiet", "--detach", "--force", commit),
         operation=f"check out engineering commit {commit}",
     )
-    if not with_website:
-        return _verify_engineering(destination, commit)
     _git(
         destination,
         (
@@ -244,7 +251,8 @@ def _remove_cache_path(path: Path) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink()
     elif path.is_dir():
-        shutil.rmtree(path)
+        from datalad.utils import rmtree
+        rmtree(path)
 
 
 def _ensure_checkout(
@@ -252,14 +260,13 @@ def _ensure_checkout(
     *,
     repository: str,
     commit: str,
-    with_website: bool = True,
 ) -> Path:
+    cache = cache.resolve()
     destination = cache / _cache_name(repository, commit)
-    verify = _verify_checkout if with_website else _verify_engineering
     mismatch: IntegrityError | None = None
     if destination.exists() or destination.is_symlink():
         try:
-            return verify(destination, commit)
+            return _verify_checkout(destination, commit)
         except IntegrityError as error:
             mismatch = error
 
@@ -267,8 +274,8 @@ def _ensure_checkout(
     temporary = Path(tempfile.mkdtemp(prefix=".engineering-", dir=cache))
     fresh = temporary / "checkout"
     try:
-        with progress("Fetching www-from-model and its dependencies" if with_website else "Fetching engineering Git metadata"):
-            www_from_model = _clone_checkout(repository, commit, fresh, with_website=with_website)
+        with progress("Fetching www-from-model and its dependencies"):
+            www_from_model = _clone_checkout(repository, commit, fresh)
         relative_checkout = www_from_model.relative_to(fresh)
         if destination.exists() or destination.is_symlink():
             _remove_cache_path(destination)
@@ -284,8 +291,29 @@ def _ensure_checkout(
         raise IntegrityError(f"Could not resolve www-from-model checkout: {error}") from error
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
-    verify(destination, commit)
+    _verify_checkout(destination, commit)
     return (destination / relative_checkout).resolve()
+
+
+def editable_package_checkout() -> Path | None:
+    """Return the source selected by the installed package's editable metadata."""
+    from importlib.metadata import distribution, PackageNotFoundError
+    import json
+    from urllib.parse import unquote, urlsplit
+
+    try:
+        raw = distribution("orinoco-lite").read_text("direct_url.json")
+    except PackageNotFoundError:
+        return None
+    if not raw:
+        return None
+    value = json.loads(raw)
+    if not value.get("dir_info", {}).get("editable"):
+        return None
+    url = urlsplit(value["url"])
+    if url.scheme != "file":
+        raise IntegrityError("Editable package source must be a local checkout")
+    return Path(unquote(url.path)).resolve()
 
 
 def _package_source(resources_root: Path) -> tuple[str, str]:
@@ -300,68 +328,20 @@ def _package_source(resources_root: Path) -> tuple[str, str]:
     return SOURCE_REPOSITORY, commit
 
 
-def resolve_engineering_source(workspace: Path, resources_root: Path) -> tuple[Path, str]:
-    """Read package-owned Gitlinks without checking out a second website."""
-    from .development import SUBMODULE
-
-    repository, commit = _package_source(resources_root)
-    candidates = [workspace / SUBMODULE, Path(__file__).resolve().parents[2]]
-    for candidate in candidates:
-        if not (candidate / ".git").exists():
-            continue
-        if _git(candidate, ("cat-file", "-e", f"{commit}^{{commit}}"),
-                operation="locate package Git objects", check=False).returncode == 0:
-            return candidate.resolve(), commit
-    engineering = _ensure_checkout(workspace / ".orinoco/www-from-model",
-                                   repository=repository, commit=commit, with_website=False)
-    return engineering, commit
-
-
-def selected_www_from_model_source(workspace: Path, resources_root: Path) -> tuple[str, str]:
-    engineering, commit = resolve_engineering_source(workspace, resources_root)
-    revision = _selected_www_from_model_commit(engineering, commit)
-    repository = _git_text(engineering, ("config", "--blob", f"{commit}:.gitmodules",
-                                        "--get", f"submodule.{_WWW_FROM_MODEL_GITLINK}.url"),
-                           operation="read selected upstream URL")
-    if repository.startswith(("./", "../")):
-        # Git resolves relative submodule URLs against the owning remote.
-        owner, _ = _package_source(resources_root)
-        engineering = _ensure_checkout(workspace / ".orinoco/www-from-model",
-                                       repository=owner, commit=commit, with_website=False)
-        _git(engineering, ("submodule", "init", "--", _WWW_FROM_MODEL_GITLINK),
-             operation="resolve upstream URL against engineering origin")
-        repository = _git_text(engineering, ("config", "--get", f"submodule.{_WWW_FROM_MODEL_GITLINK}.url"),
-                               operation="read resolved upstream URL")
-    return repository, revision
-
-
 def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) -> Path:
-    """Return the www-from-model checkout selected by the package source commit."""
+    """Use the installed package’s fixed revision or editable working source."""
 
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():
         raise IntegrityError(f"www-from-model workspace is not a directory: {workspace}")
     if resources_root is None:
         raise IntegrityError("www-from-model resolution requires package resources")
-    prepared = workspace / "sourcedata/www-from-model"
-    entry = _git(workspace, ("ls-files", "--stage", "--", "sourcedata/www-from-model"),
-                 operation="inspect registered upstream submodule", check=False).stdout.decode().strip()
-    if entry or prepared.exists() or prepared.is_symlink():
-        fields = entry.split()
-        if len(fields) != 4 or fields[0] != "160000" or fields[2] != "0":
-            raise IntegrityError("sourcedata/www-from-model must be a registered Git submodule")
-        engineering, commit = resolve_engineering_source(workspace, resources_root)
-        selected = _selected_www_from_model_commit(engineering, commit)
-        # A registered checkout is an authored-data selection. Reuse it for
-        # software only when both its gitlink and clean dependency closure match.
-        if fields[1] == selected and prepared.is_dir() and (prepared / ".git").exists():
-            if _repository_head(prepared, label="Upstream submodule") == selected:
-                closure = _git(prepared, ("submodule", "status", "--recursive"),
-                               operation="verify upstream dependencies").stdout.decode().splitlines()
-                dirty = _git(prepared, ("status", "--porcelain", "--ignore-submodules=none"),
-                             operation="check upstream software cleanliness").stdout
-                if not dirty and all(line.startswith(" ") for line in closure):
-                    return prepared.resolve()
+    editable = editable_package_checkout()
+    if editable is not None:
+        selected = editable / _WWW_FROM_MODEL_GITLINK
+        if not (selected / ".git").exists():
+            raise IntegrityError(f"Initialize the package's www-from-model submodule: {selected}")
+        return selected.resolve()
     engineering_repository, engineering_commit = _package_source(resources_root)
     return _ensure_checkout(
         workspace / ".orinoco" / "www-from-model",

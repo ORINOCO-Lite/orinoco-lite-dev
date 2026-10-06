@@ -203,3 +203,22 @@ def test_local_build_keeps_annex_filters(workspace, monkeypatch):
     with netlify_media_checkout(workspace):
         prepare_media(workspace)
     assert git(site, 'config', '--local', '--get-regexp', r'^filter\.annex\.') == before
+
+
+def test_hugo_assets_follow_unlocked_development_edits(workspace, tmp_path):
+    from orinoco_lite.annex_media import prepare_hugo_assets
+    source = workspace.path("site")
+    git(source, "annex", "unlock", "static/image.png")
+    (source / "static/image.png").write_bytes(b"edited asset")
+    mapping = prepare_hugo_assets(source, editable=True)
+    _copy_tree(source / "static", tmp_path / "assembly", media=mapping)
+    assert (tmp_path / "assembly/image.png").read_bytes() == b"edited asset"
+    assert (source / "static/image.png").read_bytes() == b"edited asset"
+
+
+def test_hugo_assets_require_available_payloads(workspace):
+    from orinoco_lite.annex_media import prepare_hugo_assets
+    source = workspace.path("site")
+    git(source, "annex", "drop", "--force", "static/image.png")
+    with pytest.raises(DriverError, match="image.png"):
+        prepare_hugo_assets(source)
