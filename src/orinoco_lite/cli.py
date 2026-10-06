@@ -115,7 +115,7 @@ def _parser() -> argparse.ArgumentParser:
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser(
         "enable", help="install the package and its nested sources editable from a local checkout",
-        description="Clone submodule/orinoco-lite-dev locally, prepare its resources, and install "
+        description="Clone .orinoco-lite/orinoco-lite-dev locally, prepare its resources, and install "
         "its Python dependencies editable in the downstream environment. The new checkout is "
         "excluded locally from Git; no submodule is registered and no files are staged. "
         "pixi.toml and pixi.lock are updated without requiring a commit. Re-running preserves "

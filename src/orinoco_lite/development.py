@@ -14,9 +14,9 @@ from .progress import progress
 
 
 PACKAGE_REPOSITORY = "https://github.com/ORINOCO-Lite/orinoco-lite-dev.git"
-SUBMODULE = "submodule/orinoco-lite-dev"
+CHECKOUT = ".orinoco-lite/orinoco-lite-dev"
 FILES = ("pixi.toml", "pixi.lock")
-EDITABLE = {"path": SUBMODULE, "editable": True}
+EDITABLE = {"path": CHECKOUT, "editable": True}
 CLIENT = "dump-things-pyclient"
 
 
@@ -64,14 +64,14 @@ def apply(root: Path) -> None:
 
 
 def prepare_checkout(root: Path, repository: str | None, revision: str | None) -> Path:
-    checkout = root / SUBMODULE
+    checkout = root / CHECKOUT
     if checkout.is_symlink():
-        raise ConfigurationError(f"{SUBMODULE} must be a real source checkout, not a symlink.")
-    if not git(root, "ls-files", "--", SUBMODULE):
+        raise ConfigurationError(f"{CHECKOUT} must be a real source checkout, not a symlink.")
+    if not git(root, "ls-files", "--", CHECKOUT):
         exclude = Path(git(root, "rev-parse", "--git-path", "info/exclude"))
         if not exclude.is_absolute():
             exclude = root / exclude
-        pattern = f"/{SUBMODULE}/"
+        pattern = f"/{CHECKOUT}/"
         content = exclude.read_text() if exclude.exists() else ""
         if pattern not in content.splitlines():
             exclude.parent.mkdir(parents=True, exist_ok=True)
@@ -93,12 +93,12 @@ def prepare_checkout(root: Path, repository: str | None, revision: str | None) -
             run("git", "checkout", "--detach", revision, cwd=checkout)
             run("git", "submodule", "update", "--init", "--recursive", cwd=checkout)
     elif repository is not None or revision is not None:
-        raise ConfigurationError(f"{SUBMODULE} already exists; use Git inside it to select another revision.")
+        raise ConfigurationError(f"{CHECKOUT} already exists; use Git inside it to select another revision.")
     if not (checkout / ".git").exists():
         raise ConfigurationError(f"Not a Git source checkout: {checkout}")
     # Do not reset existing source or nested dependency worktrees on re-enable.
     if any(line.startswith("-") for line in git(checkout, "submodule", "status", "--recursive").splitlines()):
-        raise ConfigurationError(f"Initialize missing dependencies with git -C {SUBMODULE} "
+        raise ConfigurationError(f"Initialize missing dependencies with git -C {CHECKOUT} "
                                  "submodule update --init --recursive before enabling development.")
     if not (checkout / "src/orinoco_lite").is_dir():
         raise ConfigurationError(f"Not an Orinoco Lite source checkout: {checkout}")
@@ -106,7 +106,7 @@ def prepare_checkout(root: Path, repository: str | None, revision: str | None) -
     expected = {"path": f"submodules/{CLIENT}", "editable": True}
     if metadata.get("tool", {}).get("uv", {}).get("sources", {}).get(CLIENT) != expected:
         raise ConfigurationError("The selected package predates nested editable dependency support. "
-                                 f"Select an updated commit in {SUBMODULE} before enabling development.")
+                                 f"Select an updated commit in {CHECKOUT} before enabling development.")
     return checkout
 
 

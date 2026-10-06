@@ -196,11 +196,11 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     downstream structure fails before projection or website generation.
     """
 
-    from .development import SUBMODULE
+    from .development import CHECKOUT
 
     links = _gitlinks(workspace.root)
     allowed_links = [link for link in links
-                     if link in ("site-specific", SUBMODULE)]
+                     if link in ("site-specific", CHECKOUT)]
     if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
             "Downstream .gitmodules requires a site-input or development submodule"

@@ -43,7 +43,7 @@ Development CI resolves from the declarations rather than requiring a committed 
 ## Developing in a downstream
 
 Run `pixi run orinoco-lite dev enable` from the downstream root.
-The command clones `submodule/orinoco-lite-dev` locally, initializes the package's nested submodules, prepares resources, and installs its Python dependencies editable in the downstream environment.
+The command clones `.orinoco-lite/orinoco-lite-dev` locally, initializes the package's nested submodules, prepares resources, and installs its Python dependencies editable in the downstream environment.
 The source checkout is excluded through Git's local `info/exclude`; enable does not register a downstream submodule, stage files, or require a commit.
 `pixi.toml` remains a local modification visible in Git.
 Development downstreams can keep `/pixi.lock` untracked and ignored, with CI configured to resolve dependencies; deployment locks can be retained separately when required.

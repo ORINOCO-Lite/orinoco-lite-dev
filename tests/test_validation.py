@@ -386,7 +386,7 @@ class DownstreamValidationTests(unittest.TestCase):
 
     def test_retained_source_subdataset_does_not_enter_build_inputs(self) -> None:
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
-        for path in ("site-specific", "submodule/orinoco-lite-dev"):
+        for path in ("site-specific", ".orinoco-lite/orinoco-lite-dev"):
             subprocess.run(["git", "-C", str(self.root), "update-index", "--add",
                             "--cacheinfo", f"160000,0123456789012345678901234567890123456789,{path}"], check=True)
             (self.root / ".gitmodules").write_text(f'[submodule "{path}"]\npath = {path}\nurl = https://example.invalid/input.git\n')

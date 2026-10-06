@@ -37,7 +37,7 @@ Version overrides (optional):
 
 Paths are relative to the engineering directory. Publish selected commits
 before setup. In an existing downstream, `pixi run orinoco-lite dev enable`
-installs a locally ignored checkout at submodule/orinoco-lite-dev editable.
+installs a locally ignored checkout at .orinoco-lite/orinoco-lite-dev editable.
 
 HELP
 }

@@ -48,6 +48,9 @@ def downstream(tmp_path, monkeypatch):
     (root / "pixi.toml").write_text(tomlkit.dumps(manifest))
     (root / "pixi.lock").write_text("original lock\n")
     (root / "page.md").write_text("initial content\n")
+    adapter = root / ".orinoco-lite/hugo-adapter/layouts/example.html"
+    adapter.parent.mkdir(parents=True)
+    adapter.write_text("tracked adapter\n")
     commit(root, "test: pinned package")
     original_run = dev.run
 
@@ -71,12 +74,13 @@ def read(root):
 def test_enable_clones_nested_sources_without_registering_or_staging(downstream, capfd):
     original = read(downstream)
     dev.enable(downstream)
-    source = downstream / dev.SUBMODULE
+    source = downstream / dev.CHECKOUT
     assert (source / ".git").is_dir()
     assert (source / "submodules/dump-things-pyclient/client.py").is_file()
+    assert dev.git(downstream, "ls-files", ".orinoco-lite") == ".orinoco-lite/hugo-adapter/layouts/example.html"
     assert not (downstream / ".gitmodules").exists()
     assert not dev.git(downstream, "diff", "--cached", "--name-only")
-    assert dev.git(downstream, "check-ignore", dev.SUBMODULE) == dev.SUBMODULE
+    assert dev.git(downstream, "check-ignore", dev.CHECKOUT) == dev.CHECKOUT
     assert read(downstream)["pypi-dependencies"]["orinoco-lite"] == dev.EDITABLE
     assert read(downstream)["pypi-options"] == original["pypi-options"]
     assert "no files were staged" in capfd.readouterr().err
@@ -87,7 +91,7 @@ def test_reenable_preserves_uncommitted_sources_and_downstream_dependencies(down
     doc = tomlkit.parse((downstream / "pixi.toml").read_text())
     doc["pypi-dependencies"]["new-library"] = "*"
     (downstream / "pixi.toml").write_text(tomlkit.dumps(doc))
-    client = downstream / dev.SUBMODULE / "submodules/dump-things-pyclient/client.py"
+    client = downstream / dev.CHECKOUT / "submodules/dump-things-pyclient/client.py"
     client.write_text("value = 2\n")
     dev.enable(downstream)
     assert client.read_text() == "value = 2\n"
@@ -111,7 +115,7 @@ def test_failed_install_restores_uncommitted_manifest_and_lock(downstream, monke
     with pytest.raises(subprocess.CalledProcessError):
         dev.enable(downstream)
     assert {name: (downstream / name).read_bytes() for name in dev.FILES} == before
-    assert (downstream / dev.SUBMODULE / ".git").is_dir()
+    assert (downstream / dev.CHECKOUT / ".git").is_dir()
 
 
 def test_enable_rejects_source_checkout_and_symlink(downstream):
@@ -119,8 +123,8 @@ def test_enable_rejects_source_checkout_and_symlink(downstream):
     with pytest.raises(ConfigurationError, match="Run 'dev enable'"):
         dev.enable(downstream)
     (downstream / "src/orinoco_lite").rmdir()
-    source = downstream / dev.SUBMODULE
-    source.parent.mkdir()
+    source = downstream / dev.CHECKOUT
+    source.parent.mkdir(exist_ok=True)
     source.symlink_to(downstream.parent / "package")
     with pytest.raises(ConfigurationError, match="real source checkout"):
         dev.enable(downstream)

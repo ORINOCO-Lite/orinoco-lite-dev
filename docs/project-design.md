@@ -68,7 +68,7 @@ The package development `pixi.lock` is local and untracked.
 Release consumer locks record and test the resolved deployment environment.
 
 Orinoco Lite's `pyproject.toml` declares Python requirements and nested editable sources through `[tool.uv.sources]`.
-A downstream can switch its package selection to `submodule/orinoco-lite-dev` while continuing to run all website and adapter commands in its own Pixi environment.
+A downstream can switch its package selection to `.orinoco-lite/orinoco-lite-dev` while continuing to run all website and adapter commands in its own Pixi environment.
 Development uses a locally ignored source checkout; enabling it updates the downstream environment without staging files or requiring a commit.
 Wheels and source archives carry exact Git requirements for package-owned Python dependencies, derived from the package commit's gitlinks and `.gitmodules`.
 The release workflow derives its mixed Conda/PyPI environment from the maintained Pixi configuration, selects the package commit, and generates the release lock.

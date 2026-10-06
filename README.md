@@ -97,7 +97,7 @@ Release tags use `v` followed by a Python package version; manually dispatched a
 
 For the separate engineering task of reproducing and updating the upstream website, see [upstream instantiation](docs/upstream-tracking.md).
 
-In an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `submodule/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
+In an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `.orinoco-lite/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
 The checkout is locally ignored; manifest and lock changes need no commit.
 See [dependency management](docs/dependency-management.md) for source selection and re-running enable.
 
