@@ -243,7 +243,7 @@ class WwwFromModelResolverTests(unittest.TestCase):
             resolved = resolve_www_from_model(self.workspace, self.root / "missing-resources")
         self.assertEqual(resolved, source.resolve())
         self.assertEqual((resolved / "page_templates/record.md").read_text(), "local edit\n")
-        self.assertFalse((self.workspace / ".orinoco").exists())
+        self.assertFalse((self.workspace / ".orinoco-lite").exists())
 
     def test_missing_package_source_commit_is_rejected(self) -> None:
         resources = self._resources()

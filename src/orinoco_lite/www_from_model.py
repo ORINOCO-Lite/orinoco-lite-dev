@@ -295,7 +295,7 @@ def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) 
         return selected.resolve()
     repository, commit = upstream_source(resources_root)
     return _ensure_checkout(
-        workspace / ".orinoco" / "www-from-model",
+        workspace / ".orinoco-lite" / "www-from-model",
         repository=repository,
         commit=commit,
     )
