@@ -87,11 +87,14 @@ def prepare_checkout(root: Path, repository: str | None, revision: str | None) -
             revision = source_commit(resolve_resources().root)
         if revision.startswith("-"):
             raise ConfigurationError("Supply a Git revision, not a command option.")
-        with progress("Cloning the Orinoco Lite development source with Git"):
+        with progress("Cloning Orinoco Lite source"):
             checkout.parent.mkdir(parents=True, exist_ok=True)
-            run("git", "clone", "--", repository or PACKAGE_REPOSITORY, checkout, cwd=root)
-            run("git", "checkout", "--detach", revision, cwd=checkout)
-            run("git", "submodule", "update", "--init", "--recursive", cwd=checkout)
+            run("git", "clone", "--quiet", "--", repository or PACKAGE_REPOSITORY,
+                checkout, cwd=root)
+        run("git", "checkout", "--quiet", "--detach", revision, cwd=checkout)
+        with progress("Initializing pinned development dependencies"):
+            run("git", "submodule", "update", "--quiet", "--init", "--recursive",
+                cwd=checkout)
     elif repository is not None or revision is not None:
         raise ConfigurationError(f"{CHECKOUT} already exists; use Git inside it to select another revision.")
     if not (checkout / ".git").exists():
@@ -113,8 +116,10 @@ def prepare_checkout(root: Path, repository: str | None, revision: str | None) -
 def prepare_resources(checkout: Path) -> None:
     # Build tools belong to the package's compilation environment. Website and
     # adapter commands continue to use only the downstream environment.
+    print("Preparing editable package resources...", file=sys.stderr, flush=True)
     run("pixi", "run", "--manifest-path", checkout / "pixi.toml",
-        "orinoco-lite", "dev", "prepare-resources", cwd=checkout, env=unlocked_environment())
+        "orinoco-lite", "dev", "prepare-resources", cwd=checkout,
+        env=unlocked_environment())
 
 
 def enable(root: Path, repository: str | None = None, revision: str | None = None) -> None:
@@ -129,6 +134,16 @@ def enable(root: Path, repository: str | None = None, revision: str | None = Non
     print("Enabling editable Orinoco Lite...", file=sys.stderr, flush=True)
     checkout = prepare_checkout(root, repository, revision)
     prepare_resources(checkout)
-    apply(root)
-    print(f"Editable Orinoco Lite source: {checkout}\n"
-          "Updated pixi.toml and pixi.lock locally; no files were staged.", file=sys.stderr, flush=True)
+    with progress("Installing editable Orinoco Lite in the downstream Pixi environment"):
+        apply(root)
+    selected_revision = git(checkout, "rev-parse", "--short", "HEAD")
+    branch = subprocess.run(
+        ["git", "-C", str(checkout), "symbolic-ref", "--short", "-q", "HEAD"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
+    source = checkout.relative_to(root)
+    state = f"{source} @ {selected_revision}"
+    if not branch:
+        state += " (detached HEAD)"
+    print(f"Editable Orinoco Lite enabled: {state}\n"
+          "Updated pixi.toml and pixi.lock locally.", file=sys.stderr, flush=True)
