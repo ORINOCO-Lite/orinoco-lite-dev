@@ -136,6 +136,14 @@ def test_convert_and_export_preserve_authored_inputs_capture_and_source_marker(t
     original = source.read_bytes()
     stages.jsonl_to_yaml(source, inputs)
     report = stages.jsonl_to_yaml(source, inputs)
+    from orinoco_lite.stage_reports import artifact_digest
+    digest = artifact_digest(inputs)
+    for directory in (inputs / "metadata/records", inputs / "metadata/overlays/machine-provenance-annotations"):
+        (directory / ".DS_Store").write_bytes(b"Finder metadata")
+        for child in directory.iterdir():
+            if child.is_dir():
+                (child / ".DS_Store").write_bytes(b"Finder metadata")
+    assert artifact_digest(inputs) == digest
     exported = stages.yaml_to_jsonl(inputs, tmp_path / "joined.jsonl")
     assert source.read_bytes() == original
     assert (inputs / "authored.txt").read_text() == "title: Authored\n"

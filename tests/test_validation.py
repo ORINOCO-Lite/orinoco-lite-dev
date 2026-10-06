@@ -110,7 +110,6 @@ class DownstreamValidationTests(unittest.TestCase):
     def test_non_record_content_below_record_source_fails_closed(self) -> None:
         for relative in (
             "site-specific/metadata/records/README.md",
-            "site-specific/metadata/records/.DS_Store",
             "site-specific/metadata/records/XYZPerson/notes.txt",
         ):
             with self.subTest(relative=relative):
@@ -120,6 +119,35 @@ class DownstreamValidationTests(unittest.TestCase):
                     ConfigurationError,
                     "Everything below paths.records must be a Thing YAML record",
                 ):
+                    validate_workspace(load_workspace(self.root))
+                path.unlink()
+
+    def test_finder_files_do_not_change_metadata_or_tree_hashes(self) -> None:
+        workspace = load_workspace(self.root)
+        baseline = validate_workspace(workspace)
+        for relative in (
+            "site-specific/metadata/.DS_Store",
+            "site-specific/metadata/records/.DS_Store",
+            "site-specific/metadata/records/XYZPerson/.DS_Store",
+            "site-specific/metadata/overlays/machine-provenance-annotations/.DS_Store",
+            "site-specific/content/.DS_Store",
+        ):
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"Finder metadata")
+        self.assertEqual(baseline, validate_workspace(workspace))
+
+    def test_finder_named_symlinks_remain_invalid(self) -> None:
+        for relative in (
+            "site-specific/metadata/.DS_Store",
+            "site-specific/metadata/records/.DS_Store",
+            "site-specific/metadata/overlays/machine-provenance-annotations/.DS_Store",
+        ):
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.symlink_to(self.root / "pyproject.toml")
+                with self.assertRaisesRegex(ConfigurationError, "symlinks"):
                     validate_workspace(load_workspace(self.root))
                 path.unlink()
 

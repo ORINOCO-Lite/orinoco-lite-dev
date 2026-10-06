@@ -61,6 +61,8 @@ def _files(root: Path, annex_keys: dict[Path, str] | None = None) -> Iterator[Pa
                 f"Site-owned paths cannot contain symlinks: {candidate}"
             )
         if candidate.is_file():
+            if candidate.name == ".DS_Store":
+                continue
             yield candidate
         elif not candidate.is_dir():
             raise ConfigurationError(f"Site-owned path is not regular: {candidate}")
@@ -128,6 +130,8 @@ def _validate_metadata_namespace(
             raise ConfigurationError(
                 f"Site-owned paths cannot contain symlinks: {candidate}"
             )
+        if candidate.name == ".DS_Store" and candidate.is_file():
+            continue
         if any(candidate == root or root in candidate.parents for root in allowed_roots):
             continue
         if any(candidate in root.parents for root in allowed_roots):

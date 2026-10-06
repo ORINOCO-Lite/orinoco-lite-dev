@@ -74,6 +74,8 @@ def artifact_digest(path: Path) -> str:
     for child in sorted(path.rglob("*")):
         if child.is_symlink():
             raise ConfigurationError(f"Evidence contains a symbolic link: {child}")
+        if child.name == ".DS_Store" and child.is_file():
+            continue
         if child.is_file() and not is_receipt(child):
             entries.append([child.relative_to(path).as_posix(), artifact_digest(child)])
     return json_digest(entries)
@@ -141,8 +143,9 @@ def _copy_artifact(source: Path, destination: Path) -> dict:
     producer = operation_receipt(source)
     destination.parent.mkdir(parents=True, exist_ok=True)
     if source.is_dir():
-        shutil.copytree(source, destination, ignore=lambda _, names: [
-            name for name in names if is_receipt(Path(name))])
+        shutil.copytree(source, destination, ignore=lambda directory, names: [
+            name for name in names if is_receipt(Path(name)) or
+            (name == ".DS_Store" and (Path(directory) / name).is_file())])
     else:
         shutil.copyfile(source, destination)
     media_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"

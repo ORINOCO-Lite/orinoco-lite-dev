@@ -73,6 +73,8 @@ def _render_template_tree(
             raise DriverError(f"Hugo adaptation template cannot be a symlink: {path}")
         if path.is_dir():
             continue
+        if path.name == ".DS_Store" and path.is_file():
+            continue
         if not path.is_file() or path.suffix != ".j2":
             raise DriverError(
                 f"Hugo adaptation template tree contains unsupported content: {path}"

@@ -36,6 +36,8 @@ def record_files(workspace: WorkspaceConfig) -> list[Path]:
             continue
         if not candidate.is_file():
             raise ConfigurationError(f"Metadata record path is not regular: {candidate}")
+        if candidate.name == ".DS_Store":
+            continue
         if candidate == control:
             continue
         if (

@@ -36,6 +36,8 @@ def tree_sha256(root: Path, *, annex_keys: dict[Path, str] | None = None) -> str
     for path in sorted(candidate for candidate in root.rglob("*")
                        if ".git" not in candidate.relative_to(root).parts
                        and (candidate.is_file() or candidate in annex_keys)):
+        if path.name == ".DS_Store" and path.is_file() and not path.is_symlink():
+            continue
         relative = path.relative_to(root).as_posix()
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")

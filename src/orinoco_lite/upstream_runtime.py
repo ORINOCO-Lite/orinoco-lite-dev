@@ -22,7 +22,7 @@ def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | Non
         return
     for candidate in sorted(source.rglob("*")):
         relative = candidate.relative_to(source)
-        if any(part in {".git", ".DS_Store", "__pycache__"} for part in relative.parts):
+        if any(part in {".git", "__pycache__"} for part in relative.parts):
             continue
         target = destination / relative
         if media and candidate in media:
@@ -31,6 +31,8 @@ def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | Non
             continue
         if candidate.is_symlink():
             raise DriverError(f"Static source cannot contain symlinks: {candidate}")
+        if candidate.name == ".DS_Store" and candidate.is_file():
+            continue
         if candidate.is_dir():
             target.mkdir(parents=True, exist_ok=True)
         elif candidate.is_file():

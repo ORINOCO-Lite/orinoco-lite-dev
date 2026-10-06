@@ -566,3 +566,21 @@ def test_build_destination_cannot_overwrite_intermediate_inputs(tmp_path):
                 _safe_destination(workspace, destination)
         assert marker.read_text() == "retained input"
     assert _safe_destination(workspace, Path("build/site")) == tmp_path / "build/site"
+
+
+def test_finder_files_are_omitted_from_site_copy_but_symlinks_are_rejected(tmp_path):
+    import pytest
+
+    source = tmp_path / "inputs"
+    source.mkdir()
+    (source / "image.png").write_bytes(b"image")
+    noise = source / ".DS_Store"
+    noise.write_bytes(b"Finder metadata")
+    output = tmp_path / "output"
+    site._copy_tree(source, output)
+    assert (output / "image.png").read_bytes() == b"image"
+    assert not (output / ".DS_Store").exists()
+    noise.unlink()
+    noise.symlink_to(source / "image.png")
+    with pytest.raises(DriverError, match="symlinks"):
+        site._copy_tree(source, tmp_path / "invalid")

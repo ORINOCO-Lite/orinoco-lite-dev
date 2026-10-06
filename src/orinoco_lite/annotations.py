@@ -236,6 +236,8 @@ def annotation_files(workspace: WorkspaceConfig) -> list[Path]:
             raise ConfigurationError(
                 f"Overlay file path is not regular: {candidate}"
             )
+        if candidate.name == ".DS_Store":
+            continue
         relative = candidate.relative_to(root)
         if (
             candidate.suffix.lower() not in {".yaml", ".yml"}
