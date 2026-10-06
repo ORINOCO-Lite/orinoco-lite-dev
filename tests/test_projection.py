@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import types
@@ -836,16 +837,56 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
 
-    def test_editable_dependencies_bypass_projection_cache(self):
+    def test_editable_dependencies_reuse_cache_and_invalidate_source_edits(self):
+        checkout = Path(self.temporary.name) / "editable dependency"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+        source = checkout / "converter.py"
+        source.write_text("value = 1\n")
+        subprocess.run(["git", "-C", str(checkout), "add", "converter.py"], check=True)
+        dependency = Mock()
+        dependency.metadata = {"Name": "editable-converter"}
+        dependency.version = "1.0"
+        dependency.read_text.return_value = json.dumps({
+            "url": checkout.as_uri(), "dir_info": {"editable": True},
+        })
         with (
-            patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=self.root),
+            patch("orinoco_lite.projection.distributions", return_value=[dependency]),
             patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic,
-            patch("orinoco_lite.projection._projection_cache_key", side_effect=AssertionError("development must not consult cache")),
         ):
             update_projection(self.workspace, self.resources)
             update_projection(self.workspace, self.resources)
             validate_inputs(self.workspace, self.resources)
-        assert semantic.call_count == 3
+            assert semantic.call_count == 1
+            source.write_text("value = 2\n")
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 2
+            new_source = checkout / "new.py"
+            new_source.write_text("value = 3\n")
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 3
+            new_source.unlink()
+            source.unlink()
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 4
+            update_projection(self.workspace, self.resources, no_cache=True)
+            assert semantic.call_count == 5
+        assert not (self.workspace.path("build") / ".projection-cache.json").exists()
+
+    def test_unenumerated_editable_dependency_does_not_reuse_cache(self):
+        dependency = Mock()
+        dependency.metadata = {"Name": "editable-converter"}
+        dependency.version = "1.0"
+        dependency.read_text.return_value = json.dumps({
+            "url": "file:///missing/editable/source", "dir_info": {"editable": True},
+        })
+        with (
+            patch("orinoco_lite.projection.distributions", return_value=[dependency]),
+            patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic,
+        ):
+            update_projection(self.workspace, self.resources)
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 2
         assert not (self.workspace.path("build") / ".projection-cache.json").exists()
 
     @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)

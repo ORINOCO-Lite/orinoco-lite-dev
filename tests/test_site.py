@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import shutil
+import struct
+import zlib
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
+
+import pytest
 
 from orinoco_lite import site
 from orinoco_lite.config import load_config_path
@@ -492,7 +497,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 with self.subTest(name=name):
                     commands: list[list[str]] = []
 
-                    def run(command, *, cwd):
+                    def run(command, *, cwd, environment=None):
                         normalized = [str(item) for item in command]
                         commands.append(normalized)
                         if normalized[0] == "hugo":
@@ -556,7 +561,7 @@ def test_build_destination_cannot_overwrite_intermediate_inputs(tmp_path):
     import pytest
 
     workspace = SimpleNamespace(root=tmp_path, path=lambda _: tmp_path / "build")
-    for name in ("hugo-projection", "hugo-assembly"):
+    for name in ("hugo-projection", "hugo-assembly", "hugo-cache", "hugo-resources"):
         protected = tmp_path / "build" / name
         protected.mkdir(parents=True)
         marker = protected / "input.txt"
@@ -566,6 +571,55 @@ def test_build_destination_cannot_overwrite_intermediate_inputs(tmp_path):
                 _safe_destination(workspace, destination)
         assert marker.read_text() == "retained input"
     assert _safe_destination(workspace, Path("build/site")) == tmp_path / "build/site"
+
+
+@pytest.mark.skipif(shutil.which("hugo") is None, reason="Hugo is not installed")
+def test_hugo_reuses_resource_cache_between_clean_builds(tmp_path):
+    config = tmp_path / "pyproject.toml"
+    config.write_text(CONFIG)
+    _write_site_data(tmp_path)
+    color = bytes([255, 0, 0])
+
+    def assemble(workspace, resources, assembly):
+        def chunk(kind, data):
+            return (struct.pack("!I", len(data)) + kind + data
+                    + struct.pack("!I", zlib.crc32(kind + data)))
+
+        image = (b"\x89PNG\r\n\x1a\n"
+                 + chunk(b"IHDR", struct.pack("!IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+                 + chunk(b"IDAT", zlib.compress(b"\0" + color))
+                 + chunk(b"IEND", b""))
+        (assembly / "assets").mkdir()
+        (assembly / "assets/pixel.png").write_bytes(image)
+        (assembly / "layouts").mkdir()
+        (assembly / "layouts/index.html").write_text(
+            '{{ $image := (resources.Get "pixel.png").Resize "2x2" }}'
+            '<img src="{{ $image.RelPermalink }}">'
+        )
+        (assembly / "hugo.toml").write_text('title = "Cache test"\n')
+
+    destination = tmp_path / "build/site"
+    with (
+        patch.object(site, "_assemble", side_effect=assemble),
+        patch.object(site, "_build_provenance", return_value={}),
+        patch.object(site, "_write_build_provenance_footer"),
+        patch.object(site, "bind_editor", return_value={}),
+        patch.object(site, "bind_review", return_value={}),
+    ):
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        first = (destination / "index.html").read_bytes()
+        resources = tmp_path / "build/hugo-resources"
+        cached = {p: (p.read_bytes(), p.stat().st_mtime_ns)
+                  for p in resources.rglob("*") if p.is_file()}
+        assert cached
+        (destination / "obsolete.html").write_text("old page")
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        assert (destination / "index.html").read_bytes() == first
+        assert not (destination / "obsolete.html").exists()
+        assert {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in cached} == cached
+        color = bytes([0, 0, 255])
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        assert (destination / "index.html").read_bytes() != first
 
 
 def test_finder_files_are_omitted_from_site_copy_but_symlinks_are_rejected(tmp_path):

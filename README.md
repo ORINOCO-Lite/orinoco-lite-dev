@@ -135,5 +135,6 @@ Dependency locks and release inputs contain the versions required by the build; 
   Generated projection and website output are ignored.
 - The German website and its declared dependency closure are resolved at their selected Git revisions rather than copied wholesale or pinned again in downstream configuration.
   Builds retrieve required Annex assets from that same checkout and copy ordinary files into the assembly.
-  Editable installs use the package’s nested working checkout, including local edits, and bypass projection caches; fixed installs use the package’s committed gitlink.
+  Editable installs use the package’s nested working checkout, including local edits; fixed installs use the package’s committed gitlink.
+  Both reuse unchanged projections and Hugo resource caches; editable dependency source changes invalidate the projection cache.
 - Credentials, stores, caches, browser downloads, and build output are local state.

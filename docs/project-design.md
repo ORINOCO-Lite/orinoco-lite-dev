@@ -216,7 +216,7 @@ Reusable adapter primitives belong in Orinoco Lite or the template.
 Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` rendering resources to generate the graph and Hugo pages.
 Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
 Hugo assets come from the same checkout through Git Annex, without a template overlay.
-Editable development bypasses projection caches.
+Both installation modes reuse unchanged projections, accounting for editable dependency source changes, and preserve Hugo resource caches between clean website builds.
 The template declares the minimum package version required by its adaptation and workflows; downstreams select an exact compatible package release or commit independently.
 Raise that minimum only when template functionality requires it.
 When their layout changes, update the template or recreate the scaffold while retaining site-owned inputs; do not maintain runtime paths for retired layouts.

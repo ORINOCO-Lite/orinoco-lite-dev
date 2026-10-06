@@ -218,7 +218,7 @@ def _safe_destination(workspace, destination: Path) -> Path:
     build = workspace.path("build").resolve(strict=False)
     if build not in resolved.parents:
         raise ConfigurationError(f"Build destination must be below {build}: {resolved}")
-    for name in ("hugo-projection", "hugo-assembly"):
+    for name in ("hugo-projection", "hugo-assembly", "hugo-cache", "hugo-resources"):
         reserved = (build / name).resolve(strict=False)
         if resolved == reserved or reserved in resolved.parents or resolved in reserved.parents:
             raise ConfigurationError(f"Build destination overlaps {name}: {resolved}")
@@ -279,11 +279,15 @@ def _manifest(root: Path) -> list[str]:
     ]
 
 
-def _run(command: Sequence[str | Path], *, cwd: Path) -> str:
+def _run(
+    command: Sequence[str | Path], *, cwd: Path,
+    environment: dict[str, str] | None = None,
+) -> str:
     try:
         result = subprocess.run(
             [str(item) for item in command],
             cwd=cwd,
+            env={**os.environ, **environment} if environment is not None else None,
             capture_output=True,
             text=True,
             check=False,
@@ -376,6 +380,8 @@ def build_site(
                 "hugo",
                 "--minify",
                 "--cleanDestinationDir",
+                "--cacheDir",
+                workspace.path("build") / "hugo-cache",
                 "--environment",
                 "con",
                 "--source",
@@ -386,6 +392,7 @@ def build_site(
                 base_url,
             ],
             cwd=workspace.root,
+            environment={"HUGO_RESOURCEDIR": str(workspace.path("build") / "hugo-resources")},
         )
     adapter = _site_adapter(resources_root)
     with progress("Preparing editing and review pages"):
