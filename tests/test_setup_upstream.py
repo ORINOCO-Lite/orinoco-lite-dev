@@ -434,13 +434,14 @@ def test_recreation_retains_source_history_and_skips_acquisition(setup, tmp_path
     (source / "extensions/.gitkeep").touch()
     (source / "sourcedata/downloaded").mkdir(parents=True)
     (source / "sourcedata/downloaded/records.jsonl").write_text('{"pid":"retained"}\n')
-    (source / ".gitmodules").write_text('[submodule "site-specific"]\n path = site-specific\n url = https://github.com/example/site-specific.git\n')
+    (source / ".gitmodules").write_text(f'[submodule "site-specific"]\n path = site-specific\n url = {source}\n')
     site_commit = git(source, "rev-parse", "HEAD")
     git(source, "add", ".")
     git(source, "update-index", "--add", "--cacheinfo", f"160000,{site_commit},site-specific")
     git(source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
         "-c", "commit.gpgsign=false", "commit", "--no-verify", "-qm", "test: retained inputs")
     head = git(source, "rev-parse", "HEAD")
+    run.env["GIT_ALLOW_PROTOCOL"] = "file"
     result, calls = run("--from-downstream", str(source))
     assert result.returncode == 0, result.stderr
     assert git(destination, "rev-parse", "pre-reinstantiation") == head
@@ -448,19 +449,21 @@ def test_recreation_retains_source_history_and_skips_acquisition(setup, tmp_path
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[copier.index("--data-file") + 1] == ".copier-answers.yml"
     install = next(call for call in calls if "chore: retain site-specific revision" in call)
-    assert install[-2:] == ["https://github.com/example/site-specific.git", site_commit]
+    assert install[-2:] == [".gitmodules", "site-specific"]
+    assert git(destination / "site-specific", "rev-parse", "HEAD") == site_commit
     correction = next(call for call in calls if "fix: align Copier answers with retained site settings" in call)
     assert correction[-1] == "psychoinformatics-downstream"
     assert "no acquisition or import" in result.stdout
 
 
 def test_development_registers_the_selected_package_before_enable(setup):
-    run, _, _, _, package_commit, *_ = setup
-    result, calls = run("--development")
+    run, engineering, _, destination, package_commit, *_ = setup
+    run.env["GIT_ALLOW_PROTOCOL"] = "file"
+    result, calls = run("--development", "--package-repository", str(engineering))
     assert result.returncode == 0, result.stderr
     registration = next(call for call in calls if "chore: register development package" in call)
-    assert registration[-3:] == ["https://example.invalid/engineering.git", package_commit,
-                                ".orinoco-lite/orinoco-lite-dev"]
+    assert registration[-2:] == [".gitmodules", ".orinoco-lite/orinoco-lite-dev"]
+    assert git(destination / ".orinoco-lite/orinoco-lite-dev", "rev-parse", "HEAD") == package_commit
     enable = next(call for call in calls if "chore: enable editable Orinoco Lite" in call)
     assert enable[-2:] == ["dev", "enable"]
     assert calls.index(registration) < calls.index(enable)

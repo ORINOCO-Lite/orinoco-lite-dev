@@ -1,6 +1,8 @@
 # Local deployment output and credentials.
+.DS_Store
 build/
 /src/orinoco_lite/_resources/
+/src/orinoco_lite/.resources-*/
 /dist/
 /node_modules/
 *.env

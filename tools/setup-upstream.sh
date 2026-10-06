@@ -260,11 +260,10 @@ if [[ -n $site_specific ]]; then populate+=(--site-specific "$site_relative"); f
 # Switch once. The installed package owns the workflow, and all its commands
 # inherit this downstream environment. No workflow files are copied into the site.
 if [[ -n $from_downstream ]]; then
-  datalad run --explicit -m "chore: retain site-specific revision" \
-    --output site-specific --output .gitmodules -- \
-    bash -e -c 'git submodule add -- "$1" site-specific
-git -C site-specific checkout --quiet --detach "$2"
-git add -- site-specific' -- "$site_repository" "$site_commit"
+  git submodule add -- "$site_repository" site-specific
+  git -C site-specific checkout --quiet --detach "$site_commit"
+  # Save only the parent gitlink; input checkouts are not transformation outputs.
+  datalad save -m "chore: retain site-specific revision" -- .gitmodules site-specific
 else
   pixi run --manifest-path pixi.toml "${populate[@]}"
 fi
@@ -276,12 +275,10 @@ if [[ -n $site_specific_url ]]; then
 fi
 if $development; then
   checkout=.orinoco-lite/orinoco-lite-dev
-  datalad run --explicit -m "chore: register development package" \
-    --output "$checkout" --output .gitmodules -- \
-    bash -e -c 'git submodule add -- "$1" "$3"
-git -C "$3" checkout --quiet --detach "$2"
-git -C "$3" submodule update --init --recursive
-git add -- "$3"' -- "$package_repository" "$package_commit" "$checkout"
+  git submodule add -- "$package_repository" "$checkout"
+  git -C "$checkout" checkout --quiet --detach "$package_commit"
+  git -C "$checkout" submodule update --init --recursive
+  datalad save -m "chore: register development package" -- .gitmodules "$checkout"
   datalad run --explicit -m "chore: enable editable Orinoco Lite" \
     --output pixi.toml -- pixi run --manifest-path pixi.toml orinoco-lite dev enable
 fi
