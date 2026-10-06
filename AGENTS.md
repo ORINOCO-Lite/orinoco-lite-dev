@@ -15,6 +15,8 @@
   Opted-in `site-specific` submodules may use Annex only for `assets/` and `static/`; builds copy verified content into ordinary output files.
   DataLad remains a downstream dependency for recording source-adapter run provenance; records and other structured inputs always remain in Git.
   DataLad operations in opted-in Annex submodules require the Annex executable even when saving ordinary Git records.
+- Upstream website reproduction always uses downstream development mode with `.orinoco-lite/orinoco-lite-dev` tracked as a Git submodule.
+  Import authored inputs and Annex media from its nested `www-from-model` checkout; ordinary downstream builds use bundled rendering resources without cloning upstream.
 - Test unreleased package and template work together by applying a selected downstream's declared inputs to a fresh disposable template instance with `pixi run setup-upstream` when practical.
   Setup stops before projection and building; run those explicitly only when they are part of the requested validation.
   When multi-repository rendering remains uncertain, test the downstream pull-request head in a deploy preview with explicit full-SHA package and template candidates before releasing.

@@ -16,7 +16,9 @@ If the software update changed metadata in `site-specific`, use its published br
 Otherwise keep `main`.
 Publication requires that branch head to match the parent's selected child gitlink; reconcile a stale pin before publishing.
 
-The package selects one `www-from-model` checkout for rendering, projection, assets, and site-input imports.
+The upstream-comparison downstream always uses development mode with `.orinoco-lite/orinoco-lite-dev` tracked as a Git submodule.
+Its editable package selects one nested `www-from-model` checkout for rendering, projection, assets, and site-input imports.
+The bundled rendering subset used by ordinary downstream builds does not supply authored upstream website inputs.
 Imported settings, content, identity images, and static files come from that checkout, including its Annex media.
 The importer does not copy theme or other software dependencies.
 

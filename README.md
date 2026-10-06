@@ -95,9 +95,11 @@ Package versions come from Git tags through Versioneer.
 Normal downstream installations retain the version recorded at build time.
 Release tags use `v` followed by a Python package version; manually dispatched artifact builds use the selected ref's derived version.
 
-For the separate engineering task of reproducing and updating the upstream website, see [upstream instantiation](docs/upstream-tracking.md).
+Upstream website reproduction always uses downstream development mode with `.orinoco-lite/orinoco-lite-dev` tracked as a Git submodule.
+Its nested `www-from-model` checkout supplies authored inputs and Annex media; ordinary downstreams use the bundled rendering resources without cloning upstream.
+See [upstream instantiation](docs/upstream-tracking.md).
 
-In an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `.orinoco-lite/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
+For ordinary local development in an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `.orinoco-lite/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
 The checkout is locally ignored; manifest and lock changes need no commit.
 See [dependency management](docs/dependency-management.md) for source selection and re-running enable.
 
