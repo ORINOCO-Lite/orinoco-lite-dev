@@ -18,89 +18,19 @@ import tempfile
 
 import yaml
 
-from .errors import DriverError, IntegrityError
+from .errors import DriverError
 from .projection import _route_for_pid
 from .upstream_snapshot import load_jsonl
 
 
-
-def resolve_tools(workspace: Path, presentation: Path, *, resources_root: Path | None = None) -> Path:
-    """Use prepared query tools only when they match the presentation owner's pins."""
-    from .development import LINK
-    from .www_from_model import _git_text, _repository_head, _selected_www_from_model_commit, resolve_engineering_source
-    from .resources import resolve_resources
-
-    engineering, commit = resolve_engineering_source(workspace, resources_root or resolve_resources().root)
-    if _repository_head(presentation, label="Selected presentation checkout") != _selected_www_from_model_commit(engineering, commit):
-        raise DriverError("Selected presentation checkout does not match its owning engineering Gitlink")
-    selected = {}
-    for name in ("query-things", "dump-things-pyclient"):
-        path = f"submodules/{name}"
-        entry = _git_text(engineering, ("ls-tree", commit, "--", path),
-                          operation=f"read the selected {name} Gitlink")
-        fields = entry.split()
-        if len(fields) != 4 or fields[:2] != ["160000", "commit"] or fields[3] != path:
-            raise DriverError(f"Selected engineering commit does not pin {path}")
-        selected[name] = fields[2]
-    candidates = []
-    link = workspace / LINK
-    if link.is_symlink():
-        candidates.append(link.resolve() / "submodules")
-    candidates.append(engineering / "submodules")
-    diagnostics = []
-    for candidate in dict.fromkeys(candidates):
-        try:
-            for name, expected in selected.items():
-                checkout = candidate / name
-                actual = _repository_head(checkout, label=f"Selected {name} checkout")
-                if actual != expected:
-                    raise DriverError(f"{name} checkout is {actual}, expected Gitlink {expected}")
-                if _git_text(checkout, ("status", "--porcelain", "--untracked-files=all"),
-                             operation=f"verify selected {name} sources"):
-                    raise DriverError(f"Selected {name} checkout has uncommitted source changes")
-            return candidate.resolve()
-        except (DriverError, IntegrityError) as error:
-            if "expected Gitlink" in str(error) or "uncommitted" in str(error):
-                raise DriverError(str(error)) from error
-            diagnostics.append(str(error))
-    # Ordinary wheel consumers do not have maintainer submodules prepared.
-    # Resolve the exact existing Gitlinks in the package-owned source checkout.
-    from .www_from_model import _git
-    _git(engineering, ("submodule", "update", "--init", "--checkout", "--",
-         "submodules/query-things", "submodules/dump-things-pyclient"),
-         operation="prepare selected upstream query tools")
-    candidate = engineering / "submodules"
-    for name, expected in selected.items():
-        checkout = candidate / name
-        if _repository_head(checkout, label=f"Selected {name} checkout") != expected:
-            raise DriverError(f"{name} does not match expected Gitlink {expected}")
-        if _git_text(checkout, ("status", "--porcelain", "--untracked-files=all"),
-                     operation=f"verify selected {name} sources"):
-            raise DriverError(f"Selected {name} checkout has uncommitted source changes")
-    return candidate.resolve()
-
-
-
-def run_upstream(records: Path, presentation: Path, output: Path, tools: Path,
+def run_upstream(records: Path, presentation: Path, output: Path,
                  *, python_command: list[str] | None = None, resources_root: Path | None = None) -> dict:
     from .record_stages import _check_record_input
     _check_record_input(records)
-    query = tools / "query-things"
-    client = tools / "dump-things-pyclient"
-    if not (query / "query_things").is_dir() or not (client / "dump_things_pyclient").is_dir():
-        raise DriverError(
-            f"Selected upstream query tools are missing below {tools}; initialize "
-            "the query-things and dump-things-pyclient submodules."
-        )
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join([
-        str(query), str(client), str(Path(__file__).parents[1]),
-        environment.get("PYTHONPATH", ""),
-    ])
     command = [*(python_command or [sys.executable]), "-m", __name__, str(records), str(presentation), str(output)]
     if resources_root is not None:
         command.append(str(resources_root))
-    result = subprocess.run(command, env=environment, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise DriverError(f"Selected upstream projection failed: {result.stderr.strip() or result.stdout.strip()}")
     try:
@@ -164,8 +94,8 @@ def project(records_path: Path, presentation: Path, output: Path, resources_root
         from dump_things_pyclient import communicate
     except ImportError as error:
         raise DriverError(
-            "The selected query-things dependencies are unavailable; activate "
-            "the maintainer environment (including click-option-group)."
+            "The selected query-things dependencies are unavailable; reinstall "
+            "orinoco-lite in the active environment."
         ) from error
     records = [item.record for item in load_jsonl(records_path)]
     steps = workflow_steps(presentation)

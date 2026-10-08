@@ -83,19 +83,19 @@ def validate_semantics(workspace, resources_root, www_from_model_root=None):
         (writer,) = build_format_converters(schema, writer_only=True)
     except Exception as error:
         raise DriverError("Could not initialize semantic schema conversion") from error
-    for record in records:
-        pid = record["pid"]
-        for schema_type in _nested_schema_types(record):
-            if schema_type not in accepted:
-                raise DriverError(f"{pid}: unknown CURIE schema type {schema_type}")
-        for attribute in record.get("attributes", []):
-            if isinstance(attribute, dict) and attribute.get("predicate") in FORBIDDEN_BRIDGE_PREDICATES:
-                raise DriverError(f"{pid}: relationship encoded as AttributeSpecification")
-        try:
-            with concise_date_warning():
+    with concise_date_warning():
+        for record in records:
+            pid = record["pid"]
+            for schema_type in _nested_schema_types(record):
+                if schema_type not in accepted:
+                    raise DriverError(f"{pid}: unknown CURIE schema type {schema_type}")
+            for attribute in record.get("attributes", []):
+                if isinstance(attribute, dict) and attribute.get("predicate") in FORBIDDEN_BRIDGE_PREDICATES:
+                    raise DriverError(f"{pid}: relationship encoded as AttributeSpecification")
+            try:
                 writer.convert(record, record["schema_type"].rsplit(":", 1)[-1])
-        except Exception as error:
-            raise DriverError(f"{pid}: JSON/RDF schema validation failed: {error}") from error
+            except Exception as error:
+                raise DriverError(f"{pid}: JSON/RDF schema validation failed: {error}") from error
     # The upstream graph producer owns graph selection and missing-target behavior.
     graph = json.loads(render_graph(_record_stream(stored_records(workspace)), presentation))
     return {"records": len(records), "graph_nodes": len(graph["nodes"]),
@@ -195,7 +195,7 @@ def _route_for_pid(pid: str, prefix: str) -> str:
 @progress("Projecting records with the upstream workflow and temporary Pool")
 def render_projection(workspace, resources_root, output, *, records_input=None,
                       www_from_model_root=None):
-    from .upstream_projection import resolve_tools, run_upstream
+    from .upstream_projection import run_upstream
     if records_input is not None:
         from .record_stages import _check_record_input
         _check_record_input(records_input)
@@ -214,11 +214,10 @@ def render_projection(workspace, resources_root, output, *, records_input=None,
         records = [item.record for item in load_jsonl(records_input)]
         joined = records
         report = {"records": len(records)}
-    tools = resolve_tools(workspace.root, presentation, resources_root=resources_root)
     with tempfile.TemporaryDirectory(prefix="orinoco-projection-input-") as temporary:
         source = Path(temporary) / "records.jsonl"
         source.write_text(_record_stream(records))
-        result = run_upstream(source, presentation, output, tools, resources_root=resources_root)
+        result = run_upstream(source, presentation, output, resources_root=resources_root)
     # Machine provenance remains in the exported record stream, not rendered prose.
     (output / "records.jsonl").write_text(_record_stream(joined))
     return {**report, "pages": result["pages"]}

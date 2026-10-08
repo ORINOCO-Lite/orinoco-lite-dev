@@ -43,7 +43,7 @@ def fixture(tmp_path, *, homepage=True):
 def test_selected_commands_filter_members_inject_reverse_links_and_render_annotations(tmp_path):
     source, capture = fixture(tmp_path)
     output = tmp_path / "projection"
-    report = run_upstream(capture, source, output, TOOLS)
+    report = run_upstream(capture, source, output)
     assert report["pages"] == 2
     assert (output / "content/persons/local/_index.md").read_text() == "Local"
     assert not (output / "content/persons/other/_index.md").exists()
@@ -54,44 +54,4 @@ def test_selected_commands_filter_members_inject_reverse_links_and_render_annota
 def test_missing_required_lookup_cannot_report_success(tmp_path):
     source, capture = fixture(tmp_path, homepage=False)
     with pytest.raises(DriverError, match="filter-linked-pid.*failed"):
-        run_upstream(capture, source, tmp_path / "projection", TOOLS)
-
-
-def test_tools_follow_owning_gitlinks_through_downstream_development_link(tmp_path, monkeypatch):
-    import subprocess
-    from orinoco_lite.upstream_projection import resolve_tools
-
-    def git(root, *arguments):
-        return subprocess.check_output(["git", "-C", str(root), *arguments], text=True).strip()
-
-    def repository(path):
-        path.mkdir(parents=True)
-        git(path, "init", "-q")
-        git(path, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-            "commit", "--quiet", "--allow-empty", "--no-verify", "-m", "fixture")
-        return git(path, "rev-parse", "HEAD")
-
-    engineering = tmp_path / "selected"
-    repository(engineering)
-    presentation = engineering / "submodules/www-from-model"
-    selected = {"www-from-model": repository(presentation)}
-    prepared = tmp_path / "prepared"
-    prepared.mkdir()
-    for name in ("query-things", "dump-things-pyclient"):
-        selected[name] = repository(prepared / "submodules" / name)
-    for name, commit in selected.items():
-        git(engineering, "update-index", "--add", "--cacheinfo", "160000", commit, f"submodules/{name}")
-    git(engineering, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-        "commit", "--quiet", "--no-verify", "-m", "select fixtures")
-    downstream = tmp_path / "downstream"
-    (downstream / ".orinoco-lite").mkdir(parents=True)
-    (downstream / ".orinoco-lite/dev").symlink_to(prepared)
-    from orinoco_lite import www_from_model
-    monkeypatch.setattr(www_from_model, "resolve_engineering_source",
-                        lambda *_: (engineering, git(engineering, "rev-parse", "HEAD")))
-    assert resolve_tools(downstream, presentation) == prepared / "submodules"
-    query = prepared / "submodules/query-things"
-    git(query, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-        "commit", "--quiet", "--allow-empty", "--no-verify", "-m", "unselected change")
-    with pytest.raises(DriverError, match="expected Gitlink"):
-        resolve_tools(downstream, presentation)
+        run_upstream(capture, source, tmp_path / "projection")

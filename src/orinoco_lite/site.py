@@ -456,7 +456,7 @@ def assemble_hugo(
     www_from_model: Path | None = None, flavor: str = "lite",
 ) -> dict[str, Any]:
     """Assemble explicit projection and authored inputs without invoking Hugo."""
-    projection = projection or workspace.path("generated") / "projection"
+    projection = projection or workspace.path("build") / "hugo-projection"
     inputs = inputs or workspace.path("site")
     destination = destination.resolve()
     sources = [projection, inputs, workspace.root / ".orinoco-lite"]
@@ -476,14 +476,11 @@ def assemble_hugo(
                   projection=projection, inputs=inputs)
     elif flavor == "upstream":
         www_from_model = www_from_model or resolve_www_from_model(workspace.root, resources_root)
-        for name in HUGO_SURFACES:
-            _copy_tree(www_from_model / name, destination / name)
-            _copy_tree(www_from_model / "themes/congo" / name,
-                       destination / "themes/congo" / name)
-            _copy_tree(workspace.root / ".orinoco-lite/materialized-hugo-assets/upstream" / name,
-                       destination / name)
-        _copy_file(www_from_model / "themes/congo/theme.toml", destination / "themes/congo/theme.toml")
-        _copy_file(www_from_model / "themes/congo/LICENSE", destination / "themes/congo/LICENSE")
+        from .annex_media import prepare_hugo_assets
+        from .www_from_model import editable_package_checkout
+        media = (prepare_hugo_assets(www_from_model, editable=True)
+                 if editable_package_checkout() is not None else {})
+        copy_hugo_runtime(www_from_model, destination, media=media)
         _copy_tree(projection / "content", destination / "content")
         _copy_tree(projection / "static", destination / "static")
         _copy_tree(inputs / "content", destination / "content")
@@ -525,12 +522,14 @@ def build_hugo(
         source = Path(temporary) / "source"
         shutil.copytree(assembly, source)
         command = ["hugo", "--minify", "--cleanDestinationDir", "--source", source,
-                   "--destination", destination, "--baseURL", base_url]
+                   "--destination", destination, "--baseURL", base_url,
+                   "--cacheDir", workspace.path("build") / "hugo-cache"]
         if flavor == "lite":
             command.extend(["--environment", "con"])
         elif flavor != "upstream":
             raise ConfigurationError(f"Unknown Hugo build operation: {flavor}")
-        _run(command, cwd=workspace.root)
+        _run(command, cwd=workspace.root,
+             environment={"HUGO_RESOURCEDIR": str(workspace.path("build") / "hugo-resources")})
     if flavor == "upstream":
         return {"base_url": base_url, "files": len(_manifest(destination)),
                 "operation": flavor, "input": str(assembly), "output": str(destination),

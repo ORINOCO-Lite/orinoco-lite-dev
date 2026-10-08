@@ -492,6 +492,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
+            (root / "build/hugo-projection/content").mkdir(parents=True)
             resources = root / "resources"
             adapter = resources / "drivers" / "adapt_pages.py"
             adapter.parent.mkdir(parents=True)
@@ -590,8 +591,9 @@ def test_hugo_reuses_resource_cache_between_clean_builds(tmp_path):
     config.write_text(CONFIG)
     _write_site_data(tmp_path)
     color = bytes([255, 0, 0])
+    (tmp_path / "build/hugo-projection/content").mkdir(parents=True)
 
-    def assemble(workspace, resources, assembly):
+    def assemble(workspace, resources, assembly, **kwargs):
         def chunk(kind, data):
             return (struct.pack("!I", len(data)) + kind + data
                     + struct.pack("!I", zlib.crc32(kind + data)))

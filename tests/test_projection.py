@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import os
 import shutil
+import subprocess
 from unittest.mock import Mock, patch
 import pytest
 import yaml
@@ -17,12 +18,6 @@ from orinoco_lite.resources import resolve_resources
 from orinoco_lite.schema_conversion import build_format_converters
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-
-
-@pytest.fixture(autouse=True)
-def selected_tools(monkeypatch):
-    monkeypatch.setattr("orinoco_lite.upstream_projection.resolve_tools",
-                        lambda *a, **kw: PACKAGE_ROOT / "submodules")
 
 
 @pytest.fixture
@@ -156,3 +151,45 @@ def test_upstream_date_readback_does_not_block_projection_or_edit_stored_input(t
     restored = reader.convert(rdf[record["pid"]], "XYZPublication")
     assert "at_time" not in restored["generated_by"][0]
     assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_editable_dependency_cache_tracks_working_sources(workspace, tmp_path, monkeypatch, missing):
+    checkout = tmp_path / "dependency"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    source = checkout / "converter.py"
+    source.write_text("value = 1\n")
+    subprocess.run(["git", "-C", str(checkout), "add", "."], check=True)
+    dependency = Mock()
+    dependency.metadata = {"Name": "editable-converter"}
+    dependency.version = "1.0"
+    dependency.read_text.return_value = json.dumps({
+        "url": (tmp_path / "missing" if missing else checkout).as_uri(),
+        "dir_info": {"editable": True},
+    })
+    monkeypatch.setattr(projection, "distributions", lambda: [dependency])
+    calls = []
+    def render(w, r, destination, **kwargs):
+        calls.append(destination)
+        (destination / "records.jsonl").write_text("original\n")
+        return {"records": 1, "pages": 1}
+    monkeypatch.setattr(projection, "render_projection", render)
+    resources = resolve_resources().root
+    update_projection(workspace, resources)
+    update_projection(workspace, resources)
+    assert len(calls) == (2 if missing else 1)
+    if missing:
+        assert not (workspace.path("build") / ".projection-cache.json").exists()
+        return
+    source.write_text("value = 2\n")
+    update_projection(workspace, resources)
+    assert len(calls) == 2
+    new_source = checkout / "new.py"
+    new_source.write_text("value = 3\n")
+    update_projection(workspace, resources)
+    assert len(calls) == 3
+    new_source.unlink()
+    source.unlink()
+    update_projection(workspace, resources)
+    assert len(calls) == 4
