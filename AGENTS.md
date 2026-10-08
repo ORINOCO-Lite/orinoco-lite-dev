@@ -40,6 +40,8 @@
   A reviewed repin rebases the local layer onto it, advances `main`, and pins the parent to the rebased layer or to `main` when the layer is empty.
   Keep non-empty `latest-upstream` and `orinoco-lite-diff` comparisons into `main` as draft pull requests; do not merge them.
   Delete superseded mirror branches after preserving active-purpose branches, including Git Annex branches.
+  Whenever a direct or nested submodule pin changes, regenerate and stage the [submodule divergence CSV](docs/agents/submodule-divergence.md) in the same change.
+  All local divergence commits, including existing commits, must use the prescribed Conventional Commit title and intent suffix documented there; do not infer intent or rewrite published history automatically.
 
 ## Data provenance
 
