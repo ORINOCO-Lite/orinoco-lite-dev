@@ -27,7 +27,7 @@ from .errors import ConfigurationError, DriverError
 from .integrity import canonical_json_bytes, sha256_file, tree_sha256
 from .www_from_model import resolve_www_from_model
 from .records import joined_records, stored_records
-from .schema_conversion import build_format_converters
+from .schema_conversion import build_format_converters, concise_date_warning
 
 
 PROJECTION_CONTROL_SIDECAR = ".gitattributes"
@@ -397,6 +397,7 @@ def _records(
 
 
 @progress("Checking records")
+@concise_date_warning()
 def validate_semantics(
     workspace: WorkspaceConfig,
     resources_root: Path,
