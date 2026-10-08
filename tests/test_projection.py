@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import types
@@ -493,7 +494,6 @@ class GenericProjectionContractTests(unittest.TestCase):
             "site-specific/metadata/records/Person",
             "site-specific/projection-templates",
             "site-specific/projection-tools",
-            "generated",
         ):
             (self.root / relative).mkdir(parents=True, exist_ok=True)
         (self.root / "site-specific/metadata/records/Person/home.yaml").write_text(
@@ -595,7 +595,7 @@ class GenericProjectionContractTests(unittest.TestCase):
         self.assertTrue(
             (
                 self.root
-                / "generated/projection/content/people/one/_index.md"
+                / "build/hugo-projection/content/people/one/_index.md"
             ).is_file()
         )
 
@@ -833,11 +833,64 @@ class GenericProjectionContractTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(DriverError, "original is preserved"):
                     update_projection(self.workspace, self.resources, no_cache=True)
-        backups = list((self.root / "generated").glob(".projection-backup-*"))
+        backups = list((self.root / "build").glob(".projection-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertTrue((backups[0] / "records.jsonl").is_file())
 
-    def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self):
+    def test_editable_dependencies_reuse_cache_and_invalidate_source_edits(self):
+        checkout = Path(self.temporary.name) / "editable dependency"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+        source = checkout / "converter.py"
+        source.write_text("value = 1\n")
+        subprocess.run(["git", "-C", str(checkout), "add", "converter.py"], check=True)
+        dependency = Mock()
+        dependency.metadata = {"Name": "editable-converter"}
+        dependency.version = "1.0"
+        dependency.read_text.return_value = json.dumps({
+            "url": checkout.as_uri(), "dir_info": {"editable": True},
+        })
+        with (
+            patch("orinoco_lite.projection.distributions", return_value=[dependency]),
+            patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic,
+        ):
+            update_projection(self.workspace, self.resources)
+            update_projection(self.workspace, self.resources)
+            validate_inputs(self.workspace, self.resources)
+            assert semantic.call_count == 1
+            source.write_text("value = 2\n")
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 2
+            new_source = checkout / "new.py"
+            new_source.write_text("value = 3\n")
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 3
+            new_source.unlink()
+            source.unlink()
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 4
+            update_projection(self.workspace, self.resources, no_cache=True)
+            assert semantic.call_count == 5
+        assert not (self.workspace.path("build") / ".projection-cache.json").exists()
+
+    def test_unenumerated_editable_dependency_does_not_reuse_cache(self):
+        dependency = Mock()
+        dependency.metadata = {"Name": "editable-converter"}
+        dependency.version = "1.0"
+        dependency.read_text.return_value = json.dumps({
+            "url": "file:///missing/editable/source", "dir_info": {"editable": True},
+        })
+        with (
+            patch("orinoco_lite.projection.distributions", return_value=[dependency]),
+            patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic,
+        ):
+            update_projection(self.workspace, self.resources)
+            update_projection(self.workspace, self.resources)
+            assert semantic.call_count == 2
+        assert not (self.workspace.path("build") / ".projection-cache.json").exists()
+
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_projection_cache_reuses_semantics_and_ignores_editorial_changes(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             first = update_projection(self.workspace, self.resources)
             editorial = self.workspace.path("editorial") / "about.md"
@@ -849,10 +902,11 @@ class GenericProjectionContractTests(unittest.TestCase):
             update_projection(self.workspace, self.resources, no_cache=True)
             assert semantic.call_count == 2
 
-    def test_validate_does_not_generate_projection(self):
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_validate_does_not_generate_projection(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             assert validate_inputs(self.workspace, self.resources) == self.semantic
-            assert not list(self.workspace.path("generated").iterdir())
+            assert not self.workspace.path("build").exists()
             update_projection(self.workspace, self.resources)
             count = semantic.call_count
             validate_inputs(self.workspace, self.resources)
@@ -860,7 +914,8 @@ class GenericProjectionContractTests(unittest.TestCase):
             validate_inputs(self.workspace, self.resources, no_cache=True)
             assert semantic.call_count == count + 1
 
-    def test_projection_cache_invalidates_changed_inputs_and_outputs(self):
+    @patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=None)
+    def test_projection_cache_invalidates_changed_inputs_and_outputs(self, _editable):
         with patch("orinoco_lite.projection.validate_semantics", return_value=self.semantic) as semantic:
             update_projection(self.workspace, self.resources)
             contract = load_contract(self.workspace)
@@ -869,14 +924,14 @@ class GenericProjectionContractTests(unittest.TestCase):
                 contract.path,
                 contract.homepage.template,
                 self.resources / "schema/types/base.yaml",
-                self.workspace.path("generated") / "projection/records.jsonl",
+                self.workspace.path("build") / "hugo-projection/records.jsonl",
             ]
             # Whitespace is enough to invalidate without changing fixture meaning.
             for index, path in enumerate(paths, start=2):
                 path.write_text(path.read_text() + "\n")
                 update_projection(self.workspace, self.resources)
                 assert semantic.call_count == index
-            (self.workspace.path("generated") / ".projection-cache.json").write_text("broken")
+            (self.workspace.path("build") / ".projection-cache.json").write_text("broken")
             update_projection(self.workspace, self.resources)
             assert semantic.call_count == len(paths) + 2
 
@@ -902,7 +957,7 @@ def test_ancillary_record_survives_projection_and_editor_rdf(tmp_path, monkeypat
     path.write_text(content, encoding="utf-8")
 
     update_projection(workspace, resources)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     machine = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
     assert record in machine
     assert not (projection / "content/files/ancillary/_index.md").exists()
@@ -939,7 +994,7 @@ def test_upstream_date_readback_does_not_block_projection_or_edit_stored_input(t
     path.write_text(canonical_yaml(record))
     original = path.read_bytes()
     update_projection(workspace, resources)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     projected = [json.loads(line) for line in (projection / "records.jsonl").read_text().splitlines()]
     assert record in projected
     assert path.read_bytes() == original

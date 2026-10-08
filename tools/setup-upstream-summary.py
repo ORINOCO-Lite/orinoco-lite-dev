@@ -84,6 +84,7 @@ def main():
     parser.add_argument("--api", required=True)
     parser.add_argument("--site-layout", required=True)
     parser.add_argument("--build", choices=("true", "false"), required=True)
+    parser.add_argument("--development", choices=("true", "false"), default="false")
     args = parser.parse_args()
     engineering, package_repository, package_commit = args.package
     template, template_repository, template_commit = args.template
@@ -131,6 +132,8 @@ def main():
         action = "Forced overwrite" if destination.exists() else "Create"
         line(f"{action}: {destination}", "31" if destination.exists() else None)
         line("Build: site + publication bundle" if args.build == "true" else "Build: skipped")
+        if args.development == "true":
+            line("Development: tracked .orinoco-lite/orinoco-lite-dev, editable installation")
         for label, entries in local_changes:
             show_changes(label, entries)
 

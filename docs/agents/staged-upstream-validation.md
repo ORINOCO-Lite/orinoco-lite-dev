@@ -33,7 +33,7 @@ This section plans the integration work; it does not authorize resetting downstr
    Preserve preparation-only setup as the default and add an explicit way to continue through projection and a complete build.
    Reuse [#191](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/191)'s recorded projection and publication bundle where applicable; preparing a bundle must not itself deploy or push publication refs.
    Verify the full retained-input path after the #180, #182, and #189 changes.
-   The prerequisite implementation uses `--build` and a fixed `sourcedata/www-from-model` subdataset; it does not add a stage dispatcher.
+   The prerequisite implementation uses `--build` and the package-selected nested `www-from-model` checkout; it does not add a stage dispatcher.
 5. Rebase the unique changes in [#171](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/171), [#172](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/172), and [#173](https://github.com/ORINOCO-Lite/orinoco-lite-dev/pull/173) in order.
    Keep RDF, service, website, and local review functionality separately reviewable.
    Reuse the useful behavior and review findings from the predecessor PRs listed below; do not resurrect their separate renderer or deployment harness.
@@ -200,24 +200,28 @@ The reviewer decides whether the RDF evidence justifies the implementation compl
 
 #### Operations and required behavior
 
-1. **JSONL → RDF.** Provide an explicit forward transformation for each retained JSONL input, using the selected upstream writer without invoking the RDF → JSONL reader.
+1. **JSONL → RDF.**
+   Provide an explicit forward transformation for each retained JSONL input, using the selected upstream writer without invoking the RDF → JSONL reader.
    Inspect the upstream batch/serialization API before composing its per-record output, and state whether the resulting artifact is an RDF graph or dataset.
    Preserve upstream RDF terms and graph boundaries; do not introduce named graphs solely to support record attribution.
    Retain the input, emitted RDF, producing operation, and conversion failures in a fresh output directory.
    Remove RDF → JSONL from the normal comparison path; retain the existing inverse-conversion evidence only as research into the deferred round-trip problem.
-2. **Complete RDF comparison.** Canonicalize the two complete RDF artifacts with the existing native library, preserving their graph boundaries and shared blank-node identity while ignoring serialization order and arbitrary blank-node names.
+2. **Complete RDF comparison.**
+   Canonicalize the two complete RDF artifacts with the existing native library, preserving their graph boundaries and shared blank-node identity while ignoring serialization order and arbitrary blank-node names.
    Comparison must run on retained RDF artifacts even when source-record attribution is absent.
    Report **equal**, **different**, or **not evaluated**, with input paths, scope, elapsed time, and failure reasons.
    Bound parsing and canonicalization to five seconds and report the full CLI time separately.
    Keep input formats explicit; loading an RDF graph into a default graph must not silently merge an input dataset's named graphs.
    Equality is not proof of lossless conversion: both paths may have discarded the same record information.
-3. **Optional record attribution.** An explicit option or command compares corresponding records' emitted RDF only where the retained conversion evidence establishes the source-record association.
+3. **Optional record attribution.**
+   An explicit option or command compares corresponding records' emitted RDF only where the retained conversion evidence establishes the source-record association.
    Report **“RDF emitted for this record differs”**, or identify a record present on only one side, and link its source ID, RDF evidence, and existing JSONL comparison.
    This locates a difference; it does not establish its cause or identify a minimal set of changed assertions.
    If provenance, scope, or shared blank nodes prevent independent comparison, report **record attribution unavailable** with the reason; retain the complete RDF result unchanged.
    Record selection limits only this diagnostic, never the complete-output comparison.
    Do not present per-record results as a decomposition of the complete result: changes in record contributions can cancel when combined.
-4. **Reports and command integration.** Show the complete result before optional record findings, with separate statuses and scopes in the CLI, saved report, and review application.
+4. **Reports and command integration.**
+   Show the complete result before optional record findings, with separate statuses and scopes in the CLI, saved report, and review application.
    Label any diagnostic containers as implementation packaging, not upstream graph identities.
    Canonical blank-node labels are not assertion identities; canonical added/removed counts must not be presented as minimal metadata edits. Update command help, examples, and comparator/scope versions so existing partial per-record reports cannot be interpreted as complete-output evidence.
    Reuse existing reporting interfaces; do not add causal inference or a parallel RDF matching algorithm.

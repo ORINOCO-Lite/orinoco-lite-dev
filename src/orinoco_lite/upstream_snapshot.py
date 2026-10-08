@@ -353,6 +353,8 @@ def _data_yaml_paths(records_root: Path) -> list[Path]:
             raise SnapshotError(f"record tree contains a symlink: {relative}")
         if path.is_dir():
             continue
+        if path.name == ".DS_Store" and path.is_file():
+            continue
         if path.name in CONTROL_FILES:
             continue
         if path.suffix != ".yaml":

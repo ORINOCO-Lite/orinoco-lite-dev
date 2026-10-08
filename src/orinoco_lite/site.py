@@ -26,28 +26,13 @@ from .editor import bind_editor
 from .integrity import sha256_file
 from .projection import load_contract
 from .www_from_model import resolve_www_from_model
+from .upstream_runtime import (
+    HUGO_SURFACES, _copy_tree, _copy_file, _reject_annex_pointers, copy_hugo_runtime,
+)
 from .review import bind_review
 from .resources import SOURCE_REPOSITORY, source_commit, source_description
 from . import __version__
 
-HUGO_SURFACES = (
-    "archetypes",
-    "assets",
-    "config",
-    "data",
-    "i18n",
-    "layouts",
-    "static",
-)
-SITE_IDENTITY_IMAGE_SUFFIXES = {
-    ".gif",
-    ".ico",
-    ".jpeg",
-    ".jpg",
-    ".png",
-    ".svg",
-    ".webp",
-}
 GITHUB_REPOSITORY_URL = "https://github.com/"
 FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
   {{ with .engine }}
@@ -62,29 +47,6 @@ FOOTER_PARTIAL = """{{ with .Site.Data.orinoco_build }}
   {{ end }}
 {{ end }}
 """
-
-
-def _copy_tree(source: Path, destination: Path, *, media: dict[Path, Path] | None = None) -> None:
-    if source.is_symlink():
-        raise DriverError(f"Static source cannot be a symlink: {source}")
-    if not source.is_dir():
-        return
-    for candidate in sorted(source.rglob("*")):
-        relative = candidate.relative_to(source)
-        if ".git" in relative.parts:
-            continue
-        target = destination / relative
-        if media and candidate in media:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(media[candidate], target)
-            continue
-        if candidate.is_symlink():
-            raise DriverError(f"Static source cannot contain symlinks: {candidate}")
-        if candidate.is_dir():
-            target.mkdir(parents=True, exist_ok=True)
-        elif candidate.is_file():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(candidate, target)
 
 
 def _overlay_config(source: Path, destination: Path) -> None:
@@ -118,75 +80,6 @@ def _overlay_config(source: Path, destination: Path) -> None:
             _copy_file(path, target)
 
 
-def _copy_file(source: Path, destination: Path) -> None:
-    if not source.exists():
-        return
-    if source.is_symlink() or not source.is_file():
-        raise DriverError(f"Hugo source is not a regular file: {source}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, destination)
-
-
-def _is_annex_pointer(path: Path) -> bool:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
-        return False
-    try:
-        value = path.read_text(encoding="utf-8").strip()
-    except UnicodeDecodeError:
-        return False
-    return value.startswith("/annex/objects/")
-
-
-def _reject_annex_pointers(root: Path) -> None:
-    pointers = [
-        path.relative_to(root).as_posix()
-        for path in sorted(root.rglob("*"))
-        if _is_annex_pointer(path)
-    ]
-    if pointers:
-        raise DriverError(
-            "Materialized Hugo assets are missing for upstream Annex "
-            "content: " + ", ".join(pointers[:10])
-        )
-
-
-def _remove_upstream_identity_images(static_root: Path) -> None:
-    """Leave root-level site identity images to the theme or downstream."""
-
-    if not static_root.is_dir():
-        return
-    for path in static_root.iterdir():
-        if path.is_file() and path.suffix.lower() in SITE_IDENTITY_IMAGE_SUFFIXES:
-            path.unlink()
-
-
-def _copy_upstream_section_frontmatter(source: Path, destination: Path) -> None:
-    """Retain section layout parameters without importing editorial bodies."""
-
-    if source.is_symlink():
-        raise DriverError(f"Upstream content root cannot be a symlink: {source}")
-    if not source.is_dir():
-        return
-    for path in sorted(source.glob("*/_index.md")):
-        if path.is_symlink() or not path.is_file():
-            raise DriverError(f"Upstream section metadata is not a file: {path}")
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        except UnicodeDecodeError as error:
-            raise DriverError(f"Upstream section metadata is not UTF-8: {path}") from error
-        if not lines or lines[0].strip() != "---":
-            raise DriverError(f"Upstream section has no YAML front matter: {path}")
-        closing = next(
-            (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
-            None,
-        )
-        if closing is None:
-            raise DriverError(f"Upstream section front matter is unclosed: {path}")
-        target = destination / path.parent.name / "_index.md"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("".join(lines[: closing + 1]).rstrip() + "\n", encoding="utf-8")
-
-
 def _render_template_tree(
     source: Path,
     destination: Path,
@@ -213,6 +106,8 @@ def _render_template_tree(
         if path.is_symlink():
             raise DriverError(f"Hugo adaptation template cannot be a symlink: {path}")
         if path.is_dir():
+            continue
+        if path.name == ".DS_Store" and path.is_file():
             continue
         if not path.is_file() or path.suffix != ".j2":
             raise DriverError(
@@ -357,10 +252,14 @@ def _safe_destination(workspace, destination: Path) -> Path:
     build = workspace.path("build").resolve(strict=False)
     if build not in resolved.parents:
         raise ConfigurationError(f"Build destination must be below {build}: {resolved}")
+    for name in ("hugo-projection", "hugo-assembly", "hugo-cache", "hugo-resources"):
+        reserved = (build / name).resolve(strict=False)
+        if resolved == reserved or reserved in resolved.parents or resolved in reserved.parents:
+            raise ConfigurationError(f"Build destination overlaps {name}: {resolved}")
     return resolved
 
 
-@progress("Assembling the Hugo site")
+@progress("Preparing the website")
 def _assemble(
     workspace,
     resources_root: Path,
@@ -368,47 +267,20 @@ def _assemble(
     *,
     www_from_model: Path | None = None,
 ) -> None:
-    from .annex_media import prepare_media
+    from .annex_media import prepare_media, prepare_hugo_assets
+    from .www_from_model import editable_package_checkout
 
     media = prepare_media(workspace)
     upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
     adapter = workspace.root / ".orinoco-lite" / "hugo-adapter"
-    materialized = (
-        workspace.root
-        / ".orinoco-lite"
-        / "materialized-hugo-assets"
-        / "upstream"
-    )
-
+    upstream_media = (prepare_hugo_assets(
+        upstream, editable=True,
+        remote="https://hub.psychoinformatics.de/www/www-from-model.git",
+    ) if editable_package_checkout() is not None else {})
+    copy_hugo_runtime(upstream, assembly, media=upstream_media)
     for name in HUGO_SURFACES:
-        _copy_tree(theme / name, assembly / "themes" / "congo" / name)
-    _copy_file(theme / "theme.toml", assembly / "themes" / "congo" / "theme.toml")
-    _copy_file(
-        theme / "LICENSE",
-        assembly / "static" / "LICENSES" / "congo-MIT.txt",
-    )
-
-    for name in HUGO_SURFACES:
-        _copy_tree(upstream / name, assembly / name)
-        _copy_tree(materialized / name, assembly / name)
-        if name == "static":
-            _remove_upstream_identity_images(assembly / "static")
         _copy_tree(adapter / name, assembly / name)
-    for name in ("fzj.svg", "hhu.svg", "logo.png"):
-        (assembly / "assets" / "img" / name).unlink(missing_ok=True)
-    _copy_upstream_section_frontmatter(upstream / "content", assembly / "content")
-
-    materialized_license = materialized.parent / "LICENSE"
-    if not materialized_license.is_file():
-        raise DriverError(
-            "The materialized Hugo asset overlay has no LICENSE: "
-            f"{materialized_license}"
-        )
-    _copy_file(
-        materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
-    )
 
     _copy_tree(workspace.path("site") / "config", assembly / "config" / "con")
     # Consumer module mounts describe the ownership layout before flattening.
@@ -422,7 +294,7 @@ def _assemble(
     _copy_tree(overrides / "static", assembly / "static")
     _copy_tree(workspace.path("site") / "assets", assembly / "assets", media=media)
     _copy_tree(workspace.path("site") / "static", assembly / "static", media=media)
-    projection = workspace.path("generated") / "projection"
+    projection = workspace.path("build") / "hugo-projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
     _copy_tree(workspace.path("editorial"), assembly / "content")
@@ -430,10 +302,7 @@ def _assemble(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",
     )
-    _copy_file(
-        materialized_license,
-        assembly / "static" / "LICENSES" / "materialized-hugo-assets.txt",
-    )
+
     _reject_annex_pointers(assembly)
 
 
@@ -444,11 +313,15 @@ def _manifest(root: Path) -> list[str]:
     ]
 
 
-def _run(command: Sequence[str | Path], *, cwd: Path) -> str:
+def _run(
+    command: Sequence[str | Path], *, cwd: Path,
+    environment: dict[str, str] | None = None,
+) -> str:
     try:
         result = subprocess.run(
             [str(item) for item in command],
             cwd=cwd,
+            env={**os.environ, **environment} if environment is not None else None,
             capture_output=True,
             text=True,
             check=False,
@@ -523,7 +396,7 @@ def build_site(
         else workspace.repository
     )
     parsed = urlsplit(base_url)
-    assembly = workspace.path("build") / "assembly"
+    assembly = workspace.path("build") / "hugo-assembly"
     if assembly.exists():
         shutil.rmtree(assembly)
     assembly.mkdir(parents=True)
@@ -541,6 +414,8 @@ def build_site(
                 "hugo",
                 "--minify",
                 "--cleanDestinationDir",
+                "--cacheDir",
+                workspace.path("build") / "hugo-cache",
                 "--environment",
                 "con",
                 "--source",
@@ -551,9 +426,10 @@ def build_site(
                 base_url,
             ],
             cwd=workspace.root,
+            environment={"HUGO_RESOURCEDIR": str(workspace.path("build") / "hugo-resources")},
         )
     adapter = _site_adapter(resources_root)
-    with progress("Preparing the site editor and review pages"):
+    with progress("Preparing editing and review pages"):
         if adapter.is_file():
             _run(
                 [
@@ -609,6 +485,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--build-timestamp")
+    parser.add_argument("--json", action="store_true", help="print the build report as JSON")
     args = parser.parse_args(argv)
     try:
         report = build_site(
@@ -622,7 +499,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (ConfigurationError, DriverError, IntegrityError) as error:
         print(f"orinoco-lite build: {error}", file=sys.stderr)
         return 1
-    print(json.dumps(report, sort_keys=True))
+    if args.json:
+        print(json.dumps(report, sort_keys=True))
+    else:
+        print(f"Built website in {args.destination} ({report['files']} files).")
     return 0
 
 

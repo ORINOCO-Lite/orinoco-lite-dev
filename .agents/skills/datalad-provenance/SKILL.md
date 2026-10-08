@@ -37,7 +37,10 @@ Use the project's Pixi environment.
 A Bash workflow launched through Pixi can call bare `datalad` and package executables until an explicit environment switch is needed.
 Do not repeat `pixi run` mechanically inside that shell.
 
-Keep the package selection and lock committed.
+Keep the package selection committed.
+Development locks are local and untracked, so their exact third-party resolution is not recoverable from Git.
+Declare the local `pixi.lock` as a provenance input without requiring Git tracking.
+Declaring an input does not by itself retain its contents for historical replay.
 A run record does not capture its outer launcher automatically or restore software on rerun.
 Record an exceptional bootstrap invocation in the run message when necessary.
 Avoid editable/local-only software for a claimed independently recoverable result; exact available commits are sufficient without requiring releases or additional ledgers.

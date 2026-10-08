@@ -284,6 +284,8 @@ def yaml_to_jsonl(site_inputs: Path, output: Path) -> list[snapshot.RecordEnvelo
                 raise snapshot.SnapshotError(f"overlay file must not be a symlink: {path}")
             if path.is_dir():
                 continue
+            if path.name == ".DS_Store" and path.is_file():
+                continue
             relative = path.relative_to(companions_root)
             if path.suffix != ".yaml" or not (records_root / relative).is_file():
                 raise snapshot.SnapshotError(f"overlay file has no mirrored YAML record: {path}")

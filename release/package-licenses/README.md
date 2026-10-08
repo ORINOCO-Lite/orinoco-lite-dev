@@ -9,3 +9,6 @@ Component licenses apply only to their respective components; downstream metadat
 The editor and downstream source-review dependency inventories record every installed npm package, declared license, version, and all discovered license/notice files for their respective static shells.
 The localized LinkML schema directory contains only the pinned source YAML import closure; its inventory binds every original and localized digest.
 Imports are rewritten to local relative paths solely to make release validation hermetic.
+
+The bundled `www-from-model/` subset retains available upstream notices and Congo’s license.
+`www-from-model.json` identifies its upstream repository, commit, and Congo gitlink; the package license does not assign terms to upstream components.

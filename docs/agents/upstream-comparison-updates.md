@@ -7,25 +7,24 @@ Prepare two updates in order:
 
 1. **Software only:** select the full SHA of a template candidate whose package declaration pins the desired package SHA.
    The workflow records the template update, recomputes metadata from the retained Pool capture, and builds with the package-selected upstream software and dependencies.
-   It preserves the authored site inputs and the `sourcedata/www-from-model` gitlink.
+   It preserves the authored site inputs.
    Compatibility failures remain visible in this PR.
-2. **Data refresh:** select the software-update branch as `base_branch`, leave `template_revision` empty, and supply the full `www_revision` SHA for authored inputs.
-   This run retains the software selection, captures Pool again, converts records, explicitly selects the authored-input revision, and imports site inputs as separate DataLad operations.
+2. **Data refresh:** select the software-update branch as `base_branch`, leave `template_revision` empty.
+   This run retains the software selection, captures Pool again, converts records, imports site inputs as separate DataLad operations.
 
 If the software update changed metadata in `site-specific`, use its published branch as `site_base_branch` for the stacked data refresh.
 Otherwise keep `main`.
 Publication requires that branch head to match the parent's selected child gitlink; reconcile a stale pin before publishing.
 
-The package's engineering gitlink selects rendering/projection software.
-The downstream gitlink selects authored inputs and may deliberately differ.
-A matching clean checkout can serve both purposes; otherwise software resolution uses the package selection independently.
-Imported settings, content, identity images, and static files come from the authored-input checkout, including its Annex media.
+The upstream-comparison downstream always uses development mode with `.orinoco-lite/orinoco-lite-dev` tracked as a Git submodule.
+Its editable package selects one nested `www-from-model` checkout for rendering, projection, assets, and site-input imports.
+The bundled rendering subset used by ordinary downstream builds does not supply authored upstream website inputs.
+Imported settings, content, identity images, and static files come from that checkout, including its Annex media.
 The importer does not copy theme or other software dependencies.
 
 For local recomputation use `dev upstream populate --reuse-dump --records-only`.
-Ordinary `populate` retains an existing authored-input pin; `--www-revision` explicitly changes it.
-New datasets bootstrap that pin from the package selection.
-Local package overrides remain available through the standalone package and template CLIs.
+Ordinary `populate` imports from the package-selected checkout.
+Local package selection remains available through the package and template CLIs.
 
 Clear **Publish draft pull requests** to retain the prepared bundles without publishing.
 An unchanged result creates no PR.

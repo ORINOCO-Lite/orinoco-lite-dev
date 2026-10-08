@@ -2,47 +2,51 @@
 requires-pixi = ">=0.76"
 name = "orinoco-lite-engineering"
 channels = ["conda-forge"]
-platforms = [{ platform = "osx-arm64", macos = "14.0" }, "linux-64"]
+platforms = [{ platform = "osx-arm64", macos = "14.0" }, { platform = "linux-64", glibc = "2.34" }]
 
+# Prefer "*"; bound known incompatibilities; use == only as a last resort.
+# Explain exceptions beside their declaration.
+# pixi.lock is a local, untracked development resolution.
 [dependencies]
-python = ">=3.12,<3.13"
-git = ">=2.55.0,<3"
-hugo = "==0.154.5"
-nodejs = ">=22,<23"
-make = "==4.4.1"
-
-[target.linux-64.dependencies]
-git-annex = "==10.20260601"
-
-[target.osx-arm64-macos-14-0.pypi-dependencies]
-git-annex = "==10.20260601"
+python = "*"
+git = "*"
+# The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
+hugo = "<0.156"
 
 [pypi-dependencies]
+# Python requirements and editable submodule sources come from pyproject.toml.
 orinoco-lite = { path = ".", editable = true }
-build = "==1.6.0"
-snapper-fmt = "==0.10.0"
-pre-commit = "==4.3.0"
-pytest = ">=9,<10"
-datalad = "==1.6.2"
-click-option-group = ">=0.5, <0.6"
-copier = "==9.10.3"
 
 [tasks]
 records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"
 records-get = "datalad run --explicit --output sourcedata/downloaded/records.jsonl --output sourcedata/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
+
+[feature.dev.dependencies]
+nodejs = "*"
+make = "*"
+
+[feature.dev.pypi-dependencies]
+build = "*"
+setuptools = "*"
+snapper-fmt = "*"
+pre-commit = "*"
+pytest = "*"
+
+[feature.dev.tasks]
 build-package = "python -m build --outdir build/package"
 setup-upstream = "bash tools/setup-upstream.sh"
 install-hooks = "git config core.hooksPath .githooks"
 
 [feature.skills.dependencies]
-python = ">=3.12,<3.13"
+python = "*"
 
 [feature.skills.pypi-dependencies]
-apm-cli = "==0.31.0"
+apm-cli = "*"
 
 [feature.skills.tasks]
 setup-skills = "apm install --frozen"
 audit-skills = "apm audit --ci"
 
 [environments]
+default = ["dev"]
 skills = { features = ["skills"], no-default-feature = true }

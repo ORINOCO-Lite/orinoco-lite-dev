@@ -1,152 +1,150 @@
-"""Enable and undo a downstream's editable package connection."""
+"""Enable editable package development in a downstream environment."""
 
 from __future__ import annotations
 
 import os
-import shlex
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
 
 import tomlkit
 
 from .errors import ConfigurationError
+from .progress import progress
 
 
-PACKAGE_REPOSITORY = "git@github.com:ORINOCO-Lite/orinoco-lite-dev.git"
-LINK = ".orinoco-lite/dev"
-FILES = ("pixi.toml", "pixi.lock", LINK)
-EDITABLE = {"path": f"./{LINK}", "editable": True}
+PACKAGE_REPOSITORY = "https://github.com/ORINOCO-Lite/orinoco-lite-dev.git"
+CHECKOUT = ".orinoco-lite/orinoco-lite-dev"
+FILES = ("pixi.toml", "pixi.lock")
+EDITABLE = {"path": CHECKOUT, "editable": True}
+CLIENT = "dump-things-pyclient"
 
 
-def run(*arguments: str | Path, cwd: Path, quiet: bool = False,
-        env: dict[str, str] | None = None) -> None:
-    result = subprocess.run([str(value) for value in arguments], cwd=cwd,
-                            capture_output=quiet, text=True, env=env)
-    if result.returncode and quiet:
-        print(result.stdout + result.stderr, file=sys.stderr)
-    result.check_returncode()
+def run(*arguments: str | Path, cwd: Path, env: dict[str, str] | None = None) -> None:
+    subprocess.run([str(value) for value in arguments], cwd=cwd,
+                   stdout=sys.stderr, env=env, check=True)
 
 
 def git(root: Path, *arguments: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *arguments], text=True).strip()
 
 
+def unlocked_environment() -> dict[str, str]:
+    environment = dict(os.environ)
+    environment.pop("PIXI_LOCKED", None)
+    return environment
+
+
 def check_workspace(root: Path) -> None:
     if Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise ConfigurationError("Run development commands at the downstream repository root.")
-    if git(root, "status", "--porcelain", "--", *FILES):
-        raise ConfigurationError("Commit or discard changes to pixi.toml, pixi.lock, and the development link first.")
     if not (root / "pixi.toml").is_file():
         raise ConfigurationError("The downstream has no pixi.toml.")
 
 
-def previous_selection(root: Path) -> object:
-    commits = git(root, "log", "--first-parent", "--diff-filter=A", "--format=%H", "--", LINK).splitlines()
-    if not commits:
-        raise ConfigurationError("Cannot find the development link's introduction in Git history.")
-    try:
-        before = tomlkit.parse(git(root, "show", f"{commits[0]}^:pixi.toml"))
-        return before["pypi-dependencies"]["orinoco-lite"]
-    except (subprocess.CalledProcessError, KeyError) as error:
-        raise ConfigurationError("Cannot recover the previous package selection from Git history.") from error
-
-
-def apply(root: Path, action: str, checkout: Path | None) -> None:
+def apply(root: Path) -> None:
     manifest = root / "pixi.toml"
     document = tomlkit.parse(manifest.read_text())
-    link = root / LINK
-    selection = document.get("pypi-dependencies", {}).get("orinoco-lite")
-    if action == "disable":
-        if selection != EDITABLE or not link.is_symlink():
-            raise ConfigurationError("The package connection changed; refusing to overwrite its current selection.")
-        replacement = previous_selection(root)
-    else:
-        if link.exists() or link.is_symlink():
-            raise ConfigurationError("A development link already exists. Disable it before selecting another checkout.")
-        if selection is None:
-            raise ConfigurationError("pixi.toml does not select an orinoco-lite package.")
-        replacement = tomlkit.inline_table()
-        replacement.update(EDITABLE)
-    # Pixi can write the manifest before a solve fails. Restore only our files.
-    saved = {name: (root / name).read_bytes() if (root / name).exists() else None
-             for name in FILES[:2]}
-    old_link = os.readlink(link) if link.is_symlink() else None
+    document["pypi-dependencies"]["orinoco-lite"] = EDITABLE
+    # Pixi may update a lock before installation fails. Restore our files and
+    # retain the source checkout, including all of the developer's edits.
+    saved = {name: (root / name).read_bytes() if (root / name).exists() else None for name in FILES}
     try:
-        if action == "enable":
-            link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(os.path.relpath(checkout, link.parent))
-        document["pypi-dependencies"]["orinoco-lite"] = replacement
         manifest.write_text(tomlkit.dumps(document))
-        # Switching package selection deliberately updates the dependency lock.
-        environment = dict(os.environ)
-        environment.pop("PIXI_LOCKED", None)
-        run("pixi", "install", "--manifest-path", manifest, cwd=root, env=environment)
-        if action == "disable":
-            link.unlink()
+        run("pixi", "install", "--manifest-path", manifest, cwd=root, env=unlocked_environment())
     except BaseException:
         for name, content in saved.items():
-            path = root / name
             if content is None:
-                path.unlink(missing_ok=True)
+                (root / name).unlink(missing_ok=True)
             else:
-                path.write_bytes(content)
-        if link.is_symlink():
-            link.unlink()
-        if old_link is not None:
-            link.symlink_to(old_link)
+                (root / name).write_bytes(content)
+        print("Restored pixi.toml and pixi.lock. Source edits were retained; "
+              "run pixi install --locked to resynchronize the environment.", file=sys.stderr, flush=True)
         raise
 
 
-def enable(root: Path, path: Path | None = None) -> None:
-    root = root.resolve()
-    if (root / "pyproject.toml").is_file() and (root / "src/orinoco_lite").is_dir():
-        raise ConfigurationError(
-            "This is an Orinoco Lite source checkout. Its environment should already "
-            "use this directory. Run 'dev enable' from a downstream website."
-        )
-    check_workspace(root)
-    print("Enabling editable Orinoco Lite...", flush=True)
-    checkout = (path if path is not None else root.parent / "orinoco-lite-dev").resolve()
+def prepare_checkout(root: Path, repository: str | None, revision: str | None) -> Path:
+    checkout = root / CHECKOUT
+    if checkout.is_symlink():
+        raise ConfigurationError(f"{CHECKOUT} must be a real source checkout, not a symlink.")
+    if not git(root, "ls-files", "--", CHECKOUT):
+        exclude = Path(git(root, "rev-parse", "--git-path", "info/exclude"))
+        if not exclude.is_absolute():
+            exclude = root / exclude
+        pattern = f"/{CHECKOUT}/"
+        content = exclude.read_text() if exclude.exists() else ""
+        if pattern not in content.splitlines():
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text(content + ("\n" if content and not content.endswith("\n") else "") + pattern + "\n")
     if not checkout.exists():
-        source = Path(__file__).resolve().parents[2]
-        if (source / ".git").exists() and (source / "src/orinoco_lite").is_dir():
-            revision = git(source, "rev-parse", "HEAD")
-        else:
+        document = tomlkit.parse((root / "pixi.toml").read_text())
+        selection = document["pypi-dependencies"]["orinoco-lite"]
+        if isinstance(selection, dict):
+            repository = repository or selection.get("git")
+            revision = revision or selection.get("rev")
+        if revision is None:
             from .resources import resolve_resources, source_commit
             revision = source_commit(resolve_resources().root)
-        run("git", "clone", PACKAGE_REPOSITORY, checkout, cwd=root)
-        run("git", "checkout", "--detach", revision, cwd=checkout)
-    if not (checkout / "pyproject.toml").is_file() or not (checkout / "src/orinoco_lite").is_dir():
+        if revision.startswith("-"):
+            raise ConfigurationError("Supply a Git revision, not a command option.")
+        with progress("Cloning Orinoco Lite source"):
+            checkout.parent.mkdir(parents=True, exist_ok=True)
+            run("git", "clone", "--quiet", "--", repository or PACKAGE_REPOSITORY,
+                checkout, cwd=root)
+        run("git", "checkout", "--quiet", "--detach", revision, cwd=checkout)
+        with progress("Initializing pinned development dependencies"):
+            run("git", "submodule", "update", "--quiet", "--init", "--recursive",
+                cwd=checkout)
+    elif repository is not None or revision is not None:
+        raise ConfigurationError(f"{CHECKOUT} already exists; use Git inside it to select another revision.")
+    if not (checkout / ".git").exists():
+        raise ConfigurationError(f"Not a Git source checkout: {checkout}")
+    # Do not reset existing source or nested dependency worktrees on re-enable.
+    if any(line.startswith("-") for line in git(checkout, "submodule", "status", "--recursive").splitlines()):
+        raise ConfigurationError(f"Initialize missing dependencies with git -C {CHECKOUT} "
+                                 "submodule update --init --recursive before enabling development.")
+    if not (checkout / "src/orinoco_lite").is_dir():
         raise ConfigurationError(f"Not an Orinoco Lite source checkout: {checkout}")
-    link = root / LINK
-    if link.is_symlink() and link.resolve() == checkout:
-        selection = tomllib.loads((root / "pixi.toml").read_text())["pypi-dependencies"]["orinoco-lite"]
-        if selection != EDITABLE:
-            raise ConfigurationError("The development link and package selection disagree.")
-    else:
-        apply(root, "enable", checkout)
-    # Compilation tools belong to the source checkout, not the site environment.
-    for submodule, required in (
-        ("submodules/pool.psychoinformatics.de-ui", "shacl-vue/package-lock.json"),
-        ("submodules/things-schemas", "src/demo-research-information/unreleased.yaml"),
-    ):
-        if not (checkout / submodule / required).is_file():
-            run("git", "submodule", "update", "--init", "--recursive", "--", submodule, cwd=checkout)
+    metadata = tomlkit.parse((checkout / "pyproject.toml").read_text())
+    expected = {"path": f"submodules/{CLIENT}", "editable": True}
+    if metadata.get("tool", {}).get("uv", {}).get("sources", {}).get(CLIENT) != expected:
+        raise ConfigurationError("The selected package predates nested editable dependency support. "
+                                 f"Select an updated commit in {CHECKOUT} before enabling development.")
+    return checkout
+
+
+def prepare_resources(checkout: Path) -> None:
+    # Build tools belong to the package's compilation environment. Website and
+    # adapter commands continue to use only the downstream environment.
+    print("Preparing editable package resources...", file=sys.stderr, flush=True)
     run("pixi", "run", "--manifest-path", checkout / "pixi.toml",
-        "orinoco-lite", "dev", "prepare-resources", cwd=checkout)
-    print(f"Editable Orinoco Lite source: {checkout}", flush=True)
-    task = shlex.join(["pixi", "run", "dev-enable", *([str(path)] if path is not None else [])])
-    print(f"Consider running `{task}` next time to record this operation with DataLad.", flush=True)
-    print("The enabled package selection must be committed before dev disable can restore it.", flush=True)
+        "orinoco-lite", "dev", "prepare-resources", cwd=checkout,
+        env=unlocked_environment())
 
 
-def disable(root: Path) -> None:
+def enable(root: Path, repository: str | None = None, revision: str | None = None) -> None:
     root = root.resolve()
+    if (root / "src/orinoco_lite").is_dir():
+        raise ConfigurationError("This is an Orinoco Lite source checkout. Run 'dev enable' from a downstream website.")
     check_workspace(root)
-    if not (root / LINK).is_symlink():
-        raise ConfigurationError("This downstream has no editable development connection.")
-    print("Restoring the previous package selection...", flush=True)
-    apply(root, "disable", None)
-    print("Consider running `pixi run dev-disable` next time to record this operation with DataLad.", flush=True)
+    document = tomlkit.parse((root / "pixi.toml").read_text())
+    selection = document.get("pypi-dependencies", {}).get("orinoco-lite")
+    if selection is None or (isinstance(selection, dict) and "path" in selection and selection != EDITABLE):
+        raise ConfigurationError("Select a package revision or the development checkout before enabling development.")
+    print("Enabling editable Orinoco Lite...", file=sys.stderr, flush=True)
+    checkout = prepare_checkout(root, repository, revision)
+    prepare_resources(checkout)
+    with progress("Installing editable Orinoco Lite in the downstream Pixi environment"):
+        apply(root)
+    selected_revision = git(checkout, "rev-parse", "--short", "HEAD")
+    branch = subprocess.run(
+        ["git", "-C", str(checkout), "symbolic-ref", "--short", "-q", "HEAD"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
+    source = checkout.relative_to(root)
+    state = f"{source} @ {selected_revision}"
+    if not branch:
+        state += " (detached HEAD)"
+    print(f"Editable Orinoco Lite enabled: {state}\n"
+          "Updated pixi.toml and pixi.lock locally; no files were staged.",
+          file=sys.stderr, flush=True)

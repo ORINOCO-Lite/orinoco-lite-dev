@@ -121,18 +121,18 @@ def record_projection(repository: Path) -> str:
         # Generated files are ignored in the source checkout. Stage precisely
         # this output so DataLad saves it together with the actual run record.
         _run([datalad, "run", "--explicit", "--input", ".",
-              "--output", "generated/projection", "--sidecar", "no",
+              "--output", "build/hugo-projection", "--sidecar", "no",
               "-m", "chore(pages): record Hugo projection", "--", "sh", "-c",
               "orinoco-lite projection update --no-cache && "
-              "git add --force --all -- generated/projection"], cwd=checkout, env=identity)
+              "git add --force --all -- build/hugo-projection"], cwd=checkout, env=identity)
         commit = _run(["git", "rev-parse", "HEAD"], cwd=checkout)
         if commit == source:
             raise PublicationError("Projection run did not create a DataLad commit")
         _run(["git", "fetch", "--quiet", checkout, commit], cwd=root)
-        projection = root / "generated/projection"
+        projection = root / "build/hugo-projection"
         if projection.exists():
             shutil.rmtree(projection)
-        shutil.copytree(checkout / "generated/projection", projection)
+        shutil.copytree(checkout / "build/hugo-projection", projection)
         return commit
 
 
@@ -175,7 +175,7 @@ def prepare(
     root = repository.resolve()
     if not (root / ".git").exists():
         raise PublicationError(f"Not a Git worktree: {root}")
-    projection = _relative_directory(root, "generated/projection", "projection")
+    projection = _relative_directory(root, "build/hugo-projection", "projection")
     site = _relative_directory(root, site_relative, "site")
     projection_files = _files(projection)
     site_files = _files(site)

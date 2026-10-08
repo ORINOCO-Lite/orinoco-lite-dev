@@ -28,7 +28,7 @@ def repository(tmp_path, monkeypatch):
     root = tmp_path / "site"
     root.mkdir()
     git(root, "init", "-b", "main")
-    (root / ".gitignore").write_text("/build/\n/generated/\n")
+    (root / ".gitignore").write_text("/build/\n")
     (root / "input.txt").write_text("first\n")
     git(root, "add", ".")
     git(root, "commit", "-m", "feat: add site source")
@@ -43,9 +43,9 @@ def repository(tmp_path, monkeypatch):
     executable = binaries / "orinoco-lite"
     executable.write_text(
         '#!/bin/sh\nset -eu\n'
-        'mkdir -p generated/projection/content\n'
-        'cp input.txt generated/projection/records.jsonl\n'
-        'cp input.txt generated/projection/content/_index.md\n'
+        'mkdir -p build/hugo-projection/content\n'
+        'cp input.txt build/hugo-projection/records.jsonl\n'
+        'cp input.txt build/hugo-projection/content/_index.md\n'
     )
     executable.chmod(0o755)
     annex = binaries / "git-annex"
@@ -58,10 +58,10 @@ def repository(tmp_path, monkeypatch):
 
 def prepare_build(root):
     projection = record_projection(root)
-    site = root / "build/pages"
+    site = root / "build/site"
     site.mkdir(parents=True, exist_ok=True)
     (site / "index.html").write_text((root / "input.txt").read_text())
-    prepare(root, projection, "build/pages", BUNDLE)
+    prepare(root, projection, "build/site", BUNDLE)
     return projection
 
 
@@ -82,8 +82,8 @@ def test_projection_is_one_datalad_commit_and_can_be_replayed(repository, tmp_pa
                         .split("\n^^^ Do not change lines above ^^^")[0])
     assert "orinoco-lite projection update --no-cache" in record["cmd"]
     assert record["inputs"] == ["."]
-    assert record["outputs"] == ["generated/projection"]
-    assert git(remote, "show", f"{projection}:generated/projection/records.jsonl") == "first"
+    assert record["outputs"] == ["build/hugo-projection"]
+    assert git(remote, "show", f"{projection}:build/hugo-projection/records.jsonl") == "first"
     assert git(root, "rev-parse", "HEAD") == source
     assert not git(root, "status", "--porcelain", "--untracked-files=no")
     assert git(remote, "merge-base", "main", "gh-pages", check=False) == ""
@@ -92,13 +92,13 @@ def test_projection_is_one_datalad_commit_and_can_be_replayed(repository, tmp_pa
     clone = tmp_path / "replay"
     git(root, "clone", remote, clone)
     git(clone, "checkout", "--detach", "origin/latest-hugo-projection")
-    expected = git(clone, "rev-parse", "HEAD:generated/projection")
+    expected = git(clone, "rev-parse", "HEAD:build/hugo-projection")
     # A new location with none of the publication checkout's caches or outputs.
     subprocess.run(["datalad", "rerun", "--report", "HEAD"], cwd=clone, check=True, capture_output=True)
     git(clone, "checkout", "--detach", source)
     subprocess.run(["datalad", "rerun", "--onto", "", projection], cwd=clone,
                    check=True, capture_output=True)
-    assert git(clone, "rev-parse", "HEAD:generated/projection") == expected
+    assert git(clone, "rev-parse", "HEAD:build/hugo-projection") == expected
 
 
 @pytest.mark.parametrize("limit", [1, 3])
@@ -224,5 +224,5 @@ def test_projection_uses_checked_out_submodule_without_remote_access(repository)
     executable = Path(os.environ["PATH"].split(os.pathsep)[0]) / "orinoco-lite"
     executable.write_text(executable.read_text().replace("cp input.txt", "cp site-specific/record.txt"))
     projection = record_projection(root)
-    assert git(root, "show", f"{projection}:generated/projection/records.jsonl") == "submodule input"
+    assert git(root, "show", f"{projection}:build/hugo-projection/records.jsonl") == "submodule input"
     assert git(root, "rev-parse", f"{projection}:site-specific") == git(metadata, "rev-parse", "HEAD")

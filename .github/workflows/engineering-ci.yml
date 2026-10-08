@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  PIXI_LOCKED: "true"
+  PIXI_LOCKED: "false"
 
 jobs:
   package:
@@ -39,16 +39,20 @@ jobs:
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
+            submodules/dump-things-pyclient \
+            submodules/dump-things-service \
+            submodules/things-enrichment-tools \
             submodules/www-from-model \
             submodules/things-schemas
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
+          git -C submodules/www-from-model submodule update --init --recursive
 
-      - name: Install the locked package environment
+      - name: Resolve the package development environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
-          cache: true
-          locked: true
+          cache: false
+          locked: false
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files
@@ -60,7 +64,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORINOCO-Lite/orinoco-lite-template
-          ref: main
+          ref: 6d4a67dd03b7388a28b45540bbfe61911601945b
           path: build/template-candidate
           persist-credentials: false
 
@@ -74,7 +78,7 @@ jobs:
         run: |
           pixi run build-package
           wheels=(build/package/*.whl)
-          env -u PIXI_LOCKED pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run python - <<'PY'
           from importlib.metadata import distribution
           import json

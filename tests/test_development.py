@@ -3,151 +3,165 @@ import subprocess
 import tomllib
 
 import pytest
+import tomlkit
 
 from orinoco_lite import development as dev
 from orinoco_lite.errors import ConfigurationError
 
 
 def commit(root, message):
-    for args in (("add", "."), ("commit", "-qm", message)):
-        subprocess.run(["git", "-C", str(root), *args], check=True)
+    dev.git(root, "add", ".")
+    dev.git(root, "commit", "-qm", message)
+
+
+def repository(path):
+    path.mkdir()
+    dev.git(path, "init", "-q")
+    dev.git(path, "config", "user.name", "Development test")
+    dev.git(path, "config", "user.email", "test@example.invalid")
+    return path
 
 
 @pytest.fixture
 def downstream(tmp_path, monkeypatch):
-    root = tmp_path / "site"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    for key, value in (("user.name", "Test"), ("user.email", "test@example.invalid")):
-        subprocess.run(["git", "-C", str(root), "config", key, value], check=True)
-    (root / "pixi.toml").write_text('[pypi-dependencies]\n# Keep this comment\norinoco-lite = { git = "https://example.invalid/package", rev = "abc" }\nother = "==1"\n')
+    monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+    client = repository(tmp_path / "client")
+    (client / "client.py").write_text("value = 1\n")
+    commit(client, "test: client source")
+    source = repository(tmp_path / "package")
+    (source / "src/orinoco_lite").mkdir(parents=True)
+    (source / "src/orinoco_lite/__init__.py").write_text("value = 1\n")
+    (source / "pyproject.toml").write_text(
+        '[project]\nname = "orinoco-lite"\n'
+        '[tool.uv.sources]\n'
+        'dump-things-pyclient = {path = "submodules/dump-things-pyclient", editable = true}\n'
+    )
+    dev.git(source, "submodule", "add", str(client), "submodules/dump-things-pyclient")
+    commit(source, "test: package with nested dependency")
+    root = repository(tmp_path / "site")
+    manifest = tomlkit.parse(
+        '[pypi-dependencies]\n# Keep this comment\nother = "==1"\n'
+        '[pypi-options]\nindex-strategy = "first-index"\n'
+        '[pypi-options.dependency-overrides]\nunrelated = ">=1"\n'
+    )
+    manifest["pypi-dependencies"]["orinoco-lite"] = {"git": str(source), "rev": dev.git(source, "rev-parse", "HEAD")}
+    (root / "pixi.toml").write_text(tomlkit.dumps(manifest))
     (root / "pixi.lock").write_text("original lock\n")
     (root / "page.md").write_text("initial content\n")
-    commit(root, "test: initial selection")
-    def install(*args, cwd, env):
-        assert args[0:2] == ("pixi", "install")
-        assert "PIXI_LOCKED" not in env
-        (root / "pixi.lock").write_text((root / "pixi.toml").read_text())
-    monkeypatch.setattr(dev, "run", install)
+    adapter = root / ".orinoco-lite/hugo-adapter/layouts/example.html"
+    adapter.parent.mkdir(parents=True)
+    adapter.write_text("tracked adapter\n")
+    commit(root, "test: pinned package")
+    original_run = dev.run
+
+    def run(*args, cwd, env=None):
+        if args[0] == "pixi":
+            assert args[:2] == ("pixi", "install")
+            assert "PIXI_LOCKED" not in env
+            (root / "pixi.lock").write_text((root / "pixi.toml").read_text())
+        else:
+            original_run(*args, cwd=cwd, env=env)
+
+    monkeypatch.setattr(dev, "run", run)
+    monkeypatch.setattr(dev, "prepare_resources", lambda checkout: None)
     return root
 
 
-def test_disable_preserves_site_edits_and_intervening_dependencies(downstream, capsys):
-    root = downstream
-    before = tomllib.loads((root / "pixi.toml").read_text())["pypi-dependencies"]["orinoco-lite"]
-    dev.apply(root, "enable", root.parent / "orinoco-lite-dev")
-    commit(root, "chore: enable editable Orinoco Lite")
-    manifest = root / "pixi.toml"
-    manifest.write_text(manifest.read_text().replace('other = "==1"', 'other = "==2"'))
-    commit(root, "chore: update another dependency")
-    (root / "page.md").write_text("uncommitted human edit\n")
-    dev.check_workspace(root)
-    dev.disable(root)
-    assert "pixi run dev-disable" in capsys.readouterr().out
-    dependencies = tomllib.loads(manifest.read_text())["pypi-dependencies"]
-    assert dependencies["orinoco-lite"] == before
-    assert dependencies["other"] == "==2"
-    assert "# Keep this comment" in manifest.read_text()
-    assert (root / "page.md").read_text() == "uncommitted human edit\n"
-    assert not (root / dev.LINK).is_symlink()
-    assert 'other = "==2"' in (root / "pixi.lock").read_text()
+def read(root):
+    return tomllib.loads((root / "pixi.toml").read_text())
 
 
-def test_failed_install_restores_connection_files(downstream, monkeypatch):
-    root = downstream
-    before = (root / "pixi.toml").read_bytes()
-    def fail(*args, cwd, env):
-        (root / "pixi.lock").write_text("partial solve")
-        raise subprocess.CalledProcessError(1, "pixi")
+def test_enable_clones_nested_sources_without_registering_or_staging(downstream, capfd):
+    original = read(downstream)
+    dev.enable(downstream)
+    source = downstream / dev.CHECKOUT
+    assert (source / ".git").is_dir()
+    assert (source / "submodules/dump-things-pyclient/client.py").is_file()
+    assert dev.git(downstream, "ls-files", ".orinoco-lite") == ".orinoco-lite/hugo-adapter/layouts/example.html"
+    assert not (downstream / ".gitmodules").exists()
+    assert not dev.git(downstream, "diff", "--cached", "--name-only")
+    assert dev.git(downstream, "check-ignore", dev.CHECKOUT) == dev.CHECKOUT
+    assert read(downstream)["pypi-dependencies"]["orinoco-lite"] == dev.EDITABLE
+    assert read(downstream)["pypi-options"] == original["pypi-options"]
+    assert "no files were staged" in capfd.readouterr().err
+
+
+def test_reenable_preserves_uncommitted_sources_and_downstream_dependencies(downstream):
+    dev.enable(downstream)
+    doc = tomlkit.parse((downstream / "pixi.toml").read_text())
+    doc["pypi-dependencies"]["new-library"] = "*"
+    (downstream / "pixi.toml").write_text(tomlkit.dumps(doc))
+    client = downstream / dev.CHECKOUT / "submodules/dump-things-pyclient/client.py"
+    client.write_text("value = 2\n")
+    dev.enable(downstream)
+    assert client.read_text() == "value = 2\n"
+    assert read(downstream)["pypi-dependencies"]["new-library"] == "*"
+    assert not dev.git(downstream, "diff", "--cached", "--name-only")
+
+
+def test_failed_install_restores_uncommitted_manifest_and_lock(downstream, monkeypatch):
+    manifest = downstream / "pixi.toml"
+    manifest.write_text(manifest.read_text() + "\n# local change\n")
+    before = {name: (downstream / name).read_bytes() for name in dev.FILES}
+    original_run = dev.run
+
+    def fail(*args, cwd, env=None):
+        if args[0] == "pixi":
+            (downstream / "pixi.lock").write_text("partial solve")
+            raise subprocess.CalledProcessError(1, "pixi")
+        original_run(*args, cwd=cwd, env=env)
+
     monkeypatch.setattr(dev, "run", fail)
     with pytest.raises(subprocess.CalledProcessError):
-        dev.apply(root, "enable", root.parent / "orinoco-lite-dev")
-    assert (root / "pixi.toml").read_bytes() == before
-    assert (root / "pixi.lock").read_text() == "original lock\n"
-    assert not (root / dev.LINK).is_symlink()
+        dev.enable(downstream)
+    assert {name: (downstream / name).read_bytes() for name in dev.FILES} == before
+    assert (downstream / dev.CHECKOUT / ".git").is_dir()
 
 
-def test_disable_refuses_changed_package_selection(downstream):
-    root = downstream
-    dev.apply(root, "enable", root.parent / "orinoco-lite-dev")
-    commit(root, "chore: enable editable Orinoco Lite")
-    manifest = root / "pixi.toml"
-    manifest.write_text(manifest.read_text().replace('editable = true', 'editable = false'))
-    before = manifest.read_bytes()
-    with pytest.raises(ConfigurationError, match="connection changed"):
-        dev.apply(root, "disable", None)
-    assert manifest.read_bytes() == before
-    assert (root / dev.LINK).is_symlink()
+def test_enable_rejects_source_checkout_and_symlink(downstream):
+    (downstream / "src/orinoco_lite").mkdir(parents=True)
+    with pytest.raises(ConfigurationError, match="Run 'dev enable'"):
+        dev.enable(downstream)
+    (downstream / "src/orinoco_lite").rmdir()
+    source = downstream / dev.CHECKOUT
+    source.parent.mkdir(exist_ok=True)
+    source.symlink_to(downstream.parent / "package")
+    with pytest.raises(ConfigurationError, match="real source checkout"):
+        dev.enable(downstream)
 
 
-def test_enable_defaults_to_sibling_and_clones_when_missing(downstream, monkeypatch, capsys):
-    root = downstream
-    checkout = root.parent / "orinoco-lite-dev"
-    calls = []
-    def run(*args, cwd):
-        calls.append(args)
-        if args[:2] == ("git", "clone"):
-            (checkout / "src/orinoco_lite").mkdir(parents=True)
-            (checkout / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
-    monkeypatch.setattr(dev, "run", run)
-    monkeypatch.setattr(dev, "apply", lambda root, action, path: calls.append((action, path)))
-    dev.enable(root)
-    assert calls[0] == ("git", "clone", dev.PACKAGE_REPOSITORY, checkout)
-    assert ("enable", checkout) in calls
-    assert calls[-1][-3:] == ("orinoco-lite", "dev", "prepare-resources")
-    output = capsys.readouterr().out
-    assert f"Editable Orinoco Lite source: {checkout}" in output
-    assert "`pixi run dev-enable`" in output
-    assert "must be committed before dev disable" in output
-
-
-def test_dirty_connection_files_are_not_overwritten(downstream):
-    manifest = downstream / "pixi.toml"
-    manifest.write_text(manifest.read_text() + "# pending edit\n")
-    with pytest.raises(ConfigurationError, match="Commit or discard"):
-        dev.check_workspace(downstream)
-
-
-@pytest.mark.parametrize("explicit_path", [False, True])
-def test_enable_cannot_redirect_source_checkout(downstream, monkeypatch, explicit_path):
-    root = downstream
-    (root / "src/orinoco_lite").mkdir(parents=True)
-    (root / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
-    manifest = root / "pixi.toml"
-    manifest.write_text('[pypi-dependencies]\norinoco-lite = { path = ".", editable = true }\n')
-    commit(root, "test: package source checkout")
-    before = {name: (root / name).read_bytes() for name in ("pixi.toml", "pixi.lock")}
-
-    def unexpected(*args, **kwargs):
-        pytest.fail("Source checkout rejection must precede external operations")
-
-    monkeypatch.setattr(dev, "run", unexpected)
-    with pytest.raises(ConfigurationError, match="Run 'dev enable' from a downstream website"):
-        dev.enable(root, root.parent / "another-checkout" if explicit_path else None)
-    assert {name: (root / name).read_bytes() for name in before} == before
-    assert not (root / dev.LINK).is_symlink()
-
-
-def test_enable_hint_quotes_explicit_checkout_path(downstream, monkeypatch, capsys):
-    checkout = downstream.parent / "package with spaces"
-    (checkout / "src/orinoco_lite").mkdir(parents=True)
-    (checkout / "pyproject.toml").write_text('[project]\nname = "orinoco-lite"\n')
-    monkeypatch.setattr(dev, "run", lambda *args, **kwargs: None)
-    dev.enable(downstream, checkout)
-    assert f"`pixi run dev-enable '{checkout}'`" in capsys.readouterr().out
-    assert dev.git(downstream, "status", "--porcelain", "--", *dev.FILES)
-
-
-def test_disable_requires_enable_changes_to_be_committed(downstream):
-    dev.apply(downstream, "enable", downstream.parent / "orinoco-lite-dev")
-    with pytest.raises(ConfigurationError, match="Commit or discard"):
-        dev.disable(downstream)
-
-
-def test_switch_allows_deliberate_lock_update_without_changing_caller(downstream, monkeypatch):
+def test_enable_relaxes_lock_only_for_child_install(downstream, monkeypatch):
     monkeypatch.setenv("PIXI_LOCKED", "true")
-    dev.apply(downstream, "enable", downstream.parent / "orinoco-lite-dev")
+    dev.enable(downstream)
     assert dev.os.environ["PIXI_LOCKED"] == "true"
-    commit(downstream, "chore: enable editable Orinoco Lite")
-    dev.disable(downstream)
-    assert dev.os.environ["PIXI_LOCKED"] == "true"
+
+
+def test_disable_is_not_a_command():
+    from orinoco_lite.cli import main
+    with pytest.raises(SystemExit) as error:
+        main(["dev", "disable"])
+    assert error.value.code == 2
+
+
+def test_tracked_development_checkout_survives_reenable_and_fresh_clone(downstream, tmp_path):
+    selection = read(downstream)["pypi-dependencies"]["orinoco-lite"]
+    dev.git(downstream, "submodule", "add", selection["git"], dev.CHECKOUT)
+    commit(downstream, "test: track development package")
+    dev.git(downstream / dev.CHECKOUT, "submodule", "update", "--init", "--recursive")
+    dev.enable(downstream)
+    source = downstream / dev.CHECKOUT
+    assert (source / ".git").is_file()
+    assert dev.git(downstream, "ls-files", dev.CHECKOUT) == dev.CHECKOUT
+    client = source / "submodules/dump-things-pyclient/client.py"
+    client.write_text("value = 3\n")
+    dev.enable(downstream)
+    assert client.read_text() == "value = 3\n"
+    assert (source / ".git").is_file()
+    # Restore the experimental edit before recording the parent's manifest.
+    dev.git(client.parent, "checkout", "--", "client.py")
+    commit(downstream, "test: select editable tracked package")
+    restored = tmp_path / "restored-site"
+    subprocess.run(["git", "clone", "--quiet", "--recurse-submodules", str(downstream), str(restored)], check=True)
+    assert read(restored)["pypi-dependencies"]["orinoco-lite"] == dev.EDITABLE
+    assert (restored / dev.CHECKOUT / ".git").is_file()
+    assert (restored / dev.CHECKOUT / "submodules/dump-things-pyclient/client.py").read_text() == "value = 1\n"

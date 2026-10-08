@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import shutil
+import struct
+import zlib
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import tomllib
 import unittest
 from unittest.mock import patch
+
+import pytest
 
 from orinoco_lite import site
 from orinoco_lite.config import load_config_path
@@ -64,9 +69,6 @@ def _www_from_model(root: Path) -> Path:
         "print('{\"nodes\": [], \"edges\": []}')\n",
         encoding="utf-8",
     )
-    materialized = root / ".orinoco-lite" / "materialized-hugo-assets"
-    materialized.mkdir(parents=True, exist_ok=True)
-    (materialized / "LICENSE").write_text("Template MIT\n", encoding="utf-8")
     return upstream
 
 
@@ -212,19 +214,13 @@ class HugoCompatibilityTests(unittest.TestCase):
                 ("layouts/term.html", "upstream layout\n"),
                 ("static/upstream-identity.png", "branded image\n"),
                 ("assets/img/fzj.svg", "institution brand\n"),
-                ("static/graph.js", "/annex/objects/MD5E-s12--graph.js\n"),
+                ("static/graph.js", "const graphClient = true;\n"),
                 ("layouts/.git/config", "must not ship\n"),
             ):
                 path = www_from_model / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
-            materialized = (
-                root
-                / ".orinoco-lite/materialized-hugo-assets/upstream/static/graph.js"
-            )
-            materialized.parent.mkdir(parents=True)
-            materialized.write_text("const graphClient = true;\n", encoding="utf-8")
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
 
             site._assemble(
                 load_config_path(root / "pyproject.toml"),
@@ -246,7 +242,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             self.assertFalse((assembly / "assets/img/fzj.svg").exists())
             self.assertFalse(any(path.name == ".git" for path in assembly.rglob("*")))
 
-            materialized.unlink()
+            (www_from_model / "static/graph.js").write_text("/annex/objects/missing\n")
             with self.assertRaisesRegex(
                 DriverError, "Materialized Hugo assets are missing"
             ):
@@ -323,7 +319,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 '{"name": {{ site.identity.title | json_string }}}\n',
                 encoding="utf-8",
             )
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
             workspace = load_config_path(config)
             www_from_model = _www_from_model(root)
             section = www_from_model / "content/section/_index.md"
@@ -361,7 +357,7 @@ class HugoCompatibilityTests(unittest.TestCase):
 
             # Fresh metadata supplies a homepage and entity pages without any
             # authored scaffolding. A same-path authored file replaces all of it.
-            projection = root / "generated/projection/content"
+            projection = root / "build/hugo-projection/content"
             for name, value in {
                 "_index.md": "---\ntitle: Metadata home\n---\nMetadata introduction\n",
                 "projects/example/_index.md": "---\ntitle: Metadata entity\n---\nEntity description\n",
@@ -433,7 +429,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                     workspace,
                     adapter,
                     _www_from_model(root),
-                    root / "build/assembly",
+                    root / "build/hugo-assembly",
                 )
 
     def test_assembly_copies_site_static_files(self) -> None:
@@ -445,7 +441,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text("static\n", encoding="utf-8")
             _write_site_data(root)
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
             workspace = load_config_path(config)
 
             site._assemble(
@@ -474,7 +470,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             forbidden = root / "extensions/layouts/term.html"
             forbidden.parent.mkdir(parents=True)
             forbidden.write_text("extension\n", encoding="utf-8")
-            assembly = root / "build/assembly"
+            assembly = root / "build/hugo-assembly"
 
             site._assemble(
                 load_config_path(config),
@@ -542,7 +538,7 @@ class HugoCompatibilityTests(unittest.TestCase):
                 with self.subTest(name=name):
                     commands: list[list[str]] = []
 
-                    def run(command, *, cwd):
+                    def run(command, *, cwd, environment=None):
                         normalized = [str(item) for item in command]
                         commands.append(normalized)
                         if normalized[0] == "hugo":
@@ -597,3 +593,89 @@ class HugoCompatibilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_build_destination_cannot_overwrite_intermediate_inputs(tmp_path):
+    from types import SimpleNamespace
+    from orinoco_lite.errors import ConfigurationError
+    from orinoco_lite.site import _safe_destination
+    import pytest
+
+    workspace = SimpleNamespace(root=tmp_path, path=lambda _: tmp_path / "build")
+    for name in ("hugo-projection", "hugo-assembly", "hugo-cache", "hugo-resources"):
+        protected = tmp_path / "build" / name
+        protected.mkdir(parents=True)
+        marker = protected / "input.txt"
+        marker.write_text("retained input")
+        for destination in (protected, protected / "nested"):
+            with pytest.raises(ConfigurationError, match="overlaps"):
+                _safe_destination(workspace, destination)
+        assert marker.read_text() == "retained input"
+    assert _safe_destination(workspace, Path("build/site")) == tmp_path / "build/site"
+
+
+@pytest.mark.skipif(shutil.which("hugo") is None, reason="Hugo is not installed")
+def test_hugo_reuses_resource_cache_between_clean_builds(tmp_path):
+    config = tmp_path / "pyproject.toml"
+    config.write_text(CONFIG)
+    _write_site_data(tmp_path)
+    color = bytes([255, 0, 0])
+
+    def assemble(workspace, resources, assembly):
+        def chunk(kind, data):
+            return (struct.pack("!I", len(data)) + kind + data
+                    + struct.pack("!I", zlib.crc32(kind + data)))
+
+        image = (b"\x89PNG\r\n\x1a\n"
+                 + chunk(b"IHDR", struct.pack("!IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+                 + chunk(b"IDAT", zlib.compress(b"\0" + color))
+                 + chunk(b"IEND", b""))
+        (assembly / "assets").mkdir()
+        (assembly / "assets/pixel.png").write_bytes(image)
+        (assembly / "layouts").mkdir()
+        (assembly / "layouts/index.html").write_text(
+            '{{ $image := (resources.Get "pixel.png").Resize "2x2" }}'
+            '<img src="{{ $image.RelPermalink }}">'
+        )
+        (assembly / "hugo.toml").write_text('title = "Cache test"\n')
+
+    destination = tmp_path / "build/site"
+    with (
+        patch.object(site, "_assemble", side_effect=assemble),
+        patch.object(site, "_build_provenance", return_value={}),
+        patch.object(site, "_write_build_provenance_footer"),
+        patch.object(site, "bind_editor", return_value={}),
+        patch.object(site, "bind_review", return_value={}),
+    ):
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        first = (destination / "index.html").read_bytes()
+        resources = tmp_path / "build/hugo-resources"
+        cached = {p: (p.read_bytes(), p.stat().st_mtime_ns)
+                  for p in resources.rglob("*") if p.is_file()}
+        assert cached
+        (destination / "obsolete.html").write_text("old page")
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        assert (destination / "index.html").read_bytes() == first
+        assert not (destination / "obsolete.html").exists()
+        assert {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in cached} == cached
+        color = bytes([0, 0, 255])
+        site.build_site(config, tmp_path / "resources", destination, "/")
+        assert (destination / "index.html").read_bytes() != first
+
+
+def test_finder_files_are_omitted_from_site_copy_but_symlinks_are_rejected(tmp_path):
+    import pytest
+
+    source = tmp_path / "inputs"
+    source.mkdir()
+    (source / "image.png").write_bytes(b"image")
+    noise = source / ".DS_Store"
+    noise.write_bytes(b"Finder metadata")
+    output = tmp_path / "output"
+    site._copy_tree(source, output)
+    assert (output / "image.png").read_bytes() == b"image"
+    assert not (output / ".DS_Store").exists()
+    noise.unlink()
+    noise.symlink_to(source / "image.png")
+    with pytest.raises(DriverError, match="symlinks"):
+        site._copy_tree(source, tmp_path / "invalid")

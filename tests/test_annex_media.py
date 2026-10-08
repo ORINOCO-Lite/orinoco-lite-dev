@@ -203,3 +203,24 @@ def test_local_build_keeps_annex_filters(workspace, monkeypatch):
     with netlify_media_checkout(workspace):
         prepare_media(workspace)
     assert git(site, 'config', '--local', '--get-regexp', r'^filter\.annex\.') == before
+
+
+def test_hugo_assets_follow_unlocked_development_edits(workspace, tmp_path):
+    from orinoco_lite.annex_media import prepare_hugo_assets
+    source = workspace.path("site")
+    git(source, "mv", "static/image.png", "static/graph.js")
+    git(source, "annex", "unlock", "static/graph.js")
+    (source / "static/graph.js").write_bytes(b"edited asset")
+    mapping = prepare_hugo_assets(source, editable=True)
+    _copy_tree(source / "static", tmp_path / "assembly", media=mapping)
+    assert (tmp_path / "assembly/graph.js").read_bytes() == b"edited asset"
+    assert (source / "static/graph.js").read_bytes() == b"edited asset"
+
+
+def test_hugo_assets_require_available_payloads(workspace):
+    from orinoco_lite.annex_media import prepare_hugo_assets
+    source = workspace.path("site")
+    git(source, "mv", "static/image.png", "static/graph.js")
+    git(source, "annex", "drop", "--force", "static/graph.js")
+    with pytest.raises(DriverError, match="graph.js"):
+        prepare_hugo_assets(source)

@@ -155,7 +155,7 @@ def test_update_mode_selects_only_its_operation(tmp_path, mode):
     if mode == 'Software only':
         assert args[7:] == ['--reuse-dump', '--records-only']
     else:
-        assert args[7:] == ['--www-revision', 'a' * 40]
+        assert args[7:] == []
 
 
 @pytest.mark.parametrize(('conflicts', 'validation', 'succeeds'), [

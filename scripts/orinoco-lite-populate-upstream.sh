@@ -10,8 +10,6 @@ supplied_dump=
 site_specific=
 reuse_dump=false
 records_only=false
-www_revision=
-upstream_submodule=sourcedata/www-from-model
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --directory) directory=$2; shift 2 ;;
@@ -21,12 +19,11 @@ while [[ $# -gt 0 ]]; do
     --dump) supplied_dump=$2; shift 2 ;;
     --site-specific) site_specific=$2; shift 2 ;;
     --records-only) records_only=true; shift ;;
-    --www-revision) www_revision=$2; shift 2 ;;
     --reuse-dump) reuse_dump=true; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-if $records_only && { ! $reuse_dump || [[ -n $www_revision || -n $site_specific || -n $supplied_dump ]]; }; then
+if $records_only && { ! $reuse_dump || [[ -n $site_specific || -n $supplied_dump ]]; }; then
   echo "--records-only requires --reuse-dump and cannot select site inputs." >&2; exit 2
 fi
 if ! python - <<'PYTHON'
@@ -48,10 +45,10 @@ then
   exit 2
 fi
 dump_path=$directory/downloaded/records.jsonl
-[[ -f pixi.toml && -f pixi.lock ]] || { echo 'Populate requires the downstream Pixi selection and lock.' >&2; exit 2; }
-git ls-files --error-unmatch -- pixi.toml pixi.lock >/dev/null 2>&1 &&
-  git diff --quiet HEAD -- pixi.toml pixi.lock || {
-  echo 'Record the package selection and lock before populating the downstream.' >&2; exit 2;
+[[ -f pixi.lock ]] || { echo "Populate requires the local Pixi lock." >&2; exit 2; }
+git ls-files --error-unmatch -- pixi.toml >/dev/null 2>&1 &&
+  git diff --quiet HEAD -- pixi.toml || {
+  echo 'Record the package selection before populating the downstream.' >&2; exit 2;
 }
 [[ -z $supplied_dump || -f $supplied_dump ]] || { echo "Missing dump: $supplied_dump" >&2; exit 2; }
 if $reuse_dump; then
@@ -107,17 +104,11 @@ datalad run --explicit -m "chore: convert records dump" \
     --source "$dump_path" --destination "$destination" --force
 
 if $records_only; then exit 0; fi
-checkout_args=(orinoco-lite dev upstream checkout)
-if [[ -n $www_revision ]]; then checkout_args+=(--revision "$www_revision"); fi
-"${checkout_args[@]}"
-# Save the selection of existing upstream history, then record its transformation.
-datalad save -m "chore: select upstream website submodule" -- .gitmodules "$upstream_submodule"
-# The importer retrieves and verifies selected Annex media; do not get the whole site.
+# The package selection owns the recoverable upstream revision.
 datalad run --explicit -m "chore: import upstream site inputs" \
-  --input "$upstream_submodule" --assume-ready inputs \
   --input pixi.toml --input pixi.lock \
   --input pyproject.toml --output pyproject.toml --output "$destination/content" \
   --output "$destination/assets" --output "$destination/static" \
   --output "$destination/overrides" -- \
-  orinoco-lite dev upstream import-from-www --source "$upstream_submodule" \
+  orinoco-lite dev upstream import-from-www \
     --media-remote https://hub.psychoinformatics.de/www/www-from-model.git --destination "$destination" --force

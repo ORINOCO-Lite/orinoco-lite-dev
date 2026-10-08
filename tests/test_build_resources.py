@@ -38,7 +38,7 @@ class SourceInstallationTests(unittest.TestCase):
                 patch("orinoco_lite.build_resources.build_editor", side_effect=failed_editor),
                 self.assertRaisesRegex(DriverError, "compiler failed"),
             ):
-                build_resources(root, resources)
+                build_resources(root, resources, editable=True)
 
             self.assertEqual((resources / "index.html").read_text(), "previous installation")
             self.assertEqual((pool / "shacl-vue/package-lock.json").read_text(), "{}")

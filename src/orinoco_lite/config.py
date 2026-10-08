@@ -26,17 +26,15 @@ DEFAULT_PATHS: dict[str, str] = {
     "records": "site-specific/metadata/records",
     "editorial": "site-specific/content",
     "site": "site-specific",
-    "generated": "generated",
     "extensions": "extensions",
     "build": "build",
 }
-FIXED_PATHS = frozenset({"site", "generated", "build"})
+FIXED_PATHS = frozenset({"site", "build"})
 
 DIRECTORY_PATHS = {
     "records",
     "editorial",
     "site",
-    "generated",
     "extensions",
     "build",
 }

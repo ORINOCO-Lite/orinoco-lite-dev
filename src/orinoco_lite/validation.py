@@ -61,6 +61,8 @@ def _files(root: Path, annex_keys: dict[Path, str] | None = None) -> Iterator[Pa
                 f"Site-owned paths cannot contain symlinks: {candidate}"
             )
         if candidate.is_file():
+            if candidate.name == ".DS_Store":
+                continue
             yield candidate
         elif not candidate.is_dir():
             raise ConfigurationError(f"Site-owned path is not regular: {candidate}")
@@ -128,6 +130,8 @@ def _validate_metadata_namespace(
             raise ConfigurationError(
                 f"Site-owned paths cannot contain symlinks: {candidate}"
             )
+        if candidate.name == ".DS_Store" and candidate.is_file():
+            continue
         if any(candidate == root or root in candidate.parents for root in allowed_roots):
             continue
         if any(candidate in root.parents for root in allowed_roots):
@@ -196,17 +200,19 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
     downstream structure fails before projection or website generation.
     """
 
+    from .development import CHECKOUT
+
     links = _gitlinks(workspace.root)
     allowed_links = [link for link in links
-                     if link in ("site-specific", "sourcedata/www-from-model")]
+                     if link in ("site-specific", CHECKOUT)]
     if (workspace.root / ".gitmodules").exists() and not allowed_links:
         raise ConfigurationError(
-            "Downstream .gitmodules requires site-specific or www-from-model subdatasets"
+            "Downstream .gitmodules requires a site-input or development submodule"
         )
     forbidden_links = sorted(set(links) - set(allowed_links))
     if forbidden_links:
         raise ConfigurationError(
-            f"Downstream gitlinks must be site-specific or sourcedata/www-from-model: {forbidden_links}"
+            f"Unexpected downstream gitlinks: {forbidden_links}"
         )
     for name in REQUIRED_INPUT_PATHS:
         path = workspace.path(name)

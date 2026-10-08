@@ -21,9 +21,6 @@ on:
       template_revision:
         description: Exact template commit SHA (required for Software only; unused for Data refresh)
         type: string
-      www_revision:
-        description: Exact authored-input commit SHA (required for Data refresh)
-        type: string
       publish:
         description: Publish draft pull requests
         type: boolean
@@ -33,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  PIXI_LOCKED: "true"
+  PIXI_LOCKED: "false"
 
 concurrency:
   group: psychoinformatics-downstream-update
@@ -68,7 +65,8 @@ jobs:
           git -C submodules/pool.psychoinformatics.de-ui submodule update --init --depth 1 -- shacl-vue
       - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
-          locked: true
+          cache: false
+          locked: false
           manifest-path: engineering/pixi.toml
           activate-environment: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -85,19 +83,18 @@ jobs:
         env:
           UPDATE_MODE: ${{ inputs.update_mode }}
           TEMPLATE_REVISION: ${{ inputs.template_revision }}
-          WWW_REVISION: ${{ inputs.www_revision }}
         run: |
           case "$UPDATE_MODE" in
             'Software only')
-              [[ "$TEMPLATE_REVISION" =~ ^[0-9a-f]{40}$ && -z "$WWW_REVISION" ]] || {
-                echo 'Software only requires an exact template SHA and no authored-input revision.'; exit 2;
+              [[ "$TEMPLATE_REVISION" =~ ^[0-9a-f]{40}$ ]] || {
+                echo 'Software only requires an exact template SHA.'; exit 2;
               }
               git cat-file -e HEAD:sourcedata/downloaded/records.jsonl || {
                 echo 'No retained capture. Prepare the dataset before updating software.'; exit 2;
               } ;;
             'Data refresh')
-              [[ "$WWW_REVISION" =~ ^[0-9a-f]{40}$ && -z "$TEMPLATE_REVISION" ]] || {
-                echo 'Data refresh requires an exact authored-input SHA and retains the base software selection.'; exit 2;
+              [[ -z "$TEMPLATE_REVISION" ]] || {
+                echo 'Data refresh retains the base software selection; leave the template SHA empty.'; exit 2;
               } ;;
             *) echo 'Choose Software only or Data refresh.'; exit 2 ;;
           esac
@@ -130,13 +127,12 @@ jobs:
         working-directory: downstream
         env:
           UPDATE_MODE: ${{ inputs.update_mode }}
-          WWW_REVISION: ${{ inputs.www_revision }}
         run: |
           case "$UPDATE_MODE" in
             'Software only')
               pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev upstream populate --reuse-dump --records-only ;;
             'Data refresh')
-              pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev upstream populate --www-revision "$WWW_REVISION" ;;
+              pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev upstream populate ;;
             *) echo 'Choose Software only or Data refresh.'; exit 2 ;;
           esac
       - name: Validate in the selected environment
@@ -162,7 +158,7 @@ jobs:
             pixi run --manifest-path "$GITHUB_WORKSPACE/downstream/pixi.toml" orinoco-lite dev records diff "$report/base-$stage.jsonl" "$selected" --limit 100 --full-values > "$report/$stage.txt" || status=$?
             [[ "$status" -le 1 ]] || exit "$status"
           done
-          git diff "$PARENT_BASE" HEAD -- .copier-answers.yml pixi.toml pyproject.toml sourcedata/www-from-model > "$report/selections.patch"
+          git diff "$PARENT_BASE" HEAD -- .copier-answers.yml pixi.toml pyproject.toml > "$report/selections.patch"
           git -C site-specific diff "$SITE_BASE" HEAD -- content assets static overrides > "$report/authored-inputs.patch"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()

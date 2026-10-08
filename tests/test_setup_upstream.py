@@ -5,6 +5,7 @@ import os
 import pty
 import re
 import select
+import shutil
 import time
 import termios
 from pathlib import Path
@@ -61,10 +62,18 @@ def setup(tmp_path):
     # Replace only external operations. Real Git supplies checkout refs and
     # remote URLs; the log verifies which immutable selections reach setup.
     stub = f'''#!{sys.executable}
-import json, os, sys
+import json, os, sys, subprocess
 from pathlib import Path
 name = Path(sys.argv[0]).name
 args = sys.argv[1:]
+if name == "git":
+    # Keep real submodule operations while substituting the fixture repository
+    # for external package origins used by selection tests.
+    if args[:2] == ["submodule", "add"]:
+        with open(os.environ["SETUP_TEST_LOG"], "a") as stream:
+            stream.write(json.dumps([name, *args]) + "\\n")
+        args[-2] = {str(engineering)!r}
+    os.execv({shutil.which('git')!r}, ["git", *args])
 with open(os.environ["SETUP_TEST_LOG"], "a") as stream:
     stream.write(json.dumps([name, *args]) + "\\n")
 if name == "orinoco-lite":
@@ -80,13 +89,14 @@ elif name == "pixi" and "copier" in args:
     Path("pixi.lock").write_text("template lock\\n")
 elif name == "datalad" and args[0] == "create":
     Path(args[-1]).mkdir()
+    subprocess.run(["git", "init", "--quiet", args[-1]], check=True)
 '''
-    for name in ("orinoco-lite", "datalad", "pixi"):
+    for name in ("orinoco-lite", "datalad", "pixi", "git"):
         executable = commands / name
         executable.write_text(stub)
         executable.chmod(0o755)
     log = tmp_path / "calls.jsonl"
-    env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log), COLUMNS="240")
+    env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"], SETUP_TEST_LOG=str(log), COLUMNS="240", GIT_ALLOW_PROTOCOL="file")
     destination = tmp_path / "downstream"
 
     def run(*args, fail=False, destination_path=None, interactive=False):
@@ -110,9 +120,9 @@ def test_selection_summary_and_immutable_handoff(setup, local):
     assert f"({expected_template[:7]}" in result.stdout
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[copier.index("--vcs-ref") + 1] == expected_template
-    updates = [call for call in calls if call[:2] == ["datalad", "run"]]
-    assert updates[0][updates[0].index("--revision") + 1] == package_head
-    assert "https://example.invalid/engineering.git" in updates[0]
+    registration = next(call for call in calls if call[:3] == ["git", "submodule", "add"])
+    assert "https://example.invalid/engineering.git" in registration
+    assert git(destination / ".orinoco-lite/orinoco-lite-dev", "rev-parse", "HEAD") == package_head
     assert "d" * 40 not in result.stdout
     assert git(engineering, "rev-parse", "HEAD") == package_head
     assert git(template, "rev-parse", "HEAD") == template_head
@@ -232,9 +242,8 @@ def test_github_ssh_origin_uses_public_read_url(setup, remote):
     git(engineering, "remote", "set-url", "origin", remote)
     result, calls = run("--build")
     assert result.returncode == 0, result.stderr
-    update = next(call for call in calls if call[:2] == ["datalad", "run"])
-    assert update[update.index("--repository") + 1] == "https://github.com/example/package.git"
-    assert update[update.index("--revision") + 1] == package_head
+    registration = next(call for call in calls if call[:3] == ["git", "submodule", "add"])
+    assert registration[-2] == "https://github.com/example/package.git"
 
 
 def test_summary_includes_versions_changes_inputs_and_build_hint(setup, tmp_path):
@@ -420,3 +429,50 @@ def test_public_template_records_https_source(setup, remote):
     assert result.returncode == 0, result.stderr
     copier = next(call for call in calls if "copier" in call and "copy" in call)
     assert copier[-2] == "https://github.com/ORINOCO-Lite/orinoco-lite-template.git"
+
+
+def test_development_registers_the_selected_package_before_enable(setup):
+    run, engineering, _, destination, package_commit, *_ = setup
+    run.env["GIT_ALLOW_PROTOCOL"] = "file"
+    result, calls = run("--development", "--package-repository", str(engineering))
+    assert result.returncode == 0, result.stderr
+    registration = next(call for call in calls if "chore: register development package" in call)
+    assert registration[-2:] == [".gitmodules", ".orinoco-lite/orinoco-lite-dev"]
+    assert git(destination / ".orinoco-lite/orinoco-lite-dev", "rev-parse", "HEAD") == package_commit
+    enable = next(call for call in calls if any("chore: enable editable Orinoco Lite" in arg for arg in call))
+    assert enable[-2:] == ["dev", "enable"]
+    populate = next(call for call in calls if "populate" in call)
+    assert calls.index(registration) < calls.index(enable) < calls.index(populate)
+    assert ".orinoco-lite/orinoco-lite-dev" in enable
+    assert "pixi.lock" in enable
+
+
+def test_default_development_is_enabled_before_import(setup):
+    run, _, _, destination, package_commit, *_ = setup
+    result, calls = run()
+    assert result.returncode == 0, result.stderr
+    assert git(destination / ".orinoco-lite/orinoco-lite-dev", "rev-parse", "HEAD") == package_commit
+    enable = next(call for call in calls if any("chore: enable editable Orinoco Lite" in arg for arg in call))
+    populate = next(call for call in calls if "populate" in call)
+    assert calls.index(enable) < calls.index(populate)
+
+
+def test_fixed_package_comparison_uses_retained_inputs_without_development(setup, tmp_path):
+    run, _, _, destination, *_ = setup
+    inputs = tmp_path / "retained-inputs"
+    inputs.mkdir()
+    result, calls = run("--no-development", "--site-specific", str(inputs), "--build")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / ".orinoco-lite/orinoco-lite-dev").exists()
+    assert not any(any("chore: enable editable Orinoco Lite" in arg for arg in call) for call in calls)
+    assert any("populate" in call and "--site-specific" in call for call in calls)
+    assert any("build" in call for call in calls)
+
+
+def test_fixed_package_cannot_import_upstream_inputs(setup):
+    run, _, _, destination, *_ = setup
+    result, calls = run("--no-development")
+    assert result.returncode == 2
+    assert "requires --site-specific" in result.stderr
+    assert not destination.exists()
+    assert not calls

@@ -6,7 +6,7 @@ usage() {
   cat <<'HELP'
 Usage: pixi run setup-upstream [DESTINATION] [OPTIONS]
 
-Create a downstream from upstream inputs.
+Create a downstream in development mode from upstream inputs.
 Uses template origin/main and the current engineering package commit.
 
   DESTINATION               New directory (default: ../orinoco-lite-test-downstream)
@@ -21,6 +21,9 @@ Inputs:
                             ignored with --site-specific
   --site-specific-url URL   Register the new subdataset’s published repository; does not push
   --build                   Also build the site and publication bundle
+  --development             Track the package as a submodule and install editable (default)
+  --no-development          Use a fixed package with --site-specific retained inputs;
+                            for installation-mode comparisons without upstream import
   --force                   Replace the destination, including local changes
   --non-interactive         Skip the review pause
 
@@ -36,8 +39,8 @@ Version overrides (optional):
   -h, --help                Show this help
 
 Paths are relative to the engineering directory. Publish selected commits
-before setup. For uncommitted edits, use `pixi run orinoco-lite dev enable PATH`
-in an existing downstream; `dev disable` restores its previous package.
+before setup. In an existing downstream, `pixi run orinoco-lite dev enable`
+installs a locally ignored checkout at .orinoco-lite/orinoco-lite-dev editable.
 
 HELP
 }
@@ -56,6 +59,7 @@ explicit_template_ref=false
 dump=
 site_specific=
 site_specific_url=
+development=true
 site_layout=submodule
 api=https://pool.psychoinformatics.de/api
 package_repository=
@@ -69,6 +73,8 @@ while [[ $# -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     --local-heads) local_heads=true; shift ;;
     --build) build=true; shift ;;
+    --development) development=true; shift ;;
+    --no-development) development=false; shift ;;
     --force) force=true; shift ;;
     --non-interactive) non_interactive=true; shift ;;
     --template|--template-ref|--dump|--api|--site-specific|--site-specific-url|--site-layout|--package-repository|--package-revision)
@@ -94,6 +100,11 @@ done
 [[ -z $dump || -f $dump ]] || { echo "Missing dump: $dump" >&2; exit 2; }
 [[ -z $site_specific || -d $site_specific ]] || { echo "Missing site-specific dataset: $site_specific" >&2; exit 2; }
 [[ -z $dump || -z $site_specific ]] || { echo 'Choose --dump or --site-specific, not both.' >&2; exit 2; }
+
+if ! $development && [[ -z $site_specific ]]; then
+  echo '--no-development requires --site-specific retained inputs; upstream import uses development mode.' >&2
+  exit 2
+fi
 
 if [[ -n $site_specific_url && ( $site_layout != submodule || -n $site_specific ) ]]; then
   echo '--site-specific-url requires a newly imported submodule.' >&2; exit 2
@@ -161,7 +172,8 @@ python "$(dirname "${BASH_SOURCE[0]}")/setup-upstream-summary.py" \
   --template "$template" "$template_repository" "$template_commit" \
   --package-selection "$package_selection" --template-selection "$template_selection" \
   --destination "$destination" --dump "$dump" --site-specific "$site_specific" \
-  --api "$api" --site-layout "$site_layout" --build "$build"
+  --api "$api" --site-layout "$site_layout" --build "$build" \
+  --development "$development"
 if ! $non_interactive; then
   if [[ ! -t 0 ]]; then
     echo 'Setup requires terminal input; pass --non-interactive for unattended execution.' >&2
@@ -200,18 +212,34 @@ DataLad records the Copier command; this note records its Pixi bootstrap." -- \
   copier copy --defaults --vcs-ref "$template_commit" \
     -d include_site_specific=false "$template_repository" .
 
-# Still in the inherited engineering environment. Record the exact candidate
-# and update the template's lock before switching to the downstream environment.
-datalad run --explicit -m "chore: select Orinoco Lite package candidate" \
-  --output pixi.toml --output pixi.lock -- \
-  orinoco-lite package update \
-    --repository "$package_repository" --revision "$package_commit"
+# Enable the selected source from the inherited engineering environment, before
+# the first downstream Pixi invocation or upstream import.
+if $development; then
+  checkout=.orinoco-lite/orinoco-lite-dev
+  git submodule add -- "$package_repository" "$checkout"
+  git -C "$checkout" checkout --quiet --detach "$package_commit"
+  git -C "$checkout" submodule update --init --recursive
+  datalad save -m "chore: register development package" -- .gitmodules "$checkout"
+  # Git sources are initialized above; resource preparation retrieves only
+  # required assets instead of DataLad getting every upstream Annex file.
+  datalad run --explicit --assume-ready inputs -m "chore: enable editable Orinoco Lite
+
+Bootstrap uses the inherited engineering environment; subsequent commands
+use the selected downstream editable environment." \
+    --input "$checkout" --output pixi.toml --output pixi.lock -- \
+    orinoco-lite dev enable
+else
+  datalad run --explicit -m "chore: select Orinoco Lite package candidate" \
+    --output pixi.toml --output pixi.lock -- \
+    orinoco-lite package update \
+      --repository "$package_repository" --revision "$package_commit"
+fi
 
 populate=(orinoco-lite dev upstream populate --api "$api" --site-layout "$site_layout")
 if [[ -n $dump ]]; then populate+=(--dump "$dump_relative"); fi
 if [[ -n $site_specific ]]; then populate+=(--site-specific "$site_relative"); fi
-# Switch once. The installed package owns the workflow, and all its commands
-# inherit this downstream environment. No workflow files are copied into the site.
+# Start the selected downstream environment after enabling development.
+# Its package owns the workflow; no workflow files are copied into the site.
 pixi run --manifest-path pixi.toml "${populate[@]}"
 if [[ -n $site_specific_url ]]; then
   pixi run datalad run --explicit --output .gitmodules \
@@ -219,6 +247,7 @@ if [[ -n $site_specific_url ]]; then
     git submodule set-url site-specific "$site_specific_url"
   pixi run datalad -C site-specific siblings configure --name origin --url "$site_specific_url"
 fi
+
 if $build; then
   pixi run --manifest-path pixi.toml orinoco-lite build --destination build/site \
     --publication-bundle build/pages-publication.bundle

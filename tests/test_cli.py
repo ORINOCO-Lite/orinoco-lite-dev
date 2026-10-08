@@ -110,7 +110,7 @@ class TrustedBuildCoordinatesTests(unittest.TestCase):
             self.assertEqual(
                 invoke.call_args_list,
                 [
-                    call("projection-update", workspace, resources),
+                    call("projection-update", workspace, resources, extra_arguments=("--quiet",)),
                     call(
                         "build",
                         workspace,
@@ -214,3 +214,50 @@ def test_validate_json_has_one_document_across_driver_process(tmp_path, monkeypa
     output = capfd.readouterr()
     assert json.loads(output.out)["records"] == 1
     assert not output.err
+
+
+@pytest.mark.parametrize("machine", [False, True])
+def test_build_report_output(machine, capsys):
+    import json
+    from orinoco_lite import site
+    report = {"files": 12, "version": 1}
+    arguments = ["--config", "site.toml", "--resources", "resources",
+                 "--destination", "build/site", "--base-url", "/"]
+    with patch.object(site, "build_site", return_value=report):
+        assert site.main(arguments + (["--json"] if machine else [])) == 0
+    output = capsys.readouterr().out
+    if machine:
+        assert json.loads(output) == report
+    else:
+        assert output == "Built website in build/site (12 files).\n"
+
+
+def test_quiet_projection_keeps_warnings(capsys):
+    from orinoco_lite import projection_cli
+    with patch.object(projection_cli, "load_config_path"), patch.object(
+        projection_cli, "update_projection", return_value={"dropped_graph_edges": 2}
+    ):
+        assert projection_cli.main(["--config", "site.toml", "--resources", "resources",
+                                    "update", "--quiet"]) == 0
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "omitted 2 graph relationships" in output.err
+
+
+@pytest.mark.parametrize("checkout,mode", [(None, "package"), (Path("source"), "dev")])
+def test_build_announces_installed_version_and_mode_before_work(tmp_path, checkout, mode, capsys):
+    workspace = SimpleNamespace(root=tmp_path, annex_media=False)
+    args = cli._parser().parse_args(["build"])
+
+    def build(*_):
+        output = capsys.readouterr()
+        assert output.out == ""
+        assert output.err == f"orinoco-lite {cli.__version__} ({mode})\n"
+        return 0
+
+    with (
+        patch.object(cli, "_resolve", return_value=(workspace, "resources")),
+        patch("orinoco_lite.www_from_model.editable_package_checkout", return_value=checkout),
+        patch.object(cli, "_build_workspace", side_effect=build),
+    ):
+        assert cli._build(args) == 0

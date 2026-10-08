@@ -10,7 +10,7 @@ def main() -> None:
     package = Path(__file__).resolve().parents[2]
     if not (package / "release/package-resources.yaml").is_file():
         raise ConfigurationError("Resource preparation requires an editable checkout. Run orinoco-lite dev enable first.")
-    build_resources(package, Path(__file__).parent / "_resources")
+    build_resources(package, Path(__file__).parent / "_resources", editable=True)
 
 
 if __name__ == "__main__":

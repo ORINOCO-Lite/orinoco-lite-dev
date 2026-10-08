@@ -11,13 +11,8 @@ Set the following in `pyproject.toml`:
 annex = true
 ```
 
-Install Git Annex in the downstream’s Pixi environment and commit the manifest and lock.
-For the template’s supported platforms, the engineering environment uses these dependency selections:
-
-```console
-env -u PIXI_LOCKED pixi add --platform linux-64 'git-annex==10.20260601'
-env -u PIXI_LOCKED pixi add --platform osx-arm64-macos-14-0 --pypi 'git-annex==10.20260601'
-```
+The package includes Git Annex for required upstream Hugo assets.
+The media opt-in additionally enables retrieval for the downstream’s own media.
 
 This executable is also required when DataLad saves ordinary Git records in an Annex-enabled submodule.
 It does not change where those records are stored.

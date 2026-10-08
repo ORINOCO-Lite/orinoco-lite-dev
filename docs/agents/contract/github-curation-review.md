@@ -17,7 +17,8 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 For a `site-specific` submodule, the workflow coordinates metadata and website draft pull requests under the [source-adapter contract](source-adapters.md).
 The App installation and curator-permission checks apply to both repositories.
 
-The final bot message SHOULD say: `Recorded human acceptance decisions in <commit>. Ready for merging.` It does not need an AI-draft disclaimer or a statement about actions it did not take.
+The final bot message SHOULD say: `Recorded human acceptance decisions in <commit>. Ready for merging.`
+It does not need an AI-draft disclaimer or a statement about actions it did not take.
 
 ## Downstream review page
 

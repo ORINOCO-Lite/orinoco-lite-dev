@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from jinja2 import Environment, FileSystemLoader
 import yaml
@@ -24,7 +24,7 @@ from .progress import progress
 from .annotations import annotation_root
 from .config import WorkspaceConfig
 from .errors import ConfigurationError, DriverError
-from .integrity import canonical_json_bytes, tree_sha256
+from .integrity import canonical_json_bytes, sha256_file, tree_sha256
 from .www_from_model import resolve_www_from_model
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters
@@ -396,7 +396,7 @@ def _records(
     return records, {item["pid"] for item in records}
 
 
-@progress("Validating metadata semantics")
+@progress("Checking records")
 def validate_semantics(
     workspace: WorkspaceConfig,
     resources_root: Path,
@@ -638,7 +638,7 @@ def _projection_cache_key(
     workspace: WorkspaceConfig,
     contract: ProjectionContract,
     resources_root: Path,
-) -> str:
+) -> str | None:
     """Hash projection inputs, not editorial content or deployment settings."""
     roots = [
         workspace.path("records"),
@@ -651,11 +651,46 @@ def _projection_cache_key(
     roots.extend(policy.template.parent for policy in contract.pages.values())
     roots.extend(sorted(Path(__file__).parent.glob("*.py")))
     digest = hashlib.sha256()
+    installed = list(distributions())
     digest.update(canonical_json_bytes({
-        "format": 1,
+        "format": 2,
         "python": list(sys.version_info[:3]),
-        "dependencies": sorted((d.metadata["Name"], d.version) for d in distributions()),
+        "dependencies": sorted((d.metadata["Name"], d.version) for d in installed),
     }))
+    # Editable dependency versions do not change with working-tree edits.
+    # Git supplies their source file set, including new, non-ignored files.
+    # The package itself is covered by the Python and resource roots above.
+    for dependency in sorted(installed, key=lambda d: d.metadata["Name"]):
+        if dependency.metadata["Name"].lower().replace("_", "-") == "orinoco-lite":
+            continue
+        raw = dependency.read_text("direct_url.json")
+        if not raw:
+            continue
+        source = json.loads(raw)
+        if not source.get("dir_info", {}).get("editable"):
+            continue
+        url = urlsplit(source["url"])
+        checkout = Path(unquote(url.path))
+        if url.scheme != "file" or not checkout.is_dir():
+            return None
+        try:
+            files = subprocess.run(
+                ["git", "-C", str(checkout), "ls-files", "-z", "--cached",
+                 "--others", "--exclude-standard"],
+                capture_output=True, check=False,
+            )
+        except OSError:
+            return None
+        if files.returncode:
+            return None  # Unenumerated editable sources must never reuse validation.
+        digest.update(dependency.metadata["Name"].encode() + b"\0")
+        for name in sorted(set(files.stdout.split(b"\0")) - {b""}):
+            path = checkout / os.fsdecode(name)
+            if path.is_dir():
+                return None  # Nested source repositories need their own enumeration.
+            digest.update(name + b"\0")
+            digest.update(sha256_file(path).encode() if path.is_file() else b"missing")
+            digest.update(b"\0")
     for root in roots:
         if root.is_file():
             digest.update(b"file\0" + root.read_bytes() + b"\0")
@@ -810,7 +845,9 @@ def render_projection(
 
 
 def _cached_projection_report(workspace, key):
-    destination = workspace.path("generated") / "projection"
+    if key is None:
+        return None
+    destination = workspace.path("build") / "hugo-projection"
     if destination.is_dir():
         try:
             saved = json.loads((destination.parent / ".projection-cache.json").read_text(encoding="utf-8"))
@@ -840,10 +877,10 @@ def validate_inputs(workspace, resources_root, *, no_cache=False):
 def update_projection(
     workspace: WorkspaceConfig, resources_root: Path, *, no_cache: bool = False,
 ) -> dict[str, Any]:
-    destination = workspace.path("generated") / "projection"
+    destination = workspace.path("build") / "hugo-projection"
     destination.parent.mkdir(parents=True, exist_ok=True)
     contract = load_contract(workspace, _www_from_model_root(workspace, resources_root))
-    key = _projection_cache_key(workspace, contract, resources_root)
+    key = None if no_cache else _projection_cache_key(workspace, contract, resources_root)
     cache = destination.parent / ".projection-cache.json"
     if not no_cache:
         report = _cached_projection_report(workspace, key)
@@ -899,9 +936,12 @@ def update_projection(
             shutil.rmtree(backup)
     # This is disposable cache state, never a canonical input or publication record.
     try:
-        cache.write_bytes(canonical_json_bytes({
-            "key": key, "output": tree_sha256(destination), "report": report,
-        }))
+        if key is None:
+            cache.unlink(missing_ok=True)
+        else:
+            cache.write_bytes(canonical_json_bytes({
+                "key": key, "output": tree_sha256(destination), "report": report,
+            }))
     except OSError:
         pass
     return report

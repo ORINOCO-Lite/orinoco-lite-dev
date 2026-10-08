@@ -19,6 +19,10 @@ def downstream(tmp_path, remote, monkeypatch):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Template update test")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.invalid")
     url, package_commit = remote
+    # Plumbum snapshots the environment before pytest configures the Git fixture.
+    from plumbum import local
+    for key in ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"):
+        monkeypatch.setitem(local.env, key, os.environ[key])
     source = tmp_path / "published"
     (source / "copier.yml").write_text(yaml.safe_dump({
         "_subdirectory": "template", "_skip_if_exists": ["site-specific/**", "extensions/**", "pyproject.toml"],
@@ -33,7 +37,7 @@ def downstream(tmp_path, remote, monkeypatch):
         '{{ dict(_copier_answers, _commit=_copier_conf.vcs_ref_hash, include_site_specific=include_site_specific) | to_nice_yaml }}\n')
     (scaffold / "pixi.toml.jinja").write_text(
         '[pypi-dependencies]\norinoco-lite = {git="{{ package_repository }}", rev="{{ package_revision }}"}\n')
-    (scaffold / "pixi.lock").write_text("initial lock\n")
+    (scaffold / ".gitignore").write_text("pixi.lock\n")
     (scaffold / "scaffold.txt").write_text("initial\n")
     (scaffold / "obsolete.txt").write_text("remove me\n")
     (scaffold / "pyproject.toml").write_text("site configuration\n")
@@ -59,14 +63,6 @@ def downstream(tmp_path, remote, monkeypatch):
     git(source, "commit", "-qm", "test: next template")
     git(source, "tag", "v2.0.0")
     new = git(source, "rev-parse", "HEAD")
-    # Isolate the external lock solver; this test exercises actual Copier and
-    # DataLad, while end-to-end downstream validation exercises real Pixi.
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    solver = bin_dir / "pixi"
-    solver.write_text('#!/bin/sh\n[ "$1" = lock ] || exit 2\nprintf "solved lock\\n" > pixi.lock\n')
-    solver.chmod(0o755)
-    monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
     return root, url, package_commit, old, new
 
 
@@ -79,6 +75,8 @@ def test_update_records_actual_copier_operation_preserves_submodule_and_replays(
     assert template_update.update(root, new) == 0
     assert (root / "scaffold.txt").read_text() == "updated\n"
     assert (root / "added.txt").exists()
+    assert git(root, "ls-files", "pixi.lock") == ""
+    assert not (root / "pixi.lock").exists()
     assert not (root / "obsolete.txt").exists()
     assert (root / "pyproject.toml").read_text() == "custom site configuration\n"
     assert git(root, "ls-tree", "HEAD", "site-specific") == site
@@ -183,3 +181,14 @@ def test_unmerged_template_sha_selects_its_unmerged_package_sha(downstream):
     assert selected["package_revision"] == package
     assert selected["_commit"] == template
     assert "package override" not in git(root, "log", "-1", "--format=%B")
+
+
+def test_update_untracks_an_existing_downstream_lock(downstream):
+    root, _, _, _, new = downstream
+    (root / "pixi.lock").write_text("old tracked lock\n")
+    git(root, "add", "-f", "pixi.lock")
+    git(root, "commit", "-qm", "test: legacy tracked lock")
+    assert template_update.update(root, new) == 0
+    assert git(root, "ls-files", "pixi.lock") == ""
+    assert not (root / "pixi.lock").exists()
+    assert git(root, "status", "--porcelain") == ""

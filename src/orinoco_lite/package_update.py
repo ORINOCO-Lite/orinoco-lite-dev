@@ -23,9 +23,9 @@ def remote_url(value: str) -> str:
         host, path = value.split(":", 1)
         value = f"ssh://{host}/{path}"
     parsed = urlsplit(value)
-    if (parsed.scheme not in {"https", "ssh", "git"} or not parsed.hostname
+    if (parsed.scheme not in {"https", "ssh"} or not parsed.hostname
             or parsed.password or (parsed.username and parsed.scheme != "ssh") or parsed.query or parsed.fragment):
-        raise ConfigurationError("Package repository must be a remote HTTPS, SSH, or Git URL, without embedded secrets.")
+        raise ConfigurationError("Package repository must be a remote HTTPS or SSH URL, without embedded secrets.")
     return value
 
 
@@ -76,7 +76,7 @@ def resolve_commit(repository: str, revision: str) -> str:
     """Fetch in an empty repository, so local-only commits cannot pass."""
     repository = remote_url(repository)
     if not revision or revision.startswith("-") or any(char.isspace() for char in revision):
-        raise ConfigurationError("Supply a Git commit, tag, or branch as --revision.")
+        raise ConfigurationError("Supply a full Git commit SHA, tag, or branch as --revision.")
     with tempfile.TemporaryDirectory(prefix="orinoco-package-") as temporary:
         def git(*arguments):
             environment = {key: value for key, value in os.environ.items()
@@ -87,7 +87,7 @@ def resolve_commit(repository: str, revision: str) -> str:
             if result.returncode:
                 raise ConfigurationError(
                     f"Cannot fetch package revision {revision!r} from {repository}. "
-                    "Publish the commit or select an accessible revision before continuing.\n"
+                    "Use a full commit SHA, tag, or branch, and ensure it is published.\n"
                     + result.stderr.strip())
             return result.stdout.strip()
         git("init", "--quiet")
@@ -140,6 +140,6 @@ def register(commands):
     package = commands.add_parser("package", help="manage the downstream's immutable package selection")
     actions = package.add_subparsers(dest="package_command", required=True)
     parser = actions.add_parser("update", help="select a fetchable Git revision and regenerate the Pixi lock")
-    parser.add_argument("--revision", required=True, help="commit, release tag, or branch; stored as a full commit SHA")
+    parser.add_argument("--revision", required=True, help="full commit SHA, release tag, or branch; stored as a full commit SHA")
     parser.add_argument("--repository", help="remote Git URL (default: current Git selection, or the official repository)")
     parser.add_argument("--check", action="store_true", help="verify remote availability and print the full SHA without changing files")

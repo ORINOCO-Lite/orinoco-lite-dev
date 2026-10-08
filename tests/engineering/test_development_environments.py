@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "pixi.toml"
 WORKFLOW = ROOT / ".github" / "workflows" / "engineering-ci.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "orinoco-release.yml"
-PACKAGE_MANIFEST = ROOT / "pyproject.toml"
 DEVELOPER_SKILL = ROOT / ".agents" / "skills" / "develop-orinoco-lite"
 ACCEPTED_CONSUMER_COMMIT = "96a87e38f149badf76d98ee9dc5fe2e4fd3b9c07"
 
@@ -28,17 +27,15 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         )
         manifest = tomllib.loads(serialized)
         workspace = manifest["workspace"]
-        self.assertEqual(manifest["dependencies"]["python"], ">=3.12,<3.13")
+        self.assertIn("python", manifest["dependencies"])
+        dependencies = dict(manifest["dependencies"])
+        dependencies.update(manifest.get("feature", {}).get("dev", {}).get("dependencies", {}))
         for name in ("hugo", "nodejs", "make"):
-            self.assertIn(name, manifest["dependencies"])
+            self.assertIn(name, dependencies)
         self.assertEqual(
             manifest["pypi-dependencies"]["orinoco-lite"],
             {"path": ".", "editable": True},
         )
-        for forbidden in (
-            'path = "submodules/dump-things-service"',
-        ):
-            self.assertNotIn(forbidden, serialized)
 
 
 
@@ -97,18 +94,12 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertFalse(workflow.exists())
 
     def test_release_inputs_match_selected_dependencies(self) -> None:
-        package = tomllib.loads(PACKAGE_MANIFEST.read_text(encoding="utf-8"))
         pool_gitlink = subprocess.check_output(
             [
                 "git",
                 "rev-parse",
                 "HEAD:submodules/pool.psychoinformatics.de-ui",
             ],
-            cwd=ROOT,
-            text=True,
-        ).strip()
-        enrichment_gitlink = subprocess.check_output(
-            ["git", "rev-parse", "HEAD:submodules/things-enrichment-tools"],
             cwd=ROOT,
             text=True,
         ).strip()
@@ -121,16 +112,6 @@ class DevelopmentEnvironmentTests(unittest.TestCase):
         self.assertEqual(POOL_UI_COMMIT, pool_gitlink)
         self.assertEqual(SHACL_VUE_COMMIT, shacl_gitlink)
 
-        dependency = next(
-            item
-            for item in package["project"]["dependencies"]
-            if item.startswith("things-enrichment-tools @ ")
-        )
-        self.assertTrue(dependency.endswith(f"@{enrichment_gitlink}"))
-        self.assertIn(
-            enrichment_gitlink,
-            (ROOT / "pixi.lock").read_text(encoding="utf-8"),
-        )
 
 
 

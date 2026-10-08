@@ -12,7 +12,7 @@ permissions:
   attestations: write
 
 env:
-  PIXI_LOCKED: "true"
+  PIXI_LOCKED: "false"
 
 jobs:
   release-artifacts:
@@ -30,16 +30,21 @@ jobs:
           git submodule update --init --depth 1 -- \
             submodules/pool.psychoinformatics.de-ui \
             submodules/query-things \
+            submodules/dump-things-pyclient \
+            submodules/dump-things-service \
+            submodules/things-enrichment-tools \
             submodules/www-from-model \
             submodules/things-schemas
           git -C submodules/pool.psychoinformatics.de-ui submodule update \
             --init --depth 1 -- shacl-vue
 
+          git -C submodules/www-from-model submodule update --init --recursive
+
       - name: Install the package environment
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
-          cache: true
-          locked: true
+          cache: false
+          locked: false
 
       - name: Build twice and compare release artifacts
         env:
@@ -51,15 +56,54 @@ jobs:
           done
           cmp release/dist/*.whl release/dist-repeat/*.whl
           cmp release/dist/*.tar.gz release/dist-repeat/*.tar.gz
-          (cd release/dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
 
       - name: Test the installed release wheel
         run: |
           wheels=(release/dist/*.whl)
-          env -u PIXI_LOCKED pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
+          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
           pixi run orinoco-lite --version
           pixi run orinoco-lite --help
+          pixi run python - <<'PY'
+          from importlib.metadata import distribution
+          from packaging.requirements import Requirement
+          from _build_backend import package_dependencies
+          import json
+          required = {str(Requirement(value)) for value in distribution("orinoco-lite").requires}
+          assert required == {str(Requirement(value)) for value in package_dependencies()}
+          for value in required:
+              requirement = Requirement(value)
+              if requirement.url and requirement.url.startswith("git+"):
+                  selected = json.loads(distribution(requirement.name).read_text("direct_url.json"))
+                  assert selected["vcs_info"]["commit_id"] == requirement.url.rsplit("@", 1)[1], selected
+                  assert not selected.get("dir_info", {}).get("editable"), selected
+          PY
           pixi run pytest --ignore=tests/engineering
+
+      - name: Generate and test the release environment
+        env:
+          RELEASE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          pixi run python -m orinoco_lite.release_package --environment \
+            --revision "$GITHUB_SHA" --repository-url "$RELEASE_REPOSITORY" \
+            > release/dist/pixi.toml
+          pixi lock --manifest-path release/dist/pixi.toml
+          consumer=$(mktemp -d)
+          cp release/dist/pixi.toml release/dist/pixi.lock "$consumer/"
+          pixi install --locked --manifest-path "$consumer/pixi.toml"
+          pixi run --manifest-path "$consumer/pixi.toml" orinoco-lite --version
+          pixi run --manifest-path "$consumer/pixi.toml" orinoco-lite --help
+          pixi run --manifest-path "$consumer/pixi.toml" hugo version
+          pixi run --manifest-path "$consumer/pixi.toml" git-annex version
+          pixi run --manifest-path "$consumer/pixi.toml" python - <<'PY'
+          from importlib.metadata import distributions
+          import json
+          for package in distributions():
+              source = json.loads(package.read_text("direct_url.json") or "{}")
+              assert not source.get("dir_info", {}).get("editable"), source
+              assert not source.get("url", "").startswith("file:"), source
+          import dump_things_pyclient, dump_things_service, pyoxigraph, rdflib
+          PY
+          (cd release/dist && sha256sum -- *.whl *.tar.gz pixi.toml pixi.lock > SHA256SUMS)
 
       - name: Attest the release artifact checksums
         id: attestation

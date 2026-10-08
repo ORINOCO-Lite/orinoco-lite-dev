@@ -1,31 +1,18 @@
 [build-system]
-requires = ["setuptools==80.9.0", "PyYAML==6.0.2", "versioneer[toml]==0.29"]
+requires = ["setuptools==80.9.0", "PyYAML==6.0.2", "versioneer[toml]==0.29", "tomlkit>=0.13", "packaging>=24"]
 build-backend = "_build_backend"
 backend-path = ["."]
 
 [project]
 name = "orinoco-lite"
-dynamic = ["version"]
+dynamic = ["version", "dependencies"]
 description = "Location-independent build and release interface for Orinoco Lite sites"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Center for Open Neuroscience" }]
-dependencies = [
-  "dump-things-pyclient @ git+https://github.com/ORINOCO-Lite/dump-things-pyclient.git@1e79391195ad4412286344189dc5f81a06accb90",
-  "dump-things-service==6.3.6",
-  "Jinja2==3.1.6",
-  "linkml==1.11.1",
-  "linkml-runtime==1.11.1",
-  "packaging==26.3",
-  "pydantic==2.13.4",
-  "pyoxigraph==0.5.11",
-  "PyYAML==6.0.2",
-  "tomlkit>=0.13,<1",
-  "rdflib==7.6.0",
-  "things-enrichment-tools @ git+https://github.com/ORINOCO-Lite/things-enrichment-tools.git@9f036a4cdfb53f87346152f9cd4620aaef38bce2",
-]
+
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -35,6 +22,38 @@ classifiers = [
 
 [project.scripts]
 orinoco-lite = "orinoco_lite.cli:main"
+
+# Pixi/uv follow these sources when this package is installed from its checkout.
+# Git submodules select the revisions; editable installs use working-tree edits.
+[tool.uv.sources]
+dump-things-pyclient = { path = "submodules/dump-things-pyclient", editable = true }
+dump-things-service = { path = "submodules/dump-things-service", editable = true }
+things-enrichment-tools = { path = "submodules/things-enrichment-tools", editable = true }
+query-things = { path = "submodules/query-things", editable = true }
+datalad-concepts = { path = "submodules/things-schemas", editable = true }
+
+# Build metadata derives exact source requirements from the committed gitlinks.
+[dependency-groups]
+runtime = [
+  "datalad",
+  "git-annex",
+  "copier",
+  "click-option-group",
+  "dump-things-pyclient",
+  "dump-things-service",
+  "things-enrichment-tools",
+  "query-things",
+  "datalad-concepts",
+  "Jinja2",
+  "linkml",
+  "linkml-runtime",
+  "packaging",
+  "pydantic",
+  "pyoxigraph",
+  "PyYAML",
+  "tomlkit",
+  "rdflib",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

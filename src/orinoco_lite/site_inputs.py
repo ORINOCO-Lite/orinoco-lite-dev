@@ -67,6 +67,9 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
         if not name:
             continue
         relative = Path(name)
+        path = source / relative
+        if path.name == ".DS_Store" and path.is_file() and not path.is_symlink():
+            continue
         if relative.parts[0] == "content":
             local = relative.relative_to("content")
             if local.name == "_index.md" and (
@@ -222,6 +225,8 @@ def import_site_inputs(source: Path, destination: Path, *, config_path: Path, re
         for target in surface.rglob("*"):
             if target.is_symlink():
                 raise DriverError(f"Imported site input must not be a symlink: {target}")
+            if target.name == ".DS_Store" and target.is_file():
+                continue
             if target.is_file() and target.relative_to(destination) not in files:
                 stale.append(target)
     if not force:

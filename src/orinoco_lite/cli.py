@@ -61,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--destination", type=Path, help="output directory under build/ (default: build/site)")
     build.add_argument("--publication-bundle", type=Path, metavar="PATH",
                        help="also save this build as a Git bundle at PATH under build/ for deployment history; commit input changes first (normally set by the Pages workflow)")
+    build.add_argument("--json", action="store_true", help="print the build report as one JSON document")
     build.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate metadata-derived pages and graph data; does not fetch new source data")
     build.add_argument("--base-url", default=os.environ.get("ORINOCO_BASE_URL"),
                        help="website URL, including any path prefix; use / for a local preview (default: ORINOCO_BASE_URL or your site configuration)")
@@ -96,7 +97,7 @@ def _parser() -> argparse.ArgumentParser:
     projection = commands.add_parser(
         "projection", help="generate intermediate metadata pages and graph data",
         description=("Generate the Hugo pages, normalized records, and graph data under "
-                     "generated/projection for inspection or further processing. This does "
+                     "build/hugo-projection for inspection or further processing. This does "
                      "not build HTML. For a website preview, use build, which performs this step automatically."),
     )
     projection.add_argument("projection_command", choices=("update",))
@@ -113,18 +114,16 @@ def _parser() -> argparse.ArgumentParser:
     dev_commands = dev.add_subparsers(dest="dev_command", required=True)
     dev_commands.add_parser("prepare-resources", help="compile bundled editor, review, and schema resources")
     enable = dev_commands.add_parser(
-        "enable", help="connect an editable package checkout and prepare its resources",
-        description="Connect an editable package checkout and prepare its resources. "
-        "Use pixi run dev-enable [PATH] in a downstream to record this operation with DataLad. "
-        "Direct CLI use leaves changes uncommitted; commit them before disabling.",
+        "enable", help="install the package and its nested sources editable from a local checkout",
+        description="Clone .orinoco-lite/orinoco-lite-dev locally, prepare its resources, and install "
+        "its Python dependencies editable in the downstream environment. The new checkout is "
+        "excluded locally from Git; no submodule is registered and no files are staged. "
+        "pixi.toml and pixi.lock are updated without requiring a commit. Re-running preserves "
+        "existing source edits. If a stale lock prevents launch, use: "
+        "env -u PIXI_LOCKED pixi run --as-is orinoco-lite dev enable.",
     )
-    enable.add_argument("path", nargs="?", type=Path, help="source checkout (default: ../orinoco-lite-dev; cloned if missing)")
-    dev_commands.add_parser(
-        "disable", help="restore the package selection used before editable development",
-        description="Restore the package selection used before editable development. "
-        "Use pixi run dev-disable in a downstream to record this operation with DataLad. "
-        "Direct CLI use leaves changes uncommitted.",
-    )
+    enable.add_argument("--repository", help="repository for a new checkout (default: selected package repository)")
+    enable.add_argument("--revision", help="revision for a new checkout (default: selected package commit)")
     from . import upstream, pool_capture, record_stages, rdf_stages
     upstream.register(dev_commands)
     records = dev_commands.add_parser("records", help="capture, convert, and compare records")
@@ -230,8 +229,11 @@ def _update_projection(args, workspace, resources) -> int:
 
 def _build(args: argparse.Namespace) -> int:
     from .annex_media import netlify_media_checkout
+    from .www_from_model import editable_package_checkout
 
     workspace, resources = _resolve(args)
+    mode = "dev" if editable_package_checkout() is not None else "package"
+    print(f"orinoco-lite {__version__} ({mode})", file=sys.stderr, flush=True)
     with netlify_media_checkout(workspace):
         return _build_workspace(args, workspace, resources)
 
@@ -267,7 +269,10 @@ def _build_workspace(args, workspace, resources) -> int:
         prepare_media(workspace)
         projection_commit = record_projection(workspace.root)
     else:
-        projection_status = _update_projection(args, workspace, resources)
+        projection_status = invoke_driver(
+            "projection-update", workspace, resources,
+            extra_arguments=("--quiet",) + (("--no-cache",) if getattr(args, "no_cache", False) else ()),
+        )
         if projection_status:
             return projection_status
     base_url = args.base_url or workspace.base_url
@@ -292,7 +297,7 @@ def _build_workspace(args, workspace, resources) -> int:
             ("--build-timestamp", build_timestamp)
             if build_timestamp is not None
             else ()
-        ),
+        ) + (("--json",) if getattr(args, "json", False) else ()),
     )
     if status == 0 and bundle is not None:
         from .publication import prepare
@@ -391,12 +396,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
         if args.command == "dev" and args.dev_command == "upstream":
             from . import upstream
             return upstream.execute(args)
-        if args.command == "dev" and args.dev_command in {"enable", "disable"}:
+        if args.command == "dev" and args.dev_command == "enable":
             from . import development
-            if args.dev_command == "enable":
-                development.enable(args.root or Path.cwd(), args.path)
-            else:
-                development.disable(args.root or Path.cwd())
+            development.enable(args.root or Path.cwd(), args.repository, args.revision)
             return 0
         if args.command == "dev" and args.dev_command == "prepare-resources":
             from .prepare_resources import main as prepare_resources

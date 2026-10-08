@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Sequence
 
@@ -18,13 +19,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--resources", type=Path, required=True)
     parser.add_argument("action", choices=("update",))
     parser.add_argument("--no-cache", action="store_true", help="regenerate projection and semantic checks")
+    parser.add_argument("--quiet", action="store_true", help="suppress the report, retaining warnings")
     args = parser.parse_args(argv)
     try:
         workspace = load_config_path(args.config)
         report = update_projection(workspace, args.resources.resolve(), no_cache=args.no_cache)
     except OrinocoError as error:
         parser.exit(1, f"orinoco-lite projection: {error}\n")
-    print(json.dumps(report, sort_keys=True))
+    if report.get("dropped_graph_edges", 0):
+        print(f"Warning: omitted {report['dropped_graph_edges']} graph relationships; inspect the projection report for details.", file=sys.stderr)
+    if not args.quiet:
+        print(json.dumps(report, sort_keys=True))
     return 0
 
 

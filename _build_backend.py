@@ -2,12 +2,75 @@
 
 from pathlib import Path
 import shutil
+import subprocess
 import sys
+import tomllib
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from setuptools import build_meta as _setuptools
 
 
 _PACKAGE = Path(__file__).resolve().parent
+
+
+def package_dependencies():
+    """Resolve package-owned Python sources from HEAD, never submodule worktrees."""
+    document = tomllib.loads((_PACKAGE / "pyproject.toml").read_text())
+    if "dependencies" in document["project"]:
+        return document["project"]["dependencies"]  # Prepared source archive.
+
+    def git(*arguments):
+        return subprocess.check_output(
+            ["git", "-C", str(_PACKAGE), *arguments], text=True, stderr=subprocess.PIPE
+        ).strip()
+
+    sources = document.get("tool", {}).get("uv", {}).get("sources", {})
+    sources = {canonicalize_name(name): spec for name, spec in sources.items()}
+    result = []
+    for value in document["dependency-groups"]["runtime"]:
+        requirement = Requirement(value)
+        source = sources.get(canonicalize_name(requirement.name))
+        if source is None:
+            result.append(value)
+            continue
+        path = source["path"]
+        try:
+            entries = git("ls-tree", "HEAD", "--", path).split("\t", 1)
+            mode, kind, commit = entries[0].split()
+            if mode != "160000" or kind != "commit" or entries[1] != path:
+                raise ValueError(path)
+            paths = git("config", "--blob", "HEAD:.gitmodules", "--get-regexp", r"^submodule\..*\.path$")
+            key = next(line.split(None, 1)[0] for line in paths.splitlines()
+                       if line.split(None, 1)[1] == path)
+            url = git("config", "--blob", "HEAD:.gitmodules", "--get", key[:-4] + "url")
+            if url.startswith("git@"):
+                host, remote_path = url.split(":", 1)
+                url = f"ssh://{host}/{remote_path}"
+            if not url.startswith(("https://", "ssh://")):
+                raise ValueError(url)
+        except (subprocess.CalledProcessError, ValueError, StopIteration, IndexError) as error:
+            raise RuntimeError(f"Cannot resolve committed Python source {path}; build from a Git checkout or prepared source archive") from error
+        extras = "[" + ",".join(sorted(requirement.extras)) + "]" if requirement.extras else ""
+        marker = f" ; {requirement.marker}" if requirement.marker else ""
+        result.append(f"{requirement.name}{extras} @ git+{url}@{commit}{marker}")
+    return result
+
+
+def archive_metadata(directory):
+    """Bake Git-derived requirements into the sdist copy, leaving sources intact."""
+    import tomlkit
+
+    manifest = Path(directory) / "pyproject.toml"
+    document = tomlkit.parse(manifest.read_text())
+    document["project"]["dependencies"] = package_dependencies()
+    document["project"]["dynamic"] = [name for name in document["project"]["dynamic"] if name != "dependencies"]
+    document.get("dependency-groups", {}).pop("runtime", None)
+    document.get("tool", {}).get("uv", {}).pop("sources", None)
+    # Setuptools can hardlink files into its release tree.
+    manifest.unlink()
+    manifest.write_text(tomlkit.dumps(document))
 
 
 def _checkout():
@@ -38,7 +101,7 @@ def _requirements(base, config_settings):
     requirements = base(config_settings)
     if _checkout() is not None:
         # Node and npm compile the bundled UIs; they are not Python runtime deps.
-        requirements.append("nodejs-wheel>=24.15,<25")
+        requirements.extend(["nodejs-wheel>=24.15,<25", "git-annex"])
     return requirements
 
 
