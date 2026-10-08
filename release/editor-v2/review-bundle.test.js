@@ -25,6 +25,7 @@ vi.mock('@/modules/utils', () => ({
 }));
 
 const {
+    proposalFailureGuidance,
     buildReviewBundle,
     beginReviewBundleProposal,
     curationInstallUrl,
@@ -72,9 +73,9 @@ describe('Orinoco review bundles', () => {
             kind: 'pull_request',
             pull_request: 42,
         };
-        expect(
-            reviewProposalTarget({ target: new Proxy(target, {}) }),
-        ).toEqual(target);
+        expect(reviewProposalTarget({ target: new Proxy(target, {}) })).toEqual(
+            target,
+        );
         expect(reviewProposalTarget({})).toEqual({ kind: 'standalone' });
         expect(() =>
             reviewProposalTarget({ target: { ...target, pull_request: 0 } }),
@@ -436,7 +437,7 @@ describe('Orinoco review bundles', () => {
             status: 403,
         });
         await expect(runFailure(false)).rejects.toThrow(
-            /did not confirm.*If no pull request exists.*then retry/,
+            /did not confirm.*If no pull request exists.*retry/,
         );
     });
 
@@ -538,4 +539,95 @@ describe('Orinoco review bundles', () => {
             'orinoco-review-xyzrins-persons-example.json',
         );
     });
+});
+
+describe('proposal failure guidance', () => {
+    it.each([
+        ['installation_access_required', 'installation'],
+        ['operation_disabled', 'operation'],
+        ['authentication_required', 'signin'],
+        ['curator_permission_required', 'permission'],
+        ['github_forbidden', 'other'],
+        ['github_not_found', 'other'],
+        ['invalid_origin', 'other'],
+        ['metadata_handoff_incomplete', 'other'],
+    ])(
+        'reports %s without inferring installation from HTTP status',
+        (code, expected) => {
+            expect(proposalFailureGuidance(code)).toBe(expected);
+        },
+    );
+    it.each(['verified', 'unsupported', 'denied-before-delivery'])(
+        'checks access without sending a proposal (service supports checks: %s)',
+        async (state) => {
+            let receive;
+            const popup = {
+                closed: false,
+                close: vi.fn(),
+                postMessage: vi.fn(),
+            };
+            const target = {
+                location: { origin: 'https://site.example' },
+                crypto: { getRandomValues: (value) => value.fill(10) },
+                addEventListener: (_type, listener) => {
+                    receive = listener;
+                },
+                removeEventListener: vi.fn(),
+                open: () => popup,
+                setTimeout: vi.fn(),
+                clearTimeout: vi.fn(),
+                setInterval: vi.fn(),
+                clearInterval: vi.fn(),
+            };
+            const handoff = beginReviewBundleProposal(
+                {
+                    repository: 'website/site',
+                    service_origin: 'https://review.example',
+                },
+                target,
+                { checkOnly: true },
+            );
+            if (state === 'denied-before-delivery') {
+                receive({
+                    origin: 'https://review.example',
+                    source: popup,
+                    data: {
+                        format: 'orinoco-lite-transport-error-v1',
+                        kind: 'shacl',
+                        code: 'operation_disabled',
+                        status: 403,
+                        message: 'Enable the operation.',
+                        handoff_nonce: '0a'.repeat(32),
+                        repository: 'website/site',
+                    },
+                });
+                await expect(handoff.deliver(null)).rejects.toMatchObject({
+                    code: 'operation_disabled',
+                });
+                expect(popup.postMessage).not.toHaveBeenCalled();
+                return;
+            }
+            const result = handoff.deliver(null);
+            receive({
+                origin: 'https://review.example',
+                source: popup,
+                data: {
+                    format:
+                        state === 'verified'
+                            ? 'orinoco-lite-shacl-access-verified-v1'
+                            : REVIEW_PROPOSAL_READY_FORMAT,
+                    handoff_nonce: '0a'.repeat(32),
+                    repository: 'website/site',
+                },
+            });
+            if (state === 'verified')
+                await expect(result).resolves.toEqual({ ready: true });
+            else
+                await expect(result).rejects.toMatchObject({
+                    code: 'access_check_unavailable',
+                });
+            expect(popup.postMessage).not.toHaveBeenCalled();
+            expect(popup.close).toHaveBeenCalledOnce();
+        },
+    );
 });

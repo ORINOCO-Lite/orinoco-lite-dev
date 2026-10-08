@@ -4,7 +4,7 @@ index 9621e55..7939e6a 100644
 +++ b/src/components/SubmitComp.vue
 @@ -3,0 +4,31 @@
 +        <v-card-actions
-+            v-if="patchDownloadMode && !framedContext && !responseReceived"
++            v-if="patchDownloadMode && !framedContext && !responseSuccess"
 +            class="submission-actions px-4 pb-2"
 +        >
 +            <v-btn :disabled="!nodesToSubmit.length" @click="downloadRecords()">
@@ -34,31 +34,13 @@ index 9621e55..7939e6a 100644
 +        <v-card-actions class="position-absolute top-0 right-0 pa-2">
 +            <v-btn prepend-icon="mdi-close-box" @click="props.openCloseFn()">Close</v-btn>
 +        </v-card-actions>
-@@ -4,0 +36,32 @@
-+            <v-alert
-+                v-if="proposalMode && !framedContext && !responseReceived"
-+                type="warning"
-+                variant="tonal"
-+                style="margin-bottom: 1em;"
-+            >
-+                <strong>GitHub App access is required</strong>
-+                <p>
-+                    Before proposing, make sure the Orinoco Lite GitHub App can
-+                    access this repository. Download the review bundle first if
-+                    you need to leave this page; you can upload it after returning.
-+                </p>
-+                <a
-+                    :href="curationInstallUrl(config.review_bundle_proposal)"
-+                    rel="noreferrer"
-+                    target="_blank"
-+                >Install or configure the GitHub App</a>
-+                <br />
-+                <a
-+                    :href="curationSetupUrl(config.review_bundle_proposal)"
-+                    rel="noreferrer"
-+                    target="_blank"
-+                >Read authorization and custom-app instructions</a>
-+            </v-alert>
+@@ -4,0 +36,14 @@
++            <p v-if="proposalMode && !framedContext && !responseSuccess">
++                {{ accessStatus || 'Sign in to check GitHub access before proposing.' }}
++                <v-btn :disabled="proposing" @click="checkGitHubAccess()">
++                    Check GitHub access
++                </v-btn>
++            </p>
 +            <v-alert
 +                v-if="reviewBundleStatus"
 +                :type="reviewBundleStatus.type"
@@ -67,9 +49,9 @@ index 9621e55..7939e6a 100644
 +            >
 +                {{ reviewBundleStatus.message }}
 +            </v-alert>
-@@ -17,0 +81 @@
+@@ -17,0 +63,1 @@
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
-@@ -57,0 +122,47 @@
+@@ -57,0 +104,47 @@
 +                    <v-alert
 +                        v-if="proposalMode && framedContext"
 +                        type="warning"
@@ -117,7 +99,7 @@ index 9621e55..7939e6a 100644
 +                        <strong>GitHub repository:</strong>
 +                        {{ config.review_bundle_proposal.repository }}.
 +                    </p>
-@@ -63,0 +175,29 @@
+@@ -63,0 +157,29 @@
 +                <v-alert
 +                    v-if="proposalAuthorizationFailure"
 +                    type="warning"
@@ -126,8 +108,8 @@ index 9621e55..7939e6a 100644
 +                >
 +                    <strong>The GitHub App cannot access this repository</strong>
 +                    <p>
-+                        Install the Orinoco Lite GitHub App for this repository,
-+                        approve any pending organization or SSO request, and retry.
++                        Configure the App for the repository named above with
++                        Contents and Pull requests write access, then check again.
 +                    </p>
 +                    <a
 +                        :href="curationInstallUrl(config.review_bundle_proposal)"
@@ -147,7 +129,7 @@ index 9621e55..7939e6a 100644
 +                    rel="noreferrer"
 +                    target="_blank"
 +                >Open draft pull request</a>
-@@ -98,4 +238,4 @@
+@@ -98,4 +220,4 @@
 -        <v-card-actions class="position-absolute top-0 right-0 pa-2">
 -            <v-btn v-if="!responseReceived && nodesToSubmit.length" @click="downloadRecords()">
 -                <v-icon>mdi-download</v-icon>
@@ -156,13 +138,14 @@ index 9621e55..7939e6a 100644
 +            <v-btn v-if="!proposalMode && !responseReceived && nodesToSubmit.length" @click="downloadRecords()">
 +                <v-icon>{{ patchDownloadMode && framedContext ? 'mdi-send' : 'mdi-download' }}</v-icon>
 +                {{ patchDownloadMode ? (framedContext ? 'Add to review' : 'Download review bundle') : 'Download RDF' }}
-@@ -109 +248,0 @@
+@@ -109,1 +231,0 @@
 -            <v-btn prepend-icon="mdi-close-box" @click="props.openCloseFn()">Close</v-btn>
-@@ -139 +278,13 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
+@@ -139,1 +260,14 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
 +import {
 +    beginReviewBundleProposal,
 +    buildReviewBundle,
++    proposalFailureGuidance,
 +    curationInstallUrl,
 +    curationSetupUrl,
 +    dispatchReviewBundle,
@@ -173,12 +156,13 @@ index 9621e55..7939e6a 100644
 +    reviewProposalTarget,
 +    reviewBundleFilename,
 +} from '@/modules/review-bundle';
-@@ -164,0 +316,4 @@ const responseFailure = ref(false);
+@@ -164,0 +299,5 @@ const responseFailure = ref(false);
++const accessStatus = ref('');
 +const proposalResult = ref(null);
 +const proposing = ref(false);
 +const reviewBundleStatus = ref(null);
 +const reviewBundleUpload = ref(null);
-@@ -174,0 +330,46 @@ const patchDownloadMode = computed(
+@@ -174,0 +314,40 @@ const patchDownloadMode = computed(
 +const proposalMode = computed(
 +    () =>
 +        patchDownloadMode.value &&
@@ -195,13 +179,7 @@ index 9621e55..7939e6a 100644
 +        proposalMode.value &&
 +        responseFailure.value &&
 +        responseErrors.value.some((error) =>
-+            [401, 403, 404].includes(Number(error.status)) ||
-+            [
-+                'authentication_required',
-+                'curator_permission_required',
-+                'github_forbidden',
-+                'github_not_found',
-+            ].includes(error.statusText)
++            proposalFailureGuidance(error.statusText) === 'installation'
 +        )
 +);
 +
@@ -225,7 +203,7 @@ index 9621e55..7939e6a 100644
 +        recordLabel,
 +    });
 +}
-@@ -191,0 +393,73 @@ function clearSubmitErrors() {
+@@ -191,0 +371,73 @@ function clearSubmitErrors() {
 +    proposalResult.value = null;
 +    proposing.value = false;
 +
@@ -299,7 +277,30 @@ index 9621e55..7939e6a 100644
 +    responseReceived.value = true;
 +    responseText.value = `The review bundle could not be created: ${error.message}`;
 +}
-@@ -192,0 +467,49 @@ function clearSubmitErrors() {
+@@ -192,0 +445,73 @@ function clearSubmitErrors() {
++async function checkGitHubAccess() {
++    proposing.value = true;
++    accessStatus.value = 'Signing in and checking repository access…';
++    try {
++        const handoff = beginReviewBundleProposal(
++            config.value.review_bundle_proposal, window, { checkOnly: true }
++        );
++        await handoff.deliver(null);
++        accessStatus.value = 'GitHub access and operation settings verified. They will be checked again when proposing.';
++        responseFailure.value = false;
++        responseReceived.value = false;
++        responseErrors.value = [];
++    } catch (error) {
++        responseFailure.value = true;
++        responseReceived.value = true;
++        accessStatus.value = 'GitHub access has not been verified.';
++        responseText.value = `GitHub access check: ${error.message}`;
++        responseErrors.value = [{ message: error.message, status: error.status ?? 'unknown', statusText: error.code ?? 'access_check_failed' }];
++    } finally {
++        proposing.value = false;
++    }
++}
++
 +async function proposeRecords() {
 +    if (framedContext) return;
 +    let handoff;
@@ -332,6 +333,7 @@ index 9621e55..7939e6a 100644
 +                : 'GitHub created the draft pull request.';
 +    } catch (error) {
 +        handoff?.cancel();
++        accessStatus.value = 'Resolve the reported problem, then check GitHub access again.';
 +        responseFailure.value = true;
 +        responseReceived.value = true;
 +        responseText.value = `The GitHub proposal could not be completed: ${error.message}`;
@@ -349,7 +351,7 @@ index 9621e55..7939e6a 100644
 +    } finally {
 +        proposing.value = false;
 +    }
-@@ -242,13 +565 @@ async function downloadRecords() {
+@@ -242,13 +567,1 @@ async function downloadRecords() {
 -            const response = await fetch(config.value.review_bundle_catalog, {
 -                cache: 'no-cache',
 -                credentials: 'omit',
@@ -364,9 +366,9 @@ index 9621e55..7939e6a 100644
 -                selectedNodes: toSubmit,
 -            });
 +            const bundle = await buildSelectedReviewBundle();
-@@ -255,0 +567 @@ async function downloadRecords() {
+@@ -255,0 +569,1 @@ async function downloadRecords() {
 +            dispatchReviewBundle(bundle);
-@@ -257,3 +569 @@ async function downloadRecords() {
+@@ -257,3 +571,1 @@ async function downloadRecords() {
 -            responseFailure.value = true;
 -            responseReceived.value = true;
 -            responseText.value = `The review bundle could not be created: ${error.message}`;

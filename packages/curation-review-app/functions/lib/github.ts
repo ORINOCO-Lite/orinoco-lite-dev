@@ -260,7 +260,7 @@ export class GitHubClient {
       throw new HttpError(
         403,
         "curator_permission_required",
-        "Repository write or admin permission is required.",
+        `Repository write or admin permission is required in ${repository}.`,
       );
     }
   }
