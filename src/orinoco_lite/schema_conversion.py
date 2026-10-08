@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import logging
 from pathlib import Path
 import sys
 from threading import RLock
@@ -40,3 +42,43 @@ def build_format_converters(schema: Path, *, writer_only: bool = False) -> tuple
         finally:
             if sys.getrecursionlimit() != previous_limit:
                 sys.setrecursionlimit(previous_limit)
+
+
+@contextmanager
+def concise_date_warning():
+    """Summarize the known placeholder-date diagnostic during validation."""
+    class DateWarningFilter(logging.Filter):
+        reported = False
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            error = record.exc_info[1] if record.exc_info else None
+            if (
+                record.getMessage().startswith(
+                    "Failed to convert Literal lexical form to value. Datatype="
+                    "https://concepts.datalad.org/s/things/v2/w3ctr-datetime,"
+                )
+                and isinstance(error, ValueError)
+                and str(error) == (
+                    "Invalid https://concepts.datalad.org/s/things/v2/"
+                    "w3ctr-datetime format: -"
+                )
+            ):
+                if self.reported:
+                    return False
+                self.reported = True
+                record.msg = (
+                    "Known issue: placeholder date '-' in metadata; "
+                    "no action needed for now."
+                )
+                record.args = ()
+                record.exc_info = None
+                record.exc_text = None
+            return True
+
+    logger = logging.getLogger("rdflib.term")
+    warning_filter = DateWarningFilter()
+    logger.addFilter(warning_filter)
+    try:
+        yield
+    finally:
+        logger.removeFilter(warning_filter)

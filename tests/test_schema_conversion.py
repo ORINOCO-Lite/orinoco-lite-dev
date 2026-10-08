@@ -94,3 +94,43 @@ def test_selected_conversion_uses_upstream_date_readback():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_placeholder_date_warning_is_concise_and_scoped(caplog, monkeypatch):
+    import logging
+
+    from dump_things_service.converter import TypeValidator
+    from rdflib import Literal, URIRef
+    from rdflib.term import _toPythonMapping
+
+    from orinoco_lite.schema_conversion import concise_date_warning
+
+    datatype = URIRef("https://concepts.datalad.org/s/things/v2/w3ctr-datetime")
+    validator = TypeValidator(str(datatype), r"^\d{4}$")
+    monkeypatch.setitem(_toPythonMapping, datatype, validator.validate)
+    with caplog.at_level(logging.WARNING, logger="rdflib.term"):
+        with concise_date_warning():
+            assert str(Literal("-", datatype=datatype)) == "-"
+            Literal("-", datatype=datatype)
+        assert len(caplog.records) == 1
+        assert caplog.messages == [
+            "Known issue: placeholder date '-' in metadata; no action needed for now."
+        ]
+        assert "Traceback" not in caplog.text
+        caplog.clear()
+        with concise_date_warning():
+            Literal("invalid", datatype=datatype)
+        assert "Traceback" in caplog.text
+        caplog.clear()
+        Literal("-", datatype=datatype)
+        assert "Traceback" in caplog.text
+
+
+def test_date_warning_scope_preserves_failures():
+    import pytest
+
+    from orinoco_lite.schema_conversion import concise_date_warning
+
+    with pytest.raises(RuntimeError, match="conversion failed"):
+        with concise_date_warning():
+            raise RuntimeError("conversion failed")
