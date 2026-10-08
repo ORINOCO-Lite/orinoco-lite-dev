@@ -77,7 +77,7 @@ The release workflow derives its mixed Conda/PyPI environment from the maintaine
 Downstream Pixi configuration supplies non-Python tools such as Hugo.
 Published dependency selections remain unchanged; the generated manifest is not maintained independently.
 We do not maintain Conda packages for Orinoco Lite or its Python dependencies.
-See [dependency management](dependency-management.md) for setup and exact-commit exceptions.
+See [dependency management](agents/dependency-management.md) for setup and exact-commit exceptions.
 
 Preserve dependencies declared by upstream submodules and let Pixi incorporate them into the complete solve.
 If those declarations conflict with the selected stack, investigate the conflict explicitly.

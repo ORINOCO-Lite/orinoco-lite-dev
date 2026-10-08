@@ -30,7 +30,7 @@ The central curation service, or an optional replacement, provides only GitHub a
 
 ## Command environment
 
-See [dependency management](docs/dependency-management.md) for editable submodule setup and release requirements.
+See [dependency management](docs/agents/dependency-management.md) for editable submodule setup and release requirements.
 
 Use Pixi 0.76 or newer; CI always installs the latest Pixi.
 Older local versions receive best-effort support without a formal version matrix.
@@ -101,7 +101,7 @@ See [upstream instantiation](docs/upstream-tracking.md).
 
 For ordinary local development in an existing downstream, `pixi run orinoco-lite dev enable` creates a local checkout at `.orinoco-lite/orinoco-lite-dev` and installs its Python dependencies editable in the downstream environment.
 The checkout is locally ignored; manifest and lock changes need no commit.
-See [dependency management](docs/dependency-management.md) for source selection and re-running enable.
+See [dependency management](docs/agents/dependency-management.md) for source selection and re-running enable.
 
 After editing bundled resource sources, run `pixi run orinoco-lite dev prepare-resources` in the engineering checkout.
 
