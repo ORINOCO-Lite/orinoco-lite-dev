@@ -251,6 +251,35 @@ def relevant_staged_changes(root: Path) -> bool:
     return False
 
 
+def write_csv(path: Path, content: str):
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", newline="", dir=path.parent, delete=False
+    ) as output:
+        output.write(content)
+        temporary = Path(output.name)
+    temporary.replace(path)
+
+
+def fix_csv(path: Path, staged: str, generated: str):
+    working = path.read_bytes()
+    if working == generated.encode("utf-8"):
+        print(
+            f"CSV fixes are already in the working file. Review and git add {CSV_PATH}, then retry.",
+            file=sys.stderr,
+        )
+    elif working != staged.encode("utf-8"):
+        print(
+            "CSV has unstaged edits; no files changed. Preserve those edits, then reconcile or stage the CSV and rerun the hook. To regenerate explicitly, run python tools/submodule_divergence.py --staged after preserving your edits.",
+            file=sys.stderr,
+        )
+    else:
+        write_csv(path, generated)
+        print(
+            f"Updated {CSV_PATH} for staged pins. Review the diff, git add {CSV_PATH}, and retry. Nothing was staged.",
+            file=sys.stderr,
+        )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument(
@@ -279,17 +308,32 @@ def main(argv=None):
         action="store_true",
         help="fail on stale CSV or any local commit subject outside the prescribed convention; never write (exit 1 for violations, 2 for errors)",
     )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="local hook: repair working CSV from staged pins and staged CSV, never stage; fail after repairs or title violations; refuse conflicting unstaged CSV edits (offline)",
+    )
     args = parser.parse_args(argv)
+    if args.fix and (args.check or args.fetch or args.prepare):
+        parser.error(
+            "--fix is offline and cannot be combined with --check, --fetch, or --prepare"
+        )
+    if args.fix:
+        args.staged = True
     if args.fetch and args.check:
         parser.error("--fetch writes a new snapshot; use --check separately")
     try:
         root = args.root.resolve()
-        if args.staged and args.check and not relevant_staged_changes(root):
+        if (
+            args.staged
+            and (args.check or args.fix)
+            and not relevant_staged_changes(root)
+        ):
             return 0
         csv_path = root / CSV_PATH
         text = (
             git(root, "show", f":{CSV_PATH}")
-            if args.staged and args.check
+            if args.staged and (args.check or args.fix)
             else csv_path.read_text(encoding="utf-8")
         )
         rows = read_rows(text)
@@ -300,9 +344,11 @@ def main(argv=None):
             generated, invalid = generate(
                 root, rows, staged=args.staged, fetch=args.fetch, prepare=args.prepare
             )
-        if args.check:
+        if args.check or args.fix:
             stale = generated != text
-            if stale:
+            if stale and args.fix:
+                fix_csv(csv_path, text, generated)
+            elif stale:
                 print(
                     "Submodule CSV is stale. Run python tools/submodule_divergence.py"
                     + (" --staged" if args.staged else "")
@@ -312,21 +358,13 @@ def main(argv=None):
             if invalid:
                 print(
                     "Local commit subjects must use <type>(<scope>): <purpose> [intent:general|integration|deployment|undecided]\n"
-                    + "\n".join(invalid),
+                    + "\n".join(invalid)
+                    + "\nThese titles cannot be fixed automatically. Review intent, deliberately reword the listed submodule commits, update/stage parent pins, and rerun the hook. No history was rewritten.",
                     file=sys.stderr,
                 )
             return int(stale or bool(invalid))
         if generated != text:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                newline="",
-                dir=csv_path.parent,
-                delete=False,
-            ) as output:
-                output.write(generated)
-                temporary = Path(output.name)
-            temporary.replace(csv_path)
+            write_csv(csv_path, generated)
         return 0
     except (OSError, ReportError, csv.Error, ValueError) as error:
         print(f"Submodule divergence: {error}", file=sys.stderr)

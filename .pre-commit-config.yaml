@@ -9,7 +9,7 @@ repos:
         exclude: '^\.agents/skills/asd-ste100-skill/'
       - id: submodule-divergence
         name: staged submodule CSV and commit titles
-        entry: python3 tools/submodule_divergence.py --staged --check
+        entry: python3 tools/submodule_divergence.py --fix
         language: system
         pass_filenames: false
         always_run: true

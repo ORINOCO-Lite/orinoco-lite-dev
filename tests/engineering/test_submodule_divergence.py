@@ -95,6 +95,67 @@ class DivergenceTests(unittest.TestCase):
         git(self.root, "add", CSV_PATH)
         self.run_script("--staged", "--check")
 
+    def test_fix_repairs_working_csv_but_never_stages_and_requires_retry(self):
+        newer = commit_file(
+            self.child, "value", "new", "fix(data): new value [intent:general]"
+        )
+        git(self.root, "add", "modules/child")
+        staged = git(self.root, "show", f":{CSV_PATH}").stdout
+        unrelated = self.root / "notes.txt"
+        unrelated.write_text("keep my notes")
+        result = self.run_script("--fix", status=1)
+        self.assertIn("Nothing was staged", result.stderr)
+        self.assertEqual(self.row()["selected_commit"], newer)
+        self.assertEqual(git(self.root, "show", f":{CSV_PATH}").stdout, staged)
+        self.assertEqual(unrelated.read_text(), "keep my notes")
+        repaired = self.csv.read_bytes()
+        result = self.run_script("--fix", status=1)
+        self.assertIn("already in the working file", result.stderr)
+        self.assertEqual(self.csv.read_bytes(), repaired)
+        git(self.root, "add", CSV_PATH)
+        self.run_script("--fix")
+
+    def test_fix_preserves_partially_staged_csv(self):
+        commit_file(self.child, "value", "new", "fix(data): new value [intent:general]")
+        git(self.root, "add", "modules/child")
+        self.csv.write_text(
+            self.csv.read_text().replace(GOOD.replace('"', '""'), "staged edit")
+        )
+        git(self.root, "add", CSV_PATH)
+        staged = git(self.root, "show", f":{CSV_PATH}").stdout
+        self.csv.write_text(self.csv.read_text() + "\n")
+        working = self.csv.read_bytes()
+        result = self.run_script("--fix", status=1)
+        self.assertIn("unstaged edits; no files changed", result.stderr)
+        self.assertEqual(self.csv.read_bytes(), working)
+        self.assertEqual(git(self.root, "show", f":{CSV_PATH}").stdout, staged)
+
+    def test_read_only_check_never_repairs(self):
+        commit_file(self.child, "value", "new", "fix(data): new value [intent:general]")
+        git(self.root, "add", "modules/child")
+        before = self.csv.read_bytes()
+        self.run_script("--staged", "--check", status=1)
+        self.assertEqual(self.csv.read_bytes(), before)
+
+    def test_fix_repairs_csv_but_leaves_invalid_history_unchanged(self):
+        invalid = commit_file(self.child, "value", "bad", "Unclassified local change")
+        git(self.root, "add", "modules/child")
+        result = self.run_script("--fix", status=1)
+        self.assertIn("Updated", result.stderr)
+        self.assertIn("cannot be fixed automatically", result.stderr)
+        self.assertIn("Unclassified local change", result.stderr)
+        self.assertEqual(git(self.child, "rev-parse", "HEAD").stdout.strip(), invalid)
+        self.assertEqual(self.row()["selected_commit"], invalid)
+        git(self.root, "add", CSV_PATH)
+        result = self.run_script("--fix", status=1)
+        self.assertIn("cannot be fixed automatically", result.stderr)
+        self.assertNotIn("Updated", result.stderr)
+
+    def test_fix_rejects_network_and_read_only_flags(self):
+        for option in ("--check", "--fetch", "--prepare"):
+            result = self.run_script("--fix", option, status=2)
+            self.assertIn("--fix is offline", result.stderr)
+
     def test_all_existing_local_titles_are_checked_but_upstream_is_exempt(self):
         commit_file(self.child, "value", "bad", "Legacy local title")
         git(self.root, "add", "modules/child")
@@ -188,6 +249,7 @@ class DivergenceTests(unittest.TestCase):
         git(self.root, "add", "README")
         git(self.root, "submodule", "deinit", "-f", "--", "modules/child")
         self.run_script("--staged", "--check")
+        self.run_script("--fix")
 
 
 if __name__ == "__main__":

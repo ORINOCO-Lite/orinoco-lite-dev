@@ -58,14 +58,20 @@ git add docs/agents/submodule-divergence.csv
 python tools/submodule_divergence.py --staged --check
 ```
 
-The pre-commit hook runs that last command when a gitlink, `.gitmodules`, the CSV, or its generator is staged.
+The parent-repository pre-commit hook runs `python tools/submodule_divergence.py --fix` when a gitlink, `.gitmodules`, the CSV, or its generator is staged.
+It repairs a stale working CSV and fails that commit attempt so you can review, stage the result, and retry; it never stages files.
+If unstaged CSV edits differ from the generated result, it refuses to overwrite them and asks you to preserve or reconcile them first.
+The pre-commit runner also protects partially staged changes through its normal stash/restore behavior.
+Unfixable title violations identify the commits that require deliberate rewording; the hook never infers intent or rewrites history.
+This is a parent-repository check of selected submodule commits, not a commit-msg hook inside each submodule.
 It compares the staged CSV to staged parent gitlinks and recursively reads the selected child commits, regardless of checkout `HEAD` or unstaged edits.
 An updated but unstaged CSV cannot satisfy the check.
 Unrelated commits do not require initialized submodules.
 
 Without `--staged`, generation and checks use committed parent gitlinks and the working CSV.
 `--prepare --check` fetches complete histories and the **recorded** upstream commits, without advancing the snapshot; CI uses this for reproducible PR checks.
-Checks return 1 for a stale CSV or invalid titles, and 2 for an operational error.
+Read-only checks return 1 for a stale CSV or invalid titles, and 2 for an operational error.
+The local `--fix` hook also returns 1 after writing repairs or when unstaged edits prevent repair; CI continues to use read-only `--check`.
 Generation writes only after every row succeeds; a failed fetch leaves the CSV unchanged.
 
 ## Daily CI
