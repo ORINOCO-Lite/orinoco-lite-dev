@@ -1,9 +1,21 @@
 repos:
   - repo: local
     hooks:
+      - id: submodule-upstream-remotes
+        name: configure submodule upstream remotes
+        entry: pixi run python tools/setup_submodule_remotes.py
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: snapper
         name: snapper semantic line breaks
-        entry: snapper --native --in-place
+        entry: pixi run snapper --native --in-place
         language: system
         files: '\.(md|markdown|rst|txt)$'
         exclude: '^\.agents/skills/asd-ste100-skill/'
+      - id: submodule-divergence
+        name: staged submodule CSV and commit titles
+        entry: pixi run python tools/submodule_divergence.py
+        language: system
+        pass_filenames: false
+        always_run: true
