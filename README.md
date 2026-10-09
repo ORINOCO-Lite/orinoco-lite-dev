@@ -28,7 +28,8 @@ A downstream provides declarative `site-specific/` inputs and optional overrides
 The static website owns `/edit/` for SHACL Vue editing and `/review/` for source-adapter decisions.
 The central curation service, or an optional replacement, provides only GitHub authentication and verified transport.
 
-See [submodule divergence](docs/agents/submodule-divergence.md) for the generated CSV of selected revisions, upstream distance, local commit subjects, and comparison pull requests.
+See [submodule divergence](docs/agents/submodule-divergence.md) for the generated CSV of selected revisions, upstream distance, local commit subjects, and comparison links.
+Run `pixi run submodule-divergence` to fetch upstream observations and refresh it.
 
 ## Command environment
 

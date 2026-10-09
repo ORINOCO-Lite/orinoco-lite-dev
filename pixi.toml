@@ -9,7 +9,8 @@ platforms = [{ platform = "osx-arm64", macos = "14.0" }, { platform = "linux-64"
 # pixi.lock is a local, untracked development resolution.
 [dependencies]
 python = "*"
-git = "*"
+# Fetch updates remote HEAD in the same request.
+git = ">=2.48"
 # The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
 hugo = "<0.156"
 
@@ -18,10 +19,12 @@ hugo = "<0.156"
 orinoco-lite = { path = ".", editable = true }
 
 [tasks]
+submodule-divergence = { cmd = "python tools/submodule_divergence.py", description = "Fetch upstream history and refresh the submodule divergence CSV" }
 records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"
 records-get = "datalad run --explicit --output sourcedata/downloaded/records.jsonl --output sourcedata/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
 
 [feature.dev.dependencies]
+gh = "*"
 nodejs = "*"
 make = "*"
 

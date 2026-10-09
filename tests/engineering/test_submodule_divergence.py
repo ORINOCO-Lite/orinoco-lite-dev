@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import csv
 import os
-import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -15,9 +13,9 @@ from tests.engineering.test_checkout_submodules import (
     git,
     init_repository,
 )
-from tools.submodule_divergence import CSV_PATH, FIELDS, read_rows
+from tools.submodule_divergence import CSV_PATH, comparison_url, read_rows
 
-SCRIPT = Path(__file__).resolve().parents[2] / "tools/submodule_divergence.py"
+ROOT = Path(__file__).resolve().parents[2]
 GOOD = 'fix(data): preserve quoted "é, x" values [intent:general]'
 
 
@@ -25,10 +23,10 @@ class DivergenceTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        directory = Path(self.temporary.name)
-        self.source = init_repository(directory / "source")
+        self.directory = Path(self.temporary.name)
+        self.source = init_repository(self.directory / "source")
         self.base = commit_file(self.source, "value", "base", "Original upstream title")
-        self.root = init_repository(directory / "parent")
+        self.root = init_repository(self.directory / "parent")
         commit_file(self.root, "README", "fixture", "Initialize fixture")
         add_submodule(self.root, self.source, "modules/child")
         git(self.root, "commit", "-am", "Record child")
@@ -37,27 +35,18 @@ class DivergenceTests(unittest.TestCase):
         git(self.child, "config", "user.email", "test@example.invalid")
         self.selected = commit_file(self.child, "value", "local", GOOD)
         git(self.root, "add", "modules/child")
-        git(self.root, "commit", "-m", "Select local change")
         self.csv = self.root / CSV_PATH
-        self.csv.parent.mkdir(parents=True)
-        with self.csv.open("w", newline="") as output:
-            writer = csv.DictWriter(output, fieldnames=FIELDS, lineterminator="\n")
-            writer.writeheader()
-            writer.writerow(
-                dict(
-                    path="modules/child",
-                    upstream_url=self.source.as_uri(),
-                    upstream_ref="HEAD",
-                    upstream_commit=self.base,
-                )
-            )
-        self.run_script()
-        git(self.root, "add", CSV_PATH)
-        git(self.root, "commit", "-m", "Record snapshot")
 
-    def run_script(self, *args, status=0):
+    def run_script(self, *args, status=0, setup=False):
+        script = "setup_submodule_remotes.py" if setup else "submodule_divergence.py"
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(self.root), *args],
+            [
+                sys.executable,
+                str(ROOT / "tools" / script),
+                "--root",
+                str(self.root),
+                *args,
+            ],
             text=True,
             capture_output=True,
             env={**os.environ, "GIT_ALLOW_PROTOCOL": "file"},
@@ -69,164 +58,162 @@ class DivergenceTests(unittest.TestCase):
     def row(self):
         return read_rows(self.csv.read_text())["modules/child"]
 
-    def test_exact_subjects_counts_noop_and_no_checkout_changes(self):
+    def test_create_without_seed_then_idempotent(self):
+        self.run_script("--no-fetch", status=1)
         first = self.csv.read_bytes()
+        self.run_script("--no-fetch")
         self.run_script("--check")
-        self.run_script()
         self.assertEqual(first, self.csv.read_bytes())
         self.assertEqual(self.row()["local_commit_subjects"], GOOD)
         self.assertEqual(self.row()["local_commits"], "1")
         self.assertEqual(self.row()["upstream_commits"], "0")
-        # An unrelated checkout HEAD must not change the parent's recorded pin.
+        self.assertEqual(git(self.root, "ls-files", "--", CSV_PATH).stdout, "")
+
+    def test_reads_staged_pins_not_child_head(self):
         git(self.child, "checkout", self.base)
-        self.run_script("--check")
+        self.run_script("--no-fetch", status=1)
         self.assertEqual(self.row()["selected_commit"], self.selected)
 
-    def test_staged_pin_requires_staged_csv_not_working_copy(self):
-        newer = commit_file(
-            self.child, "value", "new", "feat(data): add field [intent:integration]"
-        )
-        git(self.root, "add", "modules/child")
-        result = self.run_script("--staged", "--check", status=1)
-        self.assertIn("CSV is stale", result.stderr)
-        self.run_script("--staged")
-        self.assertEqual(self.row()["selected_commit"], newer)
-        self.run_script("--staged", "--check", status=1)
-        git(self.root, "add", CSV_PATH)
-        self.run_script("--staged", "--check")
+    def test_check_missing_csv_does_not_create_it(self):
+        before = git(self.child, "show-ref").stdout
+        self.run_script("--check", status=1)
+        self.assertFalse(self.csv.exists())
+        self.assertEqual(git(self.child, "show-ref").stdout, before)
 
-    def test_fix_repairs_working_csv_but_never_stages_and_requires_retry(self):
-        newer = commit_file(
-            self.child, "value", "new", "fix(data): new value [intent:general]"
-        )
-        git(self.root, "add", "modules/child")
-        staged = git(self.root, "show", f":{CSV_PATH}").stdout
-        unrelated = self.root / "notes.txt"
-        unrelated.write_text("keep my notes")
-        result = self.run_script("--fix", status=1)
-        self.assertIn("Nothing was staged", result.stderr)
-        self.assertEqual(self.row()["selected_commit"], newer)
-        self.assertEqual(git(self.root, "show", f":{CSV_PATH}").stdout, staged)
-        self.assertEqual(unrelated.read_text(), "keep my notes")
-        repaired = self.csv.read_bytes()
-        result = self.run_script("--fix", status=1)
-        self.assertIn("already in the working file", result.stderr)
-        self.assertEqual(self.csv.read_bytes(), repaired)
-        git(self.root, "add", CSV_PATH)
-        self.run_script("--fix")
+    def test_csv_is_output_even_when_malformed(self):
+        self.csv.parent.mkdir(parents=True)
+        self.csv.write_text("not configuration\n")
+        self.run_script("--check", status=1)
+        self.assertEqual(self.csv.read_text(), "not configuration\n")
+        self.run_script("--no-fetch", status=1)
+        self.assertEqual(self.row()["upstream_commit"], self.base)
 
-    def test_fix_preserves_partially_staged_csv(self):
-        commit_file(self.child, "value", "new", "fix(data): new value [intent:general]")
+    def test_all_legacy_local_titles_fail_without_repairs(self):
+        invalid = commit_file(self.child, "value", "bad", "Legacy local title")
         git(self.root, "add", "modules/child")
-        self.csv.write_text(
-            self.csv.read_text().replace(GOOD.replace('"', '""'), "staged edit")
-        )
-        git(self.root, "add", CSV_PATH)
-        staged = git(self.root, "show", f":{CSV_PATH}").stdout
-        self.csv.write_text(self.csv.read_text() + "\n")
-        working = self.csv.read_bytes()
-        result = self.run_script("--fix", status=1)
-        self.assertIn("unstaged edits; no files changed", result.stderr)
-        self.assertEqual(self.csv.read_bytes(), working)
-        self.assertEqual(git(self.root, "show", f":{CSV_PATH}").stdout, staged)
-
-    def test_read_only_check_never_repairs(self):
-        commit_file(self.child, "value", "new", "fix(data): new value [intent:general]")
-        git(self.root, "add", "modules/child")
-        before = self.csv.read_bytes()
-        self.run_script("--staged", "--check", status=1)
-        self.assertEqual(self.csv.read_bytes(), before)
-
-    def test_fix_repairs_csv_but_leaves_invalid_history_unchanged(self):
-        invalid = commit_file(self.child, "value", "bad", "Unclassified local change")
-        git(self.root, "add", "modules/child")
-        result = self.run_script("--fix", status=1)
-        self.assertIn("Updated", result.stderr)
-        self.assertIn("cannot be fixed automatically", result.stderr)
-        self.assertIn("Unclassified local change", result.stderr)
-        self.assertEqual(git(self.child, "rev-parse", "HEAD").stdout.strip(), invalid)
-        self.assertEqual(self.row()["selected_commit"], invalid)
-        git(self.root, "add", CSV_PATH)
-        result = self.run_script("--fix", status=1)
-        self.assertIn("cannot be fixed automatically", result.stderr)
-        self.assertNotIn("Updated", result.stderr)
-
-    def test_fix_rejects_network_and_read_only_flags(self):
-        for option in ("--check", "--fetch", "--prepare"):
-            result = self.run_script("--fix", option, status=2)
-            self.assertIn("--fix is offline", result.stderr)
-
-    def test_all_existing_local_titles_are_checked_but_upstream_is_exempt(self):
-        commit_file(self.child, "value", "bad", "Legacy local title")
-        git(self.root, "add", "modules/child")
-        git(self.root, "commit", "-m", "Select legacy local commit")
-        self.run_script()
-        result = self.run_script("--check", status=1)
+        self.run_script("--no-fetch", status=1)
+        result = self.run_script("--no-fetch", status=1)
         self.assertIn("Legacy local title", result.stderr)
         self.assertNotIn("Original upstream title", result.stderr)
-        self.assertNotIn("CSV is stale", result.stderr)
+        self.assertNotIn("Updated", result.stderr)
+        self.assertEqual(git(self.child, "rev-parse", "HEAD").stdout.strip(), invalid)
 
-    def test_fetch_detects_upstream_advance_and_does_not_advance_pins(self):
+    def test_upstream_ahead_is_information_not_violation(self):
         upstream = commit_file(self.source, "upstream", "new", "Upstream change")
-        self.run_script("--fetch")
+        self.run_script(status=1)
         self.assertEqual(self.row()["upstream_commit"], upstream)
         self.assertEqual(self.row()["upstream_commits"], "1")
-        self.assertEqual(self.row()["selected_commit"], self.selected)
-        before = self.csv.read_bytes()
-        self.run_script("--fetch")
-        self.assertEqual(self.csv.read_bytes(), before)
-
-    def test_failed_fetch_preserves_csv(self):
-        before = self.csv.read_text()
-        self.csv.write_text(
-            before.replace(self.source.as_uri(), self.source.as_uri() + "-missing")
+        self.run_script()
+        self.assertEqual(
+            git(self.child, "rev-parse", "HEAD").stdout.strip(), self.selected
         )
+
+    def test_shared_merge_ancestors_are_not_counted_as_local_changes(self):
+        tree = git(self.source, "rev-parse", "HEAD^{tree}").stdout.strip()
+
+        def commit(parents, title):
+            args = ["commit-tree", tree]
+            for parent in parents:
+                args += ["-p", parent]
+            return git(self.source, *args, "-m", title).stdout.strip()
+
+        left = commit([self.base], "Original upstream left")
+        right = commit([self.base], "Original upstream right")
+        local = commit([left, right], "fix(data): combine branches [intent:general]")
+        upstream = commit([right, left], "Original upstream merge")
+        git(self.source, "update-ref", "refs/heads/main", upstream)
+        git(self.source, "update-ref", "refs/heads/local", local)
+        git(self.child, "fetch", "origin")
+        git(self.root, "update-index", "--cacheinfo", "160000", local, "modules/child")
+        self.run_script(status=1)
+        row = self.row()
+        self.assertEqual(row["local_commits"], "1")
+        self.assertEqual(row["upstream_commits"], "1")
+        self.assertEqual(
+            row["local_commit_subjects"], "fix(data): combine branches [intent:general]"
+        )
+        self.run_script("--check")
+
+    def test_failed_fetch_preserves_output(self):
+        add_submodule(self.root, self.source, "modules/healthy")
+        self.run_script("--no-fetch", status=1)
         before = self.csv.read_bytes()
-        result = self.run_script("--fetch", status=2)
-        self.assertNotIn("Traceback", result.stderr)
+        git(self.child, "remote", "set-url", "origin", str(self.directory / "missing"))
+        self.run_script(status=2)
         self.assertEqual(self.csv.read_bytes(), before)
 
-    def test_unknown_new_submodule_requires_explicit_upstream(self):
+    def test_new_dependency_needs_no_csv_row(self):
         add_submodule(self.root, self.source, "modules/new")
-        result = self.run_script("--staged", status=2)
-        self.assertIn("Add a CSV row for modules/new", result.stderr)
+        self.run_script("--no-fetch", status=1)
+        self.assertIn("modules/new", read_rows(self.csv.read_text()))
 
-    def test_nested_pins_follow_selected_parent_not_checkout_head(self):
-        nested_source = init_repository(Path(self.temporary.name) / "nested")
-        nested_base = commit_file(nested_source, "nested", "base", "Upstream nested")
-        nested_pin = commit_file(
-            nested_source, "nested", "local", "fix(nested): fix value [intent:general]"
+    def test_nested_pin_and_branch_come_from_selected_parent(self):
+        source = init_repository(self.directory / "nested-source")
+        pin = commit_file(source, "nested", "stable", "Upstream nested")
+        git(source, "branch", "stable")
+        commit_file(source, "nested", "development", "Upstream development")
+        add_submodule(self.child, source, "nested")
+        nested = self.child / "nested"
+        git(nested, "checkout", pin)
+        git(
+            self.child,
+            "config",
+            "-f",
+            ".gitmodules",
+            "submodule.nested.branch",
+            "stable",
         )
-        add_submodule(self.child, nested_source, "nested")
+        git(self.child, "add", ".gitmodules", "nested")
         git(
             self.child,
             "commit",
-            "-am",
-            "build(deps): select nested dependency [intent:integration]",
+            "-m",
+            "build(deps): select nested [intent:integration]",
         )
         git(self.root, "add", "modules/child")
-        git(self.root, "commit", "-m", "Select nested parent")
-        with self.csv.open("a", newline="") as output:
-            writer = csv.DictWriter(output, fieldnames=FIELDS, lineterminator="\n")
-            writer.writerow(
-                dict(
-                    path="modules/child/nested",
-                    upstream_url=nested_source.as_uri(),
-                    upstream_ref="HEAD",
-                    upstream_commit=nested_base,
-                )
-            )
         git(self.child, "checkout", self.selected)
-        git(self.child / "nested", "checkout", nested_base)
-        self.run_script()
-        rows = read_rows(self.csv.read_text())
-        self.assertEqual(rows["modules/child/nested"]["selected_commit"], nested_pin)
+        self.run_script("--no-fetch", status=1)
+        row = read_rows(self.csv.read_text())["modules/child/nested"]
+        self.assertEqual(row["selected_commit"], pin)
+        self.assertEqual(row["upstream_ref"], "refs/heads/stable")
+        self.assertEqual(row["local_commits"], "0")
+
+    def test_fork_uses_upstream_default_not_main_or_parent_branch(self):
+        git(self.source, "branch", "-m", "master")
+        git(self.child, "remote", "add", "upstream", self.source.as_uri())
+        self.run_script(status=1)
+        self.assertEqual(self.row()["upstream_ref"], "refs/heads/master")
+        self.run_script("--no-fetch")
+        self.assertIn(
+            "compare/master...",
+            comparison_url("https://github.com/ORINOCO-Lite/example.git", "master"),
+        )
+
+    def test_fetch_updates_cached_default_when_upstream_renames_branch(self):
+        git(self.child, "remote", "add", "upstream", self.source.as_uri())
+        self.run_script(status=1)
+        self.assertEqual(self.row()["upstream_ref"], "refs/heads/main")
+        git(self.source, "branch", "-m", "new-default")
+        self.run_script(status=1)
+        self.assertEqual(self.row()["upstream_ref"], "refs/heads/new-default")
+        self.assertEqual(
+            git(
+                self.child, "symbolic-ref", "refs/remotes/upstream/HEAD"
+            ).stdout.strip(),
+            "refs/remotes/upstream/new-default",
+        )
         self.run_script("--check")
 
-    def test_shallow_clone_can_prepare_recorded_history_without_advancing_snapshot(
-        self,
-    ):
-        git(self.child, "push", self.source.as_uri(), "HEAD:refs/heads/local")
+    def test_no_fetch_explains_missing_default_ref(self):
+        git(self.child, "remote", "add", "upstream", self.source.as_uri())
+        result = self.run_script("--no-fetch", status=2)
+        self.assertIn("run without --no-fetch", result.stderr)
+        self.assertFalse(self.csv.exists())
+
+    def test_shallow_dependency_requires_fetch_and_is_completed(self):
+        import shutil
+
+        git(self.child, "push", "origin", "HEAD:refs/heads/local")
         shutil.rmtree(self.child)
         git(
             self.root,
@@ -238,35 +225,95 @@ class DivergenceTests(unittest.TestCase):
             self.source.as_uri(),
             str(self.child),
         )
-        before = self.csv.read_bytes()
         result = self.run_script("--check", status=2)
-        self.assertIn("complete history is required", result.stderr)
-        self.run_script("--prepare", "--check")
-        self.assertEqual(self.csv.read_bytes(), before)
+        self.assertIn("complete history", result.stderr)
+        # Setup expands the clone's single-branch fetch mapping.
+        self.run_script(setup=True, status=1)
+        self.run_script(status=1)
+        self.assertEqual(
+            git(self.child, "rev-parse", "--is-shallow-repository").stdout.strip(),
+            "false",
+        )
+        self.run_script("--check")
 
-    def test_unrelated_staged_change_still_requires_submodule_history(self):
-        (self.root / "README").write_text("edited")
-        git(self.root, "add", "README")
+    def test_setup_initializes_missing_checkout_then_succeeds(self):
+        # Make the selected local commit recoverable before deinitialization.
+        git(self.child, "push", "origin", "HEAD:refs/heads/local")
         git(self.root, "submodule", "deinit", "-f", "--", "modules/child")
-        for args in (("--staged", "--check"), ("--fix",)):
-            result = self.run_script(*args, status=2)
-            self.assertIn("Initialize modules/child", result.stderr)
+        self.run_script("--check", setup=True, status=2)
+        self.assertFalse((self.child / ".git").exists())
+        self.run_script(setup=True, status=1)
+        self.run_script(setup=True)
+        self.assertEqual(
+            git(self.child, "rev-parse", "HEAD").stdout.strip(), self.selected
+        )
 
-    def test_existing_invalid_history_fails_without_relevant_staged_changes(self):
-        commit_file(self.child, "value", "bad", "Legacy local title")
+    def test_setup_does_not_move_initialized_checkout(self):
+        git(self.child, "checkout", self.base)
+        self.run_script(setup=True)
+        self.assertEqual(git(self.child, "rev-parse", "HEAD").stdout.strip(), self.base)
+
+    def test_personal_fork_still_uses_german_upstream(self):
+        git(
+            self.root,
+            "config",
+            "-f",
+            ".gitmodules",
+            "submodule.modules/child.url",
+            "https://github.com/alice/query-things.git",
+        )
+        git(self.root, "add", ".gitmodules")
+        git(
+            self.child,
+            "remote",
+            "add",
+            "upstream",
+            "https://github.com/ORINOCO-Lite/query-things.git",
+        )
+        git(
+            self.child,
+            "remote",
+            "add",
+            "orinoco-lite",
+            "https://github.com/ORINOCO-Lite/query-things.git",
+        )
+        origin = git(self.child, "remote", "get-url", "origin").stdout
+        self.run_script(setup=True, status=1)
+        self.assertEqual(
+            git(self.child, "remote", "get-url", "upstream").stdout.strip(),
+            "https://hub.psychoinformatics.de/orinoco/query-things.git",
+        )
+        self.assertEqual(git(self.child, "remote", "get-url", "origin").stdout, origin)
+        self.assertEqual(
+            git(self.child, "remote", "get-url", "orinoco-lite").stdout.strip(),
+            "https://github.com/ORINOCO-Lite/query-things.git",
+        )
+        self.run_script(setup=True)
+
+    def test_setup_repairs_nested_fork_remote_and_fetch_mapping(self):
+        nested_source = init_repository(self.directory / "nested-source")
+        commit_file(nested_source, "value", "base", "Upstream")
+        add_submodule(self.child, nested_source, "nested")
+        git(
+            self.child,
+            "config",
+            "-f",
+            ".gitmodules",
+            "submodule.nested.url",
+            "https://github.com/ORINOCO-Lite/shacl-vue.git",
+        )
+        git(self.child, "add", ".gitmodules", "nested")
+        git(self.child, "commit", "-m", "build(deps): nested [intent:integration]")
         git(self.root, "add", "modules/child")
-        git(self.root, "commit", "-m", "Select legacy local change")
-        self.run_script()
-        git(self.root, "add", CSV_PATH)
-        git(self.root, "commit", "-m", "Record correct snapshot")
-        for unrelated_change in (False, True):
-            if unrelated_change:
-                (self.root / "README").write_text("edited")
-                git(self.root, "add", "README")
-            for args in (("--staged", "--check"), ("--fix",)):
-                result = self.run_script(*args, status=1)
-                self.assertIn("Legacy local title", result.stderr)
-                self.assertNotIn("CSV is stale", result.stderr)
+        nested = self.child / "nested"
+        self.run_script("--check", setup=True, status=1)
+        self.assertNotIn("upstream", git(nested, "remote").stdout)
+        self.run_script(setup=True, status=1)
+        self.assertEqual(
+            git(nested, "remote", "get-url", "upstream").stdout.strip(),
+            "https://hub.psychoinformatics.de/orinoco/shacl-vue.git",
+        )
+        self.run_script(setup=True)
 
 
 if __name__ == "__main__":

@@ -2,18 +2,24 @@
 
 [The CSV](submodule-divergence.csv) records every direct and nested submodule selected by this package.
 Gitlinks select the commits; Git history supplies descriptions, merge-bases, distances, and local commit subjects.
-The CSV owns only the original `upstream_url` and `upstream_ref` selections that are not declared by the fork gitlinks.
-Set those two fields when adding a submodule, then regenerate the other fields.
-Remove obsolete rows by regenerating after removing a gitlink.
+The CSV is generated output and can be recreated from nothing.
+The setup hook initializes missing submodules and configures confirmed fork upstreams, including nested forks such as `shacl-vue`.
+For maintained forks, `upstream` always identifies the original German Hub repository, including when the fork lives in another GitHub namespace.
+Use `orinoco-lite` for an additional remote pointing at the ORINOCO-Lite copy; `origin` can remain your own fork.
+Direct upstream dependencies such as Congo use `origin`.
+Fork comparisons follow the authoritative remote's default branch.
+Direct dependencies retain the selected parent's `.gitmodules` branch when declared, such as Congo's `stable`; otherwise they follow the remote default.
+Selected commits always come from gitlinks, never from a branch tip.
 
 `local_commit_subjects` contains exact subjects in oldest-first topological order, separated by newlines inside a quoted CSV field.
 It includes merge and revert commits; a subject list does not imply that every patch remains effective.
-`comparison_pr` links the matching open mirror comparison when available.
+`comparison_url` links the mirror branch comparison against the authoritative default branch, without requiring a hosting API.
+It is a comparison link, not confirmation that a pull request exists.
 No AI summary or inferred submission decision is generated.
 
 ## Commit titles
 
-Every commit in `merge_base..selected_commit` must use:
+Every selected commit absent from the observed upstream history (`upstream_commit..selected_commit`) must use:
 
 ```text
 <type>(<scope>): <purpose> [intent:<value>]
@@ -43,36 +49,42 @@ Rewording published history and advancing its parent pins is a separate reviewed
 
 ## Updating locally
 
-Initialize submodules with `git submodule update --init --recursive`.
-The script uses Python 3 and Git; `--fetch` also uses authenticated `gh` to find comparison PRs.
+Run both commands through Pixi, which supplies Python and Git 2.48 or newer.
+Stage intended parent gitlink changes before running them.
 
 ```console
-# Observe current upstream heads and complete histories.
-python tools/submodule_divergence.py --fetch
-
-# After staging a parent gitlink change, regenerate against those staged pins.
-python tools/submodule_divergence.py --staged
-git add docs/agents/submodule-divergence.csv
-
-# Check the exact contents that will be committed, without network access.
-python tools/submodule_divergence.py --staged --check
+pixi run python tools/setup_submodule_remotes.py
+pixi run submodule-divergence
 ```
 
-The parent-repository pre-commit hook runs `python tools/submodule_divergence.py --fix` on every invocation, including ordinary commits and explicit `pre-commit run --all-files` runs.
-It repairs a stale working CSV and fails that commit attempt so you can review, stage the result, and retry; it never stages files.
-If unstaged CSV edits differ from the generated result, it refuses to overwrite them and asks you to preserve or reconcile them first.
-The pre-commit runner also protects partially staged changes through its normal stash/restore behavior.
-Unfixable title violations identify the commits that require deliberate rewording; the hook never infers intent or rewrites history.
-This is a parent-repository check of selected submodule commits, not a commit-msg hook inside each submodule.
-It compares the staged CSV to staged parent gitlinks and recursively reads the selected child commits, regardless of checkout `HEAD` or unstaged edits.
-An updated but unstaged CSV cannot satisfy the check.
-Even unrelated commits require initialized submodules and valid selected history; an empty staged diff does not skip validation.
+Setup initializes missing checkouts and repairs remote configuration; it does not move initialized checkouts.
+It reports unknown Orinoco Lite forks for explicit upstream configuration.
+Initialization requires the containing checkout's index and working `.gitmodules` to agree with the selected dependency declaration.
+Normal report generation fetches up to eight repositories concurrently and replaces the generated CSV atomically after all observations succeed.
+Git discovers remote default branches during the same fetch.
+Neither command stages files, advances selected pins, rebases commits, or changes remote repository settings.
+Review and stage the CSV after generation.
 
-Without `--staged`, generation and checks use committed parent gitlinks and the working CSV.
-`--prepare --check` fetches complete histories and the **recorded** upstream commits, without advancing the snapshot; CI uses this for reproducible PR checks.
-Read-only checks return 1 for a stale CSV or invalid titles, and 2 for an operational error.
-The local `--fix` hook also returns 1 after writing repairs or when unstaged edits prevent repair; CI continues to use read-only `--check`.
-Generation writes only after every row succeeds; a failed fetch leaves the CSV unchanged.
+Both commands return 1 after repairs and 0 on an unchanged, valid rerun.
+The report also returns 1 for any invalid local commit title, even when the CSV is current.
+Operational errors return 2.
+Additional upstream commits are information, not title violations or a reason to repin automatically.
+Generation writes the CSV only after every row succeeds.
+
+Use `--no-fetch` on the report to use locally available upstream refs.
+It reminds you that remote changes may be missing; refresh without that option before reviewing an update.
+Missing refs or incomplete history require a fetch-enabled run.
+Use `--check` on either command to report needed repairs without changing files or Git state; report checks imply `--no-fetch`.
+
+The pre-commit hooks run setup followed by fetch-enabled report generation through Pixi on every invocation.
+Commits therefore require access to the dependency remotes; network failures stop the hook.
+The report uses staged parent gitlinks and recursively reads the selected child commits, regardless of checkout `HEAD`.
+It compares generated output to the working CSV; pre-commit's normal stash/restore behavior supplies staged file contents during commits and protects unstaged changes.
+After a repair, review and stage the CSV before retrying the commit.
+Running the script directly a second time succeeds when the working CSV is current and all titles conform.
+Existing nonconforming titles continue to fail; they require deliberate review and rewording.
+Forks that do not use this maintenance policy can opt out through pre-commit's standard `SKIP=submodule-upstream-remotes,submodule-divergence` setting.
+The daily publication job runs only in `ORINOCO-Lite/orinoco-lite-dev`.
 
 ## Daily CI
 
@@ -89,6 +101,7 @@ The workflow does not update dependency pins, advance mirror branches, merge PRs
 It explicitly dispatches validation for its new branch because PR creation with `GITHUB_TOKEN` does not trigger ordinary PR workflows.
 Enable Actions to create pull requests in repository settings; the workflow uses the job token and needs no new secret.
 
-PR validation recomputes the CSV and checks every local commit title.
+PR validation fetches upstream refs, then checks the CSV without applying repairs and validates every local commit title.
+A newly observed upstream advance can make a previously generated CSV stale.
 A correct snapshot can therefore have a failing check until legacy titles are deliberately reworded.
 To make this a merge gate, require the workflow's `check` job in the repository's branch rules.
