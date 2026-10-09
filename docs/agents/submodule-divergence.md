@@ -58,7 +58,7 @@ git add docs/agents/submodule-divergence.csv
 python tools/submodule_divergence.py --staged --check
 ```
 
-The parent-repository pre-commit hook runs `python tools/submodule_divergence.py --fix` when a gitlink, `.gitmodules`, the CSV, or its generator is staged.
+The parent-repository pre-commit hook runs `python tools/submodule_divergence.py --fix` on every invocation, including ordinary commits and explicit `pre-commit run --all-files` runs.
 It repairs a stale working CSV and fails that commit attempt so you can review, stage the result, and retry; it never stages files.
 If unstaged CSV edits differ from the generated result, it refuses to overwrite them and asks you to preserve or reconcile them first.
 The pre-commit runner also protects partially staged changes through its normal stash/restore behavior.
@@ -66,7 +66,7 @@ Unfixable title violations identify the commits that require deliberate rewordin
 This is a parent-repository check of selected submodule commits, not a commit-msg hook inside each submodule.
 It compares the staged CSV to staged parent gitlinks and recursively reads the selected child commits, regardless of checkout `HEAD` or unstaged edits.
 An updated but unstaged CSV cannot satisfy the check.
-Unrelated commits do not require initialized submodules.
+Even unrelated commits require initialized submodules and valid selected history; an empty staged diff does not skip validation.
 
 Without `--staged`, generation and checks use committed parent gitlinks and the working CSV.
 `--prepare --check` fetches complete histories and the **recorded** upstream commits, without advancing the snapshot; CI uses this for reproducible PR checks.

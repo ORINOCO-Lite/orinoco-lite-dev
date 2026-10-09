@@ -240,17 +240,6 @@ def generate(root: Path, rows, *, staged=False, fetch=False, prepare=False):
     return render(sorted(result, key=lambda row: row["path"])), invalid
 
 
-def relevant_staged_changes(root: Path) -> bool:
-    # Inspect modes as well as paths so adding/removing a gitlink triggers the hook.
-    changes = git(root, "diff", "--cached", "--raw", "--no-abbrev", "-z").split("\0")
-    for entry in changes:
-        if entry.startswith(":") and "160000" in entry[1:].split()[:2]:
-            return True
-        if entry in {CSV_PATH, ".gitmodules", "tools/submodule_divergence.py"}:
-            return True
-    return False
-
-
 def write_csv(path: Path, content: str):
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", newline="", dir=path.parent, delete=False
@@ -291,7 +280,7 @@ def main(argv=None):
     parser.add_argument(
         "--staged",
         action="store_true",
-        help="use staged parent pins; --check also reads staged CSV and skips unrelated commits",
+        help="use staged parent pins; --check also reads staged CSV",
     )
     parser.add_argument(
         "--fetch",
@@ -324,12 +313,6 @@ def main(argv=None):
         parser.error("--fetch writes a new snapshot; use --check separately")
     try:
         root = args.root.resolve()
-        if (
-            args.staged
-            and (args.check or args.fix)
-            and not relevant_staged_changes(root)
-        ):
-            return 0
         csv_path = root / CSV_PATH
         text = (
             git(root, "show", f":{CSV_PATH}")

@@ -244,12 +244,29 @@ class DivergenceTests(unittest.TestCase):
         self.run_script("--prepare", "--check")
         self.assertEqual(self.csv.read_bytes(), before)
 
-    def test_unrelated_staged_change_does_not_require_submodule_history(self):
+    def test_unrelated_staged_change_still_requires_submodule_history(self):
         (self.root / "README").write_text("edited")
         git(self.root, "add", "README")
         git(self.root, "submodule", "deinit", "-f", "--", "modules/child")
-        self.run_script("--staged", "--check")
-        self.run_script("--fix")
+        for args in (("--staged", "--check"), ("--fix",)):
+            result = self.run_script(*args, status=2)
+            self.assertIn("Initialize modules/child", result.stderr)
+
+    def test_existing_invalid_history_fails_without_relevant_staged_changes(self):
+        commit_file(self.child, "value", "bad", "Legacy local title")
+        git(self.root, "add", "modules/child")
+        git(self.root, "commit", "-m", "Select legacy local change")
+        self.run_script()
+        git(self.root, "add", CSV_PATH)
+        git(self.root, "commit", "-m", "Record correct snapshot")
+        for unrelated_change in (False, True):
+            if unrelated_change:
+                (self.root / "README").write_text("edited")
+                git(self.root, "add", "README")
+            for args in (("--staged", "--check"), ("--fix",)):
+                result = self.run_script(*args, status=1)
+                self.assertIn("Legacy local title", result.stderr)
+                self.assertNotIn("CSV is stale", result.stderr)
 
 
 if __name__ == "__main__":
