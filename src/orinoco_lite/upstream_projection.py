@@ -6,10 +6,8 @@ The service and client own lookup and pagination behavior.
 
 from __future__ import annotations
 
-from contextlib import ExitStack
 import socket
 import json
-import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -85,104 +83,57 @@ def render_graph(records: str, presentation: Path) -> str:
 
 
 def project(records_path: Path, presentation: Path, output: Path, resources_root: Path | None = None) -> dict:
-    """Run query-things commands from the selected upstream workflow."""
+    """Execute inspected upstream shell blocks against the local Pool."""
     from .record_stages import _check_record_input
+    from .projection_blocks import adjust_for_lite, parse_workflow, BlockExecutionError
+    from .upstream_service import local_service, selected_schema
+    from dump_things_pyclient import communicate
+    import shutil
+
     _check_record_input(records_path)
-    try:
-        from click.testing import CliRunner
-        from query_things.cli import main
-        from dump_things_pyclient import communicate
-    except ImportError as error:
-        raise DriverError(
-            "The selected query-things dependencies are unavailable; reinstall "
-            "orinoco-lite in the active environment."
-        ) from error
-    records = [item.record for item in load_jsonl(records_path)]
-    steps = workflow_steps(presentation)
+    records = load_jsonl(records_path)
+    pipeline = adjust_for_lite(parse_workflow(
+        presentation / '.forgejo/workflows/update-from-pool.yaml'))
     root_pid = homepage_pid(presentation)
-    route_prefix = root_pid.split(":", 1)[0] + ":"
-    runner = CliRunner()
+    for item in records:
+        if item.pid != root_pid:
+            # Check route safety without imposing Lite's own page-selection policy.
+            prefix = item.pid.split(':', 1)[0] + ':'
+            _route_for_pid(item.pid, prefix)
     output.mkdir(parents=True, exist_ok=True)
-    (output / "content").mkdir(exist_ok=True)
-    (output / "static").mkdir(exist_ok=True)
-    commands = []
-    original_cwd = Path.cwd()
-    try:
-        with tempfile.TemporaryDirectory(prefix="orinoco-query-") as temporary, ExitStack() as services:
-            scratch = Path(temporary)
-            from .upstream_service import local_service
-            from .upstream_service import selected_schema
-            with socket.socket() as listener:
-                listener.bind(("127.0.0.1", 0))
-                port = listener.getsockname()[1]
-            # The selected SQLite backend applies search patterns in storage;
-            # the file backend scans all records for each incoming-link query.
-            service = services.enter_context(local_service(
-                scratch / "service", selected_schema(resources_root), port=port, backend="sqlite+stl"))
+    with tempfile.TemporaryDirectory(prefix='orinoco-projection-') as temporary:
+        scratch = Path(temporary)
+        for name in ('page_templates', 'code'):
+            shutil.copytree(presentation / name, scratch / name)
+        for name in ('content', 'static'):
+            (scratch / name).mkdir()
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            port = listener.getsockname()[1]
+        with local_service(scratch / 'service', selected_schema(resources_root),
+                           port=port, backend='sqlite+stl') as service:
             with communicate.get_session() as session:
-                for item in load_jsonl(records_path):
+                for item in records:
                     try:
-                        communicate.curated_write_record(service.url, "public", item.class_name,
+                        communicate.curated_write_record(service.url, 'public', item.class_name,
                             item.record, token=service.token, session=session)
                     except communicate.HTTPError as error:
-                        raise DriverError(f"Cannot load {item.pid} into the selected service: {error.response.text}") from error
-            os.chdir(scratch)
-            environment = {
-                "QRI_RECORD_CACHE": str(scratch / "cache.json"),
-                "DUMPTHINGS_APIURL": service.url,
-            }
-
-            def invoke(arguments, stream=""):
-                result = runner.invoke(main, arguments, input=stream, env=environment)
-                if result.exit_code:
-                    raise DriverError(
-                        f"query-things {' '.join(arguments)} failed: "
-                        f"{result.output.strip()} ({result.exception})"
-                    )
-                commands.append(["query-things", *arguments])
-                return result.stdout
-
-            raw = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
-            invoke(["cache"], raw)
-            render_steps = 0
-            for step in steps:
-                run = step.get("run", "").replace("\\\n", " ")
-                if not run.lstrip().startswith("query-things "):
-                    continue
-                stream = ""
-                for pipe in run.strip().split("|"):
-                    arguments = shlex.split(pipe.strip())
-                    if arguments[:2] == ["jq", "-r"]:
-                        if arguments != ["jq", "-r", ".pid", ">", "localfolk.pids"]:
-                            raise DriverError("Unsupported selected upstream member-list pipeline")
-                        (scratch / "localfolk.pids").write_text("".join(
-                            json.loads(line)["pid"] + "\n" for line in stream.splitlines() if line
-                        ))
-                        continue
-                    if not arguments or arguments.pop(0) != "query-things":
-                        raise DriverError("Unsupported operation in selected upstream projection pipeline")
-                    if arguments[0] == "render-record":
-                        for line in stream.splitlines():
-                            if line:
-                                pid = json.loads(line)["pid"]
-                                if pid != root_pid:
-                                    _route_for_pid(pid, route_prefix)
-                        arguments[1] = str(presentation / arguments[1])
-                        for index in range(2, len(arguments)):
-                            value = Path(arguments[index])
-                            if value.is_absolute() or ".." in value.parts or value.parts[0] != "content":
-                                raise DriverError("Upstream render output must remain under content/")
-                            arguments[index] = str(output / value)
-                        render_steps += 1
-                    stream = invoke(arguments, stream)
-            if not render_steps:
-                raise DriverError("Selected upstream workflow has no supported render-record operations")
-            (output / "static/graph.json").write_text(render_graph(raw, presentation))
-    finally:
-        os.chdir(original_cwd)
-    (output / "records.jsonl").write_text(raw)
-    return {"records": len(records), "pages": len(list((output / "content").rglob("*.md"))),
-            "operations": commands, "lookup": "temporary service populated from retained records"}
+                        raise DriverError(f'Cannot load {item.pid} into the selected service: {error.response.text}') from error
+            try:
+                operations = pipeline.execute(cwd=scratch, environment={
+                    'DUMPTHINGS_APIURL': service.url,
+                    'QRI_RECORD_CACHE': str(scratch / 'cache.json'),
+                }, stdout=sys.stderr)
+            except BlockExecutionError as error:
+                raise DriverError(str(error)) from error
+        for name in ('content', 'static'):
+            shutil.copytree(scratch / name, output / name, dirs_exist_ok=True)
+    raw = ''.join(json.dumps(item.record, ensure_ascii=False) + '\n' for item in records)
+    (output / 'records.jsonl').write_text(raw)
+    graph = json.loads((output / 'static/graph.json').read_text())
+    return {'records': len(records), 'pages': len(list((output / 'content').rglob('*.md'))),
+            'graph_nodes': len(graph['nodes']), 'graph_edges': len(graph['edges']),
+            'operations': operations, 'lookup': 'temporary service populated from retained records'}
 
 
 if __name__ == "__main__":

@@ -108,7 +108,7 @@ class CodeBlock:
     def __repr__(self) -> str:
         return self.display()
 
-    def execute(self, *, cwd: Path, environment: dict[str, str] | None = None) -> bool:
+    def execute(self, *, cwd: Path, environment: dict[str, str] | None = None, stdout=None) -> bool:
         """Run adjusted shell text; return False for an empty block."""
         if not self.adjusted.strip():
             return False
@@ -118,7 +118,7 @@ class CodeBlock:
             env.update(environment)
         try:
             subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', self.adjusted],
-                           cwd=cwd, env=env, check=True)
+                           cwd=cwd, env=env, stdout=stdout, check=True)
         except subprocess.CalledProcessError as error:
             raise BlockExecutionError(self.name, error.returncode) from error
         return True
@@ -158,10 +158,10 @@ class Pipeline:
         """Select and order blocks by name or one-based workflow number."""
         return Pipeline(tuple(self[selector] for selector in selectors))
 
-    def execute(self, *, cwd: Path, environment: dict[str, str] | None = None) -> list[str]:
+    def execute(self, *, cwd: Path, environment: dict[str, str] | None = None, stdout=None) -> list[str]:
         """Execute in order with shared files; stop at the first failure."""
         return [block.name for block in self.blocks
-                if block.execute(cwd=cwd, environment=environment)]
+                if block.execute(cwd=cwd, environment=environment, stdout=stdout)]
 
 
 def parse_workflow(path: Path, *, job: str = 'create_pages') -> Pipeline:

@@ -8,6 +8,8 @@ platforms = [{ platform = "osx-arm64", macos = "14.0" }, { platform = "linux-64"
 # Explain exceptions beside their declaration.
 # pixi.lock is a local, untracked development resolution.
 [dependencies]
+bash = "*"
+jq = "*"
 python = "*"
 git = "*"
 # The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
@@ -22,8 +24,6 @@ records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/re
 records-get = "datalad run --explicit --output sourcedata/downloaded/records.jsonl --output sourcedata/downloaded/records.jsonl.manifest.json orinoco-lite dev records get"
 
 [feature.dev.dependencies]
-bash = "*"
-jq = "*"
 nodejs = "*"
 make = "*"
 

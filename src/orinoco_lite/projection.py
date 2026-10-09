@@ -216,9 +216,9 @@ def render_projection(workspace, resources_root, output, *, records_input=None,
         report = {"records": len(records)}
     with tempfile.TemporaryDirectory(prefix="orinoco-projection-input-") as temporary:
         source = Path(temporary) / "records.jsonl"
-        source.write_text(_record_stream(records))
+        source.write_text(_record_stream(joined))
         result = run_upstream(source, presentation, output, resources_root=resources_root)
-    # Machine provenance remains in the exported record stream, not rendered prose.
+    # Retain complete records in the Pool and exported record stream.
     (output / "records.jsonl").write_text(_record_stream(joined))
     return {**report, "pages": result["pages"]}
 
