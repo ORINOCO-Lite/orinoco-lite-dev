@@ -20,7 +20,7 @@ def test_adjustment_history_keeps_raw_and_intermediate_states():
     assert '+printf adjusted' in block.diff()
     restored = block.replace('adjusted', 'original', reason='Restore')
     assert len(restored.adjustments) == 2
-    assert restored.diff() == '(unchanged)\n'
+    assert restored.diff() == ' printf original\n'
     assert 'First change' in restored.display('adjustments')
     assert 'Restore' in restored.display('adjustments')
     assert '[diff]' in repr(block)
@@ -131,8 +131,9 @@ def test_closed_output_pipe_has_no_traceback(tmp_path):
 def test_default_is_unified_diff_and_color_is_optional():
     result = cli('show', 'Update navigation graph')
     assert result.returncode == 0
-    assert '--- Update navigation graph: raw' in result.stdout
-    assert '+++ Update navigation graph: adjusted' in result.stdout
+    assert '=== 4. Update navigation graph ===' in result.stdout
+    assert '---' not in result.stdout
+    assert '+++' not in result.stdout
     assert '[raw]' not in result.stdout
     assert '\033[' not in result.stdout
     result = cli('show', 'Update navigation graph', '--color', 'always')
@@ -142,3 +143,27 @@ def test_default_is_unified_diff_and_color_is_optional():
     assert '\033[' not in result.stdout
     result = cli('show', 'Update navigation graph', '--json', '--color', 'always')
     assert '\033' not in json.loads(result.stdout)[0]['diff']
+
+
+def test_numbers_are_stable_after_selection_and_work_in_cli():
+    pipeline = adjust_for_lite(parse_workflow(WORKFLOW))
+    assert pipeline[4].name == 'Update navigation graph'
+    assert pipeline['4'] == pipeline['Update navigation graph']
+    selected = pipeline.chain(5, 'Update navigation graph')
+    assert [block.number for block in selected.blocks] == [5, 4]
+    assert selected[4].name == 'Update navigation graph'
+    assert cli('show', '4').stdout == cli('show', 'Update navigation graph').stdout
+    assert '=== 4. Update navigation graph ===' in cli('list').stdout
+    assert cli('show', '0').returncode == 1
+
+
+def test_diff_displays_full_unchanged_context_without_headers():
+    raw = ''.join(f'line {i}\n' for i in range(30))
+    block = CodeBlock('Long', raw).replace('line 15\n', 'replacement\n', reason='Change middle')
+    diff = block.diff()
+    assert ' line 0\n' in diff
+    assert ' line 29\n' in diff
+    assert '-line 15\n' in diff
+    assert '+replacement\n' in diff
+    assert '---' not in diff and '+++' not in diff
+    assert all(f' line {i}\n' in CodeBlock('Unchanged', raw).diff() for i in range(30))

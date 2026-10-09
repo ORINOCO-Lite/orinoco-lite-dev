@@ -24,18 +24,20 @@ class Adjustment:
     before: str
     after: str
 
-    def diff(self, name: str) -> str:
-        return _diff(self.before, self.after, f'{name}: before', f'{name}: after')
+    def diff(self) -> str:
+        return _diff(self.before, self.after)
 
 
-def _diff(before: str, after: str, before_name: str, after_name: str) -> str:
+def _diff(before: str, after: str) -> str:
+    before_lines = [line + '\n' for line in before.splitlines()]
+    after_lines = [line + '\n' for line in after.splitlines()]
     if before == after:
-        return '(unchanged)\n'
-    return ''.join(difflib.unified_diff(
-        [line + '\n' for line in before.splitlines()],
-        [line + '\n' for line in after.splitlines()],
-        fromfile=before_name, tofile=after_name,
+        return ''.join(' ' + line for line in before_lines) or '(empty)\n'
+    # Keep the entire block as context, without synthetic file headers.
+    lines = list(difflib.unified_diff(
+        before_lines, after_lines, n=max(len(before_lines), len(after_lines)),
     ))
+    return ''.join(lines[2:])
 
 
 def _color_diff(text: str) -> str:
@@ -58,6 +60,7 @@ class CodeBlock:
     raw: str
     adjustments: tuple[Adjustment, ...] = ()
     uses: str | None = None
+    number: int | None = None
 
     @property
     def adjusted(self) -> str:
@@ -73,17 +76,17 @@ class CodeBlock:
         ))
 
     def diff(self) -> str:
-        return _diff(self.raw, self.adjusted, f'{self.name}: raw', f'{self.name}: adjusted')
+        return _diff(self.raw, self.adjusted)
 
     def display(self, view: str = 'diff', *, color: bool = False) -> str:
         views = ('raw', 'adjustments', 'adjusted', 'diff') if view == 'all' else (view,)
-        sections = [f'=== {self.name} ===']
+        sections = [self.heading]
         if self.uses:
             sections.append(f'uses: {self.uses} (no shell block)')
         for current in views:
             if current == 'adjustments':
                 text = ''.join(
-                    f'{i}. {item.reason}\n{item.diff(self.name)}'
+                    f'{i}. {item.reason}\n{item.diff()}'
                     for i, item in enumerate(self.adjustments, 1)
                 ) or '(none)\n'
             elif current == 'diff':
@@ -96,6 +99,11 @@ class CodeBlock:
                 text = _color_diff(text)
             sections.append(f'[{current}]\n{text.rstrip()}')
         return '\n'.join(sections) + '\n'
+
+    @property
+    def heading(self) -> str:
+        prefix = f'{self.number}. ' if self.number is not None else ''
+        return f'=== {prefix}{self.name} ==='
 
     def __repr__(self) -> str:
         return self.display()
@@ -127,17 +135,28 @@ class Pipeline:
     blocks: tuple[CodeBlock, ...]
 
     def __post_init__(self):
+        object.__setattr__(self, 'blocks', tuple(
+            replace(block, number=i) if block.number is None else block
+            for i, block in enumerate(self.blocks, 1)
+        ))
         names = [block.name for block in self.blocks]
         if len(set(names)) != len(names):
             raise ValueError('Block names must be unique')
 
-    def chain(self, *names: str) -> Pipeline:
-        """Select and order blocks explicitly by name, before any execution."""
-        blocks = {block.name: block for block in self.blocks}
-        unknown = [name for name in names if name not in blocks]
-        if unknown:
-            raise ValueError(f'Unknown block name: {unknown[0]}')
-        return Pipeline(tuple(blocks[name] for name in names))
+    def __getitem__(self, selector: str | int) -> CodeBlock:
+        """Look up a name or stable one-based workflow number."""
+        for block in self.blocks:
+            if block.name == selector:
+                return block
+        number = int(selector) if str(selector).isdigit() else None
+        for block in self.blocks:
+            if number is not None and block.number == number:
+                return block
+        raise ValueError(f'Unknown block name or number: {selector}')
+
+    def chain(self, *selectors: str | int) -> Pipeline:
+        """Select and order blocks by name or one-based workflow number."""
+        return Pipeline(tuple(self[selector] for selector in selectors))
 
     def execute(self, *, cwd: Path, environment: dict[str, str] | None = None) -> list[str]:
         """Execute in order with shared files; stop at the first failure."""
@@ -208,14 +227,14 @@ def main(argv=None) -> int:
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('list', help='list block names in execution order')
     show = commands.add_parser('show', help='show block text and changes; defaults to unified diffs for all blocks')
-    show.add_argument('names', nargs='*', help='exact block names, in the requested order')
+    show.add_argument('names', nargs='*', help='block names or one-based workflow numbers, in the requested order')
     show.add_argument('--view', choices=('raw', 'adjustments', 'adjusted', 'diff', 'all'), default='diff',
                       help='display state (diff is a unified raw-to-adjusted diff; default: diff)')
     show.add_argument('--color', choices=('auto', 'always', 'never'), default='auto',
                       help='red deletions and green additions (default: auto for terminals; respects NO_COLOR)')
     show.add_argument('--json', action='store_true', help='emit block states and adjustment history as JSON')
     run = commands.add_parser('run', help='execute adjusted shell in a prepared directory; empty blocks are skipped')
-    run.add_argument('names', nargs='*', help='exact block names; defaults to the complete named chain')
+    run.add_argument('names', nargs='*', help='block names or one-based workflow numbers; defaults to the complete chain')
     run.add_argument('--cwd', type=Path, required=True,
                      help='prepared directory with code/, page_templates/, content/, static/; '
                           'set DUMPTHINGS_APIURL and QRI_RECORD_CACHE in the environment')
@@ -228,11 +247,11 @@ def main(argv=None) -> int:
             pipeline = pipeline.chain(*args.names)
         if args.command == 'list':
             for block in pipeline.blocks:
-                print(block.name)
+                print(block.heading)
         elif args.command == 'show':
             if args.json:
                 print(json.dumps([{
-                    'name': block.name, 'uses': block.uses, 'raw': block.raw,
+                    'number': block.number, 'name': block.name, 'uses': block.uses, 'raw': block.raw,
                     'adjusted': block.adjusted, 'diff': block.diff(),
                     'adjustments': [dict(reason=a.reason, before=a.before, after=a.after)
                                     for a in block.adjustments],
