@@ -44,7 +44,7 @@ A revert also needs a prescribed title describing its purpose and intent.
 
 The check covers **all existing and future local divergence commits**, including merges and reverts, without a legacy exemption.
 Original upstream commits are outside this range and are not subject to Orinoco's title policy.
-Existing nonconforming titles currently fail deliberately; this change does not rewrite them.
+Nonconforming titles fail validation.
 Rewording published history and advancing its parent pins is a separate reviewed operation.
 
 ## Updating locally
@@ -103,5 +103,5 @@ Enable Actions to create pull requests in repository settings; the workflow uses
 
 PR validation fetches upstream refs, then checks the CSV without applying repairs and validates every local commit title.
 A newly observed upstream advance can make a previously generated CSV stale.
-A correct snapshot can therefore have a failing check until legacy titles are deliberately reworded.
+A correct snapshot can still fail validation if selected local titles do not conform.
 To make this a merge gate, require the workflow's `check` job in the repository's branch rules.
