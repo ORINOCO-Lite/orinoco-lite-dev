@@ -16,6 +16,9 @@ from urllib.parse import quote
 CSV_PATH = "docs/agents/submodule-divergence.csv"
 FIELDS = (
     "path",
+    "local_commits",
+    "upstream_commits",
+    "local_commit_subjects",
     "upstream_url",
     "upstream_ref",
     "selected_commit",
@@ -24,9 +27,6 @@ FIELDS = (
     "merge_base_description",
     "upstream_commit",
     "upstream_description",
-    "local_commits",
-    "upstream_commits",
-    "local_commit_subjects",
     "comparison_url",
 )
 SUBJECT = re.compile(
