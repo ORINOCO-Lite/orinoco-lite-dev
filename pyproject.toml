@@ -45,8 +45,9 @@ runtime = [
   "query-things",
   "datalad-concepts",
   "Jinja2",
-  "linkml",
-  "linkml-runtime",
+  # LinkML 1.12 emits inherited predicates that the pinned service cannot read.
+  "linkml<1.12",
+  "linkml-runtime<1.12",
   "packaging",
   "pydantic",
   "pyoxigraph",
