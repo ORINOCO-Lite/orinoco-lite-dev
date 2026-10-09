@@ -38,6 +38,15 @@ def _diff(before: str, after: str, before_name: str, after_name: str) -> str:
     ))
 
 
+def _color_diff(text: str) -> str:
+    lines = []
+    for line in text.splitlines(keepends=True):
+        shade = '\033[31m' if line.startswith('-') else '\033[32m' if line.startswith('+') else ''
+        lines.append(shade + line.rstrip('\n') + '\033[0m' + ('\n' if line.endswith('\n') else '')
+                     if shade else line)
+    return ''.join(lines)
+
+
 @dataclass(frozen=True, repr=False)
 class CodeBlock:
     """A workflow step's run text and ordered text adjustments.
@@ -66,7 +75,7 @@ class CodeBlock:
     def diff(self) -> str:
         return _diff(self.raw, self.adjusted, f'{self.name}: raw', f'{self.name}: adjusted')
 
-    def display(self, view: str = 'all') -> str:
+    def display(self, view: str = 'diff', *, color: bool = False) -> str:
         views = ('raw', 'adjustments', 'adjusted', 'diff') if view == 'all' else (view,)
         sections = [f'=== {self.name} ===']
         if self.uses:
@@ -83,6 +92,8 @@ class CodeBlock:
                 text = getattr(self, current) or '(empty)\n'
             else:
                 raise ValueError(f'Unknown view: {current}')
+            if color and current in ('diff', 'adjustments'):
+                text = _color_diff(text)
             sections.append(f'[{current}]\n{text.rstrip()}')
         return '\n'.join(sections) + '\n'
 
@@ -196,9 +207,12 @@ def main(argv=None) -> int:
                         help='inspect unadjusted blocks; run also includes setup and publishing commands')
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('list', help='list block names in execution order')
-    show = commands.add_parser('show', help='show block text and changes; defaults to all blocks and states')
+    show = commands.add_parser('show', help='show block text and changes; defaults to unified diffs for all blocks')
     show.add_argument('names', nargs='*', help='exact block names, in the requested order')
-    show.add_argument('--view', choices=('raw', 'adjustments', 'adjusted', 'diff', 'all'), default='all')
+    show.add_argument('--view', choices=('raw', 'adjustments', 'adjusted', 'diff', 'all'), default='diff',
+                      help='display state (diff is a unified raw-to-adjusted diff; default: diff)')
+    show.add_argument('--color', choices=('auto', 'always', 'never'), default='auto',
+                      help='red deletions and green additions (default: auto for terminals; respects NO_COLOR)')
     show.add_argument('--json', action='store_true', help='emit block states and adjustment history as JSON')
     run = commands.add_parser('run', help='execute adjusted shell in a prepared directory; empty blocks are skipped')
     run.add_argument('names', nargs='*', help='exact block names; defaults to the complete named chain')
@@ -224,8 +238,11 @@ def main(argv=None) -> int:
                                     for a in block.adjustments],
                 } for block in pipeline.blocks], ensure_ascii=False, indent=2))
             else:
+                color = args.color == 'always' or (args.color == 'auto'
+                        and sys.stdout.isatty() and 'NO_COLOR' not in os.environ
+                        and os.environ.get('TERM') != 'dumb')
                 for block in pipeline.blocks:
-                    print(block.display(args.view), end='')
+                    print(block.display(args.view, color=color), end='')
         else:
             pipeline.execute(cwd=args.cwd.resolve())
         sys.stdout.flush()

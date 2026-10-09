@@ -23,7 +23,9 @@ def test_adjustment_history_keeps_raw_and_intermediate_states():
     assert restored.diff() == '(unchanged)\n'
     assert 'First change' in restored.display('adjustments')
     assert 'Restore' in restored.display('adjustments')
-    assert all(f'[{view}]' in repr(block) for view in ('raw', 'adjustments', 'adjusted', 'diff'))
+    assert '[diff]' in repr(block)
+    assert '[raw]' not in repr(block)
+    assert all(f'[{view}]' in block.display('all') for view in ('raw', 'adjustments', 'adjusted', 'diff'))
     with pytest.raises(ValueError, match='exactly once'):
         block.replace('missing', '', reason='Drift')
 
@@ -124,3 +126,19 @@ def test_closed_output_pipe_has_no_traceback(tmp_path):
     stderr = process.stderr.read().decode()
     assert process.wait(timeout=10) == 1
     assert 'Traceback' not in stderr
+
+
+def test_default_is_unified_diff_and_color_is_optional():
+    result = cli('show', 'Update navigation graph')
+    assert result.returncode == 0
+    assert '--- Update navigation graph: raw' in result.stdout
+    assert '+++ Update navigation graph: adjusted' in result.stdout
+    assert '[raw]' not in result.stdout
+    assert '\033[' not in result.stdout
+    result = cli('show', 'Update navigation graph', '--color', 'always')
+    assert '\033[31m-&& git annex add static\033[0m' in result.stdout
+    assert '\033[32m+&& mv static/graph.json_new static/graph.json\033[0m' in result.stdout
+    result = cli('show', 'Update navigation graph', '--color', 'never')
+    assert '\033[' not in result.stdout
+    result = cli('show', 'Update navigation graph', '--json', '--color', 'always')
+    assert '\033' not in json.loads(result.stdout)[0]['diff']
