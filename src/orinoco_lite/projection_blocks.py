@@ -184,24 +184,10 @@ def parse_workflow(path: Path, *, job: str = 'create_pages') -> Pipeline:
     return Pipeline(tuple(blocks))
 
 
-# Names make the selected workflow order and every Lite adjustment inspectable.
-# Page selection and pipeline commands remain in the upstream file.
-LITE_BLOCKS = (
-    'Checkout project', 'Prepare environment', 'git-annex init',
-    'Update navigation graph', 'Install jq', 'Identify project members',
-    'Update objectives', 'Update topics', 'Update persons', 'Update projects',
-    'Update publications', 'Update instruments', 'Update datasets',
-    'Update frontpage', 'Deposit changes', 'Deposit annex keys',
-)
-
-
 def adjust_for_lite(pipeline: Pipeline) -> Pipeline:
-    ordered = pipeline.chain(*LITE_BLOCKS)
-    extra = set(block.name for block in pipeline.blocks) - set(LITE_BLOCKS)
-    if extra:
-        raise ValueError(f'Unreviewed upstream block: {sorted(extra)[0]}')
+    """Apply text adjustments while preserving upstream blocks and order."""
     adjusted = []
-    for block in ordered.blocks:
+    for block in pipeline.blocks:
         if not block.raw.strip():
             adjusted.append(block)
             continue
@@ -234,7 +220,7 @@ def main(argv=None) -> int:
                       help='red deletions and green additions (default: auto for terminals; respects NO_COLOR)')
     show.add_argument('--json', action='store_true', help='emit block states and adjustment history as JSON')
     run = commands.add_parser('run', help='execute adjusted shell in a prepared directory; empty blocks are skipped')
-    run.add_argument('names', nargs='*', help='block names or one-based workflow numbers; defaults to the complete chain')
+    run.add_argument('names', nargs='*', help='block names or one-based workflow numbers; defaults to workflow order')
     run.add_argument('--cwd', type=Path, required=True,
                      help='prepared directory with code/, page_templates/, content/, static/; '
                           'set DUMPTHINGS_APIURL and QRI_RECORD_CACHE in the environment')

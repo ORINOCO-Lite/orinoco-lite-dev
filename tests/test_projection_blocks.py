@@ -167,3 +167,17 @@ def test_diff_displays_full_unchanged_context_without_headers():
     assert '+replacement\n' in diff
     assert '---' not in diff and '+++' not in diff
     assert all(f' line {i}\n' in CodeBlock('Unchanged', raw).diff() for i in range(30))
+
+
+def test_lite_adjustments_preserve_new_blocks_and_upstream_order():
+    pipeline = Pipeline((
+        CodeBlock('New upstream projection', 'printf new\n'),
+        CodeBlock('Install jq', 'apt install jq\n'),
+        CodeBlock('Renamed page block', 'printf page\n'),
+    ))
+    adjusted = adjust_for_lite(pipeline)
+    assert [block.name for block in adjusted.blocks] == [block.name for block in pipeline.blocks]
+    assert [block.number for block in adjusted.blocks] == [1, 2, 3]
+    assert adjusted[1].adjusted == 'printf new\n'
+    assert adjusted[2].adjusted == ''
+    assert adjusted[3].adjusted == 'printf page\n'
