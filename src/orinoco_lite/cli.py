@@ -100,8 +100,13 @@ def _parser() -> argparse.ArgumentParser:
                      "build/hugo-projection for inspection or further processing. This does "
                      "not build HTML. For a website preview, use build, which performs this step automatically."),
     )
-    projection.add_argument("projection_command", choices=("update",))
     projection.add_argument("--no-cache", action="store_true", help="repeat metadata checks and regenerate intermediate output rather than reuse cached results")
+    projection_commands = projection.add_subparsers(dest="projection_command", required=True)
+    update = projection_commands.add_parser("update", help="generate intermediate metadata pages and graph data")
+    update.add_argument("--no-cache", action="store_true", default=argparse.SUPPRESS,
+                        help="repeat metadata checks and regenerate intermediate output")
+    from . import projection_blocks
+    projection_blocks.register(projection_commands)
 
     run = commands.add_parser("run", help="run an advanced release driver")
     run.add_argument("driver")
@@ -347,6 +352,9 @@ def _editor(args: argparse.Namespace) -> int:
 
 
 def _projection(args: argparse.Namespace) -> int:
+    if args.projection_command == "blocks":
+        from . import projection_blocks
+        return projection_blocks.execute(args)
     workspace, resources = _resolve(args)
     validate_workspace(workspace)
     return _update_projection(args, workspace, resources)

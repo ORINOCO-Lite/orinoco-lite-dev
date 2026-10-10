@@ -57,6 +57,9 @@ A downstream development installation uses a local checkout with its nested subm
 Contributors develop package and template changes in ordinary downstreams through the same package CLI used for deployment.
 An editable package checkout lets downstream developers test improvements and contribute reusable Python code and pytest tests back to the package; scaffold and Orinoco Hugo adaptations belong in the template.
 Setup, building, and serving remain separate operations, without parallel development renderers or custom test runners.
+Ordinary builds and diagnostic comparisons call the same stage implementations.
+Projection runs the selected German `www-from-model` workflow against a temporary Pool populated from Git records; the deployed website remains static.
+Complete-build comparisons invoke the ordinary build command, including validation, application binding, and requested publication outputs.
 This development loop must work with representative site inputs; establishing how closely Lite tracks the upstream deployment is a separate validation effort.
 Upstream website reproduction always uses downstream development mode with `.orinoco-lite/orinoco-lite-dev` tracked as a Git submodule.
 Its nested `www-from-model` checkout supplies authored inputs and Annex media; ordinary downstream builds require only the bundled rendering subset.
@@ -217,6 +220,8 @@ Reusable adapter primitives belong in Orinoco Lite or the template.
 
 Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` rendering resources to generate the graph and Hugo pages.
 Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
+Projection executes that source's Forgejo workflow shell blocks in upstream order.
+`orinoco-lite projection blocks show` displays the upstream text and every shell adjustment used by execution; `--view raw` shows the unchanged source.
 Hugo assets come from the same checkout through Git Annex, without a template overlay.
 Both installation modes reuse unchanged projections, accounting for editable dependency source changes, and preserve Hugo resource caches between clean website builds.
 The template declares the minimum package version required by its adaptation and workflows; downstreams select an exact compatible package release or commit independently.

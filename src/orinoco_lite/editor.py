@@ -90,19 +90,19 @@ def record_catalog(
 ) -> dict[str, Any]:
     """Return coordinates for records editable under the projection plan."""
 
-    # Import here so projection and editor can share record loading without a
-    # module cycle. Editability is declarative, never inferred from a second
-    # filesystem category.
-    from .projection import load_contract
+    from .projection import reject_projection_override, _record_stream
+    from .upstream_projection import render_graph
+    from .resources import resolve_resources
+    from .www_from_model import resolve_www_from_model
 
-    contract = load_contract(workspace, www_from_model_root)
-    editable_classes = set(contract.pages) | set(contract.graph_node_classes)
-
+    reject_projection_override(workspace)
+    presentation = www_from_model_root or resolve_www_from_model(workspace.root, resolve_resources().root)
+    sources = record_sources(workspace)
+    graph = json.loads(render_graph(_record_stream([yaml.safe_load(s["content"]) for s in sources]), presentation))
+    editable_pids = {node["id"] for node in graph["nodes"]}
     records = [
         {key: source[key] for key in ("path", "pid", "schema_type", "sha256")}
-        for source in record_sources(workspace)
-        if source["pid"] == contract.homepage_pid
-        or source["schema_type"] in editable_classes
+        for source in sources if source["pid"] in editable_pids
     ]
     return {
         "format": CATALOG_FORMAT,
@@ -279,8 +279,7 @@ def bind_editor(
     repository: str | None = None,
     service_origin: str | None = None,
 ) -> dict[str, Any]:
-    from .www_from_model import resolve_www_from_model
-    from .projection import load_contract
+    from .projection import _www_from_model_root
 
     shell = resources_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
@@ -298,17 +297,10 @@ def bind_editor(
             raise DriverError(f"Package editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    www_from_model_root = None
-    if not (workspace.path("site") / "projection.yaml").is_file():
-        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
-    contract = load_contract(workspace, www_from_model_root)
+    www_from_model_root = _www_from_model_root(workspace, resources_root)
     all_sources = record_sources(workspace)
     catalog = record_catalog(workspace, www_from_model_root)
-    if contract.editor_record_scope == "editable":
-        editable_pids = {entry["pid"] for entry in catalog["records"]}
-        sources = [source for source in all_sources if source["pid"] in editable_pids]
-    else:
-        sources = all_sources
+    sources = all_sources
     json_to_rdf, _ = _converters(
         resources_root / "schema/demo-research-information/unreleased.yaml"
     )
@@ -330,7 +322,7 @@ def bind_editor(
         "catalog_format": CATALOG_FORMAT,
         "editable_records": len(catalog["records"]),
         "loaded_records": len(sources),
-        "record_scope": contract.editor_record_scope,
+        "record_scope": "all",
         "source_commit": catalog["source_commit"],
         "source_records": len(all_sources),
         "version": VERSION,
@@ -447,11 +439,9 @@ def validate_bundle(
     resources_root: Path,
     bundle: Mapping[str, Any],
 ) -> dict[Path, str]:
-    from .www_from_model import resolve_www_from_model
+    from .projection import _www_from_model_root
 
-    www_from_model_root = None
-    if not (workspace.path("site") / "projection.yaml").is_file():
-        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
+    www_from_model_root = _www_from_model_root(workspace, resources_root)
     catalog = record_catalog(workspace, www_from_model_root)
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")

@@ -69,6 +69,10 @@ def _www_from_model(root: Path) -> Path:
         "print('{\"nodes\": [], \"edges\": []}')\n",
         encoding="utf-8",
     )
+    workflow = upstream / ".forgejo/workflows/update-from-pool.yaml"
+    workflow.parent.mkdir(parents=True, exist_ok=True)
+    prefix = "example:" if 'record_prefix = "example:"' in (root / "pyproject.toml").read_text() or "record_prefix = 'example:'" in (root / "pyproject.toml").read_text() else "xyzrins:"
+    workflow.write_text(("jobs:\n  create_pages:\n    steps:\n      - run: query-things list --pid example:site-root | query-things render-record page_templates/homepage.md.j2 content/_index.md\n").replace("example:", prefix))
     return upstream
 
 
@@ -282,23 +286,6 @@ class HugoCompatibilityTests(unittest.TestCase):
             (site_root / "projection-tools/graph.py").write_text(
                 "print('{}')\n", encoding="utf-8"
             )
-            (site_root / "projection.yaml").write_text(
-                "version: 2\n"
-                "routing:\n"
-                "  strip_prefix: 'example:'\n"
-                "homepage:\n"
-                "  pid: example:site-root\n"
-                "  template: site-specific/projection-templates/homepage.md.j2\n"
-                "pages:\n"
-                "  xyzri:XYZProject:\n"
-                "    template: site-specific/projection-templates/project.md.j2\n"
-                "unrendered_classes: []\n"
-                "graph:\n"
-                "  producer: site-specific/projection-tools/graph.py\n"
-                "  node_classes: []\n"
-                "  relationship_fields: []\n",
-                encoding="utf-8",
-            )
             (site_root / "static").mkdir(parents=True)
             records = site_root / "metadata/records/XYZProject"
             records.mkdir(parents=True)
@@ -400,23 +387,6 @@ class HugoCompatibilityTests(unittest.TestCase):
                 )
             (site_root / "projection-tools/graph.py").write_text(
                 "print('{}')\n", encoding="utf-8"
-            )
-            (site_root / "projection.yaml").write_text(
-                "version: 2\n"
-                "routing:\n"
-                "  strip_prefix: 'example:'\n"
-                "homepage:\n"
-                "  pid: example:site-root\n"
-                "  template: site-specific/projection-templates/homepage.md.j2\n"
-                "pages:\n"
-                "  xyzri:XYZProject:\n"
-                "    template: site-specific/projection-templates/project.md.j2\n"
-                "unrendered_classes: []\n"
-                "graph:\n"
-                "  producer: site-specific/projection-tools/graph.py\n"
-                "  node_classes: []\n"
-                "  relationship_fields: []\n",
-                encoding="utf-8",
             )
             adapter = root / ".orinoco-lite/hugo-adapter"
             templates = adapter / "content-templates"
@@ -522,6 +492,7 @@ class HugoCompatibilityTests(unittest.TestCase):
             config = root / "pyproject.toml"
             config.write_text(CONFIG, encoding="utf-8")
             _write_site_data(root)
+            (root / "build/hugo-projection/content").mkdir(parents=True)
             resources = root / "resources"
             adapter = resources / "drivers" / "adapt_pages.py"
             adapter.parent.mkdir(parents=True)
@@ -620,8 +591,9 @@ def test_hugo_reuses_resource_cache_between_clean_builds(tmp_path):
     config.write_text(CONFIG)
     _write_site_data(tmp_path)
     color = bytes([255, 0, 0])
+    (tmp_path / "build/hugo-projection/content").mkdir(parents=True)
 
-    def assemble(workspace, resources, assembly):
+    def assemble(workspace, resources, assembly, **kwargs):
         def chunk(kind, data):
             return (struct.pack("!I", len(data)) + kind + data
                     + struct.pack("!I", zlib.crc32(kind + data)))
