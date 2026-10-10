@@ -1,0 +1,33 @@
+path,local_commits,upstream_commits,local_commit_subjects,upstream_url,upstream_ref,selected_commit,selected_description,merge_base,merge_base_description,upstream_commit,upstream_description,comparison_url
+submodules/dump-things-pyclient,0,0,,https://hub.psychoinformatics.de/orinoco/dump-things-pyclient.git,refs/heads/master,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,
+submodules/dump-things-service,0,51,,https://hub.psychoinformatics.de/orinoco/dump-things-service.git,refs/heads/master,9f101d97c7f15d491f602db5a9c33ad9a19ad8bf,6.3.6,9f101d97c7f15d491f602db5a9c33ad9a19ad8bf,6.3.6,eb514eb47c5a117871a3b83cf7795b308e2d82b5,6.6.3,
+submodules/pool.psychoinformatics.de-ui,13,2,"Track local service deployment configuration
+Copy external YAML configuration into UI builds
+Bundle the deployment schema assets
+Declare the upstream record namespace
+Use local git-annex service for deployment
+Point nested dependencies at leej3 mirrors
+build(deps): update shacl-vue dependency
+feat(editor): pin static review bundle export
+fix(build): reset runtime plugins before bundling
+chore(git): move SHACL Vue mirror to ORINOCO-Lite
+test(editor): pin static navigation regression coverage
+fix(editor): pin the corrected static navigation call
+fix(editor): pin static related-record service isolation",https://hub.psychoinformatics.de/www/pool.psychoinformatics.de-ui.git,refs/heads/main,05bc40c3bf0d21b97bf6c5ce91f107c3c231717b,05bc40c3bf0d,4543dfe9956eb53bb99b4fcccc6f0c85f05bc2d4,4543dfe9956e,d05057af747ed73d4687dbf5e006ab93322bc304,d05057af747e,https://github.com/ORINOCO-Lite/pool.psychoinformatics.de-ui/compare/main...orinoco-lite-diff
+submodules/pool.psychoinformatics.de-ui/shacl-vue,6,16,"Fix show-all-fields ref initialization
+build(deps): refresh frontend dependencies
+feat(editor): add static review bundle export
+test(editor): cover static navigation after upstream rebase
+fix(editor): pass the token reset callback in navigation order
+fix(editor): keep related-record lookups local in static mode",https://hub.psychoinformatics.de/orinoco/shacl-vue.git,refs/heads/main,2d6e07412bb490491efa103b72cf093ef8934675,2d6e07412bb4,992d7bb1e1a0646d769e0b9e47424f770b8473ef,992d7bb1e1a0,94f28278115fe034658d41c6794d60bdde40bc49,94f28278115f,https://github.com/ORINOCO-Lite/shacl-vue/compare/main...orinoco-lite-diff
+submodules/query-things,1,0,remove hard-coded git source,https://hub.psychoinformatics.de/orinoco/query-things.git,refs/heads/main,8efe2c03e383f595ee48abc59f5571fcd478e1d8,8efe2c03e383,16ab3732555844d62bfd21260decae0f666c4cf7,16ab37325558,16ab3732555844d62bfd21260decae0f666c4cf7,16ab37325558,https://github.com/ORINOCO-Lite/query-things/compare/main...orinoco-lite-diff
+submodules/things-enrichment-tools,0,0,,https://hub.psychoinformatics.de/orinoco/things-enrichment-tools.git,refs/heads/main,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,
+submodules/things-schemas,0,0,,https://hub.psychoinformatics.de/orinoco/things-schemas.git,refs/heads/main,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,
+submodules/www-from-model,7,3,"fix(theme): retain Congo compatibility with Hugo 0.161
+fix(publications): display retained issued dates
+chore(git): remove the mutable Congo branch hint
+fix(navigation): show menu labels on mobile
+Revert ""fix(theme): retain Congo compatibility with Hugo 0.161""
+Revert ""chore(git): remove the mutable Congo branch hint""
+fix(site): resolve graph assets beneath the site base URL",https://hub.psychoinformatics.de/www/www-from-model.git,refs/heads/main,31d7b254c93a4a65613632fd6e1df71b32a20fd0,31d7b254c93a,dc2a3f2d4734cdd16b33bbcdd654687f809ef29a,dc2a3f2d4734,ff686cc41f6e51500d3033be9691209926bf4aa0,ff686cc41f6e,https://github.com/ORINOCO-Lite/www-from-model/compare/main...orinoco-lite-diff
+submodules/www-from-model/themes/congo,0,66,,https://github.com/jpanther/congo.git,refs/heads/stable,3623fa505ee42fee899844d94a4ff7f5a1ae9096,v2.13.0,3623fa505ee42fee899844d94a4ff7f5a1ae9096,v2.13.0,87dd58ce29e71f210d57dd356055b7b97f528ec3,v2.14.0,
