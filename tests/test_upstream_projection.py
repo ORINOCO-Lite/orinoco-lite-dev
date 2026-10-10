@@ -56,3 +56,29 @@ def test_missing_required_lookup_cannot_report_success(tmp_path):
     source, capture = fixture(tmp_path, homepage=False)
     with pytest.raises(DriverError, match="Update persons.*status 1"):
         run_upstream(capture, source, tmp_path / "projection")
+
+
+def test_nonmember_http_pid_is_retained_without_becoming_a_page(tmp_path):
+    source, capture = fixture(tmp_path)
+    pid = 'https://example.org/people/other'
+    capture.write_text(capture.read_text().replace('xyzrins:persons/other', pid))
+    output = tmp_path / 'projection'
+
+    report = run_upstream(capture, source, output)
+
+    assert report['pages'] == 2
+    assert {path.relative_to(output / 'content').as_posix()
+            for path in (output / 'content').rglob('*.md')} == {
+        '_index.md', 'persons/local/_index.md',
+    }
+    assert pid in {json.loads(line)['pid']
+                   for line in (output / 'records.jsonl').read_text().splitlines()}
+
+
+def test_parent_traversal_cannot_escape_upstream_content(tmp_path):
+    source, capture = fixture(tmp_path)
+    capture.write_text(capture.read_text().replace(
+        'xyzrins:persons/local', 'xyzrins:../outside'))
+
+    with pytest.raises(DriverError, match='PID escapes upstream content directory'):
+        run_upstream(capture, source, tmp_path / 'projection')

@@ -169,29 +169,6 @@ def _projection_cache_key(
     return digest.hexdigest()
 
 
-def _unsafe_route_text(route: str) -> bool:
-    return (
-        any(ord(character) < 32 or ord(character) == 127 for character in route)
-        or any(character in route for character in '\\?#{}<>\"\'')
-        or any(part in {"", ".", ".."} for part in route.split("/"))
-    )
-
-
-def _route_for_pid(pid: str, prefix: str) -> str:
-    if not pid.startswith(prefix):
-        raise DriverError(f"Renderable record PID is outside routing.strip_prefix: {pid}")
-    route = pid.removeprefix(prefix)
-    decoded = route
-    while True:
-        expanded = unquote(decoded)
-        if expanded == decoded:
-            break
-        decoded = expanded
-    if not route or _unsafe_route_text(route) or _unsafe_route_text(decoded):
-        raise DriverError(f"Renderable record has an unsafe route: {pid}")
-    return route
-
-
 @progress("Projecting records with the upstream workflow and temporary Pool")
 def render_projection(workspace, resources_root, output, *, records_input=None,
                       www_from_model_root=None):
