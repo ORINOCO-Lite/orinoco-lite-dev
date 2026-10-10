@@ -79,15 +79,12 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
+In a fresh engineering checkout, initialize its recursive submodules before installing the Pixi environment:
 
 ``` console
-git submodule update --init -- \
-  submodules/pool.psychoinformatics.de-ui submodules/things-schemas \
-  submodules/query-things submodules/www-from-model
-git -C submodules/pool.psychoinformatics.de-ui submodule update --init -- shacl-vue
-orinoco-lite dev prepare-resources
-pytest
+python3 tools/setup_submodule_remotes.py
+pixi run orinoco-lite dev prepare-resources
+pixi run pytest
 ```
 
 Package versions come from Git tags through Versioneer.
@@ -118,7 +115,10 @@ Edit them there directly; they do not require APM or a setup hook.
 Do not add a package manager, manifest, lock, bootstrap task, or agent hook while every skill is owned by this repository.
 Introduce dependency management only when the project first consumes an independently maintained promoted skill; the chosen setup mechanism remains a downstream preference.
 
-Initialize the remaining engineering submodules only when broader cross-component work needs them:
+The setup command initializes missing submodules and configures the authoritative `upstream` remotes for known mirrors.
+It preserves existing working checkouts and `origin` URLs; `--check` reports required setup without changing Git state.
+Run it before Pixi because the editable package depends on local submodule sources.
+To deliberately reset every submodule to its recorded gitlink and fetch full history, use:
 
 ``` console
 python tools/checkout_submodules.py
