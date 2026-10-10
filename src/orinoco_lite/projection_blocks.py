@@ -5,7 +5,6 @@ Each block runs in a separate Bash process, as a workflow run step does.
 """
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass, replace
 import difflib
 import json
@@ -15,7 +14,7 @@ import subprocess
 import sys
 
 
-WORKFLOW = Path('submodules/www-from-model/.forgejo/workflows/update-from-pool.yaml')
+WORKFLOW = Path('.forgejo/workflows/update-from-pool.yaml')
 
 
 @dataclass(frozen=True)
@@ -203,14 +202,19 @@ def adjust_for_lite(pipeline: Pipeline) -> Pipeline:
     return Pipeline(tuple(adjusted))
 
 
-def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--workflow', type=Path, default=WORKFLOW,
-                        help=f'upstream YAML file (default: {WORKFLOW})')
+def register(commands) -> None:
+    parser = commands.add_parser(
+        'blocks', help='inspect or execute upstream projection shell blocks',
+        description='Inspect the same upstream workflow and explicit adjustments used by projection. '
+                    'Installed packages use the bundled workflow; editable installs use the selected '
+                    'www-from-model submodule, including working edits. No site configuration is required.',
+    )
+    parser.add_argument('--workflow', type=Path,
+                        help='inspect or run an explicit YAML file instead of the selected upstream workflow')
     parser.add_argument('--job', default='create_pages')
     parser.add_argument('--upstream', action='store_true',
                         help='inspect unadjusted blocks; run also includes setup and publishing commands')
-    commands = parser.add_subparsers(dest='command', required=True)
+    commands = parser.add_subparsers(dest='blocks_command', required=True)
     commands.add_parser('list', help='list block names in execution order')
     show = commands.add_parser('show', help='show block text and changes; defaults to unified diffs for all blocks')
     show.add_argument('names', nargs='*', help='block names or one-based workflow numbers, in the requested order')
@@ -224,17 +228,24 @@ def main(argv=None) -> int:
     run.add_argument('--cwd', type=Path, required=True,
                      help='prepared directory with code/, page_templates/, content/, static/; '
                           'set DUMPTHINGS_APIURL and QRI_RECORD_CACHE in the environment')
-    args = parser.parse_args(argv)
+
+
+def execute(args) -> int:
     try:
-        pipeline = parse_workflow(args.workflow, job=args.job)
+        if args.workflow is None:
+            from .www_from_model import resolve_www_from_model
+            workflow = resolve_www_from_model(args.root or Path.cwd()) / WORKFLOW
+        else:
+            workflow = args.workflow
+        pipeline = parse_workflow(workflow, job=args.job)
         if not args.upstream:
             pipeline = adjust_for_lite(pipeline)
         if getattr(args, 'names', None):
             pipeline = pipeline.chain(*args.names)
-        if args.command == 'list':
+        if args.blocks_command == 'list':
             for block in pipeline.blocks:
                 print(block.heading)
-        elif args.command == 'show':
+        elif args.blocks_command == 'show':
             if args.json:
                 print(json.dumps([{
                     'number': block.number, 'name': block.name, 'uses': block.uses, 'raw': block.raw,
@@ -253,18 +264,14 @@ def main(argv=None) -> int:
         sys.stdout.flush()
         return 0
     except BlockExecutionError as error:
-        print(f'projection-blocks: {error}', file=sys.stderr)
+        print(f'orinoco-lite projection blocks: {error}', file=sys.stderr)
         return error.returncode if error.returncode > 0 else 128 - error.returncode
     except BrokenPipeError:
         with open(os.devnull, 'w') as sink:
             os.dup2(sink.fileno(), sys.stdout.fileno())
         return 1
     except (OSError, ValueError) as error:
-        print(f'projection-blocks: {error}', file=sys.stderr)
+        print(f'orinoco-lite projection blocks: {error}', file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())

@@ -2,13 +2,14 @@
 import json
 from pathlib import Path
 import subprocess
-import sys
 
 import pytest
 
 from orinoco_lite.projection_blocks import (
-    BlockExecutionError, CodeBlock, Pipeline, WORKFLOW, adjust_for_lite, parse_workflow,
+    BlockExecutionError, CodeBlock, Pipeline, adjust_for_lite, parse_workflow,
 )
+
+WORKFLOW = Path(__file__).resolve().parents[1] / 'submodules/www-from-model/.forgejo/workflows/update-from-pool.yaml'
 
 
 def test_adjustment_history_keeps_raw_and_intermediate_states():
@@ -70,7 +71,7 @@ def test_duplicate_names_and_unnamed_steps_are_rejected(tmp_path):
 
 
 def cli(*arguments, cwd=None):
-    return subprocess.run([sys.executable, '-m', 'orinoco_lite.projection_blocks', *arguments],
+    return subprocess.run(['orinoco-lite', 'projection', 'blocks', *arguments],
                           cwd=cwd, capture_output=True, text=True)
 
 
@@ -118,7 +119,7 @@ def test_closed_output_pipe_has_no_traceback(tmp_path):
     workflow.write_text(yaml.safe_dump({'jobs': {'create_pages': {'steps': [
         {'name': 'Large', 'run': 'printf hello\n' * 100000},
     ]}}}))
-    process = subprocess.Popen([sys.executable, '-m', 'orinoco_lite.projection_blocks',
+    process = subprocess.Popen(['orinoco-lite', 'projection', 'blocks',
                                '--workflow', str(workflow), '--upstream', 'show', '--view', 'raw'],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     process.stdout.read(64)
@@ -181,3 +182,45 @@ def test_lite_adjustments_preserve_new_blocks_and_upstream_order():
     assert adjusted[1].adjusted == 'printf new\n'
     assert adjusted[2].adjusted == ''
     assert adjusted[3].adjusted == 'printf page\n'
+
+
+@pytest.mark.parametrize('editable', [False, True])
+def test_default_inspection_uses_build_source_outside_a_site(tmp_path, monkeypatch, capsys, editable):
+    from orinoco_lite import cli as public_cli, resources, www_from_model
+    resource_root = tmp_path / 'resources'
+    resource_root.mkdir()
+    checkout = tmp_path / 'checkout'
+    selected = (checkout / 'submodules/www-from-model' if editable
+                else resource_root / 'www-from-model')
+    selected.mkdir(parents=True)
+    if editable:
+        (selected / '.git').write_text('gitdir: selected-source\n')
+    else:
+        (selected / 'page_templates').mkdir()
+        (selected / 'themes/congo').mkdir(parents=True)
+        (selected / 'themes/congo/theme.toml').write_text('name = "congo"\n')
+    workflow = selected / '.forgejo/workflows/update-from-pool.yaml'
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text('jobs:\n  create_pages:\n    steps:\n      - name: Selected source\n        run: printf selected\n')
+    def bundled_resources():
+        assert not editable, 'Dev inspection must not require prepared package resources'
+        return resources.PackageResources(resource_root)
+    monkeypatch.setattr(resources, 'resolve_resources', bundled_resources)
+    monkeypatch.setattr(www_from_model, 'editable_package_checkout', lambda: checkout if editable else None)
+    monkeypatch.chdir(tmp_path)
+    assert public_cli.main(['projection', 'blocks', 'show', '--json']) == 0
+    output = capsys.readouterr()
+    assert output.err == ''
+    assert json.loads(output.out)[0]['raw'] == 'printf selected'
+    if editable:
+        workflow.write_text(workflow.read_text().replace('printf selected', 'printf edited'))
+        assert public_cli.main(['projection', 'blocks', 'show', '--json']) == 0
+        assert json.loads(capsys.readouterr().out)[0]['raw'] == 'printf edited'
+
+
+def test_missing_workflow_is_a_concise_cli_error(tmp_path):
+    result = cli('--workflow', str(tmp_path / 'missing.yaml'), 'list', cwd=tmp_path)
+    assert result.returncode == 1
+    assert result.stdout == ''
+    assert 'missing.yaml' in result.stderr
+    assert 'Traceback' not in result.stderr

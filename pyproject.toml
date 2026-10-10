@@ -61,7 +61,12 @@ package-dir = { "" = "src" }
 script-files = ["scripts/orinoco-lite-populate-upstream.sh"]
 
 [tool.setuptools.package-data]
-orinoco_lite = ["_resources/**/*", "_resources/www-from-model/.forgejo/workflows/update-from-pool.yaml"]
+# Setuptools globs omit dot-directories. Ship the selected upstream workflow
+# verbatim alongside the other runtime resources for installed-wheel projection.
+orinoco_lite = [
+  "_resources/**/*",
+  "_resources/www-from-model/.forgejo/workflows/update-from-pool.yaml",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

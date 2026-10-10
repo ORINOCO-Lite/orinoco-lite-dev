@@ -17,7 +17,6 @@ import tempfile
 import yaml
 
 from .errors import DriverError
-from .projection import _route_for_pid
 from .upstream_snapshot import load_jsonl
 
 
@@ -94,15 +93,17 @@ def project(records_path: Path, presentation: Path, output: Path, resources_root
     records = load_jsonl(records_path)
     pipeline = adjust_for_lite(parse_workflow(
         presentation / '.forgejo/workflows/update-from-pool.yaml'))
-    root_pid = homepage_pid(presentation)
-    for item in records:
-        if item.pid != root_pid:
-            # Check route safety without imposing Lite's own page-selection policy.
-            prefix = item.pid.split(':', 1)[0] + ':'
-            _route_for_pid(item.pid, prefix)
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='orinoco-projection-') as temporary:
         scratch = Path(temporary)
+        # Upstream interpolates PID suffixes into this literal filename.
+        # Check filesystem containment without imposing URL or page-selection rules.
+        content_root = (scratch / 'content').resolve()
+        for item in records:
+            suffix = item.pid.partition(':')[2]
+            target = (scratch / f'content/{suffix}/_index.md').resolve()
+            if not target.is_relative_to(content_root):
+                raise DriverError(f'Record PID escapes upstream content directory: {item.pid}')
         for name in ('page_templates', 'code'):
             shutil.copytree(presentation / name, scratch / name)
         for name in ('content', 'static'):

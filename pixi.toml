@@ -35,7 +35,6 @@ pre-commit = "*"
 pytest = "*"
 
 [feature.dev.tasks]
-projection-blocks = "python -m orinoco_lite.projection_blocks"
 build-package = "python -m build --outdir build/package"
 setup-upstream = "bash tools/setup-upstream.sh"
 install-hooks = "git config core.hooksPath .githooks"

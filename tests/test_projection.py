@@ -12,7 +12,7 @@ from orinoco_lite.canonical import canonical_yaml
 from orinoco_lite.config import load_workspace
 from orinoco_lite.editor import _render_rdf_sources
 from orinoco_lite.errors import ConfigurationError, DriverError
-from orinoco_lite.projection import update_projection, validate_inputs, _route_for_pid
+from orinoco_lite.projection import update_projection, validate_inputs
 from orinoco_lite.records import record_sources
 from orinoco_lite.resources import resolve_resources
 from orinoco_lite.schema_conversion import build_format_converters
@@ -35,12 +35,6 @@ def test_override_fails_before_projection_or_cache(workspace):
     with pytest.raises(ConfigurationError, match="Remove this file"):
         update_projection(workspace, resolve_resources().root)
     assert not (workspace.path("build") / "hugo-projection").exists()
-
-
-@pytest.mark.parametrize("suffix", ["../escape", "%2e%2e/escape", "a//b", "a?b", "a#b", "%252e%252e/escape", "a\\b"])
-def test_routes_cannot_escape_output(suffix):
-    with pytest.raises(DriverError, match="unsafe route"):
-        _route_for_pid("xyzrins:" + suffix, "xyzrins:")
 
 
 def test_cache_validation_and_transactional_install(workspace, monkeypatch):
