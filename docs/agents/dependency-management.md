@@ -9,12 +9,12 @@ Gitlinks select dependency revisions; editable installs use working-tree edits.
 The build backend derives fixed Git requirements from committed gitlinks and writes them into release metadata, including source archives.
 Downstreams need no repeated source pins or overrides.
 [`pixi.toml`](../../pixi.toml) selects the package and external tools.
-Keep development `pixi.lock` local and untracked; release CI tests locked consumer environments.
+Keep development `pixi.lock` local and untracked.
+Retain exact resolutions for failure investigation and, when offered, tested release installation artifacts; a wheel does not consume a separate Pixi lock.
 
-Fix hard-coded dependency URLs in the declaring package where possible: declare the package name and necessary compatibility constraints, and let the consumer select its source.
-Check why the URL was required before removing it.
-uv root overrides do not propagate from installed dependencies; document any unavoidable override.
-Commit dependency fixes and their parent gitlinks before sharing them.
+Use the [upstream-convergence skill](../../.agents/skills/upstream-convergence/SKILL.md) for recursive ecosystem source selection, moving Git dependencies, compatibility exceptions, and fresh-solve validation.
+The [design charter](../project-design.md#design-principles) defines the strategy.
+Development constraints belong visibly in `pixi.toml`; restrictions needed by installed packages must also reach published Python metadata. uv root overrides do not propagate from installed dependencies.
 
 ## Package development
 

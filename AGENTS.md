@@ -51,7 +51,8 @@
 - Across the package and template, CI installs the latest Pixi without a version pin; manifests require `>=0.76` without an upper bound.
   Keep the package development `pixi.lock` local and untracked; allow Pixi to resolve dependencies in development and engineering CI.
   Unset inherited `PIXI_LOCKED` in development shells.
-  Generate and test release consumer locks with locked installation; do not restore Pixi pins to work around lock serialization changes.
+  Follow `.agents/skills/upstream-convergence/SKILL.md` for recursive source selection, compatibility exceptions, and fresh developer solves.
+  Test offered release consumer locks separately; do not restore Pixi pins to work around lock serialization changes.
 - Use `.agents/skills/review-terminology/SKILL.md` before establishing or changing shared component or interface terminology, or when a term denotes different things across code, configuration, and guidance.
   Delegate its exploratory review to a sub-agent and use the returned recommendations to resolve naming before implementation depends on it.
 - Inspect the selected upstream dependency's API or CLI before implementing functionality it may already provide, and use that functionality where applicable.

@@ -302,11 +302,18 @@ The normative contracts define the precise behavior:
 - **Keep people and Git in control.**
   Automation only reads external sources.
   It produces proposals, people make explicit choices, and Git supplies durable history and recovery.
+- **Select sources precisely; test dependency compatibility.**
+  Track the Orinoco repositories needed by supported operations recursively, including code, schemas, templates, and workflow helpers reached through other components.
+  Git submodules select immutable commits; execution and packaged resources must honor those selections.
+  Let third-party release dependencies resolve within their declared constraints, but replace moving Git references with an explicit release or immutable commit.
+  Keep temporary compatibility restrictions visible at the top level with their reason.
+  Frequently test a fresh developer setup and dependency solve against observable behavior.
+  Development lockfiles stay local and untracked; retain resolved environments as failure evidence or optional tested release-installation artifacts.
+  Packaged releases may constrain dependencies more tightly; ordinary package installation does not automatically consume a separate lockfile.
 - **Record each fact once.**
-  Gitlinks record source revisions, Python metadata declares Python requirements, `pixi.toml` selects the environment, and `pixi.lock` records its resolution.
-  A separate release lock is unnecessary.
-  Change history belongs in Git and GitHub.
-  Do not add parallel ledgers or inventories merely for explanation or proof.
+  Gitlinks select ecosystem sources, Python metadata declares package requirements, and `pixi.toml` selects the development environment.
+  Locks record particular resolutions rather than a second source-selection policy.
+  Change history belongs in Git and GitHub; do not add parallel ledgers or inventories.
 - **Keep tool layers explicit.**
   Pixi supplies environments and convenient tasks.
   Package-selection commands deliberately update those environments; ordinary website and adapter commands use the active downstream environment.
