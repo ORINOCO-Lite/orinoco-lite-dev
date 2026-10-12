@@ -279,8 +279,7 @@ def bind_editor(
     repository: str | None = None,
     service_origin: str | None = None,
 ) -> dict[str, Any]:
-    from .www_from_model import resolve_www_from_model
-    from .projection import load_contract
+    from .projection import _www_from_model_root, load_contract
 
     shell = resources_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
@@ -298,9 +297,7 @@ def bind_editor(
             raise DriverError(f"Package editor schema resource is missing: {name}")
         shutil.copyfile(source, destination / name)
 
-    www_from_model_root = None
-    if not (workspace.path("site") / "projection.yaml").is_file():
-        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
+    www_from_model_root = _www_from_model_root(workspace, resources_root)
     contract = load_contract(workspace, www_from_model_root)
     all_sources = record_sources(workspace)
     catalog = record_catalog(workspace, www_from_model_root)

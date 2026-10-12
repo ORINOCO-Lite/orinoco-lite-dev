@@ -342,6 +342,21 @@ class EditorBundleTests(unittest.TestCase):
             2,
         )
 
+    def test_custom_projection_can_use_upstream_editor_templates(self) -> None:
+        projection = self.root / "site-specific/projection.yaml"
+        projection.write_text(
+            projection.read_text().replace(
+                "site-specific/projection-templates/person.md.j2",
+                "www-from-model:person.md.j2",
+            )
+        )
+        with patch(
+            "orinoco_lite.projection.resolve_www_from_model",
+            return_value=self.root / "site-specific/projection-templates",
+        ) as resolved:
+            self.test_editor_can_limit_rdf_data_to_declared_editable_records()
+        resolved.assert_called_once_with(self.workspace.root, self.resources)
+
     def test_editor_can_limit_rdf_data_to_declared_editable_records(self) -> None:
         projection = self.root / "site-specific/projection.yaml"
         projection.write_text(
