@@ -79,13 +79,25 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-In a fresh engineering checkout, initialize its recursive submodules before installing the Pixi environment:
+Clone with the repository hooks enabled to initialize submodules automatically:
 
 ``` console
-python3 tools/setup_submodule_remotes.py
+git clone --config core.hooksPath=.githooks https://github.com/ORINOCO-Lite/orinoco-lite-dev.git
+cd orinoco-lite-dev
 pixi run orinoco-lite dev prepare-resources
 pixi run pytest
 ```
+
+For an existing clone without hooks, enable them and initialize once:
+
+``` console
+git config core.hooksPath .githooks && sh .githooks/post-checkout
+```
+
+An already initialized development environment can also use `pixi run install-hooks`.
+Branch checkouts then install missing submodules through DataLad and configure upstream remotes.
+If Pixi is missing or initialization fails, the hook prints a warning and retry command.
+Git cannot run this hook or display its guidance on a plain clone before hooks are enabled.
 
 Package versions come from Git tags through Versioneer.
 `orinoco-lite --version` reports the current commit and dirty state in an editable checkout; installed distribution metadata refreshes when the package is reinstalled.

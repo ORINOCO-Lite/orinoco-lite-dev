@@ -1,0 +1,11 @@
+#!/bin/sh
+# Git passes 0 for a file checkout; direct invocation initializes this checkout.
+[ "${3:-1}" = 1 ] || exit 0
+
+if ! command -v pixi >/dev/null 2>&1; then
+    echo "Warning: Pixi is missing; repository initialization is incomplete." >&2
+    echo "Install Pixi (https://pixi.sh), then run: sh .githooks/post-checkout" >&2
+elif ! pixi exec --spec datalad bash -c 'datalad install -r . && python tools/setup_submodule_remotes.py'; then
+    echo "Warning: repository initialization failed. Retry: sh .githooks/post-checkout" >&2
+fi
+exit 0
