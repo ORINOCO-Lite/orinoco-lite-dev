@@ -8,7 +8,7 @@ if ! command -v pixi >/dev/null 2>&1; then
 else
     # Child repositories must not inherit the parent's Git directory/index.
     unset $(git rev-parse --local-env-vars)
-    if ! pixi exec --spec datalad bash -c 'datalad install -r . && python tools/setup_submodule_remotes.py'; then
+    if ! pixi exec --spec uv uv run --no-project --python 3.12 --with datalad --with git-annex bash -c 'datalad install -r . && python tools/setup_submodule_remotes.py'; then
         echo "Warning: repository initialization failed. Retry: sh .githooks/post-checkout" >&2
     fi
 fi
