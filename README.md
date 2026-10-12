@@ -127,9 +127,6 @@ Edit them there directly; they do not require APM or a setup hook.
 Do not add a package manager, manifest, lock, bootstrap task, or agent hook while every skill is owned by this repository.
 Introduce dependency management only when the project first consumes an independently maintained promoted skill; the chosen setup mechanism remains a downstream preference.
 
-The setup command initializes missing submodules and configures the authoritative `upstream` remotes for known mirrors.
-It preserves existing working checkouts and `origin` URLs; `--check` reports required setup without changing Git state.
-Run it before Pixi because the editable package depends on local submodule sources.
 To deliberately reset every submodule to its recorded gitlink and fetch full history, use:
 
 ``` console

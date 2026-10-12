@@ -91,10 +91,10 @@ class SubmoduleSetupTests(unittest.TestCase):
 
 
 class CheckoutHookTests(unittest.TestCase):
-    def run_hook(self, path, *args):
+    def run_hook(self, path, *args, **environment):
         return subprocess.run(
             ["/bin/sh", str(ROOT / ".githooks/post-checkout"), *args],
-            env={**os.environ, "PATH": str(path)}, text=True, capture_output=True,
+            env={**os.environ, "PATH": str(path), **environment}, text=True, capture_output=True,
         )
 
     def test_missing_pixi_warns_without_failing_checkout(self):
@@ -114,10 +114,21 @@ class CheckoutHookTests(unittest.TestCase):
             pixi = Path(directory) / "pixi"
             pixi.write_text("#!/bin/sh\nexit 1\n")
             pixi.chmod(0o755)
-            result = self.run_hook(directory)
+            result = self.run_hook(directory + ":/usr/bin:/bin")
         self.assertEqual(result.returncode, 0)
         self.assertIn("initialization failed", result.stderr)
         self.assertIn("sh .githooks/post-checkout", result.stderr)
+
+    def test_child_commands_do_not_inherit_parent_git_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pixi = Path(directory) / "pixi"
+            pixi.write_text('#!/bin/sh\n[ -z "${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_INDEX_FILE+x}" ]\n')
+            pixi.chmod(0o755)
+            result = self.run_hook(
+                directory + ":/usr/bin:/bin", GIT_DIR=".git",
+                GIT_WORK_TREE=str(ROOT), GIT_INDEX_FILE="unused-index",
+            )
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
 
 if __name__ == "__main__":
