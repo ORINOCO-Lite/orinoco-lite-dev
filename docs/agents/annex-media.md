@@ -1,7 +1,7 @@
 # Optional Annex media
 
-A downstream can store images and other media in Git Annex under its `site-specific` submodule’s `assets/` and `static/` directories.
-Records, configuration, editorial content, and source-adapter outputs must remain ordinary Git files.
+A downstream can store editorial content, images, and other media in Git Annex under its `site-specific` submodule’s `assets/`, `static/`, and `content/` directories.
+Records, configuration, and source-adapter outputs must remain ordinary Git files.
 Directories without a submodule do not support this option.
 
 Set the following in `pyproject.toml`:
@@ -12,7 +12,7 @@ annex = true
 ```
 
 The package includes Git Annex for required upstream Hugo assets.
-The media opt-in additionally enables retrieval for the downstream’s own media.
+The media opt-in additionally enables retrieval for the downstream’s own media and editorial content.
 
 This executable is also required when DataLad saves ordinary Git records in an Annex-enabled submodule.
 It does not change where those records are stored.
@@ -26,7 +26,7 @@ metadata/** annex.largefiles=nothing
 *.toml annex.largefiles=nothing
 ```
 
-Orinoco does not overwrite that policy and rejects Annex-managed files outside the media directories, including unlocked files.
+Orinoco does not overwrite that policy and rejects Annex-managed files outside these three directories, including unlocked files.
 
 Configure publicly readable storage using native Git Annex remotes.
 Keep their configuration in the Annex repository so new clones can discover the content.

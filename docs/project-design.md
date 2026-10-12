@@ -323,8 +323,8 @@ The normative contracts define the precise behavior:
 - **Give provenance tools distinct jobs.**
   Git Annex retrieves and verifies required upstream assets during distribution preparation or editable builds, and optional downstream media during site builds.
   DataLad records downstream adapter runs in ordinary Git.
-  Downstreams may opt in for media under a `site-specific` submodule's `assets/` and `static/`.
-  Records, configuration, and editorial content remain ordinary Git files; builds materialize media as ordinary output files.
+  Downstreams may opt in for media under a `site-specific` submodule's `assets/`, `static/`, and `content/`.
+  Records and configuration remain ordinary Git files; builds materialize Annex media and editorial content as ordinary output files.
   Native Annex remotes own storage configuration, independently of the hosting provider.
 
 ## Documentation and change control

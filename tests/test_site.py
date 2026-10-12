@@ -72,6 +72,24 @@ def _www_from_model(root: Path) -> Path:
     return upstream
 
 
+def test_assembly_materializes_annex_editorial_content(tmp_path, monkeypatch):
+    (tmp_path / "pyproject.toml").write_text(CONFIG)
+    _write_site_data(tmp_path)
+    upstream = _www_from_model(tmp_path)
+    content = tmp_path / "site-specific/content"
+    content.mkdir()
+    payload = tmp_path / "editorial-object"
+    payload.write_text("---\ntitle: Annex editorial\n---\nReadable content.\n")
+    editorial = content / "annex.md"
+    editorial.symlink_to(tmp_path / "unavailable-annex-pointer")
+    monkeypatch.setattr("orinoco_lite.annex_media.prepare_media", lambda workspace: {editorial: payload})
+    assembly = tmp_path / "assembly"
+    site._assemble(load_config_path(tmp_path / "pyproject.toml"), tmp_path / "resources",
+                   assembly, www_from_model=upstream)
+    assert (assembly / "content/annex.md").read_text() == payload.read_text()
+    assert not (assembly / "content/annex.md").is_symlink()
+
+
 class HugoCompatibilityTests(unittest.TestCase):
     def test_partial_config_override_preserves_other_site_settings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -297,7 +297,7 @@ def _assemble(
     projection = workspace.path("build") / "hugo-projection"
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
-    _copy_tree(workspace.path("editorial"), assembly / "content")
+    _copy_tree(workspace.path("editorial"), assembly / "content", media=media)
     _copy_file(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",

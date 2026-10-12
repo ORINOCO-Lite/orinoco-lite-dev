@@ -36,7 +36,7 @@ def workspace(tmp_path, monkeypatch):
         '[tool.orinoco.site.identity]\ntitle = "Media test"\n'
         'description = "Media fixture"\nbase_url = "https://example.org/"\n'
     )
-    (site / 'content/example.md').write_text('Editorial content stays in Git.\n')
+    (site / 'content/example.md').write_text('Editorial content.\n')
     (site / 'metadata/records/person.yaml').write_text('pid: ex:person\nschema_type: dlthings:Person\nname: Person\n')
     (site / 'static/image.png').write_bytes(b'fixture image bytes')
     git(site, 'annex', 'add', 'static/image.png')
@@ -105,17 +105,26 @@ def test_publication_clone_retrieves_from_original_checkout(workspace, tmp_path)
     assert git(clone, 'status', '--porcelain') == ''
 
 
-def test_unlocked_media_is_verified_and_prohibited_inputs_still_rejected(workspace, tmp_path):
+@pytest.mark.parametrize('unlocked', [False, True])
+def test_annex_editorial_content_and_portraits_are_materialized(workspace, tmp_path, unlocked):
     site = workspace.path('site')
-    git(site, 'annex', 'unlock', 'static/image.png')
-    media = prepare_media(workspace)
-    _copy_tree(site / 'static', tmp_path / 'output', media=media)
-    assert (tmp_path / 'output/image.png').read_bytes() == b'fixture image bytes'
+    portrait = site / 'content/persons/person/portrait.png'
+    portrait.parent.mkdir(parents=True)
+    portrait.write_bytes(b'portrait bytes')
     git(site, 'rm', '--cached', 'content/example.md')
-    git(site, 'annex', 'add', '--force-large', 'content/example.md')
-    git(site, 'annex', 'unlock', 'content/example.md')
-    with pytest.raises(ConfigurationError, match='content/example.md'):
-        workspace_annex_files(workspace)
+    git(site, 'annex', 'add', '--force-large', 'content')
+    if unlocked:
+        git(site, 'annex', 'unlock', 'content')
+    report = validate_workspace(workspace)
+    media = prepare_media(workspace)
+    _copy_tree(site / 'content', tmp_path / 'output', media=media)
+    assert (tmp_path / 'output/example.md').read_text() == 'Editorial content.\n'
+    assert (tmp_path / 'output/persons/person/portrait.png').read_bytes() == b'portrait bytes'
+    assert not any(path.is_symlink() for path in (tmp_path / 'output').rglob('*'))
+    git(site, 'annex', 'drop', '--force', 'content')
+    assert validate_workspace(workspace)['site_owned_tree_sha256'] == report['site_owned_tree_sha256']
+    with pytest.raises(DriverError, match='content/'):
+        prepare_media(workspace)
 
 
 def test_corrupt_media_is_not_copied(workspace):

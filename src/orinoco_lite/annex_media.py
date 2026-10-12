@@ -118,7 +118,7 @@ def prepare_hugo_assets(repository: Path, *, editable: bool = False, remote: str
 
 
 def workspace_annex_files(workspace) -> dict[Path, str]:
-    """Enforce the opted-in submodule and ordinary-Git input boundary."""
+    """Discover opted-in Annex assets and editorial content."""
     if not workspace.annex_media:
         return {}
     site = workspace.path("site")
@@ -130,11 +130,11 @@ def workspace_annex_files(workspace) -> dict[Path, str]:
         raise ConfigurationError("media.annex requires an initialized site-specific submodule")
     files = annex_files(site, initialize=True)
     forbidden = [str(path) for path in files
-                 if len(path.parts) < 2 or path.parts[0] not in {"assets", "static"}]
+                 if len(path.parts) < 2 or path.parts[0] not in {"assets", "static", "content"}]
     if forbidden:
         raise ConfigurationError(
-            "Records, configuration, and editorial content must remain in ordinary Git; "
-            "Annex media is limited to assets/ and static/: " + ", ".join(forbidden)
+            "Records and configuration must remain in ordinary Git; "
+            "Annex content is limited to assets/, static/, and content/: " + ", ".join(forbidden)
         )
     return files
 
