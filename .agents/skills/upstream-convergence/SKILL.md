@@ -1,6 +1,6 @@
 ---
 name: upstream-convergence
-description: Deliberately update a fork, mirror, submodule stack, or thin integration layer to authoritative upstream heads while preserving linear upstream-plus-local history, advancing exact pins and locks, validating clean clones, and recording review or release evidence. Use for coordinated upstream repinning and fork convergence; do not use for an ordinary package-manager upgrade with no mirrored Git history.
+description: Deliberately update a fork, mirror, submodule stack, or thin integration layer to authoritative upstream heads while preserving linear upstream-plus-local history, advancing exact source pins, validating clean clones, and recording review or release evidence. Use for ecosystem source selection, dependency compatibility constraints, and coordinated upstream repinning or fork convergence.
 ---
 
 # Upstream Convergence
@@ -17,6 +17,31 @@ Update the retained stack to reviewed current upstream coordinates without turni
 - Record the current parent gitlink, direct pin, nested pin, lock, and local-layer tip before mutation.
   Treat released or accepted checkpoints as immutable unless the user explicitly authorizes rewriting them.
 - Confirm that the request authorizes external Git writes, pull requests, merges, releases, or force pushes before performing each class of mutation.
+
+## Select dependencies and handle compatibility
+
+1. Start with supported build, projection, editing, and enrichment operations.
+   Follow their dependency declarations recursively: gitlinks, Python requirements, workflow actions, downloaded scripts, schemas, and templates.
+   Track each required Orinoco repository at an immutable submodule commit, including components reached transitively.
+   Preserve nested ownership where it already exists; do not duplicate pins in the parent or create a separate inventory.
+2. Verify that execution uses those selections.
+   Adding a submodule does not pin an action or download that still follows `main`.
+   Editable execution uses the selected working checkouts; distributions must include required resources or derive immutable source requirements from committed gitlinks.
+3. Let third-party release requirements resolve normally.
+   For a moving Git dependency, inspect why upstream needs it and select a compatible release or immutable commit, including an unreleased fix when necessary.
+   Do not automatically downgrade or silently inherit a branch tip.
+4. When tests reveal incompatibility, add a narrow, visible top-level constraint with a comment naming the declaring component, observed failure, and condition for reconsidering it.
+   Use `pixi.toml` for development constraints; ensure published Python requirements also carry restrictions needed by package users.
+   A patch to the owning component's declaration is an option, not a prerequisite; keep its reason discoverable at the top level and avoid independently maintained duplicate rules.
+   A tested working combination is sufficient evidence for a temporary bound: a paired LinkML/runtime downgrade need not be isolated further before adoption.
+   Report the exception and evidence without claiming an unproven root cause.
+5. Frequently exercise the actual developer setup from a disposable clean checkout with no inherited lock or environment, then run behavioral tests relevant to the stack, including RDF round trips and projection.
+   Run this fresh solve in routine engineering CI as well as when changing dependency selections; a warm environment or installation-only smoke test is insufficient.
+   Keep the resulting development lock local and untracked.
+   On failure, retain the resolution and logs as diagnostic artifacts before changing constraints.
+6. Releases may use tighter package requirements and offer a separately tested application lock as an installation artifact.
+   Verify both the ordinary package installation and any offered locked installation.
+   Do not assume pip consumes a Pixi lock, require developers to use the release lock, or commit routine development lock churn.
 
 ## Choose the history operation from the ownership shape
 
@@ -39,7 +64,7 @@ For nested submodules, Annex-backed repositories, mirror default-branch updates,
 Treat a repin as the complete fetch-and-content closure of the selected revision.
 Before publishing or presenting the parent pin for review, verify from a cache-cold clone of an exact candidate commit that every gitlink is fetchable from the consumer-configured remote, and advance any exact companion content pins—such as `git-annex` metadata refs—needed to hydrate and build that revision.
 
-1. Test each rebased leaf component with its native locked build and focused tests.
+1. Test each rebased leaf component with its native setup and focused tests; use its lock when that component requires one.
 2. Update nested gitlinks to the corresponding rebased commits, not to discarded merge tips.
 3. Test each owning component, then advance its reviewed mirror ref.
 4. Audit every independently interpreted pin surface: parent and nested gitlinks, direct VCS requirements, generated locks, build-time commit assertions, package source specifications, compatibility declarations, and CI or deploy pins.
