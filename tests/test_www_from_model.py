@@ -97,3 +97,60 @@ def test_distribution_requires_exact_clean_upstream_and_nested_theme(tmp_path):
     _git(source, 'commit', '--allow-empty', '-qm', 'different upstream')
     with pytest.raises(DriverError, match='package gitlink'):
         distribution_upstream(tmp_path, commit)
+
+
+@pytest.mark.parametrize(("source", "change", "message"), [
+    ("things-schemas", "dirty", "things-schemas working changes"),
+    ("things-schemas", "commit", "things-schemas at the package gitlink"),
+    ("pool.psychoinformatics.de-ui", "dirty", "pool.psychoinformatics.de-ui working changes"),
+    ("pool.psychoinformatics.de-ui", "commit", "pool.psychoinformatics.de-ui at the package gitlink"),
+    ("pool.psychoinformatics.de-ui/shacl-vue", "dirty", "pool.psychoinformatics.de-ui working changes"),
+    ("pool.psychoinformatics.de-ui/shacl-vue", "commit", "dependencies at their gitlinks"),
+])
+def test_distribution_rejects_changed_editor_or_schema_before_copying(
+    tmp_path, source, change, message,
+):
+    from orinoco_lite.build_resources import build_resources
+    from orinoco_lite.errors import DriverError
+    from tests.engineering.test_checkout_submodules import (
+        add_submodule, commit_file, init_repository,
+    )
+
+    root = init_repository(tmp_path / "package")
+    for name, nested in (
+        ("www-from-model", "themes/congo"),
+        ("pool.psychoinformatics.de-ui", "shacl-vue"),
+        ("things-schemas", None),
+    ):
+        origin = init_repository(tmp_path / name)
+        commit_file(origin, "file", "original", "fixture source")
+        if nested:
+            child = init_repository(tmp_path / Path(nested).name)
+            commit_file(child, "package-lock.json", "{}", "fixture nested source")
+            add_submodule(origin, child, nested)
+        else:
+            commit_file(origin, "src/demo-research-information/unreleased.yaml", "{}", "fixture schema")
+        _git(origin, "commit", "--allow-empty", "-qam", "select fixture inputs")
+        add_submodule(root, origin, "submodules/" + name)
+    _git(root, "commit", "-qm", "select fixture sources")
+    _git(root, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+    destination = root / "build/resources"
+    with (
+        patch("orinoco_lite.build_resources.shutil.which", return_value="tool"),
+        patch("orinoco_lite.build_resources.shutil.copytree", side_effect=RuntimeError("copy started")),
+    ):
+        # Clean selected inputs reach assembly without running the UI compilers.
+        with pytest.raises(RuntimeError, match="copy started"):
+            build_resources(root, destination)
+        changed = root / "submodules" / source
+        if change == "dirty":
+            tracked = "package-lock.json" if source.endswith("shacl-vue") else "file"
+            (changed / tracked).write_text("working edit")
+        else:
+            _git(changed, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                 "commit", "--allow-empty", "-qm", "different source commit")
+        with pytest.raises(DriverError, match=message):
+            build_resources(root, destination)
+        # Editable preparation deliberately keeps using those working sources.
+        with pytest.raises(RuntimeError, match="copy started"):
+            build_resources(root, destination, editable=True)

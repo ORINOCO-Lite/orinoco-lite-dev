@@ -10,11 +10,15 @@ The build backend derives fixed Git requirements from committed gitlinks and wri
 Downstreams need no repeated source pins or overrides.
 [`pixi.toml`](../../pixi.toml) selects the package and external tools.
 Keep development `pixi.lock` local and untracked.
-Retain exact resolutions for failure investigation and, when offered, tested release installation artifacts; a wheel does not consume a separate Pixi lock.
+CI retains exact resolutions, solve logs, platform information, and the Pixi version for successful runs and failures.
+These artifacts support diagnosis and replay; a wheel does not consume a separate Pixi lock.
 
 Use the [upstream-convergence skill](../../.agents/skills/upstream-convergence/SKILL.md) for recursive ecosystem source selection, moving Git dependencies, compatibility exceptions, and fresh-solve validation.
 The [design charter](../project-design.md#design-principles) defines the strategy.
 Development constraints belong visibly in `pixi.toml`; restrictions needed by installed packages must also reach published Python metadata. uv root overrides do not propagate from installed dependencies.
+Top-level bounds must overlap the selected components' requirements.
+Contradictory requirements need a corrected component declaration or a different source revision.
+The temporary LinkML bounds record a tested version pair, not evidence for every permitted combination.
 
 ## Package development
 
@@ -51,5 +55,7 @@ The command records a fetchable full SHA in `pixi.toml` and refreshes the local 
 Use `--repository` for a fork; a release is not required.
 If the current environment cannot launch the command, prefix it with `env -u PIXI_LOCKED pixi run --as-is` instead of `pixi run`.
 
-The [release workflow](../../.github/workflows/orinoco-release.yml) checks reproducible artifacts, dependency commits, and clean consumer installs.
+The [engineering workflow](../../.github/workflows/engineering-ci.yml) tests a fresh developer solve and an independently solved wheel installation without development constraints.
+Both run the existing RDF and projection tests.
+The [release workflow](../../.github/workflows/orinoco-release.yml) also checks reproducible artifacts, dependency commits, and the offered locked installation.
 Artifact upload and publication are separate steps.

@@ -34,23 +34,38 @@ def selected_upstream(checkout: Path, commit: str) -> dict[str, str]:
     return {"repository": repository, "commit": entry[2]}
 
 
+def distribution_source(checkout: Path, commit: str, path: Path) -> Path:
+    """Require a clean source checkout at its committed recursive gitlinks."""
+    source = checkout / path
+    name = path.name
+    entry = subprocess.check_output(
+        ["git", "-C", str(checkout), "ls-tree", commit, "--", str(path)], text=True,
+    ).split()
+    if len(entry) != 4 or entry[:2] != ["160000", "commit"] or entry[3] != path.as_posix():
+        raise DriverError(f"Package commit must select {name} as a Git submodule")
+    if not (source / ".git").exists():
+        raise DriverError(f"Initialize the {name} submodule and its nested dependencies before building a distribution")
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(source), *args], text=True).strip()
+    if git("rev-parse", "HEAD") != entry[2]:
+        raise DriverError(f"Initialize {name} at the package gitlink before building a distribution")
+    if any(not line.startswith(" ") for line in subprocess.check_output(
+        ["git", "-C", str(source), "submodule", "status", "--recursive"], text=True,
+    ).splitlines()):
+        raise DriverError(f"Initialize {name} dependencies at their gitlinks before building a distribution")
+    if git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"):
+        raise DriverError(f"Commit or remove {name} working changes before building a distribution; editable builds use them directly")
+    return source
+
+
 def distribution_upstream(checkout: Path, commit: str) -> tuple[Path, dict]:
     """Require the committed source closure before labeling a packaged payload."""
-    upstream = checkout / "submodules/www-from-model"
+    upstream = distribution_source(checkout, commit, Path("submodules/www-from-model"))
     selection = selected_upstream(checkout, commit)
-    if not (upstream / ".git").exists():
-        raise DriverError("Initialize the www-from-model submodule and its nested dependencies before building a distribution")
-    def git(*args):
-        return subprocess.check_output(["git", "-C", str(upstream), *args], text=True).strip()
-    if git("rev-parse", "HEAD") != selection["commit"]:
-        raise DriverError("Initialize www-from-model at the package gitlink before building a distribution")
-    if any(not line.startswith(" ") for line in subprocess.check_output(
-        ["git", "-C", str(upstream), "submodule", "status", "--recursive"], text=True,
-    ).splitlines()):
-        raise DriverError("Initialize www-from-model dependencies at their gitlinks before building a distribution")
-    if git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"):
-        raise DriverError("Commit or remove www-from-model working changes before building a distribution; editable builds use them directly")
-    selection["dependencies"] = {"themes/congo": git("rev-parse", "HEAD:themes/congo")}
+    theme_commit = subprocess.check_output(
+        ["git", "-C", str(upstream), "rev-parse", "HEAD:themes/congo"], text=True,
+    ).strip()
+    selection["dependencies"] = {"themes/congo": theme_commit}
     return upstream, selection
 
 
@@ -76,6 +91,8 @@ def build_resources(checkout: Path, destination: Path, *, editable: bool = False
     ).strip()
     if not editable:
         upstream, selection = distribution_upstream(checkout, commit)
+        distribution_source(checkout, commit, pool.relative_to(checkout))
+        distribution_source(checkout, commit, schema.parent.relative_to(checkout))
     destination.parent.mkdir(parents=True, exist_ok=True)
     # Work beside the destination so the finished resource directory can be renamed.
     # Compiler patches and npm output must never modify the developer's sources.

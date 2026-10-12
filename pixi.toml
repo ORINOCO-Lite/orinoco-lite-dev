@@ -16,6 +16,13 @@ hugo = "<0.156"
 [pypi-dependencies]
 # Python requirements and editable submodule sources come from pyproject.toml.
 orinoco-lite = { path = ".", editable = true }
+# things-schemas and dump-things-service declare LinkML requirements. The
+# selected service's RDF converter fails round trips with LinkML/runtime
+# 1.12.0; the 1.11.1 pair passes. Reconsider these temporary bounds together
+# when tests/test_annotations.py and tests/test_projection.py pass with newer
+# versions. Required consumer bounds also live in pyproject.toml.
+linkml = "<1.12"
+linkml-runtime = "<1.12"
 
 [tasks]
 records-jsonl-to-yaml = "datalad run --explicit --input sourcedata/downloaded/records.jsonl --output site-specific/metadata orinoco-lite dev records jsonl-to-yaml"

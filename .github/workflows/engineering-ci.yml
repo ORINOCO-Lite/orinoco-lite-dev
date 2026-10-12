@@ -48,11 +48,20 @@ jobs:
             --init --depth 1 -- shacl-vue
           git -C submodules/www-from-model submodule update --init --recursive
 
-      - name: Resolve the package development environment
+      - name: Install Pixi
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: false
-          locked: false
+          run-install: false
+
+      - name: Resolve a fresh development environment
+        shell: bash
+        run: |
+          mkdir -p build/ci-diagnostics/development
+          pixi --version > build/ci-diagnostics/resolver.txt
+          pixi info --json > build/ci-diagnostics/platform.json
+          pixi install 2>&1 | tee build/ci-diagnostics/development/solve.log
+          pixi run --locked python -VV > build/ci-diagnostics/development/python.txt
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files
@@ -71,20 +80,58 @@ jobs:
       - name: Run package and engineering tests
         env:
           ORINOCO_TEST_TEMPLATE: ${{ github.workspace }}/build/template-candidate
-        run: pixi run pytest
-
-      - name: Build the source archive and verify its installed wheel
         shell: bash
-        run: |
-          pixi run build-package
-          wheels=(build/package/*.whl)
-          pixi add --pypi "orinoco-lite @ $PWD/${wheels[0]}"
-          pixi run python - <<'PY'
-          from importlib.metadata import distribution
-          import json
-          from pathlib import Path
-          import sysconfig
+        run: pixi run --locked pytest --junitxml=build/ci-diagnostics/development/tests.xml 2>&1 | tee build/ci-diagnostics/development/tests.log
 
+      - name: Build the source archive and wheel
+        shell: bash
+        run: pixi run --locked build-package 2>&1 | tee build/ci-diagnostics/build.log
+
+      - name: Resolve and test an independent wheel consumer
+        shell: bash
+        env:
+          CONSUMER_PLATFORM: ${{ runner.os == 'Linux' && 'linux-64' || 'osx-arm64' }}
+        run: |
+          consumer="$RUNNER_TEMP/orinoco-wheel-consumer"
+          diagnostics="$GITHUB_WORKSPACE/build/ci-diagnostics/wheel-consumer"
+          mkdir -p "$consumer" "$diagnostics"
+          wheels=(build/package/*.whl)
+          platform_spec=$(pixi run --locked python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import tomllib
+          platforms = tomllib.loads(Path("pixi.toml").read_text())["workspace"]["platforms"]
+          selected = next(item for item in platforms if item["platform"] == os.environ["CONSUMER_PLATFORM"])
+          print(", ".join(f"{key} = {json.dumps(value)}" for key, value in selected.items()))
+          PY
+          )
+          cat > "$consumer/pixi.toml" <<EOF
+          [workspace]
+          name = "orinoco-wheel-consumer"
+          channels = ["conda-forge"]
+          platforms = [{ $platform_spec }]
+          [dependencies]
+          python = ">=3.12"
+          git = "*"
+          # The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
+          hugo = "<0.156"
+          [pypi-dependencies]
+          orinoco-lite = { path = "$GITHUB_WORKSPACE/${wheels[0]}" }
+          pytest = "*"
+          setuptools = "*"
+          EOF
+          pixi run --locked python -c 'import json; from _build_backend import package_dependencies; print(json.dumps(package_dependencies()))' > "$diagnostics/expected-requirements.json"
+          pixi install --manifest-path "$consumer/pixi.toml" 2>&1 | tee "$diagnostics/solve.log"
+          cd "$consumer"
+          pixi run --locked python -I - <<'PY' 2>&1 | tee "$diagnostics/installed-wheel.log"
+          from importlib.metadata import distribution, distributions, version
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import sysconfig
+          from packaging.requirements import Requirement
           import orinoco_lite
 
           installed = Path(orinoco_lite.__file__).resolve()
@@ -92,8 +139,54 @@ jobs:
           assert installed.is_relative_to(site_packages), installed
           source = json.loads(distribution("orinoco-lite").read_text("direct_url.json"))
           assert "archive_info" in source and source["url"].endswith(".whl"), source
-          assert not source.get("dir_info", {}).get("editable", False), source
+          for package in distributions():
+              selected = json.loads(package.read_text("direct_url.json") or "{}")
+              assert not selected.get("dir_info", {}).get("editable", False), selected
+          required = distribution("orinoco-lite").requires or []
+          expected = json.loads((Path(os.environ["GITHUB_WORKSPACE"]) / "build/ci-diagnostics/wheel-consumer/expected-requirements.json").read_text())
+          print(f"Python: {platform.python_version()} ({platform.platform()})")
           print(f"Testing installed wheel: {installed}")
+          print(f"LinkML: {version('linkml')}; runtime: {version('linkml-runtime')}")
+          print("Requires-Dist:", json.dumps(required, indent=2))
+          assert {str(Requirement(value)) for value in required} == {str(Requirement(value)) for value in expected}
+          for value in required:
+              requirement = Requirement(value)
+              if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
+                  continue
+              assert version(requirement.name) in requirement.specifier, value
+              if requirement.url and requirement.url.startswith("git+"):
+                  selected = json.loads(distribution(requirement.name).read_text("direct_url.json"))
+                  assert selected["vcs_info"]["commit_id"] == requirement.url.rsplit("@", 1)[1], selected
           PY
-          pixi run orinoco-lite --help
-          pixi run pytest --ignore=tests/engineering
+          pixi run --locked orinoco-lite --help
+          # Existing pytest config exposes repository test helpers, never src/.
+          pixi run --locked python -I -m pytest \
+            -c "$GITHUB_WORKSPACE/pyproject.toml" "$GITHUB_WORKSPACE"/tests/test_*.py \
+            --junitxml="$diagnostics/tests.xml" 2>&1 | tee "$diagnostics/tests.log"
+
+      - name: Retain dependency resolution diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/ci-diagnostics/development build/ci-diagnostics/wheel-consumer
+          uname -a > build/ci-diagnostics/runner.txt
+          if command -v pixi >/dev/null; then
+            pixi --version > build/ci-diagnostics/resolver.txt
+          fi
+          if [[ -f pixi.lock ]]; then
+            cp pixi.lock build/ci-diagnostics/development/
+          fi
+          for file in pixi.toml pixi.lock; do
+            if [[ -f "$RUNNER_TEMP/orinoco-wheel-consumer/$file" ]]; then
+              cp "$RUNNER_TEMP/orinoco-wheel-consumer/$file" build/ci-diagnostics/wheel-consumer/
+            fi
+          done
+
+      - name: Upload dependency resolution diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: engineering-resolution-${{ matrix.runner }}
+          path: build/ci-diagnostics
+          if-no-files-found: error
+          retention-days: 90
