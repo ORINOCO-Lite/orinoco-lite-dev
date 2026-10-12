@@ -79,25 +79,32 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-Clone with the repository hooks enabled to initialize submodules automatically:
+Initialize submodules before the first `pixi run` using either option:
+
+- Clone with hooks enabled to initialize during checkout and on subsequent branch checkouts:
+
+  ``` console
+  git clone --config core.hooksPath=.githooks https://github.com/ORINOCO-Lite/orinoco-lite-dev.git
+  cd orinoco-lite-dev
+  ```
+
+- If you already cloned the repository, run the initialization hook directly from its root:
+
+  ``` console
+  sh .githooks/post-checkout
+  ```
+
+  This initializes the current checkout immediately.
+  To also enable hooks for future checkouts, run `git config core.hooksPath .githooks`.
+
+If Pixi is missing or initialization fails, the script prints a warning and retry command.
+A plain clone does not run the hook automatically.
+After initialization:
 
 ``` console
-git clone --config core.hooksPath=.githooks https://github.com/ORINOCO-Lite/orinoco-lite-dev.git
-cd orinoco-lite-dev
 pixi run orinoco-lite dev prepare-resources
 pixi run pytest
 ```
-
-For an existing clone without hooks, enable them and initialize once:
-
-``` console
-git config core.hooksPath .githooks && sh .githooks/post-checkout
-```
-
-An already initialized development environment can also use `pixi run install-hooks`.
-Branch checkouts then install missing submodules through DataLad and configure upstream remotes.
-If Pixi is missing or initialization fails, the hook prints a warning and retry command.
-Git cannot run this hook or display its guidance on a plain clone before hooks are enabled.
 
 Package versions come from Git tags through Versioneer.
 `orinoco-lite --version` reports the current commit and dirty state in an editable checkout; installed distribution metadata refreshes when the package is reinstalled.
