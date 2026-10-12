@@ -35,10 +35,11 @@
   Do not create manifests, ledgers, or decision registers that restate repository configuration, locks, Git, or GitHub.
 - Use commit identifiers where software requires them, such as dependency selections and concurrency checks.
   Do not require per-file origins or before-and-after coordinate inventories for ordinary work.
-- Track each upstream mirror in Orinoco Lite with `main` (the accepted upstream base), `latest-upstream` (the most recently observed upstream commit), and `orinoco-lite-diff` (only the retained Orinoco Lite commits rebased on `main`).
+- Track each upstream mirror in Orinoco Lite with the branch selected by its parent's `.gitmodules` (or the authoritative default when none is declared) as the accepted upstream base, `latest-upstream` as the most recently observed upstream commit, and `orinoco-lite-diff` as the retained local commits on that base.
   An updater advances `latest-upstream` only.
-  A reviewed repin rebases the local layer onto it, advances `main`, and pins the parent to the rebased layer or to `main` when the layer is empty.
-  Keep non-empty `latest-upstream` and `orinoco-lite-diff` comparisons into `main` as draft pull requests; do not merge them.
+  A reviewed repin rebases the local layer onto it, advances the accepted base, and pins the parent to the rebased layer or to that base when the layer is empty.
+  Keep non-empty `latest-upstream` and `orinoco-lite-diff` comparisons into the accepted base branch as draft pull requests; do not merge them.
+  Stage the corresponding [divergence report](docs/agents/submodule-divergence.md) when changing a selected dependency; existing local commit subjects are descriptive, not a validation gate.
   Delete superseded mirror branches after preserving active-purpose branches, including Git Annex branches.
 
 ## Data provenance
