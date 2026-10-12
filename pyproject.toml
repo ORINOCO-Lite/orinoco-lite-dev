@@ -45,8 +45,9 @@ runtime = [
   "query-things",
   "datalad-concepts",
   "Jinja2",
-  "linkml",
-  "linkml-runtime",
+  # Consumer counterpart of the temporary RDF compatibility bounds in pixi.toml.
+  "linkml<1.12",
+  "linkml-runtime<1.12",
   "packaging",
   "pydantic",
   "pyoxigraph",
