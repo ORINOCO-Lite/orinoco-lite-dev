@@ -341,12 +341,10 @@ class DivergenceTests(unittest.TestCase):
         git(self.root, "add", "modules/child")
         self.run_script("--no-fetch")
         git(self.root, "add", CSV_PATH)
-        # Same cached upstream URL is kept in the report; URL rewrite blocks access.
-        git(
-            self.child,
-            "config",
-            "url.file:///missing-source/.insteadOf",
-            self.source.as_uri(),
+        # Make the remote unavailable without changing its reported URL.
+        self.source.rename(self.directory / "offline-source")
+        self.assertNotEqual(
+            git(self.child, "fetch", "origin", check=False).returncode, 0
         )
         self.run_script("--staged-check")
 
