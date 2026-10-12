@@ -84,8 +84,11 @@ jobs:
           import json
           from pathlib import Path
           import sysconfig
+          import subprocess
+          import tempfile
 
           import orinoco_lite
+          from orinoco_lite.www_from_model import resolve_www_from_model
 
           installed = Path(orinoco_lite.__file__).resolve()
           site_packages = Path(sysconfig.get_path("purelib")).resolve()
@@ -94,6 +97,15 @@ jobs:
           assert "archive_info" in source and source["url"].endswith(".whl"), source
           assert not source.get("dir_info", {}).get("editable", False), source
           print(f"Testing installed wheel: {installed}")
+          relative = Path(".forgejo/workflows/update-from-pool.yaml")
+          selected = resolve_www_from_model(Path.cwd()) / relative
+          assert selected.read_bytes() == (Path("submodules/www-from-model") / relative).read_bytes()
+          with tempfile.TemporaryDirectory() as directory:
+              result = subprocess.run(
+                  ["orinoco-lite", "projection", "blocks", "show", "--json"],
+                  cwd=directory, text=True, capture_output=True, check=True,
+              )
+          assert json.loads(result.stdout), result.stdout
           PY
           pixi run orinoco-lite --help
           pixi run pytest --ignore=tests/engineering
