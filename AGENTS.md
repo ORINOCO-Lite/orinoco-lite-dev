@@ -7,6 +7,14 @@
   Resolve Congo and other upstream dependencies through the dependency declarations and exact pins owned by that selected revision rather than repeating them in package or downstream configuration.
   The package owns generic source resolution, metadata, projection, and composition operations.
   Keep the template thin: it contains the Orinoco adaptation, Copier scaffold, workflows, and dependency locks, not a copied website.
+  Prefer shared presentation improvements in the template; keep organization-specific content and presentation choices downstream.
+  Put reusable optional behavior in the template when an existing or small, natural opt-in supports it; do not force site preferences on every downstream or add configuration for merely conceivable choices.
+  For the Center for Open Neuroscience downstream, start with the generic template experience and use observed friction to improve it while allowing deliberate local polish.
+  Before implementing a presentation change, state its intended home.
+  The current integration does not support inheriting the upstream project page template to insert local content; do not promise a minimal override for that operation.
+  Treat inheritance or composition as a capability to implement and exercise before relying on it, not as an available customization path.
+  Do not patch `www-from-model` merely to customize this site; when missing upstream extension support prevents a small adaptation, consider contributing that support upstream or retaining explicit submodule commits through the mirror workflow below.
+  Make routine placement decisions from these rules without repeated approval requests; explain verified limitations and seek agreement only when the implementation changes the agreed scope or requires a full template copy.
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.
   Package builds hydrate and verify required upstream Hugo assets.
   Fixed site builds use ordinary bundled files without an upstream Git/Annex checkout; editable builds hydrate required assets from their working source.
