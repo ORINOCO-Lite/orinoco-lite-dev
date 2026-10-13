@@ -241,7 +241,7 @@ index 9621e55..7939e6a 100644
 +        if (file.size > 10 * 1024 * 1024) {
 +            throw new Error('review bundle exceeds 10 MiB');
 +        }
-+        const restored = restoreReviewBundle({
++        const restored = await restoreReviewBundle({
 +            bundle: JSON.parse(await file.text()),
 +            catalog: await loadRecordCatalog(),
 +            graph: rdfDS.data.graph,

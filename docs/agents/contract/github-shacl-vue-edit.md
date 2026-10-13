@@ -8,6 +8,11 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 The downstream `/edit/` route is the only editor.
 Its build combines the downstream-selected editor shell and schema with records from the exact site source used for that deployment.
 Generated editor inputs are static output, not canonical metadata or durable curation state.
+Curators may edit existing records or create records in the schema classes permitted by the downstream projection.
+Version 3 bundles use a null `source_sha256` for creation: both the PID and the target file MUST be absent.
+Updates retain the existing source digest; version 2 update bundles remain accepted.
+New files use the package's existing class-and-PID-hash naming rule below the configured record root.
+The materializer MUST verify these coordinates, check identities across all stored records, and reject collisions before writing any record.
 
 The editor exposes:
 
@@ -91,6 +96,7 @@ The fixed temporary website handoff may wrap the unchanged bundle and metadata p
 
 A trusted workflow runs the downstream-selected package against an isolated checkout of the handoff parent.
 It verifies the bundle and allowed paths, applies the edits, validates all records and the joined graph, and replaces the temporary handoff with one ordinary metadata commit.
+Applying a bundle containing both creates and updates MUST roll back all record changes if a write fails.
 
 For a submodule proposal, the trusted website workflow MUST verify both exact heads, the pinned metadata base, the identical bundles, and curator authority in both repositories.
 It checks out metadata as data and validates the complete website and metadata composition without write credentials.

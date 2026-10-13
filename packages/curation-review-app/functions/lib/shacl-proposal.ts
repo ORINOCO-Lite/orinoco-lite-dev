@@ -87,7 +87,7 @@ function parsePullRequest(
 
 function commitBody(sourceCommit: string): string {
   return [
-    "Hand off the exact SHACL Vue v2 bundle for the trusted workflow.",
+    "Hand off the exact SHACL Vue review bundle for the trusted workflow.",
     "",
     `Source commit: ${sourceCommit}`,
     `Temporary path: ${SHACL_BUNDLE_PATH}`,

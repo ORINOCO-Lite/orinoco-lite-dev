@@ -151,6 +151,17 @@ describe("normal SHACL Vue v2 bundle handoff", () => {
     expect(() => parseShaclReviewBundle(unsafe)).toThrow("source path");
   });
 
+  it("preserves version 3 create preconditions and rejects them in version 2", () => {
+    const value = bundle();
+    value.version = 3;
+    value.records[0]!.source_sha256 = null;
+    expect(parseShaclReviewBundle(value)).toEqual(value);
+    value.version = 2;
+    expect(() => parseShaclReviewBundle(value)).toThrow(
+      "require SHACL review bundle version 3",
+    );
+  });
+
   it.each([
     ["current", "site-specific/metadata/records"],
     ["legacy", "metadata/records"],

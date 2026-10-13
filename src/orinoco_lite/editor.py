@@ -32,7 +32,7 @@ from .schema_conversion import build_format_converters
 
 CATALOG_FORMAT = "orinoco-static-record-sources"
 BUNDLE_FORMAT = "orinoco-shacl-review-bundle"
-VERSION = 2
+VERSION = 3
 MAX_BUNDLE_BYTES = 10 * 1024 * 1024
 MAX_RECORDS = 50
 APPLY_REPORT_FORMAT = "orinoco-editor-apply-report"
@@ -106,6 +106,8 @@ def record_catalog(
     ]
     return {
         "format": CATALOG_FORMAT,
+        "records_root": workspace.paths["records"],
+        "new_record_schema_types": sorted(editable_classes),
         "records": records,
         "source_commit": _git_commit(workspace.root),
         "version": VERSION,
@@ -345,12 +347,12 @@ def _read_bundle(path: Path) -> dict[str, Any]:
         raise DriverError("Review bundle must be a JSON object")
     if (
         value.get("format") != BUNDLE_FORMAT
-        or value.get("version") != VERSION
+        or value.get("version") not in {2, VERSION}
         or not isinstance(value.get("source_commit"), str)
         or not isinstance(value.get("records"), list)
         or not 0 < len(value["records"]) <= MAX_RECORDS
     ):
-        raise DriverError("Review bundle does not satisfy version 2")
+        raise DriverError("Review bundle does not satisfy version 2 or 3")
     return value
 
 
@@ -451,6 +453,7 @@ def validate_bundle(
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")
     by_pid = {entry["pid"]: entry for entry in catalog["records"]}
+    all_pids = {source["pid"] for source in record_sources(workspace)}
     dirty = _git_status(workspace.root)
     companions = {
         source.record_path.resolve(): source
@@ -465,16 +468,36 @@ def validate_bundle(
         if not isinstance(item, dict) or set(item) != BUNDLE_RECORD_KEYS:
             raise DriverError("Review bundle record has unexpected fields")
         pid = item.get("pid")
-        if pid in seen:
-            raise DriverError(f"Review bundle contains duplicate PID: {pid}")
         if not isinstance(pid, str):
             raise DriverError("Review bundle record PID must be a string")
+        if pid in seen:
+            raise DriverError(f"Review bundle contains duplicate PID: {pid}")
         seen.add(pid)
         source = by_pid.get(pid)
-        if source is None:
-            raise DriverError(
-                f"Review bundle PID is not in the configured record tree: {pid}"
+        creating = item.get("source_sha256") is None
+        if creating:
+            from .upstream_snapshot import RecordEnvelope, record_relative_path
+
+            schema_type = item.get("schema_type")
+            if bundle["version"] != VERSION:
+                raise DriverError("New records require review bundle version 3")
+            if pid in all_pids:
+                raise DriverError(f"New record PID already exists: {pid}")
+            if schema_type not in catalog["new_record_schema_types"]:
+                raise DriverError(f"New record schema type is not editable: {schema_type}")
+            relative_path = record_relative_path(
+                RecordEnvelope(
+                    schema_type.rsplit(":", 1)[-1],
+                    {"pid": pid, "schema_type": schema_type},
+                )
             )
+            source = {
+                "schema_type": schema_type,
+                "path": f"{catalog['records_root']}/{relative_path.as_posix()}",
+                "sha256": None,
+            }
+        elif source is None:
+            raise DriverError(f"Review bundle PID is not in the configured record tree: {pid}")
         source_path = item.get("source_path")
         relative = PurePosixPath(source_path) if isinstance(source_path, str) else None
         if (
@@ -486,15 +509,28 @@ def validate_bundle(
         ):
             raise DriverError(f"Review bundle source path does not match {pid}")
         path = workspace.root.joinpath(*relative.parts)
+        if not path.resolve().is_relative_to(workspace.path("records").resolve()):
+            raise DriverError(f"Review bundle source path escapes records: {source_path}")
+        if any(
+            candidate.is_symlink()
+            for candidate in (path, *path.parents)
+            if candidate.is_relative_to(workspace.root)
+        ):
+            raise DriverError(f"Review bundle source path contains a symlink: {source_path}")
+        if creating and path.exists():
+            raise DriverError(f"New record source path already exists: {source_path}")
         if source_path in dirty:
             raise DriverError(f"Metadata source has a conflicting local change: {source_path}")
         if item.get("source_sha256") != source["sha256"]:
             raise DriverError(f"Review bundle source digest is stale for {pid}")
-        if hashlib.sha256(path.read_bytes()).hexdigest() != item.get("source_sha256"):
+        if (
+            not creating
+            and hashlib.sha256(path.read_bytes()).hexdigest() != item.get("source_sha256")
+        ):
             raise DriverError(f"Review bundle source digest is stale for {pid}")
         if item.get("schema_type") != source["schema_type"]:
             raise DriverError(f"Review bundle schema type does not match {pid}")
-        original = yaml.safe_load(path.read_text(encoding="utf-8"))
+        original = {} if creating else yaml.safe_load(path.read_text(encoding="utf-8"))
         rdf_turtle = item.get("rdf_turtle")
         if not isinstance(rdf_turtle, str) or not rdf_turtle.strip():
             raise DriverError(f"Review bundle RDF is missing for {pid}")
@@ -533,11 +569,12 @@ def _atomic_apply(updates: Mapping[Path, str]) -> None:
     """Replace one or more records as a rollback-capable transaction."""
 
     staged: dict[Path, Path] = {}
-    backups: dict[Path, bytes] = {}
+    backups: dict[Path, bytes | None] = {}
     replaced: list[Path] = []
     try:
         for source, content in updates.items():
-            backups[source] = source.read_bytes()
+            backups[source] = source.read_bytes() if source.exists() else None
+            source.parent.mkdir(parents=True, exist_ok=True)
             descriptor, name = tempfile.mkstemp(
                 prefix=f".{source.name}.", suffix=".staged", dir=source.parent
             )
@@ -561,6 +598,9 @@ def _atomic_apply(updates: Mapping[Path, str]) -> None:
                 os.close(directory)
     except BaseException:
         for source in reversed(replaced):
+            if backups[source] is None:
+                source.unlink(missing_ok=True)
+                continue
             descriptor, name = tempfile.mkstemp(
                 prefix=f".{source.name}.", suffix=".rollback", dir=source.parent
             )
@@ -590,13 +630,13 @@ def apply_bundle_report(
     updates = validate_bundle(workspace, resources_root, _read_bundle(path))
     chunks: list[str] = []
     for source, content in sorted(updates.items()):
-        before = source.read_text(encoding="utf-8")
+        before = source.read_text(encoding="utf-8") if source.exists() else ""
         relative = source.relative_to(workspace.root).as_posix()
         chunks.extend(
             difflib.unified_diff(
                 before.splitlines(keepends=True),
                 content.splitlines(keepends=True),
-                fromfile=f"a/{relative}",
+                fromfile=f"a/{relative}" if source.exists() else "/dev/null",
                 tofile=f"b/{relative}",
             )
         )
@@ -606,7 +646,7 @@ def apply_bundle_report(
     changed_paths = [
         source.relative_to(workspace.root).as_posix()
         for source, content in sorted(updates.items())
-        if source.read_text(encoding="utf-8") != content
+        if not source.exists() or source.read_text(encoding="utf-8") != content
     ]
     # After a successful write the source bytes now equal ``content``. Derive
     # changed paths from the reviewed diff in that mode instead.

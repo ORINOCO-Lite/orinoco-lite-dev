@@ -17,7 +17,7 @@ from .progress import progress
 
 HANDOFF_PATH = ".orinoco-lite/shacl-vue-review-bundle.json"
 BUNDLE_FORMAT = "orinoco-shacl-review-bundle"
-BUNDLE_VERSION = 2
+BUNDLE_VERSION = 3
 MAX_BUNDLE_BYTES = 10 * 1024 * 1024
 MAX_BUNDLE_RECORDS = 50
 RECORD_ROOT = PurePosixPath("site-specific/metadata/records")
@@ -267,12 +267,12 @@ def _read_bundle_blob(root: Path, head_sha: str) -> tuple[dict[str, object], byt
     if (
         not isinstance(value, dict)
         or value.get("format") != BUNDLE_FORMAT
-        or value.get("version") != BUNDLE_VERSION
+        or value.get("version") not in {2, BUNDLE_VERSION}
         or SHA40.fullmatch(str(value.get("source_commit", ""))) is None
         or not isinstance(value.get("records"), list)
         or not 0 < len(value["records"]) <= MAX_BUNDLE_RECORDS
     ):
-        raise HandoffError("SHACL Vue bundle does not satisfy bounded version 2")
+        raise HandoffError("SHACL Vue bundle does not satisfy bounded version 2 or 3")
     return value, payload
 
 

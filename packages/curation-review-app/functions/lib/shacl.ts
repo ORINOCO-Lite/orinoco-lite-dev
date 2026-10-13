@@ -54,8 +54,9 @@ function parseRecord(value: unknown): ShaclReviewRecord {
     invalid(`SHACL review bundle source path for ${pid} is invalid.`);
   }
   if (
-    typeof value.source_sha256 !== "string" ||
-    !DIGEST.test(value.source_sha256)
+    value.source_sha256 !== null &&
+    (typeof value.source_sha256 !== "string" ||
+      !DIGEST.test(value.source_sha256))
   ) {
     invalid(`SHACL review bundle source digest for ${pid} is invalid.`);
   }
@@ -89,16 +90,22 @@ export function parseShaclReviewBundle(value: unknown): ShaclReviewBundle {
   );
   if (
     value.format !== "orinoco-shacl-review-bundle" ||
-    value.version !== 2 ||
+    (value.version !== 2 && value.version !== 3) ||
     typeof value.source_commit !== "string" ||
     !COMMIT.test(value.source_commit) ||
     !Array.isArray(value.records) ||
     value.records.length === 0 ||
     value.records.length > 50
   ) {
-    invalid("SHACL review bundle does not satisfy version 2.");
+    invalid("SHACL review bundle does not satisfy version 2 or 3.");
   }
   const records = value.records.map(parseRecord);
+  if (
+    value.version === 2 &&
+    records.some((record) => record.source_sha256 === null)
+  ) {
+    invalid("New records require SHACL review bundle version 3.");
+  }
   const pids = new Set<string>();
   const paths = new Set<string>();
   for (const record of records) {
@@ -112,7 +119,7 @@ export function parseShaclReviewBundle(value: unknown): ShaclReviewBundle {
     format: "orinoco-shacl-review-bundle",
     records,
     source_commit: value.source_commit,
-    version: 2,
+    version: value.version,
   };
   if (serializeShaclReviewBundle(bundle).byteLength > MAX_SHACL_BUNDLE_BYTES) {
     throw new HttpError(
