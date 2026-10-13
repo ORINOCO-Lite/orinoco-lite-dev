@@ -444,11 +444,9 @@ def validate_bundle(
     resources_root: Path,
     bundle: Mapping[str, Any],
 ) -> dict[Path, str]:
-    from .www_from_model import resolve_www_from_model
+    from .projection import _www_from_model_root
 
-    www_from_model_root = None
-    if not (workspace.path("site") / "projection.yaml").is_file():
-        www_from_model_root = resolve_www_from_model(workspace.root, resources_root)
+    www_from_model_root = _www_from_model_root(workspace, resources_root)
     catalog = record_catalog(workspace, www_from_model_root)
     if bundle["source_commit"] != catalog["source_commit"]:
         raise DriverError("Review bundle is stale for the current consumer commit")
