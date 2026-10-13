@@ -182,14 +182,14 @@ export interface ShaclReviewRecord {
   rdf_turtle: string;
   schema_type: string;
   source_path: string;
-  source_sha256: string;
+  source_sha256: string | null;
 }
 
 export interface ShaclReviewBundle {
   format: "orinoco-shacl-review-bundle";
   records: ShaclReviewRecord[];
   source_commit: string;
-  version: 2;
+  version: 2 | 3;
 }
 
 export interface ShaclPullRequestTarget {

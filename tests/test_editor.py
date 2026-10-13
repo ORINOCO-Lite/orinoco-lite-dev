@@ -185,7 +185,7 @@ class EditorBundleTests(unittest.TestCase):
 
     def test_catalog_uses_projection_editability_policy(self) -> None:
         catalog = record_catalog(self.workspace)
-        self.assertEqual(catalog["version"], 2)
+        self.assertEqual(catalog["version"], 3)
         self.assertEqual(len(catalog["records"]), 2)
         self.assertEqual(
             [record["pid"] for record in catalog["records"]],
@@ -528,6 +528,84 @@ class EditorBundleTests(unittest.TestCase):
                 _atomic_apply(updates)
         self.assertEqual(self.first.read_bytes(), originals[self.first])
         self.assertEqual(self.second.read_bytes(), originals[self.second])
+
+    def _new_bundle(self) -> tuple[Path, Path]:
+        from orinoco_lite.upstream_snapshot import RecordEnvelope, record_relative_path
+
+        bundle = self._bundle({"xyzrins:persons/first": "Changed"})
+        value = json.loads(bundle.read_text())
+        record = {"pid": "xyzrins:persons/new", "schema_type": "xyzri:XYZPerson"}
+        relative = record_relative_path(RecordEnvelope("XYZPerson", record))
+        path = self.workspace.path("records") / relative
+        value["records"].append({
+            **record,
+            "source_path": path.relative_to(self.workspace.root).as_posix(),
+            "source_sha256": None,
+            "rdf_turtle": '<https://example.invalid/persons/new> <http://www.w3.org/2000/01/rdf-schema#label> "New" .',
+        })
+        bundle.write_text(json.dumps(value))
+        return bundle, path
+
+    def test_create_and_update_bundle_can_be_reviewed_then_applied(self) -> None:
+        bundle, path = self._new_bundle()
+        preview = apply_bundle_report(self.workspace, self.resources, bundle, write=False)
+        self.assertFalse(path.exists())
+        self.assertIn("--- /dev/null", preview["diff"])
+        self.assertEqual(len(preview["changed_paths"]), 2)
+        applied = apply_bundle_report(self.workspace, self.resources, bundle, write=True)
+        self.assertEqual(applied["changed_paths"], preview["changed_paths"])
+        self.assertEqual(yaml.safe_load(path.read_text())["pid"], "xyzrins:persons/new")
+        self.assertIn("Changed", self.first.read_text())
+
+    def test_new_records_reject_occupied_paths_and_existing_identities(self) -> None:
+        bundle, path = self._new_bundle()
+        path.write_text("pid: xyzrins:persons/occupied\nschema_type: xyzri:XYZPerson\n")
+        with self.assertRaisesRegex(DriverError, "already exists"):
+            apply_bundle(self.workspace, self.resources, bundle, write=True)
+        self.assertIn("First", self.first.read_text())
+        path.unlink()
+        value = json.loads(bundle.read_text())
+        value["records"][-1]["pid"] = "xyzrins:roles/member"
+        bundle.write_text(json.dumps(value))
+        with self.assertRaisesRegex(DriverError, "PID already exists"):
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
+
+    def test_new_records_reject_wrong_paths_classes_and_old_bundle_version(self) -> None:
+        for field, invalid, message in (
+            ("source_path", "site-specific/metadata/records/XYZPerson/arbitrary.yaml", "source path"),
+            ("schema_type", "xyzri:XYZAgentRole", "not editable"),
+            ("source_path", "../new.yaml", "source path"),
+        ):
+            with self.subTest(field=field, value=invalid):
+                bundle, path = self._new_bundle()
+                value = json.loads(bundle.read_text())
+                value["records"][-1][field] = invalid
+                bundle.write_text(json.dumps(value))
+                with self.assertRaisesRegex(DriverError, message):
+                    apply_bundle(self.workspace, self.resources, bundle, write=False)
+                self.assertFalse(path.exists())
+        bundle, _ = self._new_bundle()
+        value = json.loads(bundle.read_text())
+        value["version"] = 2
+        bundle.write_text(json.dumps(value))
+        with self.assertRaisesRegex(DriverError, "require review bundle version 3"):
+            apply_bundle(self.workspace, self.resources, bundle, write=False)
+
+    def test_failed_mixed_transaction_removes_created_record(self) -> None:
+        path = self.workspace.path("records") / "A/new.yaml"
+        original = self.first.read_bytes()
+        real_replace = os.replace
+
+        def failing_replace(source, destination):
+            if destination == self.first and str(source).endswith(".staged"):
+                raise OSError("injected failure")
+            return real_replace(source, destination)
+
+        with patch("orinoco_lite.editor.os.replace", side_effect=failing_replace):
+            with self.assertRaisesRegex(OSError, "injected failure"):
+                _atomic_apply({path: "pid: xyzrins:new\n", self.first: "pid: changed\n"})
+        self.assertFalse(path.exists())
+        self.assertEqual(self.first.read_bytes(), original)
 
     def test_human_replacement_reconciles_companion_in_the_same_apply(self) -> None:
         companion = (

@@ -8,7 +8,7 @@ vi.mock('@/modules/utils', () => ({
             const writer = new Writer({ prefixes });
             writer.addQuads(quads);
             writer.end((error, result) =>
-                error ? reject(error) : resolve(result),
+                error ? reject(error) : resolve(result)
             );
         }),
     toCURIE: (iri, prefixes) => {
@@ -66,7 +66,81 @@ const catalog = {
     version: 2,
 };
 
+const creationCatalog = {
+    ...catalog,
+    version: 3,
+    records_root: 'metadata/records',
+    new_record_schema_types: ['xyzri:XYZPerson'],
+};
+
 describe('Orinoco review bundles', () => {
+    it('downloads and restores a new record with an absent-source precondition', async () => {
+        const iri = 'https://example.test/r/persons/new';
+        const prefixes = {
+            xyzri: 'https://example.test/s/',
+            xyzrins: 'https://example.test/r/',
+        };
+        const graph = new Store([
+            quad(
+                namedNode(iri),
+                namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
+                namedNode('https://example.test/s/XYZPerson')
+            ),
+            quad(
+                namedNode(iri),
+                namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
+                literal('New person')
+            ),
+        ]);
+        const bundle = await buildReviewBundle({
+            catalog: creationCatalog,
+            graph,
+            prefixes,
+            selectedNodes: [
+                {
+                    node_iri: iri,
+                    nodeshape_iri: 'https://example.test/s/XYZPerson',
+                },
+            ],
+        });
+        expect(bundle.version).toBe(3);
+        expect(bundle.records[0].source_sha256).toBeNull();
+        expect(bundle.records[0].source_path).toMatch(
+            /^metadata\/records\/XYZPerson\/[a-f0-9]{64}\.yaml$/
+        );
+        const restoredGraph = new Store();
+        await restoreReviewBundle({
+            bundle,
+            catalog: creationCatalog,
+            graph: restoredGraph,
+            prefixes,
+        });
+        expect(restoredGraph.size).toBe(2);
+        bundle.records[0].source_path =
+            'metadata/records/XYZPerson/arbitrary.yaml';
+        await expect(
+            restoreReviewBundle({
+                bundle,
+                catalog: creationCatalog,
+                graph: restoredGraph,
+                prefixes,
+            })
+        ).rejects.toThrow('does not match this deployment');
+        expect(restoredGraph.size).toBe(2);
+        await expect(
+            buildReviewBundle({
+                catalog: creationCatalog,
+                graph,
+                prefixes,
+                selectedNodes: [
+                    {
+                        node_iri: iri,
+                        nodeshape_iri: 'https://example.test/s/XYZAgentRole',
+                    },
+                ],
+            })
+        ).rejects.toThrow('not editable');
+    });
     it('binds a candidate preview to one exact draft pull request', () => {
         const target = {
             expected_head_sha: SOURCE_COMMIT,
@@ -74,11 +148,11 @@ describe('Orinoco review bundles', () => {
             pull_request: 42,
         };
         expect(reviewProposalTarget({ target: new Proxy(target, {}) })).toEqual(
-            target,
+            target
         );
         expect(reviewProposalTarget({})).toEqual({ kind: 'standalone' });
         expect(() =>
-            reviewProposalTarget({ target: { ...target, pull_request: 0 } }),
+            reviewProposalTarget({ target: { ...target, pull_request: 0 } })
         ).toThrow('invalid pull-request target');
     });
 
@@ -89,7 +163,7 @@ describe('Orinoco review bundles', () => {
                 recordIri: IRI,
                 recordLabel: 'Example person',
                 prefixes: { xyzrins: 'https://example.test/r/' },
-            }),
+            })
         ).toBe('Person: Example person: xyzrins:persons/example: ' + IRI);
     });
 
@@ -98,7 +172,7 @@ describe('Orinoco review bundles', () => {
             quad(
                 IRI,
                 namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
-                literal('Changed label'),
+                literal('Changed label')
             ),
         ]);
         const bundle = await buildReviewBundle({
@@ -129,7 +203,7 @@ describe('Orinoco review bundles', () => {
             quad(
                 IRI,
                 namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
-                literal('Changed label'),
+                literal('Changed label')
             ),
         ]);
         const bundle = await buildReviewBundle({
@@ -147,19 +221,19 @@ describe('Orinoco review bundles', () => {
             (event) => {
                 observed = event.detail;
             },
-            { once: true },
+            { once: true }
         );
 
         expect(dispatchReviewBundle(bundle)).toBe(true);
         expect(observed).toBe(bundle);
     });
 
-    it('restores a downloaded bundle into the matching deployed editor', () => {
+    it('restores a downloaded bundle into the matching deployed editor', async () => {
         const graph = new Store([
             quad(
                 IRI,
                 namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
-                literal('Original label'),
+                literal('Original label')
             ),
         ]);
         const bundle = {
@@ -181,7 +255,7 @@ describe('Orinoco review bundles', () => {
         };
 
         expect(
-            restoreReviewBundle({
+            await restoreReviewBundle({
                 bundle,
                 catalog,
                 graph,
@@ -189,7 +263,7 @@ describe('Orinoco review bundles', () => {
                     xyzri: 'https://example.test/s/',
                     xyzrins: 'https://example.test/r/',
                 },
-            }),
+            })
         ).toEqual([
             {
                 node_iri: IRI,
@@ -202,19 +276,19 @@ describe('Orinoco review bundles', () => {
                 IRI,
                 'http://www.w3.org/2000/01/rdf-schema#label',
                 null,
-                null,
-            )[0].object.value,
+                null
+            )[0].object.value
         ).toBe('Restored label');
     });
 
-    it('rejects a bundle from a different deployment before changing data', () => {
+    it('rejects a bundle from a different deployment before changing data', async () => {
         const original = quad(
             IRI,
             namedNode('http://www.w3.org/2000/01/rdf-schema#label'),
-            literal('Original label'),
+            literal('Original label')
         );
         const graph = new Store([original]);
-        expect(() =>
+        await expect(
             restoreReviewBundle({
                 bundle: {
                     format: 'orinoco-shacl-review-bundle',
@@ -225,8 +299,8 @@ describe('Orinoco review bundles', () => {
                 catalog,
                 graph,
                 prefixes: {},
-            }),
-        ).toThrow('does not match this deployed editor');
+            })
+        ).rejects.toThrow('does not match this deployed editor');
         expect(graph.has(original)).toBe(true);
     });
 
@@ -240,7 +314,7 @@ describe('Orinoco review bundles', () => {
         const nonce = '0a'.repeat(32);
         const target = {
             addEventListener: vi.fn((type, listener) =>
-                listeners.set(type, listener),
+                listeners.set(type, listener)
             ),
             clearTimeout: vi.fn(),
             crypto: {
@@ -272,13 +346,13 @@ describe('Orinoco review bundles', () => {
                 repository: 'ORINOCO-Lite/example-site',
                 service_origin: 'https://review.example.test',
             },
-            target,
+            target
         );
         expect(target.open).toHaveBeenCalledWith(
             'https://review.example.test/api/transport?kind=shacl&repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
                 nonce,
             `orinoco-lite-shacl-proposal-${nonce}`,
-            'popup,width=720,height=760,resizable=yes,scrollbars=yes',
+            'popup,width=720,height=760,resizable=yes,scrollbars=yes'
         );
         const reactiveProposal = new Proxy(proposal, {});
         const delivered = handoff.deliver(reactiveProposal);
@@ -319,10 +393,10 @@ describe('Orinoco review bundles', () => {
                 proposal,
                 repository: 'ORINOCO-Lite/example-site',
             },
-            'https://review.example.test',
+            'https://review.example.test'
         );
         expect(popup.postMessage.mock.calls[0][0].proposal).not.toBe(
-            reactiveProposal,
+            reactiveProposal
         );
         receive({
             data: {
@@ -359,7 +433,7 @@ describe('Orinoco review bundles', () => {
         await expect(delivered).resolves.toBe(result);
         expect(target.removeEventListener).toHaveBeenCalledWith(
             'message',
-            receive,
+            receive
         );
         expect(target.clearTimeout).toHaveBeenCalledWith(17);
         expect(target.clearInterval).toHaveBeenCalledWith(18);
@@ -392,7 +466,7 @@ describe('Orinoco review bundles', () => {
                     repository: 'ORINOCO-Lite/example-site',
                     service_origin: 'https://review.example.test',
                 },
-                target,
+                target
             );
             const delivered = handoff.deliver({
                 repository: 'ORINOCO-Lite/example-site',
@@ -430,14 +504,14 @@ describe('Orinoco review bundles', () => {
         }
 
         await expect(runFailure(true)).rejects.toThrow(
-            'GitHub did not return a complete result.',
+            'GitHub did not return a complete result.'
         );
         await expect(runFailure(true)).rejects.toMatchObject({
             code: 'github_forbidden',
             status: 403,
         });
         await expect(runFailure(false)).rejects.toThrow(
-            /did not confirm.*If no pull request exists.*retry/,
+            /did not confirm.*If no pull request exists.*retry/
         );
     });
 
@@ -454,7 +528,7 @@ describe('Orinoco review bundles', () => {
             ['curation.example.org', false],
         ]) {
             expect(isSharedGithubPagesOrigin({ location: { hostname } })).toBe(
-                expected,
+                expected
             );
         }
     });
@@ -475,31 +549,31 @@ describe('Orinoco review bundles', () => {
             },
         ]) {
             expect(() => beginReviewBundleProposal(proposal)).toThrow(
-                /invalid/,
+                /invalid/
             );
         }
     });
 
     it('provides setup instructions for GitHub authorization failures', () => {
         expect(curationSetupUrl({})).toContain(
-            'packages/curation-review-app/README.md#fix-github-authorization',
+            'packages/curation-review-app/README.md#fix-github-authorization'
         );
         expect(curationInstallUrl({})).toBe(
-            'https://github.com/apps/orinoco-lite-curation-review/installations/new',
+            'https://github.com/apps/orinoco-lite-curation-review/installations/new'
         );
         expect(
             curationSetupUrl({
                 setup_url:
                     'https://github.com/example/site/blob/main/README.md',
-            }),
+            })
         ).toBe('https://github.com/example/site/blob/main/README.md');
         expect(() =>
-            curationSetupUrl({ setup_url: 'https://example.test/setup' }),
+            curationSetupUrl({ setup_url: 'https://example.test/setup' })
         ).toThrow(/setup URL/);
         expect(() =>
             curationInstallUrl({
                 install_url: 'https://github.com/settings/apps/new',
-            }),
+            })
         ).toThrow(/install URL/);
     });
 
@@ -517,7 +591,7 @@ describe('Orinoco review bundles', () => {
 
         expect(isFramedContext(framed)).toBe(true);
         expect(() => beginReviewBundleProposal(proposal, framed)).toThrow(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.'
         );
         expect(open).not.toHaveBeenCalled();
         expect(isFramedContext({ self: window, top: window })).toBe(false);
@@ -533,10 +607,10 @@ describe('Orinoco review bundles', () => {
 
     it('rejects old catalogs and produces deterministic filenames', () => {
         expect(() => validateRecordCatalog({ ...catalog, version: 1 })).toThrow(
-            /version 2/,
+            /version 2/
         );
         expect(reviewBundleFilename([{ pid: PID }])).toBe(
-            'orinoco-review-xyzrins-persons-example.json',
+            'orinoco-review-xyzrins-persons-example.json'
         );
     });
 });
@@ -555,7 +629,7 @@ describe('proposal failure guidance', () => {
         'reports %s without inferring installation from HTTP status',
         (code, expected) => {
             expect(proposalFailureGuidance(code)).toBe(expected);
-        },
+        }
     );
     it.each(['verified', 'unsupported', 'denied-before-delivery'])(
         'checks access without sending a proposal (service supports checks: %s)',
@@ -585,7 +659,7 @@ describe('proposal failure guidance', () => {
                     service_origin: 'https://review.example',
                 },
                 target,
-                { checkOnly: true },
+                { checkOnly: true }
             );
             if (state === 'denied-before-delivery') {
                 receive({
@@ -628,6 +702,6 @@ describe('proposal failure guidance', () => {
                 });
             expect(popup.postMessage).not.toHaveBeenCalled();
             expect(popup.close).toHaveBeenCalledOnce();
-        },
+        }
     );
 });

@@ -3,7 +3,7 @@ import { Parser, Store } from 'n3';
 import { getRecordQuads, quadsToTTL, toCURIE, toIRI } from '@/modules/utils';
 
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
-export const REVIEW_BUNDLE_VERSION = 2;
+export const REVIEW_BUNDLE_VERSION = 3;
 export const REVIEW_BUNDLE_EVENT = 'orinoco:review-bundle';
 export const REVIEW_PROPOSAL_MESSAGE_FORMAT =
     'orinoco-lite-shacl-proposal-message-v1';
@@ -37,7 +37,7 @@ function exactKeys(value, expected) {
 
 export function dispatchReviewBundle(bundle, target = window) {
     return target.dispatchEvent(
-        new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle }),
+        new CustomEvent(REVIEW_BUNDLE_EVENT, { detail: bundle })
     );
 }
 
@@ -48,7 +48,7 @@ function reviewProposalCoordinates(value) {
     }
     const serviceOrigin = requireString(
         value?.service_origin,
-        'proposal service origin',
+        'proposal service origin'
     );
     let service;
     try {
@@ -195,11 +195,11 @@ export function isFramedContext(target = window) {
 export function beginReviewBundleProposal(
     value,
     target = window,
-    { checkOnly = false } = {},
+    { checkOnly = false } = {}
 ) {
     if (isFramedContext(target)) {
         throw new Error(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.',
+            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.'
         );
     }
     const {
@@ -219,11 +219,11 @@ export function beginReviewBundleProposal(
     if (proposalTarget.kind === 'pull_request') {
         url.searchParams.set(
             'pull_request',
-            String(proposalTarget.pull_request),
+            String(proposalTarget.pull_request)
         );
         url.searchParams.set(
             'expected_head_sha',
-            proposalTarget.expected_head_sha,
+            proposalTarget.expected_head_sha
         );
     }
     let popup;
@@ -271,7 +271,7 @@ export function beginReviewBundleProposal(
                 proposal,
                 repository,
             },
-            serviceOrigin,
+            serviceOrigin
         );
     }
 
@@ -300,7 +300,7 @@ export function beginReviewBundleProposal(
             const error = new Error(
                 typeof event.data.message === 'string'
                     ? event.data.message
-                    : 'The GitHub transport failed',
+                    : 'The GitHub transport failed'
             );
             error.code =
                 typeof event.data.code === 'string' ? event.data.code : null;
@@ -392,7 +392,7 @@ export function beginReviewBundleProposal(
                 const error = new Error(
                     `${message} GitHub did not confirm that it created a pull ` +
                         'request. Check the repository first. If no pull request ' +
-                        'exists, retry after resolving the reported problem.',
+                        'exists, retry after resolving the reported problem.'
                 );
                 error.code =
                     typeof event.data.error_code === 'string'
@@ -424,7 +424,7 @@ export function beginReviewBundleProposal(
         }
         if (checkOnly) {
             const error = new Error(
-                'This curation service does not support access checks yet. Ask its operator to update it.',
+                'This curation service does not support access checks yet. Ask its operator to update it.'
             );
             error.code = 'access_check_unavailable';
             dispose({ reject: error });
@@ -438,7 +438,7 @@ export function beginReviewBundleProposal(
     popup = target.open(
         url.toString(),
         `orinoco-lite-shacl-proposal-${nonce}`,
-        'popup,width=720,height=760,resizable=yes,scrollbars=yes',
+        'popup,width=720,height=760,resizable=yes,scrollbars=yes'
     );
     if (!popup) {
         dispose();
@@ -453,7 +453,7 @@ export function beginReviewBundleProposal(
                       'retry after resolving the reported problem.'
                     : 'The GitHub proposal transport expired before writing.',
             }),
-        HANDOFF_TIMEOUT_MS,
+        HANDOFF_TIMEOUT_MS
     );
     closedPoll = target.setInterval(() => {
         if (popup.closed) {
@@ -474,7 +474,7 @@ export function beginReviewBundleProposal(
             if (proposal !== undefined || settled) {
                 return Promise.reject(
                     terminalError ??
-                        new Error('The GitHub proposal was already delivered'),
+                        new Error('The GitHub proposal was already delivered')
                 );
             }
             // Vue exposes the editor state through reactive Proxy objects.
@@ -503,7 +503,7 @@ export function recordSubmissionLabel({
             (value, index, values) =>
                 typeof value === 'string' &&
                 value.length &&
-                values.indexOf(value) === index,
+                values.indexOf(value) === index
         )
         .join(': ');
 }
@@ -519,7 +519,7 @@ export function validateRecordCatalog(catalog) {
     if (
         !catalog ||
         catalog.format !== 'orinoco-static-record-sources' ||
-        catalog.version !== 2 ||
+        ![2, 3].includes(catalog.version) ||
         !/^[0-9a-f]{40}$/.test(catalog.source_commit || '') ||
         !Array.isArray(catalog.records)
     ) {
@@ -527,11 +527,29 @@ export function validateRecordCatalog(catalog) {
     }
 
     const byPid = new Map();
+    if (
+        catalog.version === 3 &&
+        (typeof catalog.records_root !== 'string' ||
+            !catalog.records_root ||
+            catalog.records_root.startsWith('/') ||
+            /[\\\u0000-\u001f\u007f]/.test(catalog.records_root) ||
+            catalog.records_root
+                .split('/')
+                .some((part) => !part || part === '.' || part === '..') ||
+            !Array.isArray(catalog.new_record_schema_types) ||
+            catalog.new_record_schema_types.some(
+                (type) =>
+                    !/^[A-Za-z][A-Za-z0-9_-]*:[A-Za-z][A-Za-z0-9_]*$/.test(type)
+            ))
+    )
+        throw new Error(
+            'Static record catalog has invalid new record coordinates'
+        );
     for (const record of catalog.records) {
         const pid = requireString(record?.pid, 'PID');
         if (byPid.has(pid)) {
             throw new Error(
-                `Static record catalog contains duplicate PID ${pid}`,
+                `Static record catalog contains duplicate PID ${pid}`
             );
         }
         requireString(record.schema_type, `${pid} schema type`);
@@ -539,7 +557,7 @@ export function validateRecordCatalog(catalog) {
         requireString(record.rdf_turtle, `${pid} RDF`);
         if (!/^[0-9a-f]{64}$/.test(record.sha256 || '')) {
             throw new Error(
-                `Static record catalog has an invalid ${pid} digest`,
+                `Static record catalog has an invalid ${pid} digest`
             );
         }
         byPid.set(pid, record);
@@ -547,12 +565,35 @@ export function validateRecordCatalog(catalog) {
     return byPid;
 }
 
-function reviewBundleRecords(bundle, catalogByPid, sourceCommit) {
+async function newRecordSource(catalog, pid, schemaType) {
+    if (
+        catalog.version !== 3 ||
+        !catalog.new_record_schema_types.includes(schemaType)
+    ) {
+        throw new Error(
+            `New record schema type is not editable: ${schemaType}`
+        );
+    }
+    const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(pid)
+    );
+    const filename = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, '0')
+    ).join('');
+    return {
+        path: `${catalog.records_root}/${schemaType.split(':')[1]}/${filename}.yaml`,
+        schema_type: schemaType,
+        sha256: null,
+    };
+}
+
+async function reviewBundleRecords(bundle, catalogByPid, catalog) {
     if (
         !exactKeys(bundle, ['format', 'records', 'source_commit', 'version']) ||
         bundle.format !== REVIEW_BUNDLE_FORMAT ||
-        bundle.version !== REVIEW_BUNDLE_VERSION ||
-        bundle.source_commit !== sourceCommit ||
+        ![2, 3].includes(bundle.version) ||
+        bundle.source_commit !== catalog.source_commit ||
         !Array.isArray(bundle.records) ||
         !bundle.records.length ||
         bundle.records.length > 50
@@ -561,7 +602,8 @@ function reviewBundleRecords(bundle, catalogByPid, sourceCommit) {
     }
     const pids = new Set();
     const paths = new Set();
-    return bundle.records.map((record) => {
+    const records = [];
+    for (const record of bundle.records) {
         if (
             !exactKeys(record, [
                 'pid',
@@ -576,14 +618,27 @@ function reviewBundleRecords(bundle, catalogByPid, sourceCommit) {
             record.rdf_turtle.includes('\0') ||
             typeof record.schema_type !== 'string' ||
             typeof record.source_path !== 'string' ||
-            typeof record.source_sha256 !== 'string' ||
-            !/^[0-9a-f]{64}$/.test(record.source_sha256) ||
+            (record.source_sha256 !== null &&
+                !/^[0-9a-f]{64}$/.test(record.source_sha256)) ||
+            (record.source_sha256 === null && bundle.version !== 3) ||
             pids.has(record.pid) ||
             paths.has(record.source_path)
         ) {
             throw new Error('Review bundle contains an invalid record');
         }
-        const source = catalogByPid.get(record.pid);
+        let source = catalogByPid.get(record.pid);
+        if (record.source_sha256 === null && !source) {
+            source = await newRecordSource(
+                catalog,
+                record.pid,
+                record.schema_type
+            );
+            if (catalog.records.some((entry) => entry.path === source.path)) {
+                throw new Error(
+                    `New record source path already exists: ${source.path}`
+                );
+            }
+        }
         if (
             !source ||
             source.schema_type !== record.schema_type ||
@@ -591,22 +646,24 @@ function reviewBundleRecords(bundle, catalogByPid, sourceCommit) {
             source.sha256 !== record.source_sha256
         ) {
             throw new Error(
-                `Review bundle record does not match this deployment: ${record.pid}`,
+                `Review bundle record does not match this deployment: ${record.pid}`
             );
         }
         pids.add(record.pid);
         paths.add(record.source_path);
-        return record;
-    });
+        records.push(record);
+    }
+    return records;
 }
 
-export function restoreReviewBundle({ bundle, catalog, graph, prefixes }) {
+export async function restoreReviewBundle({
+    bundle,
+    catalog,
+    graph,
+    prefixes,
+}) {
     const catalogByPid = validateRecordCatalog(catalog);
-    const records = reviewBundleRecords(
-        bundle,
-        catalogByPid,
-        catalog.source_commit,
-    );
+    const records = await reviewBundleRecords(bundle, catalogByPid, catalog);
     const restored = records.map((record) => {
         const nodeIri = toIRI(record.pid, prefixes);
         const nodeShapeIri = toIRI(record.schema_type, prefixes);
@@ -617,7 +674,7 @@ export function restoreReviewBundle({ bundle, catalog, graph, prefixes }) {
             !nodeShapeIri.includes(':')
         ) {
             throw new Error(
-                `Review bundle uses an unknown prefix: ${record.pid}`,
+                `Review bundle uses an unknown prefix: ${record.pid}`
             );
         }
         let quads;
@@ -634,7 +691,7 @@ export function restoreReviewBundle({ bundle, catalog, graph, prefixes }) {
             !recordQuads.some((quad) => quad.subject.value === nodeIri)
         ) {
             throw new Error(
-                `Review bundle RDF does not describe its record: ${record.pid}`,
+                `Review bundle RDF does not describe its record: ${record.pid}`
             );
         }
         return {
@@ -664,7 +721,7 @@ export async function buildReviewBundle({
 }) {
     const catalogByPid = validateRecordCatalog(catalog);
     const selected = [...selectedNodes].sort((left, right) =>
-        left.node_iri.localeCompare(right.node_iri),
+        left.node_iri.localeCompare(right.node_iri)
     );
     if (!selected.length) {
         throw new Error('Select at least one edited record');
@@ -673,11 +730,21 @@ export async function buildReviewBundle({
     const records = [];
     for (const node of selected) {
         const pid = toCURIE(node.node_iri, prefixes);
-        const source = catalogByPid.get(pid);
+        let source = catalogByPid.get(pid);
         if (!source) {
-            throw new Error(
-                `Edited record is not in the static catalog: ${pid}`,
+            source = await newRecordSource(
+                catalog,
+                pid,
+                toCURIE(node.nodeshape_iri, prefixes)
             );
+            if (
+                catalog.records.some((entry) => entry.path === source.path) ||
+                records.some((entry) => entry.source_path === source.path)
+            ) {
+                throw new Error(
+                    `New record source path already exists: ${source.path}`
+                );
+            }
         }
         const dataset = new Store();
         dataset.addQuads(getRecordQuads(node.node_iri, graph, true));
@@ -701,7 +768,7 @@ export async function buildReviewBundle({
         format: REVIEW_BUNDLE_FORMAT,
         records,
         source_commit: catalog.source_commit,
-        version: REVIEW_BUNDLE_VERSION,
+        version: catalog.version === 2 ? 2 : REVIEW_BUNDLE_VERSION,
     };
 }
 
@@ -720,7 +787,7 @@ export function proposalFailureGuidance(code) {
         return 'signin';
     if (
         ['curator_permission_required', 'metadata_access_required'].includes(
-            code,
+            code
         )
     )
         return 'permission';

@@ -203,7 +203,7 @@ index 9621e55..7939e6a 100644
 +        recordLabel,
 +    });
 +}
-@@ -191,0 +371,73 @@ function clearSubmitErrors() {
+@@ -191,0 +371,74 @@ function clearSubmitErrors() {
 +    proposalResult.value = null;
 +    proposing.value = false;
 +
@@ -241,12 +241,13 @@ index 9621e55..7939e6a 100644
 +        if (file.size > 10 * 1024 * 1024) {
 +            throw new Error('review bundle exceeds 10 MiB');
 +        }
-+        const restored = restoreReviewBundle({
++        const restored = await restoreReviewBundle({
 +            bundle: JSON.parse(await file.text()),
 +            catalog: await loadRecordCatalog(),
 +            graph: rdfDS.data.graph,
 +            prefixes: allPrefixes,
 +        });
++        rdfDS.emitAddedRecords(restored.map((record) => record.node_iri));
 +        for (const record of restored) {
 +            const existing = nodesToSubmit.value.findIndex(
 +                (node) => node.node_iri === record.node_iri
@@ -277,7 +278,7 @@ index 9621e55..7939e6a 100644
 +    responseReceived.value = true;
 +    responseText.value = `The review bundle could not be created: ${error.message}`;
 +}
-@@ -192,0 +445,73 @@ function clearSubmitErrors() {
+@@ -192,0 +446,73 @@ function clearSubmitErrors() {
 +async function checkGitHubAccess() {
 +    proposing.value = true;
 +    accessStatus.value = 'Signing in and checking repository access…';
@@ -351,7 +352,7 @@ index 9621e55..7939e6a 100644
 +    } finally {
 +        proposing.value = false;
 +    }
-@@ -242,13 +567,1 @@ async function downloadRecords() {
+@@ -242,13 +568,1 @@ async function downloadRecords() {
 -            const response = await fetch(config.value.review_bundle_catalog, {
 -                cache: 'no-cache',
 -                credentials: 'omit',
@@ -366,9 +367,9 @@ index 9621e55..7939e6a 100644
 -                selectedNodes: toSubmit,
 -            });
 +            const bundle = await buildSelectedReviewBundle();
-@@ -255,0 +569,1 @@ async function downloadRecords() {
+@@ -255,0 +570,1 @@ async function downloadRecords() {
 +            dispatchReviewBundle(bundle);
-@@ -257,3 +571,1 @@ async function downloadRecords() {
+@@ -257,3 +572,1 @@ async function downloadRecords() {
 -            responseFailure.value = true;
 -            responseReceived.value = true;
 -            responseText.value = `The review bundle could not be created: ${error.message}`;
