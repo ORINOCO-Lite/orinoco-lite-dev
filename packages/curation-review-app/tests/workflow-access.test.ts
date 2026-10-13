@@ -176,14 +176,17 @@ async function setup() {
             {
               check_run_url:
                 "https://api.github.com/repos/owner/site/check-runs/5",
-              steps: [
-                "Validate the materialized joined graph",
-                "Create the equivalent attributed human metadata commit",
-              ].map((name) => ({
-                name,
-                status: "completed",
-                conclusion: "success",
-              })),
+              name: "Publish validated SHACL Vue proposal",
+              status: "in_progress",
+              steps: [],
+            },
+            {
+              name: "Validate SHACL Vue proposal",
+              check_run_url:
+                "https://api.github.com/repos/owner/site/check-runs/6",
+              status: "completed",
+              conclusion: "success",
+              steps: [],
             },
           ],
         };
@@ -225,6 +228,35 @@ describe("proposal-bound workflow authority", () => {
       ["owner/data", "curator", 3],
     ]);
     expect(s.auth.revoke).toHaveBeenCalledTimes(2);
+  });
+  it.each([
+    { status: "in_progress", conclusion: null },
+    { status: "completed", conclusion: "failure" },
+    { status: "completed", conclusion: "skipped" },
+    { name: "Other validation" },
+    { check_run_url: "https://api.github.com/repos/owner/site/check-runs/5" },
+  ])("rejects uncompleted or unrelated validation %j", async (change) => {
+    const s = await setup();
+    const original = s.json.getMockImplementation()!;
+    s.json.mockImplementation(async (path, ...rest) => {
+      const value = (await original(path, ...rest)) as any;
+      if (path.endsWith("/jobs?per_page=100"))
+        Object.assign(value.jobs[1], change);
+      return value;
+    });
+    await expect(
+      workflowAccess(env, identity, request, s.auth),
+    ).rejects.toThrow(
+      "A separate trusted validation job must succeed before write access.",
+    );
+    expect(s.token.mock.calls.every((call) => call[1] !== true)).toBe(true);
+  });
+  it("rejects write access from the validation job itself", async () => {
+    const s = await setup();
+    await expect(
+      workflowAccess(env, { ...identity, check_run_id: "6" }, request, s.auth),
+    ).rejects.toThrow();
+    expect(s.token.mock.calls.every((call) => call[1] !== true)).toBe(true);
   });
   it("uses read-only access before validation", async () => {
     const s = await setup();

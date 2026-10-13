@@ -435,27 +435,25 @@ export async function workflowAccess(
           `/repos/${request.repository}/actions/runs/${identity.run_id}/attempts/1/jobs?per_page=100`,
         ),
       );
-      const job = jobs.jobs?.find(
+      const current = jobs.jobs?.find(
         (j: any) =>
           j.check_run_url ===
           `https://api.github.com/repos/${request.repository}/check-runs/${identity.check_run_id}`,
       );
-      for (const name of [
-        "Validate the materialized joined graph",
-        "Create the equivalent attributed human metadata commit",
-      ]) {
-        if (
-          !job?.steps?.some(
-            (s: any) =>
-              s.name === name &&
-              s.status === "completed" &&
-              s.conclusion === "success",
-          )
-        )
-          deny(
-            "Trusted materialization and validation must succeed before write access.",
-          );
-      }
+      const validation = jobs.jobs?.filter(
+        (j: any) => j.name === "Validate SHACL Vue proposal",
+      );
+      if (
+        current?.name !== "Publish validated SHACL Vue proposal" ||
+        current.status !== "in_progress" ||
+        validation?.length !== 1 ||
+        validation[0].status !== "completed" ||
+        validation[0].conclusion !== "success" ||
+        validation[0].check_run_url === current.check_run_url
+      )
+        deny(
+          "A separate trusted validation job must succeed before write access.",
+        );
     }
     metadataToken = await auth.token(metadata.repository);
     const github = new GitHubClient(metadataToken.token, auth.fetcher);

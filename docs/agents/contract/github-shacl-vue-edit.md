@@ -100,6 +100,8 @@ Applying a bundle containing both creates and updates MUST roll back all record 
 
 For a submodule proposal, the trusted website workflow MUST verify both exact heads, the pinned metadata base, the identical bundles, and curator authority in both repositories.
 It checks out metadata as data and validates the complete website and metadata composition without write credentials.
+The App MUST verify a separate completed successful validation job in the same exact first-attempt run before granting write access to the publishing job.
+The publishing job repeats materialization and validation from the same exact inputs on its isolated runner; no checkout or credentials cross the job boundary.
 Only then may it replace the metadata handoff with a metadata-only commit and replace the website handoff with a commit changing only the gitlink to that metadata commit.
 The existing curation App supplies bounded automated access under the [authentication contract](curation-service-authentication-options.md#app-credentials-and-automated-completion); downstreams MUST NOT configure a second App or copy its private key into Actions.
 Both branch updates MUST use exact-head leases.
