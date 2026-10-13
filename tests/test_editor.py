@@ -407,6 +407,31 @@ class EditorBundleTests(unittest.TestCase):
         apply_bundle(self.workspace, self.resources, bundle, write=True)
         self.assertIn("display_label: Changed", self.first.read_text())
 
+    def test_bundle_applies_with_custom_upstream_projection_templates(self) -> None:
+        bundle = self._bundle({"xyzrins:persons/first": "Changed"})
+        upstream = self.resources / "www-from-model"
+        upstream.mkdir()
+        (upstream / "person.md.j2").write_text("{{ display_label }}\n")
+        projection = self.root / "site-specific/projection.yaml"
+        projection.write_text(projection.read_text().replace(
+            "site-specific/projection-templates/person.md.j2",
+            "www-from-model:person.md.j2",
+        ))
+
+        with patch(
+            "orinoco_lite.projection.resolve_www_from_model",
+            return_value=upstream,
+        ):
+            report = apply_bundle_report(
+                self.workspace, self.resources, bundle, write=True
+            )
+
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["changed_paths"], [
+            "site-specific/metadata/records/XYZPerson/first.yaml",
+        ])
+        self.assertIn("display_label: Changed", self.first.read_text())
+
     def test_bundle_preserves_unchanged_rdf_multivalue_order(self) -> None:
         associated_with = [
             {"object": f"xyzrins:projects/{slug}"}
