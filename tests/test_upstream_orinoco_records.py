@@ -46,6 +46,43 @@ class UpstreamProjectionTests(unittest.TestCase):
         self.assertIn(expected.split("---", 2)[2], actual)
         self.assertIn("Editorial addition.", actual)
 
+    def test_person_profile_links_and_explicit_contact_opt_in(self):
+        from orinoco_lite.projection import _render_record, RenderPolicy
+
+        upstream = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
+        record = {
+            "pid": "xyzrins:persons/example", "given_name": "Example", "family_name": "Person",
+            "identifiers": [{"creator": {"name": "GitHub"}, "notation": "example"}],
+            "attributes": [
+                {"predicate": "foaf:homepage", "value": "https://example.org/profile"},
+                {"predicate": "foaf:account", "value": "https://www.linkedin.com/in/example"},
+                {"predicate": "dlthings:github", "value": "https://github.com/example"},
+                {"predicate": "vcard:Email", "value": "fallback@example.org"},
+                {"predicate": "vcard:hasEmail", "value": "mailto:preferred@example.org"},
+                {"predicate": "vcard:hasTelephone", "value": "tel:+123456789"},
+            ],
+        }
+        policy = RenderPolicy(upstream / "page_templates/person.md.j2", {}, (), ())
+        rendered = _render_record(record, policy, {}, [], upstream).split("---", 2)[2]
+        self.assertIn("https://example.org/profile", rendered)
+        self.assertIn("https://www.linkedin.com/in/example", rendered)
+        self.assertNotIn("mailto:", rendered)
+        self.assertNotIn("tel:", rendered)
+        self.assertNotIn("https://github.com/example", rendered)
+        with tempfile.TemporaryDirectory() as temporary:
+            child = Path(temporary) / "person.md.j2"
+            child.write_text(
+                '{% extends "www-from-model:page_templates/person.md.j2" %}'
+                '{% from "www-from-model:page_templates/person_links.md.j2" import contact_links %}'
+                '{% block content %}{{ super() }}\n\n{{ contact_links(__rec) }}{% endblock %}'
+            )
+            actual = _render_record(record, RenderPolicy(child, {}, (), ()), {}, [], upstream).split("---", 2)[2]
+        self.assertIn(rendered, actual)
+        self.assertIn("mailto:preferred@example.org", actual)
+        self.assertNotIn("fallback@example.org", actual)
+        self.assertIn("tel:+123456789", actual)
+        self.assertEqual(actual.count("https://www.linkedin.com/in/example"), 1)
+
     def test_default_projection_keeps_publication_authors_and_issued_date(self):
         from orinoco_lite.projection import _render_record
         import yaml
