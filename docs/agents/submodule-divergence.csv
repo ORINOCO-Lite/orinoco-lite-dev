@@ -1,0 +1,23 @@
+path,local_commits,upstream_commits,local_commit_subjects,upstream_url,upstream_ref,selected_commit,selected_description,merge_base,merge_base_description,upstream_commit,upstream_description,comparison_url
+submodules/dump-things-pyclient,0,0,,https://hub.psychoinformatics.de/orinoco/dump-things-pyclient.git,refs/heads/master,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,1e79391195ad4412286344189dc5f81a06accb90,0.3.0-2-g1e79391195ad,
+submodules/dump-things-service,0,51,,https://hub.psychoinformatics.de/orinoco/dump-things-service.git,refs/heads/master,9f101d97c7f15d491f602db5a9c33ad9a19ad8bf,6.3.6,9f101d97c7f15d491f602db5a9c33ad9a19ad8bf,6.3.6,eb514eb47c5a117871a3b83cf7795b308e2d82b5,6.6.3,
+submodules/pool.psychoinformatics.de-ui,5,2,"build(config): copy external YAML configuration [intent:general]
+fix(build): clear generated runtime plugins [intent:general]
+build(site): bundle local service configuration [intent:deployment]
+build(deps): select the Orinoco Lite editor [intent:integration]
+build(app): supply pinned build metadata [intent:integration]",https://hub.psychoinformatics.de/www/pool.psychoinformatics.de-ui.git,refs/heads/main,3ff21d4b609681fa267bfef0492ed6807f0f4de8,3ff21d4b6096,4543dfe9956eb53bb99b4fcccc6f0c85f05bc2d4,4543dfe9956e,d05057af747ed73d4687dbf5e006ab93322bc304,d05057af747e,https://github.com/ORINOCO-Lite/pool.psychoinformatics.de-ui/compare/main...orinoco-lite-diff
+submodules/pool.psychoinformatics.de-ui/shacl-vue,8,16,"fix(form): initialize the show-all-fields ref [intent:general]
+build(deps): refresh frontend dependencies [intent:general]
+test(markdown): cover sanitized preview rendering [intent:general]
+fix(links): restrict external links to HTTP schemes [intent:general]
+fix(downloads): honor selection and release URLs [intent:general]
+fix(editor): respect disabled service and tokens [intent:general]
+build(app): support pinned build metadata [intent:integration]
+feat(editor): export static review bundles [intent:integration]",https://hub.psychoinformatics.de/orinoco/shacl-vue.git,refs/heads/main,244159d90f7ff261f4e20e6343af096fe3a35e6c,244159d90f7f,992d7bb1e1a0646d769e0b9e47424f770b8473ef,992d7bb1e1a0,94f28278115fe034658d41c6794d60bdde40bc49,94f28278115f,https://github.com/ORINOCO-Lite/shacl-vue/compare/main...orinoco-lite-diff
+submodules/query-things,1,0,build(deps): allow consumer-selected client sources [intent:general],https://hub.psychoinformatics.de/orinoco/query-things.git,refs/heads/main,7780d5d0f16ff23cecbf62397357f54693176643,7780d5d0f16f,16ab3732555844d62bfd21260decae0f666c4cf7,16ab37325558,16ab3732555844d62bfd21260decae0f666c4cf7,16ab37325558,https://github.com/ORINOCO-Lite/query-things/compare/main...orinoco-lite-diff
+submodules/things-enrichment-tools,0,0,,https://hub.psychoinformatics.de/orinoco/things-enrichment-tools.git,refs/heads/main,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,9f036a4cdfb53f87346152f9cd4620aaef38bce2,9f036a4cdfb5,
+submodules/things-schemas,0,0,,https://hub.psychoinformatics.de/orinoco/things-schemas.git,refs/heads/main,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,cb6c791aec4c5309775437df4bd58e94e1bfcc3c,cb6c791aec4c,
+submodules/www-from-model,3,3,"fix(publications): fall back to issued dates [intent:general]
+fix(navigation): show mobile menu labels [intent:general]
+fix(site): resolve graph assets under the base URL [intent:general]",https://hub.psychoinformatics.de/www/www-from-model.git,refs/heads/main,1e3d6b3435fc50c342af191cfb55e9b20b74df8e,1e3d6b3435fc,dc2a3f2d4734cdd16b33bbcdd654687f809ef29a,dc2a3f2d4734,ff686cc41f6e51500d3033be9691209926bf4aa0,ff686cc41f6e,https://github.com/ORINOCO-Lite/www-from-model/compare/main...orinoco-lite-diff
+submodules/www-from-model/themes/congo,0,66,,https://github.com/jpanther/congo.git,refs/heads/stable,3623fa505ee42fee899844d94a4ff7f5a1ae9096,v2.13.0,3623fa505ee42fee899844d94a4ff7f5a1ae9096,v2.13.0,87dd58ce29e71f210d57dd356055b7b97f528ec3,v2.14.0,

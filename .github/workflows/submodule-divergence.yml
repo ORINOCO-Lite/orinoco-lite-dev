@@ -1,0 +1,130 @@
+name: Submodule divergence
+
+on:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+    inputs:
+      validate_only:
+        description: Check a prepared snapshot without publishing
+        type: boolean
+        default: false
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: submodule-divergence-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'daily' }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request' || inputs.validate_only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Resolve the Pixi development environment
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          cache: false
+          locked: false
+          activate-environment: true
+      - name: Test CSV generation and staged checks
+        run: pixi run python -m unittest tests.engineering.test_submodule_divergence
+      - name: Configure remotes and fetch upstream observations
+        run: |
+          pixi run python - <<'PYTHON'
+          from pathlib import Path
+          from tools.setup_submodule_remotes import configure, selected_modules
+          from tools.submodule_divergence import observe_upstreams
+          root = Path.cwd()
+          configure(root)
+          observe_upstreams(list(selected_modules(root)), fetch=True)
+          PYTHON
+      - name: Check selected pins, CSV, and all local commit titles
+        run: pixi run python tools/submodule_divergence.py --check
+
+  update:
+    if: github.repository == 'ORINOCO-Lite/orinoco-lite-dev' && github.event_name != 'pull_request' && !inputs.validate_only && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Resolve the Pixi development environment
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          cache: false
+          locked: false
+          activate-environment: true
+      - name: Configure remotes
+        run: |
+          pixi run python - <<'PYTHON'
+          from pathlib import Path
+          from tools.setup_submodule_remotes import configure
+          configure(Path.cwd())
+          PYTHON
+      - name: Refresh upstream observations
+        shell: bash
+        run: |
+          status=0
+          pixi run python tools/submodule_divergence.py || status=$?
+          # Repairs and title violations still produce a reviewable report.
+          # Operational failures must not publish a partial snapshot.
+          if (( status > 1 )); then exit "$status"; fi
+      - name: Open one snapshot for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          csv=docs/agents/submodule-divergence.csv
+          if [[ -f "$csv" ]] && git ls-files --error-unmatch "$csv" >/dev/null 2>&1 && git diff --quiet -- "$csv"; then
+            echo 'The submodule divergence snapshot is unchanged.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Do not replace a pending snapshot, or edit any human-reviewed PR text.
+          pending=$(gh pr list --state open --base "$BASE_BRANCH" --limit 1000 --json url,headRefName --jq '[.[] | select(.headRefName | startswith("automation/submodule-divergence-"))][0].url // empty')
+          if [[ -n "$pending" ]]; then
+            echo "Review the pending snapshot before another is opened: $pending" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch="automation/submodule-divergence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$csv"
+          git -c core.hooksPath=/dev/null commit -m 'docs: refresh submodule divergence snapshot'
+          # Hosted runners have no configured SSH credential; use the job token.
+          gh auth setup-git
+          git push "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          cat > "$RUNNER_TEMP/divergence-pr.md" <<'BODY'
+          **AI-generated draft — not reviewed by John**
+
+          Refresh the submodule divergence CSV from the selected gitlinks and
+          current upstream heads. Local commit subjects are copied verbatim;
+          this snapshot does not classify changes or update dependency pins.
+
+          The strict check includes all existing local commit titles. Any
+          legacy violations require deliberate rewording before it can pass.
+          BODY
+          gh pr create --base "$BASE_BRANCH" --head "$branch" --draft \
+            --title 'docs: refresh submodule divergence snapshot' \
+            --body-file "$RUNNER_TEMP/divergence-pr.md" >> "$GITHUB_STEP_SUMMARY"
+          # GITHUB_TOKEN-created PRs do not trigger pull_request workflows.
+          gh workflow run submodule-divergence.yml --ref "$branch" -f validate_only=true

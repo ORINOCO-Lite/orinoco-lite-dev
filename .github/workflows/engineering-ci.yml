@@ -63,6 +63,12 @@ jobs:
           pixi install 2>&1 | tee build/ci-diagnostics/development/solve.log
           pixi run --locked python -VV > build/ci-diagnostics/development/python.txt
 
+      - name: Configure submodule remotes
+        run: |
+          # Run setup twice so that only persistent setup issues fail
+          pixi run pre-commit run submodule-upstream-remotes --all-files ||
+            pixi run pre-commit run submodule-upstream-remotes --all-files
+
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files
 
