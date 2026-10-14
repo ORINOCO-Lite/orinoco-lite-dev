@@ -17,7 +17,7 @@ import tempfile
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import unquote, urlsplit
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, FunctionLoader, PrefixLoader
 import yaml
 
 from .progress import progress
@@ -575,19 +575,38 @@ def _apply_inline(
     _walk_inline(record, tuple(operation.split("::")), by_pid)
 
 
+class _ProjectionEnvironment(Environment):
+    def join_path(self, template: str, parent: str) -> str:
+        prefix = "www-from-model:"
+        if parent.startswith(prefix) and not template.startswith(prefix):
+            directory = PurePosixPath(parent.removeprefix(prefix)).parent
+            return prefix + (directory / template).as_posix()
+        return template
+
+
 def _render_record(
     record: dict[str, Any],
     policy: RenderPolicy,
     by_pid: Mapping[str, dict[str, Any]],
     records: Sequence[dict[str, Any]],
+    www_from_model_root: Path | None,
 ) -> str:
     rec = deepcopy(record)
     for source_field, target_field in policy.reverse_injections:
         rec[target_field] = _incoming(records, rec["pid"], source_field)
     for operation in policy.inline:
         _apply_inline(rec, operation, by_pid)
-    environment = Environment(
-        loader=FileSystemLoader(policy.template.parent),
+    upstream_sources = (
+        {"www-from-model": FileSystemLoader(www_from_model_root)}
+        if www_from_model_root is not None else {}
+    )
+    sources = ChoiceLoader([
+        PrefixLoader(upstream_sources, delimiter=":"),
+        FileSystemLoader(policy.template.parent),
+    ])
+    environment = _ProjectionEnvironment(
+        # Keep qualified template names when compiling, including parent names.
+        loader=FunctionLoader(lambda name: sources.get_source(environment, name)),
         autoescape=False,
         keep_trailing_newline=True,
     )
@@ -792,7 +811,8 @@ def render_projection(
                 continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(
-                _render_record(record, policy, by_pid, records), encoding="utf-8"
+                _render_record(record, policy, by_pid, records, www_from_model_root),
+                encoding="utf-8",
             )
     with progress("Generating the metadata graph"):
         graph_result = subprocess.run(

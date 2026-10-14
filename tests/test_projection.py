@@ -28,6 +28,8 @@ from orinoco_lite.projection import (
     _matches_policy,
     _relationship_targets,
     _route_for_pid,
+    _render_record,
+    RenderPolicy,
     load_contract,
     rendered_record_route,
     render_projection,
@@ -615,6 +617,32 @@ class GenericProjectionContractTests(unittest.TestCase):
             update_projection(self.workspace, self.resources)
         resolve.assert_called_with(self.workspace.root, self.resources)
         self.assertEqual(load_contract(self.workspace, self.root).missing_graph_targets, "reject")
+
+    def test_local_template_inherits_selected_upstream_blocks(self) -> None:
+        upstream = self.resources / "www-from-model"
+        templates = upstream / "page_templates"
+        templates.mkdir(parents=True)
+        (templates / "base.j2").write_text(
+            "{% block params %}upstream {{ display_label }}{% endblock %}",
+            encoding="utf-8",
+        )
+        (templates / "person.j2").write_text(
+            '{% extends "base.j2" %}', encoding="utf-8"
+        )
+        local = self.root / "site-specific/projection-templates/person.j2"
+        local.write_text(
+            '{% extends "www-from-model:page_templates/person.j2" %}'
+            '{% block params %}{{ super() }}; local{% endblock %}',
+            encoding="utf-8",
+        )
+        # An upstream dependency must not pick up a same-named local file.
+        (local.parent / "base.j2").write_text("wrong source", encoding="utf-8")
+        policy = RenderPolicy(local, {}, (), ())
+        rendered = _render_record(
+            {"pid": "acme:people/one", "display_label": "One"},
+            policy, {}, [], upstream,
+        )
+        self.assertEqual(rendered, "upstream One; local")
 
     def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
         alias = self.root / "site-specific/metadata/records/Person/alias.yaml"
