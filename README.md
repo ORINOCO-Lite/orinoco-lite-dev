@@ -79,15 +79,31 @@ Precise interfaces and normative engineering behavior are documented in:
 
 ## Engineering workflow
 
-In a fresh engineering checkout, activate its environment, initialize the sources used by package resources and tests, then prepare the editable package before running pytest:
+Initialize submodules before the first `pixi run` using either option:
+
+- Clone with hooks enabled to initialize during checkout and on subsequent branch checkouts:
+
+  ``` console
+  git clone --config core.hooksPath=.githooks https://github.com/ORINOCO-Lite/orinoco-lite-dev.git
+  cd orinoco-lite-dev
+  ```
+
+- If you already cloned the repository, run the initialization hook directly from its root:
+
+  ``` console
+  sh .githooks/post-checkout
+  ```
+
+  This initializes the current checkout immediately.
+  To also enable hooks for future checkouts, run `git config core.hooksPath .githooks`.
+
+If Pixi is missing or initialization fails, the script prints a warning and retry command.
+A plain clone does not run the hook automatically.
+After initialization:
 
 ``` console
-git submodule update --init -- \
-  submodules/pool.psychoinformatics.de-ui submodules/things-schemas \
-  submodules/query-things submodules/www-from-model
-git -C submodules/pool.psychoinformatics.de-ui submodule update --init -- shacl-vue
-orinoco-lite dev prepare-resources
-pytest
+pixi run orinoco-lite dev prepare-resources
+pixi run pytest
 ```
 
 Package versions come from Git tags through Versioneer.
@@ -118,7 +134,7 @@ Edit them there directly; they do not require APM or a setup hook.
 Do not add a package manager, manifest, lock, bootstrap task, or agent hook while every skill is owned by this repository.
 Introduce dependency management only when the project first consumes an independently maintained promoted skill; the chosen setup mechanism remains a downstream preference.
 
-Initialize the remaining engineering submodules only when broader cross-component work needs them:
+To deliberately reset every submodule to its recorded gitlink and fetch full history, use:
 
 ``` console
 python tools/checkout_submodules.py

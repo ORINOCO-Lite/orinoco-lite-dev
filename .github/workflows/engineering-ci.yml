@@ -33,26 +33,18 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Initialize only release-authorized compatibility components
-        shell: bash
-        run: |
-          git submodule update --init --depth 1 -- \
-            submodules/pool.psychoinformatics.de-ui \
-            submodules/query-things \
-            submodules/dump-things-pyclient \
-            submodules/dump-things-service \
-            submodules/things-enrichment-tools \
-            submodules/www-from-model \
-            submodules/things-schemas
-          git -C submodules/pool.psychoinformatics.de-ui submodule update \
-            --init --depth 1 -- shacl-vue
-          git -C submodules/www-from-model submodule update --init --recursive
-
-      - name: Install Pixi
+      - name: Install Pixi before initializing submodules
         uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           cache: false
+          locked: false
           run-install: false
+
+      - name: Initialize development submodules and remotes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          pixi exec --spec uv uv run --no-project --python 3.12 --with datalad --with git-annex bash -c 'datalad install -r . && python tools/setup_submodule_remotes.py'
 
       - name: Resolve a fresh development environment
         shell: bash
@@ -62,6 +54,7 @@ jobs:
           pixi info --json > build/ci-diagnostics/platform.json
           pixi install 2>&1 | tee build/ci-diagnostics/development/solve.log
           pixi run --locked python -VV > build/ci-diagnostics/development/python.txt
+
 
       - name: Verify pre-commit formatting
         run: pixi run pre-commit run --all-files

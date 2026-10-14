@@ -42,7 +42,7 @@ pytest = "*"
 [feature.dev.tasks]
 build-package = "python -m build --outdir build/package"
 setup-upstream = "bash tools/setup-upstream.sh"
-install-hooks = "git config core.hooksPath .githooks"
+install-hooks = "git config core.hooksPath .githooks && sh .githooks/post-checkout"
 
 [feature.skills.dependencies]
 python = "*"
