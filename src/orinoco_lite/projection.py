@@ -14,10 +14,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import unquote, urlsplit
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, FunctionLoader, TemplateNotFound
 import yaml
 
 from .progress import progress
@@ -575,31 +575,72 @@ def _apply_inline(
     _walk_inline(record, tuple(operation.split("::")), by_pid)
 
 
+class _ProjectionEnvironment(Environment):
+    def join_path(self, template: str, parent: str) -> str:
+        prefix = "www-from-model:"
+        if parent.startswith(prefix) and not template.startswith(prefix):
+            directory = PurePosixPath(parent.removeprefix(prefix)).parent
+            return prefix + (directory / template).as_posix()
+        return template
+
+
 def _render_record(
     record: dict[str, Any],
     policy: RenderPolicy,
     by_pid: Mapping[str, dict[str, Any]],
     records: Sequence[dict[str, Any]],
+    www_from_model_root: Path | None = None,
+    resolve_upstream: Callable[[], Path] | None = None,
 ) -> str:
     rec = deepcopy(record)
     for source_field, target_field in policy.reverse_injections:
         rec[target_field] = _incoming(records, rec["pid"], source_field)
     for operation in policy.inline:
         _apply_inline(rec, operation, by_pid)
-    environment = Environment(
-        loader=FileSystemLoader(policy.template.parent),
-        autoescape=False,
-        keep_trailing_newline=True,
+    local_loader = FileSystemLoader(policy.template.parent)
+    upstream_loader = None
+
+    def source(name: str):
+        nonlocal www_from_model_root, upstream_loader
+        prefix = "www-from-model:"
+        if not name.startswith(prefix):
+            return local_loader.get_source(environment, name)
+        relative = name.removeprefix(prefix)
+        path = PurePosixPath(relative)
+        if (
+            not relative or "\\" in relative or path.is_absolute()
+            or ".." in path.parts or path.as_posix() != relative
+        ):
+            raise ConfigurationError(f"Invalid upstream template path: {name}")
+        if www_from_model_root is None and resolve_upstream is not None:
+            www_from_model_root = resolve_upstream()
+        if www_from_model_root is None:
+            raise ConfigurationError(f"Template {name} requires the selected www-from-model source")
+        resolved = (www_from_model_root / relative).resolve()
+        if not resolved.is_relative_to(www_from_model_root.resolve()):
+            raise ConfigurationError(f"Template {name} escapes the www-from-model source")
+        if upstream_loader is None:
+            upstream_loader = FileSystemLoader(www_from_model_root)
+        try:
+            return upstream_loader.get_source(environment, relative)
+        except TemplateNotFound as error:
+            raise TemplateNotFound(name) from error
+
+    environment = _ProjectionEnvironment(
+        # Preserve qualified compilation names for transitive upstream dependencies.
+        loader=FunctionLoader(source), autoescape=False, keep_trailing_newline=True,
     )
     environment.filters["toyaml"] = _toyaml
-    loaded = environment.get_template(policy.template.name)
+    name = policy.template.name
+    if www_from_model_root is not None and policy.template.is_relative_to(www_from_model_root):
+        name = "www-from-model:" + policy.template.relative_to(www_from_model_root).as_posix()
     props = {
         "__pid_curie_reference": rec["pid"].split(":", 1)[1],
         "__rec": rec,
         **rec,
     }
     try:
-        return loaded.render(**props)
+        return environment.get_template(name).render(**props)
     except Exception as error:
         raise DriverError(f"Could not render {record['pid']}: {error}") from error
 
@@ -642,6 +683,7 @@ def _projection_cache_key(
 ) -> str | None:
     """Hash projection inputs, not editorial content or deployment settings."""
     roots = [
+        resources_root / "www-from-model" / "page_templates",
         workspace.path("records"),
         annotation_root(workspace),
         contract.path,
@@ -663,6 +705,9 @@ def _projection_cache_key(
     # The package itself is covered by the Python and resource roots above.
     for dependency in sorted(installed, key=lambda d: d.metadata["Name"]):
         if dependency.metadata["Name"].lower().replace("_", "-") == "orinoco-lite":
+            from .www_from_model import editable_package_checkout
+            if editable_package_checkout() is not None:
+                return None  # Include changes in the actual nested working source.
             continue
         raw = dependency.read_text("direct_url.json")
         if not raw:
@@ -792,7 +837,11 @@ def render_projection(
                 continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(
-                _render_record(record, policy, by_pid, records), encoding="utf-8"
+                _render_record(
+                    record, policy, by_pid, records, www_from_model_root,
+                    lambda: resolve_www_from_model(workspace.root, resources_root),
+                ),
+                encoding="utf-8",
             )
     with progress("Generating the metadata graph"):
         graph_result = subprocess.run(

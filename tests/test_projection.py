@@ -28,6 +28,8 @@ from orinoco_lite.projection import (
     _matches_policy,
     _relationship_targets,
     _route_for_pid,
+    _render_record,
+    RenderPolicy,
     load_contract,
     rendered_record_route,
     render_projection,
@@ -615,6 +617,68 @@ class GenericProjectionContractTests(unittest.TestCase):
             update_projection(self.workspace, self.resources)
         resolve.assert_called_with(self.workspace.root, self.resources)
         self.assertEqual(load_contract(self.workspace, self.root).missing_graph_targets, "reject")
+
+    def test_local_template_inherits_selected_upstream_blocks(self) -> None:
+        upstream = self.resources / "www-from-model"
+        templates = upstream / "page_templates"
+        templates.mkdir(parents=True)
+        (templates / "base.j2").write_text(
+            "{% block params %}upstream {{ display_label }}{% endblock %}",
+            encoding="utf-8",
+        )
+        (templates / "person.j2").write_text(
+            '{% extends "base.j2" %}', encoding="utf-8"
+        )
+        local = self.root / "site-specific/projection-templates/person.j2"
+        local.write_text(
+            '{% extends "www-from-model:page_templates/person.j2" %}'
+            '{% block params %}{{ super() }}; local{% endblock %}',
+            encoding="utf-8",
+        )
+        # An upstream dependency must not pick up a same-named local file.
+        (local.parent / "base.j2").write_text("wrong source", encoding="utf-8")
+        policy = RenderPolicy(local, {}, (), ())
+        rendered = _render_record(
+            {"pid": "acme:people/one", "display_label": "One"},
+            policy, {}, [], upstream,
+        )
+        self.assertEqual(rendered, "upstream One; local")
+
+    def test_upstream_entry_template_retains_its_namespace(self) -> None:
+        upstream = self.resources / "www-from-model"
+        templates = upstream / "page_templates"
+        templates.mkdir(parents=True)
+        (templates / "base.j2").write_text('{% include "fragment.j2" %}')
+        (templates / "fragment.j2").write_text("selected source")
+        entry = templates / "homepage.j2"
+        entry.write_text('{% extends "base.j2" %}')
+        self.assertEqual(
+            _render_record({"pid": "acme:home"}, RenderPolicy(entry, {}, (), ()), {}, [], upstream),
+            "selected source",
+        )
+
+    def test_local_template_resolves_upstream_only_when_requested(self) -> None:
+        upstream = self.resources / "www-from-model"
+        upstream.mkdir()
+        (upstream / "parent.j2").write_text("inherited")
+        local = self.root / "site-specific/projection-templates/person.j2"
+        resolver = Mock(return_value=upstream)
+        policy = RenderPolicy(local, {}, (), ())
+        record = {"pid": "acme:home"}
+        local.write_text("local")
+        self.assertEqual(_render_record(record, policy, {}, [], resolve_upstream=resolver), "local")
+        resolver.assert_not_called()
+        local.write_text('{% extends "www-from-model:parent.j2" %}')
+        self.assertEqual(_render_record(record, policy, {}, [], resolve_upstream=resolver), "inherited")
+        resolver.assert_called_once_with()
+        for parent, message in [
+            ("www-from-model:missing.j2", "www-from-model:missing.j2"),
+            ("www-from-model:../escape.j2", "Invalid upstream template path"),
+        ]:
+            with self.subTest(parent=parent):
+                local.write_text('{% extends "' + parent + '" %}')
+                with self.assertRaisesRegex(DriverError, message):
+                    _render_record(record, policy, {}, [], resolve_upstream=resolver)
 
     def test_noncanonical_pid_route_fails_before_overwriting_a_page(self) -> None:
         alias = self.root / "site-specific/metadata/records/Person/alias.yaml"
