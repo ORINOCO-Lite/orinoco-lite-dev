@@ -589,7 +589,7 @@ def _render_record(
     policy: RenderPolicy,
     by_pid: Mapping[str, dict[str, Any]],
     records: Sequence[dict[str, Any]],
-    www_from_model_root: Path | None,
+    www_from_model_root: Path | None = None,
 ) -> str:
     rec = deepcopy(record)
     for source_field, target_field in policy.reverse_injections:
