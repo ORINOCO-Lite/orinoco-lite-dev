@@ -14,6 +14,38 @@ from orinoco_lite import upstream_snapshot as snapshot
 
 
 class UpstreamProjectionTests(unittest.TestCase):
+    def test_inherited_homepage_preserves_upstream_metadata_and_content(self):
+        from orinoco_lite.projection import _render_record, RenderPolicy
+        import yaml
+
+        upstream = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
+        record = {
+            "pid": "xyzrins:.", "title": "Example", "description": "Description",
+            "parts": [{"pid": "xyzrins:projects/one", "schema_type": "xyzri:XYZProject"}],
+            "influenced_by": [{"object": {
+                "pid": "xyzrins:objectives/open", "schema_type": "xyzri:XYZObjective",
+                "title": "Open research",
+            }, "roles": []}],
+            "associated_with": [], "generated": [],
+        }
+        parent = RenderPolicy(upstream / "page_templates/homepage.md.j2", {}, (), ())
+        expected = _render_record(record, parent, {}, [], upstream)
+        with tempfile.TemporaryDirectory() as temporary:
+            child = Path(temporary) / "homepage.md.j2"
+            child.write_text(
+                '{% extends "www-from-model:page_templates/homepage.md.j2" %}'
+                '{% block content %}{{ super() }}Editorial addition.{% endblock %}'
+            )
+            actual = _render_record(record, RenderPolicy(child, {}, (), ()), {}, [], upstream)
+        frontmatter = yaml.safe_load(actual.split("---", 2)[1])
+        self.assertEqual(frontmatter, yaml.safe_load(expected.split("---", 2)[1]))
+        self.assertEqual(frontmatter["params"]["graphRootNodePID"], "xyzrins:.")
+        self.assertEqual(frontmatter["objectives"], ["open"])
+        self.assertEqual(frontmatter["projects"], ["one"])
+        self.assertIn("[Open research](/objectives/open)", actual)
+        self.assertIn(expected.split("---", 2)[2], actual)
+        self.assertIn("Editorial addition.", actual)
+
     def test_default_projection_keeps_publication_authors_and_issued_date(self):
         from orinoco_lite.projection import _render_record
         import yaml
