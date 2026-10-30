@@ -27,6 +27,7 @@ from orinoco_lite.editor import (
     record_catalog,
 )
 from orinoco_lite.errors import ConfigurationError, DriverError
+from orinoco_lite.records import record_sources
 
 
 CONFIG = '[tool.orinoco]\n'
@@ -67,20 +68,6 @@ class EditorBundleTests(unittest.TestCase):
         )
         (self.root / "site-specific/projection-tools/graph.py").write_text(
             "import json, sys\njson.dump({'nodes': [], 'edges': []}, sys.stdout)\n",
-            encoding="utf-8",
-        )
-        (self.root / "site-specific/projection.yaml").write_text(
-            "version: 2\n"
-            "routing:\n  strip_prefix: 'xyzrins:'\n"
-            "homepage:\n  pid: xyzrins:persons/first\n"
-            "  template: site-specific/projection-templates/person.md.j2\n"
-            "pages:\n  xyzri:XYZPerson:\n"
-            "    template: site-specific/projection-templates/person.md.j2\n"
-            "unrendered_classes: [xyzri:XYZAgentRole]\n"
-            "graph:\n  producer: site-specific/projection-tools/graph.py\n"
-            "  node_classes: [xyzri:XYZPerson]\n"
-            "  relationship_fields: []\n"
-            "  missing_external_targets: reject\n",
             encoding="utf-8",
         )
         self.first = self.root / "site-specific/metadata/records/XYZPerson/first.yaml"
@@ -144,6 +131,13 @@ class EditorBundleTests(unittest.TestCase):
             return_value=(FixtureConverter(), FixtureConverter()),
         )
         self.converter_patch.start()
+        upstream = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
+        for target in ("orinoco_lite.www_from_model.resolve_www_from_model",
+                       "orinoco_lite.projection.resolve_www_from_model"):
+            resolver = patch(target, return_value=upstream)
+            resolver.start()
+            self.addCleanup(resolver.stop)
+
 
     def tearDown(self) -> None:
         self.converter_patch.stop()
@@ -187,6 +181,9 @@ class EditorBundleTests(unittest.TestCase):
         catalog = record_catalog(self.workspace)
         self.assertEqual(catalog["version"], 3)
         self.assertEqual(len(catalog["records"]), 2)
+        # Creation includes upstream graph classes even before the first record.
+        self.assertIn("xyzri:XYZProject", catalog["new_record_schema_types"])
+        self.assertNotIn("xyzri:XYZAgentRole", catalog["new_record_schema_types"])
         self.assertEqual(
             [record["pid"] for record in catalog["records"]],
             ["xyzrins:persons/first", "xyzrins:persons/second"],
@@ -342,15 +339,7 @@ class EditorBundleTests(unittest.TestCase):
             2,
         )
 
-    def test_editor_can_limit_rdf_data_to_declared_editable_records(self) -> None:
-        projection = self.root / "site-specific/projection.yaml"
-        projection.write_text(
-            projection.read_text(encoding="utf-8").replace(
-                "homepage:\n",
-                "editor:\n  record_scope: editable\nhomepage:\n",
-            ),
-            encoding="utf-8",
-        )
+    def test_editor_loads_all_records_including_non_graph_support_records(self) -> None:
         shell = self.resources / "editor-shell"
         schema = self.resources / "editor-schema"
         shell.mkdir()
@@ -383,12 +372,17 @@ class EditorBundleTests(unittest.TestCase):
 
         sources = rendered.call_args.args[0]
         self.assertEqual(
-            [source["pid"] for source in sources],
-            ["xyzrins:persons/first", "xyzrins:persons/second"],
+            sorted(source["pid"] for source in sources),
+            sorted(source["pid"] for source in record_sources(self.workspace)),
         )
-        self.assertEqual(report["record_scope"], "editable")
-        self.assertEqual(report["loaded_records"], 2)
+        self.assertEqual(report["record_scope"], "all")
+        self.assertEqual(report["loaded_records"], 3)
         self.assertEqual(report["source_records"], 3)
+
+    def test_editor_rejects_obsolete_projection_override(self):
+        (self.root / "site-specific/projection.yaml").write_text("version: 2\n")
+        with self.assertRaisesRegex(ConfigurationError, "Unsupported projection override"):
+            record_catalog(self.workspace)
 
     def test_bundle_dry_run_and_write(self) -> None:
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
@@ -407,30 +401,15 @@ class EditorBundleTests(unittest.TestCase):
         apply_bundle(self.workspace, self.resources, bundle, write=True)
         self.assertIn("display_label: Changed", self.first.read_text())
 
-    def test_bundle_applies_with_custom_upstream_projection_templates(self) -> None:
+    def test_bundle_rejects_retired_projection_override_before_writing(self) -> None:
+        from orinoco_lite.errors import ConfigurationError
+
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
-        upstream = self.resources / "www-from-model"
-        upstream.mkdir()
-        (upstream / "person.md.j2").write_text("{{ display_label }}\n")
         projection = self.root / "site-specific/projection.yaml"
-        projection.write_text(projection.read_text().replace(
-            "site-specific/projection-templates/person.md.j2",
-            "www-from-model:person.md.j2",
-        ))
-
-        with patch(
-            "orinoco_lite.projection.resolve_www_from_model",
-            return_value=upstream,
-        ):
-            report = apply_bundle_report(
-                self.workspace, self.resources, bundle, write=True
-            )
-
-        self.assertTrue(report["applied"])
-        self.assertEqual(report["changed_paths"], [
-            "site-specific/metadata/records/XYZPerson/first.yaml",
-        ])
-        self.assertIn("display_label: Changed", self.first.read_text())
+        projection.write_text("version: 2\n")
+        with self.assertRaisesRegex(ConfigurationError, "Unsupported projection override"):
+            apply_bundle_report(self.workspace, self.resources, bundle, write=True)
+        self.assertIn("display_label: First", self.first.read_text())
 
     def test_bundle_preserves_unchanged_rdf_multivalue_order(self) -> None:
         associated_with = [

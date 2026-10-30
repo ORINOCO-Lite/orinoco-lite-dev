@@ -33,14 +33,15 @@ def resolve_www_from_model(workspace: Path, resources_root: Path | None = None) 
     workspace = workspace.resolve()
     if workspace.is_symlink() or not workspace.is_dir():
         raise IntegrityError(f"www-from-model workspace is not a directory: {workspace}")
-    if resources_root is None:
-        raise IntegrityError("www-from-model resolution requires package resources")
     editable = editable_package_checkout()
     if editable is not None:
         selected = editable / _WWW_FROM_MODEL_GITLINK
         if not (selected / ".git").exists():
             raise IntegrityError(f"Initialize the package's www-from-model submodule: {selected}")
         return selected.resolve()
+    if resources_root is None:
+        from .resources import resolve_resources
+        resources_root = resolve_resources().root
     selected = resources_root / "www-from-model"
     if not (selected / "page_templates").is_dir() or not (selected / "themes/congo/theme.toml").is_file():
         raise IntegrityError("Packaged www-from-model rendering resources are missing; reinstall orinoco-lite")

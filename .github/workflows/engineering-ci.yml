@@ -114,6 +114,8 @@ jobs:
           [dependencies]
           python = ">=3.12"
           git = "*"
+          bash = "*"
+          jq = "*"
           # The selected Congo theme uses .Site.Author, removed in Hugo 0.156.
           hugo = "<0.156"
           [pypi-dependencies]
@@ -131,8 +133,11 @@ jobs:
           from pathlib import Path
           import platform
           import sysconfig
+          import subprocess
+          import tempfile
           from packaging.requirements import Requirement
           import orinoco_lite
+          from orinoco_lite.www_from_model import resolve_www_from_model
 
           installed = Path(orinoco_lite.__file__).resolve()
           site_packages = Path(sysconfig.get_path("purelib")).resolve()
@@ -157,6 +162,15 @@ jobs:
               if requirement.url and requirement.url.startswith("git+"):
                   selected = json.loads(distribution(requirement.name).read_text("direct_url.json"))
                   assert selected["vcs_info"]["commit_id"] == requirement.url.rsplit("@", 1)[1], selected
+          relative = Path(".forgejo/workflows/update-from-pool.yaml")
+          selected = resolve_www_from_model(Path.cwd()) / relative
+          assert selected.read_bytes() == (Path(os.environ["GITHUB_WORKSPACE"]) / "submodules/www-from-model" / relative).read_bytes()
+          with tempfile.TemporaryDirectory() as directory:
+              result = subprocess.run(
+                  ["orinoco-lite", "projection", "blocks", "show", "--json"],
+                  cwd=directory, text=True, capture_output=True, check=True,
+              )
+          assert json.loads(result.stdout), result.stdout
           PY
           pixi run --locked orinoco-lite --help
           # Existing pytest config exposes repository test helpers, never src/.
