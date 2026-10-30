@@ -90,13 +90,14 @@ def record_catalog(
 ) -> dict[str, Any]:
     """Return coordinates for records editable under the projection plan."""
 
-    from .projection import reject_projection_override, _record_stream
+    from .projection import _record_stream
+    from .projection_blocks import load_pipeline
     from .upstream_projection import render_graph
     from .resources import resolve_resources
     from .www_from_model import resolve_www_from_model
 
-    reject_projection_override(workspace)
     presentation = www_from_model_root or resolve_www_from_model(workspace.root, resolve_resources().root)
+    load_pipeline(presentation, workspace.path("site"))
     sources = record_sources(workspace)
     graph = json.loads(render_graph(_record_stream([yaml.safe_load(s["content"]) for s in sources]), presentation))
     editable_pids = {node["id"] for node in graph["nodes"]}

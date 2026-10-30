@@ -72,7 +72,7 @@ def _www_from_model(root: Path) -> Path:
     workflow = upstream / ".forgejo/workflows/update-from-pool.yaml"
     workflow.parent.mkdir(parents=True, exist_ok=True)
     prefix = "example:" if 'record_prefix = "example:"' in (root / "pyproject.toml").read_text() or "record_prefix = 'example:'" in (root / "pyproject.toml").read_text() else "xyzrins:"
-    workflow.write_text(("jobs:\n  create_pages:\n    steps:\n      - run: query-things list --pid example:site-root | query-things render-record page_templates/homepage.md.j2 content/_index.md\n").replace("example:", prefix))
+    workflow.write_text(("jobs:\n  create_pages:\n    steps:\n      - name: Frontpage\n        run: query-things list --pid example:site-root | query-things render-record page_templates/homepage.md.j2 content/_index.md\n").replace("example:", prefix))
     return upstream
 
 

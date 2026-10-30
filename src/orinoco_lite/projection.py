@@ -15,9 +15,10 @@ from urllib.parse import unquote, urlsplit
 
 from .annotations import annotation_root
 from .config import WorkspaceConfig
-from .errors import ConfigurationError, DriverError
+from .errors import DriverError
 from .integrity import canonical_json_bytes, sha256_file, tree_sha256
 from .progress import progress
+from .projection_blocks import read_adjustments
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters, concise_date_warning
 from .www_from_model import resolve_www_from_model
@@ -29,18 +30,8 @@ FORBIDDEN_BRIDGE_PREDICATES = {
 }
 
 
-def reject_projection_override(workspace: WorkspaceConfig) -> None:
-    path = workspace.path("site") / "projection.yaml"
-    if path.exists() or path.is_symlink():
-        raise ConfigurationError(
-            f"Unsupported projection override: {path}. Remove this file; "
-            "selection and rendering now follow the pinned German www-from-model "
-            "workflow. Keep editorial grouping in site-specific/content."
-        )
-
-
 def _www_from_model_root(workspace, resources_root):
-    reject_projection_override(workspace)
+    read_adjustments(workspace.path("site"))
     return resolve_www_from_model(workspace.root, resources_root)
 
 
@@ -69,13 +60,13 @@ def _record_stream(records):
 def validate_semantics(workspace, resources_root, www_from_model_root=None):
     from linkml_runtime import SchemaView
     from .upstream_projection import homepage_pid, render_graph
-    reject_projection_override(workspace)
+    read_adjustments(workspace.path("site"))
     presentation = www_from_model_root or _www_from_model_root(workspace, resources_root)
     schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     records, pids = _records(workspace, schema)
     if not pids or len(pids) != len(records):
         raise DriverError("Projection metadata PIDs must be unique and non-empty")
-    if homepage_pid(presentation) not in pids:
+    if homepage_pid(presentation, workspace.path("site")) not in pids:
         raise DriverError("Upstream homepage is not a metadata record")
     view = SchemaView(str(schema))
     accepted = {str(view.get_uri(name, expand=False)) for name in view.all_classes()}
@@ -110,6 +101,8 @@ def _projection_cache_key(
 ) -> str | None:
     """Hash projection inputs, not editorial content or deployment settings."""
     roots = [
+        workspace.path("site") / "projection.yaml",
+        workspace.path("site") / "projection-templates",
         workspace.path("records"),
         annotation_root(workspace),
         presentation / ".forgejo/workflows/update-from-pool.yaml",
@@ -176,7 +169,7 @@ def render_projection(workspace, resources_root, output, *, records_input=None,
     if records_input is not None:
         from .record_stages import _check_record_input
         _check_record_input(records_input)
-    reject_projection_override(workspace)
+    read_adjustments(workspace.path("site"))
     presentation = www_from_model_root or _www_from_model_root(workspace, resources_root)
     if records_input is None:
         report = validate_semantics(workspace, resources_root, presentation)
@@ -194,7 +187,8 @@ def render_projection(workspace, resources_root, output, *, records_input=None,
     with tempfile.TemporaryDirectory(prefix="orinoco-projection-input-") as temporary:
         source = Path(temporary) / "records.jsonl"
         source.write_text(_record_stream(joined))
-        result = run_upstream(source, presentation, output, resources_root=resources_root)
+        result = run_upstream(source, presentation, output, resources_root=resources_root,
+                              site=workspace.path("site"))
     # Retain complete records in the Pool and exported record stream.
     (output / "records.jsonl").write_text(_record_stream(joined))
     return {**report, "pages": result["pages"]}

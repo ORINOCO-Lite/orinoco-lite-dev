@@ -12,7 +12,8 @@ import pytest
 import yaml
 
 
-def test_downstream_replaces_starter_records_without_overrides(tmp_path):
+@pytest.mark.parametrize("customized", [False, True])
+def test_downstream_replaces_starter_records(tmp_path, customized):
     selected = os.environ.get("ORINOCO_TEST_TEMPLATE")
     template = Path(selected) if selected else Path(__file__).resolve().parents[3] / "orinoco-lite-template"
     if not selected and not template.exists():
@@ -27,6 +28,30 @@ def test_downstream_replaces_starter_records_without_overrides(tmp_path):
     shutil.rmtree(records)
     fixture = Path(__file__).parents[1] / "fixtures/template-candidate/site-specific/metadata/records"
     shutil.copytree(fixture, records)
+    if customized:
+        # PR251's scoped selection and inherited presentation, executed by the
+        # upstream shell workflow and query-things rather than a Lite renderer.
+        (records / "XYZProject/independent.yaml").write_text(yaml.safe_dump({
+            "pid": "xyzrins:projects/independent", "schema_type": "xyzri:XYZProject",
+            "title": "Independent project", "description": "Retained project description",
+        }))
+        site_inputs = root / "site-specific"
+        templates = site_inputs / "projection-templates"
+        templates.mkdir()
+        (templates / "local-project.md.j2").write_text(
+            '{% extends "project.md.j2" %}\n'
+            '{% block frontmatter_params %}{{ super() }}\n  localContribution: true\n{% endblock %}\n'
+            '{% block content %}{{ super() }}\nLocal project presentation.\n{% endblock %}'
+        )
+        (site_inputs / "projection.yaml").write_text(yaml.safe_dump({
+            "version": 3, "extends": "upstream", "adjustments": [
+                {"step": "Update projects", "old": "page_templates/project.md.j2",
+                 "new": "page_templates/local-project.md.j2", "reason": "Local project presentation"},
+                {"step": "Update projects",
+                 "old": "query-things filter-links-pid --link part_of xyzrins:. --recursive --collection public",
+                 "new": "cat", "reason": "Include independent projects"},
+            ],
+        }))
     original = {path.relative_to(records): path.read_bytes() for path in records.rglob("*.yaml")}
 
     # Use the active engineering package and the downstream's ordinary build path.
@@ -46,6 +71,16 @@ def test_downstream_replaces_starter_records_without_overrides(tmp_path):
         assert f"/{section}/" in home
         assert f"/{section}/{record}/" in (site / section / "index.html").read_text()
         assert title in (site / section / record / "index.html").read_text()
+    if customized:
+        independent = (site / "projects/independent/index.html").read_text()
+        assert "Retained project description" in independent
+        assert "Local project presentation." in independent
+        generated = (root / "build/hugo-projection/content/projects/independent/_index.md").read_text()
+        frontmatter = yaml.safe_load(generated.split("---", 2)[1])
+        assert frontmatter["params"]["localContribution"] is True
+        assert frontmatter["params"]["graphRootNodePID"] == "xyzrins:projects/independent"
+        catalog = json.loads((site / "edit/data/record-sources.json").read_text())
+        assert any(record["pid"] == "xyzrins:projects/independent" for record in catalog["records"])
     person = (site / "persons/example-person/index.html").read_text()
     assert "/projects/example-project/" in person
     assert "/publications/example-publication/" in person

@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+from .errors import ConfigurationError
 
 WORKFLOW = Path('.forgejo/workflows/update-from-pool.yaml')
 
@@ -60,6 +61,7 @@ class CodeBlock:
     adjustments: tuple[Adjustment, ...] = ()
     uses: str | None = None
     number: int | None = None
+    skip_reason: str | None = None
 
     @property
     def adjusted(self) -> str:
@@ -82,6 +84,8 @@ class CodeBlock:
         sections = [self.heading]
         if self.uses:
             sections.append(f'uses: {self.uses} (no shell block)')
+        if self.skip_reason:
+            sections.append(self.skip_reason)
         for current in views:
             if current == 'adjustments':
                 text = ''.join(
@@ -109,6 +113,8 @@ class CodeBlock:
 
     def execute(self, *, cwd: Path, environment: dict[str, str] | None = None, stdout=None) -> bool:
         """Run adjusted shell text; return False for an empty block."""
+        if self.uses and not self.skip_reason:
+            raise ValueError(f'{self.name}: action execution is unsupported: {self.uses}')
         if not self.adjusted.strip():
             return False
         print(f'Executing {self.name}...', file=sys.stderr, flush=True)
@@ -159,6 +165,9 @@ class Pipeline:
 
     def execute(self, *, cwd: Path, environment: dict[str, str] | None = None, stdout=None) -> list[str]:
         """Execute in order with shared files; stop at the first failure."""
+        for block in self.blocks:
+            if block.uses and not block.skip_reason:
+                raise ValueError(f'{block.name}: action execution is unsupported: {block.uses}')
         return [block.name for block in self.blocks
                 if block.execute(cwd=cwd, environment=environment, stdout=stdout)]
 
@@ -166,19 +175,33 @@ class Pipeline:
 def parse_workflow(path: Path, *, job: str = 'create_pages') -> Pipeline:
     import yaml
     try:
-        steps = yaml.safe_load(path.read_text())['jobs'][job]['steps']
+        document = yaml.safe_load(path.read_text())
+        selected = document['jobs'][job]
+        steps = selected['steps']
     except (KeyError, TypeError, yaml.YAMLError) as error:
         raise ValueError(f'{path}: cannot read steps for job {job}') from error
     if not isinstance(steps, list):
         raise ValueError(f'{path}: steps must be a list')
+    # This is a shell-block adapter, not a Forgejo runner. Reject execution
+    # semantics we cannot preserve before any command can write output.
+    if ('defaults' in document or set(selected) - {'runs-on', 'if', 'steps'}
+            or selected.get('if') not in (None, "${{ forgejo.repository == 'www/www-from-model' }}")):
+        raise ValueError(f'{path}: unsupported workflow/job execution settings')
+    environment = document.get('env', {})
+    if not isinstance(environment, dict) or set(environment) - {'DUMPTHINGS_APIURL', 'QRI_RECORD_CACHE'}:
+        raise ValueError(f'{path}: unsupported workflow environment; Lite supplies the Pool and cache')
     blocks = []
     for step in steps:
         if not isinstance(step, dict) or not isinstance(step.get('name'), str) or not step['name'].strip():
             raise ValueError(f'{path}: every step needs a nonempty name')
         raw = step.get('run', '')
         uses = step.get('uses')
+        if set(step) - {'name', 'run', 'uses'} or ('run' in step and 'uses' in step):
+            raise ValueError(f'{step["name"]}: unsupported step execution settings')
         if not isinstance(raw, str) or (uses is not None and not isinstance(uses, str)):
             raise ValueError(f'{step["name"]}: run and uses must be text')
+        if '${{' in raw:
+            raise ValueError(f'{step["name"]}: workflow expressions are unsupported in shell blocks')
         blocks.append(CodeBlock(step['name'], raw, uses=uses))
     return Pipeline(tuple(blocks))
 
@@ -186,7 +209,19 @@ def parse_workflow(path: Path, *, job: str = 'create_pages') -> Pipeline:
 def adjust_for_lite(pipeline: Pipeline) -> Pipeline:
     """Apply text adjustments while preserving upstream blocks and order."""
     adjusted = []
+    actions = {
+        'actions/checkout@v4': 'Lite prepares the selected source in a scratch directory',
+        'https://hub.psychoinformatics.de/orinoco/flow/forgejo/actions/prep-metadata-query@main':
+            'The package environment supplies the pinned upstream commands',
+        'https://hub.psychoinformatics.de/orinoco/flow/forgejo/actions/deposit-changes@main':
+            'Projection produces local files; the caller owns publication',
+    }
     for block in pipeline.blocks:
+        if block.uses:
+            if block.uses not in actions:
+                raise ValueError(f'{block.name}: unsupported upstream action: {block.uses}')
+            adjusted.append(replace(block, skip_reason=actions[block.uses]))
+            continue
         if not block.raw.strip():
             adjusted.append(block)
             continue
@@ -202,6 +237,58 @@ def adjust_for_lite(pipeline: Pipeline) -> Pipeline:
     return Pipeline(tuple(adjusted))
 
 
+def read_adjustments(site: Path | None) -> list[dict[str, str]]:
+    """Read only scoped adjustments; never load a second projection policy."""
+    import yaml
+    if site is None:
+        return []
+    path = site / 'projection.yaml'
+    if not path.exists() and not path.is_symlink():
+        return []
+    try:
+        value = yaml.safe_load(path.read_text())
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        raise ConfigurationError(f'Cannot read projection adjustments: {path}') from error
+    if (not isinstance(value, dict) or value.get('version') != 3
+            or value.get('extends') != 'upstream'
+            or set(value) - {'version', 'extends', 'adjustments'}):
+        raise ConfigurationError(
+            f'Unsupported projection override: {path}. Migrate the complete policy '
+            'to version: 3, extends: upstream, and scoped adjustments; '
+            'see docs/agents/projection-templates.md.'
+        )
+    adjustments = value.get('adjustments', [])
+    if not isinstance(adjustments, list):
+        raise ConfigurationError(f'{path}: adjustments must be a list')
+    for item in adjustments:
+        if (not isinstance(item, dict) or set(item) != {'step', 'old', 'new', 'reason'}
+                or not all(isinstance(v, str) for v in item.values())
+                or not all(item[key].strip() for key in ('step', 'old', 'reason'))):
+            raise ConfigurationError(f'{path}: each adjustment needs step, old, new, and reason strings')
+    return adjustments
+
+
+def adjust_for_site(pipeline: Pipeline, site: Path | None) -> Pipeline:
+    for item in read_adjustments(site):
+        matches = [block for block in pipeline.blocks if block.name == item['step']]
+        if len(matches) != 1 or not matches[0].adjusted.strip():
+            raise ConfigurationError(f'Unknown or inactive projection step: {item["step"]}')
+        try:
+            changed = matches[0].replace(item['old'], item['new'], reason=item['reason'])
+        except ValueError as error:
+            raise ConfigurationError(str(error)) from error
+        pipeline = Pipeline(tuple(changed if block.name == changed.name else block
+                                  for block in pipeline.blocks))
+    return pipeline
+
+
+def load_pipeline(presentation: Path, site: Path | None = None) -> Pipeline:
+    try:
+        return adjust_for_site(adjust_for_lite(parse_workflow(presentation / WORKFLOW)), site)
+    except (OSError, ValueError) as error:
+        raise ConfigurationError(f'Cannot prepare upstream projection: {error}') from error
+
+
 def register(commands) -> None:
     parser = commands.add_parser(
         'blocks', help='inspect or execute upstream projection shell blocks',
@@ -212,6 +299,8 @@ def register(commands) -> None:
     parser.add_argument('--workflow', type=Path,
                         help='inspect or run an explicit YAML file instead of the selected upstream workflow')
     parser.add_argument('--job', default='create_pages')
+    parser.add_argument('--site', type=Path,
+                        help='site-specific directory containing scoped projection.yaml adjustments')
     parser.add_argument('--upstream', action='store_true',
                         help='inspect unadjusted blocks; run also includes setup and publishing commands')
     commands = parser.add_subparsers(dest='blocks_command', required=True)
@@ -238,8 +327,10 @@ def execute(args) -> int:
         else:
             workflow = args.workflow
         pipeline = parse_workflow(workflow, job=args.job)
+        if args.site and args.upstream:
+            raise ValueError('--site cannot be combined with --upstream; use --view raw to inspect the original')
         if not args.upstream:
-            pipeline = adjust_for_lite(pipeline)
+            pipeline = adjust_for_site(adjust_for_lite(pipeline), args.site)
         if getattr(args, 'names', None):
             pipeline = pipeline.chain(*args.names)
         if args.blocks_command == 'list':
@@ -249,6 +340,7 @@ def execute(args) -> int:
             if args.json:
                 print(json.dumps([{
                     'number': block.number, 'name': block.name, 'uses': block.uses, 'raw': block.raw,
+                    'skip_reason': block.skip_reason,
                     'adjusted': block.adjusted, 'diff': block.diff(),
                     'adjustments': [dict(reason=a.reason, before=a.before, after=a.after)
                                     for a in block.adjustments],
@@ -270,7 +362,7 @@ def execute(args) -> int:
         with open(os.devnull, 'w') as sink:
             os.dup2(sink.fileno(), sys.stdout.fileno())
         return 1
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, ConfigurationError) as error:
         print(f'orinoco-lite projection blocks: {error}', file=sys.stderr)
         return 1
     except KeyboardInterrupt:

@@ -14,19 +14,20 @@ import subprocess
 import sys
 import tempfile
 
-import yaml
-
 from .errors import DriverError
 from .upstream_snapshot import load_jsonl
 
 
 def run_upstream(records: Path, presentation: Path, output: Path,
-                 *, python_command: list[str] | None = None, resources_root: Path | None = None) -> dict:
+                 *, python_command: list[str] | None = None, resources_root: Path | None = None,
+                 site: Path | None = None) -> dict:
     from .record_stages import _check_record_input
     _check_record_input(records)
     command = [*(python_command or [sys.executable]), "-m", __name__, str(records), str(presentation), str(output)]
     if resources_root is not None:
         command.append(str(resources_root))
+    if site is not None:
+        command.extend(['--site', str(site)])
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise DriverError(f"Selected upstream projection failed: {result.stderr.strip() or result.stdout.strip()}")
@@ -38,22 +39,12 @@ def run_upstream(records: Path, presentation: Path, output: Path,
         raise DriverError("Selected upstream projection emitted an invalid summary") from error
 
 
-def workflow_steps(presentation: Path) -> list[dict]:
-    path = presentation / ".forgejo/workflows/update-from-pool.yaml"
-    try:
-        steps = yaml.safe_load(path.read_text())["jobs"]["create_pages"]["steps"]
-        if not isinstance(steps, list) or not all(isinstance(step, dict) for step in steps):
-            raise ValueError("steps must be mappings")
-        return steps
-    except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as error:
-        raise DriverError(f"Unsupported upstream projection workflow: {path}") from error
-
-
-def homepage_pid(presentation: Path) -> str:
-    """Read the singleton homepage selection from the authoritative workflow."""
+def homepage_pid(presentation: Path, site: Path | None = None) -> str:
+    """Read homepage selection from the same adjusted workflow we execute."""
+    from .projection_blocks import load_pipeline
     pids = []
-    for step in workflow_steps(presentation):
-        run = step.get("run", "").replace("\\\n", " ")
+    for block in load_pipeline(presentation, site).blocks:
+        run = block.adjusted.replace("\\\n", " ")
         if "render-record" not in run:
             continue
         arguments = shlex.split(run.split("|", 1)[0])
@@ -81,18 +72,42 @@ def render_graph(records: str, presentation: Path) -> str:
     return result.stdout.rstrip() + "\n"
 
 
-def project(records_path: Path, presentation: Path, output: Path, resources_root: Path | None = None) -> dict:
+def stage_templates(presentation: Path, destination: Path, site: Path | None = None) -> None:
+    """Compose files for query-things' native FileSystemLoader, without shadowing parents."""
+    import shutil
+    shutil.copytree(presentation / 'page_templates', destination)
+    if site is None:
+        return
+    local = site / 'projection-templates'
+    if local.is_symlink():
+        raise DriverError(f'Projection templates cannot be symlinks: {local}')
+    if local.exists() and not local.is_dir():
+        raise DriverError(f'Projection templates must be a directory: {local}')
+    for source in sorted(local.rglob('*')):
+        if source.is_symlink():
+            raise DriverError(f'Projection templates cannot be symlinks: {source}')
+        if source.is_dir():
+            continue
+        target = destination / source.relative_to(local)
+        if target.exists():
+            raise DriverError(f'Local template would replace an upstream template: {source}; '
+                              'use a distinct filename and Jinja inheritance')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+
+def project(records_path: Path, presentation: Path, output: Path, resources_root: Path | None = None,
+            *, site: Path | None = None) -> dict:
     """Execute inspected upstream shell blocks against the local Pool."""
     from .record_stages import _check_record_input
-    from .projection_blocks import adjust_for_lite, parse_workflow, BlockExecutionError
+    from .projection_blocks import load_pipeline, BlockExecutionError
     from .upstream_service import local_service, selected_schema
     from dump_things_pyclient import communicate
     import shutil
 
     _check_record_input(records_path)
     records = load_jsonl(records_path)
-    pipeline = adjust_for_lite(parse_workflow(
-        presentation / '.forgejo/workflows/update-from-pool.yaml'))
+    pipeline = load_pipeline(presentation, site)
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='orinoco-projection-') as temporary:
         scratch = Path(temporary)
@@ -104,8 +119,8 @@ def project(records_path: Path, presentation: Path, output: Path, resources_root
             target = (scratch / f'content/{suffix}/_index.md').resolve()
             if not target.is_relative_to(content_root):
                 raise DriverError(f'Record PID escapes upstream content directory: {item.pid}')
-        for name in ('page_templates', 'code'):
-            shutil.copytree(presentation / name, scratch / name)
+        stage_templates(presentation, scratch / 'page_templates', site)
+        shutil.copytree(presentation / 'code', scratch / 'code')
         for name in ('content', 'static'):
             (scratch / name).mkdir()
         with socket.socket() as listener:
@@ -138,8 +153,17 @@ def project(records_path: Path, presentation: Path, output: Path, resources_root
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('records', 'presentation', 'output'):
+        parser.add_argument(name, type=Path)
+    parser.add_argument('resources_root', type=Path, nargs='?')
+    parser.add_argument('--site', type=Path)
+    args = parser.parse_args()
     try:
-        print(json.dumps(project(*(Path(value).resolve() for value in sys.argv[1:]))))
+        print(json.dumps(project(args.records.resolve(), args.presentation.resolve(), args.output.resolve(),
+                                 args.resources_root.resolve() if args.resources_root else None,
+                                 site=args.site.resolve() if args.site else None)))
     except Exception as error:
         print(str(error), file=sys.stderr)
         raise SystemExit(2)

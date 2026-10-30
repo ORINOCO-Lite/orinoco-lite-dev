@@ -24,7 +24,6 @@ from .config import github_repository, load_config_path
 from .errors import ConfigurationError, DriverError, IntegrityError
 from .editor import bind_editor
 from .integrity import sha256_file
-from .projection import reject_projection_override
 from .upstream_projection import homepage_pid
 from .www_from_model import resolve_www_from_model
 from .upstream_runtime import (
@@ -135,8 +134,7 @@ def _render_site_surfaces(
     assembly: Path,
 ) -> None:
     site_data = workspace.site_data
-    reject_projection_override(workspace)
-    upstream_prefix = homepage_pid(www_from_model_root).split(":", 1)[0] + ":"
+    upstream_prefix = homepage_pid(www_from_model_root, workspace.path("site")).split(":", 1)[0] + ":"
     record_prefix = site_data.get("record_prefix", upstream_prefix)
     if record_prefix != upstream_prefix:
         raise ConfigurationError(

@@ -32,7 +32,7 @@ def workspace(tmp_path, monkeypatch):
 def test_override_fails_before_projection_or_cache(workspace):
     override = workspace.path("site") / "projection.yaml"
     override.write_text("version: 2\n")
-    with pytest.raises(ConfigurationError, match="Remove this file"):
+    with pytest.raises(ConfigurationError, match="Migrate the complete policy"):
         update_projection(workspace, resolve_resources().root)
     assert not (workspace.path("build") / "hugo-projection").exists()
 
@@ -187,3 +187,29 @@ def test_editable_dependency_cache_tracks_working_sources(workspace, tmp_path, m
     source.unlink()
     update_projection(workspace, resources)
     assert len(calls) == 4
+
+
+
+def test_cache_tracks_scoped_adjustments_and_inherited_templates(workspace, monkeypatch):
+    resources = resolve_resources().root
+    calls = []
+    def render(w, r, destination, **kwargs):
+        calls.append(destination)
+        (destination / "records.jsonl").write_text("original\n")
+        return {"records": 1, "pages": 1}
+    monkeypatch.setattr(projection, "render_projection", render)
+    config = workspace.path("site") / "projection.yaml"
+    config.write_text("version: 3\nextends: upstream\nadjustments: []\n")
+    templates = workspace.path("site") / "projection-templates"
+    templates.mkdir()
+    child = templates / "local-project.md.j2"
+    child.write_text('{% extends "project.md.j2" %}')
+    update_projection(workspace, resources)
+    update_projection(workspace, resources)
+    assert len(calls) == 1
+    child.write_text(child.read_text() + "\n")
+    update_projection(workspace, resources)
+    assert len(calls) == 2
+    config.write_text(config.read_text() + "# changed adjustment\n")
+    update_projection(workspace, resources)
+    assert len(calls) == 3
