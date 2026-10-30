@@ -118,6 +118,36 @@ def _contract_document(workspace: WorkspaceConfig) -> tuple[Path, dict[str, Any]
         raise ConfigurationError(f"Projection contract is invalid: {path}") from error
     if not isinstance(value, dict) or value.get("version") != 2:
         raise ConfigurationError("Projection contract must be version 2")
+    if "extends" in value:
+        if value["extends"] != "default" or set(value) - {
+            "version", "extends", "homepage", "pages"
+        }:
+            raise ConfigurationError(
+                "Projection overrides must extend default and contain only homepage and pages"
+            )
+        default_path = Path(__file__).with_name("default_projection.yaml")
+        try:
+            default = yaml.safe_load(default_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+            raise ConfigurationError(f"Projection contract is invalid: {default_path}") from error
+        for section in ("homepage", "pages"):
+            overrides = value.get(section, {})
+            if not isinstance(overrides, dict):
+                raise ConfigurationError(f"Projection overrides {section} must be a mapping")
+            if section == "homepage":
+                if set(overrides) - {"template", "select", "inline", "reverse_injections"}:
+                    raise ConfigurationError(
+                        "Projection homepage overrides contain unknown operations"
+                    )
+                default[section].update(overrides)
+            else:
+                for schema_type, operations in overrides.items():
+                    if schema_type not in default["pages"] or not isinstance(operations, dict):
+                        raise ConfigurationError(
+                            f"Projection override page is unknown or malformed: {schema_type}"
+                        )
+                    default["pages"][schema_type].update(operations)
+        value = default
     return path, value
 
 
@@ -687,6 +717,7 @@ def _projection_cache_key(
         workspace.path("records"),
         annotation_root(workspace),
         contract.path,
+        Path(__file__).with_name("default_projection.yaml"),
         contract.homepage.template.parent,
         contract.graph_producer,
         resources_root / "schema",
