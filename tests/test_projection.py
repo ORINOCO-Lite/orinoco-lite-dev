@@ -618,6 +618,78 @@ class GenericProjectionContractTests(unittest.TestCase):
         resolve.assert_called_with(self.workspace.root, self.resources)
         self.assertEqual(load_contract(self.workspace, self.root).missing_graph_targets, "reject")
 
+    def test_scoped_project_override_preserves_defaults_and_upstream_parent(self) -> None:
+        upstream = self.resources / "www-from-model"
+        default = yaml.safe_load((PACKAGE_ROOT / "src/orinoco_lite/default_projection.yaml").read_text())
+        paths = [default["homepage"]["template"], default["graph"]["producer"]]
+        paths.extend(page["template"] for page in default["pages"].values())
+        for name in paths:
+            path = upstream / name.removeprefix("www-from-model:")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("placeholder")
+        (upstream / "page_templates/page.md.j2").write_text(
+            "---\n{% block frontmatter %}title: {{ title }}\n{% endblock %}"
+            "params:\n  graphRootNodePID: {{ pid }}\n"
+            "{% block frontmatter_params %}{% endblock %}---\n"
+            "{% block content %}upstream content{% endblock %}"
+        )
+        (upstream / "page_templates/project.md.j2").write_text(
+            '{% extends "page.md.j2" %}'
+        )
+        local = self.root / "site-specific/projection-templates/project.j2"
+        local.write_text(
+            '{% extends "www-from-model:page_templates/project.md.j2" %}'
+            '{% block frontmatter_params %}  contribution: true\n{% endblock %}'
+        )
+        (self.root / "site-specific/projection.yaml").write_text(
+            "version: 2\nextends: default\npages:\n"
+            "  xyzri:XYZProject:\n    select: {}\n"
+            "    template: site-specific/projection-templates/project.j2\n"
+        )
+        contract = load_contract(self.workspace, upstream)
+        project = contract.pages["xyzri:XYZProject"]
+        self.assertEqual(project.inline, tuple(default["pages"]["xyzri:XYZProject"]["inline"]))
+        self.assertTrue(_matches_policy({"pid": "xyzrins:projects/bids"}, project, {}))
+        self.assertTrue(contract.pages["xyzri:XYZPerson"].select)
+        rendered = _render_record(
+            {"pid": "xyzrins:projects/bids", "title": "BIDS"}, project, {}, [], upstream,
+        )
+        self.assertIn("graphRootNodePID: xyzrins:projects/bids", rendered)
+        self.assertIn("contribution: true", rendered)
+        self.assertIn("upstream content", rendered)
+
+    @unittest.skipUnless(
+        (PACKAGE_ROOT / "submodules/www-from-model/page_templates/project.md.j2").is_file(),
+        "selected upstream templates are unavailable",
+    )
+    def test_project_override_inherits_real_upstream_template(self) -> None:
+        upstream = PACKAGE_ROOT / "submodules/www-from-model"
+        local = self.root / "site-specific/projection-templates/project.j2"
+        local.write_text(
+            '{% extends "www-from-model:page_templates/project.md.j2" %}\n'
+            '{% block frontmatter_params %}{{ super() }}\n'
+            '  conContribution: {{ "true" if associated_with else "false" }}\n'
+            '{% endblock %}\n'
+        )
+        record = {
+            "pid": "xyzrins:projects/bids", "title": "BIDS", "description": "Upstream content",
+            "associated_with": [{"object": {"pid": "ror:04tfhh831", "schema_type": "xyzri:XYZOrganization"}}],
+            "influenced_by": [], "part_of": [], "parts": [], "generated": [],
+        }
+        result = _render_record(record, RenderPolicy(local, {}, (), ()), {}, [], upstream)
+        frontmatter = yaml.safe_load(result.split("---", 2)[1])
+        self.assertEqual(frontmatter["params"]["graphRootNodePID"], record["pid"])
+        self.assertTrue(frontmatter["params"]["conContribution"])
+        self.assertIn("Upstream content", result)
+
+    def test_scoped_override_rejects_unknown_page(self) -> None:
+        from orinoco_lite.errors import ConfigurationError
+        (self.root / "site-specific/projection.yaml").write_text(
+            "version: 2\nextends: default\npages:\n  typo: {select: {}}\n"
+        )
+        with self.assertRaisesRegex(ConfigurationError, "unknown or malformed"):
+            load_contract(self.workspace)
+
     def test_local_template_inherits_selected_upstream_blocks(self) -> None:
         upstream = self.resources / "www-from-model"
         templates = upstream / "page_templates"
