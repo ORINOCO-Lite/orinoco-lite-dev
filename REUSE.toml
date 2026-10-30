@@ -22,7 +22,7 @@ SPDX-License-Identifier = "CC-BY-4.0"
 [[annotations]]
 path = [
   "tests/fixtures/template-candidate/site-specific/metadata/**",
-  "packages/orinoco-lite/src/orinoco_lite/default_projection.yaml",
+  "src/orinoco_lite/default_projection.yaml",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Center for Open Neuroscience and contributors"
@@ -35,7 +35,7 @@ SPDX-FileCopyrightText = "2026 Dustin Yuchen Teng"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = [".agents/skills/introduce-reuse-compliance/**"]
+path = "src/orinoco_lite/_version.py"
 precedence = "override"
 SPDX-FileCopyrightText = "NONE"
-SPDX-License-Identifier = "LicenseRef-Not-Declared"
+SPDX-License-Identifier = "LicenseRef-Public-Domain"

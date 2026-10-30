@@ -1,6 +1,5 @@
 cff-version: 1.2.0
 title: Orinoco Lite
-version: 0.3.0rc5
 type: software
 abstract: >-
   Location-independent build and release interface for Orinoco Lite sites.
