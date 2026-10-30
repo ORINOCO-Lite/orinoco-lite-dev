@@ -181,6 +181,9 @@ class EditorBundleTests(unittest.TestCase):
         catalog = record_catalog(self.workspace)
         self.assertEqual(catalog["version"], 3)
         self.assertEqual(len(catalog["records"]), 2)
+        # Creation includes upstream graph classes even before the first record.
+        self.assertIn("xyzri:XYZProject", catalog["new_record_schema_types"])
+        self.assertNotIn("xyzri:XYZAgentRole", catalog["new_record_schema_types"])
         self.assertEqual(
             [record["pid"] for record in catalog["records"]],
             ["xyzrins:persons/first", "xyzrins:persons/second"],
@@ -398,30 +401,15 @@ class EditorBundleTests(unittest.TestCase):
         apply_bundle(self.workspace, self.resources, bundle, write=True)
         self.assertIn("display_label: Changed", self.first.read_text())
 
-    def test_bundle_applies_with_custom_upstream_projection_templates(self) -> None:
+    def test_bundle_rejects_retired_projection_override_before_writing(self) -> None:
+        from orinoco_lite.errors import ConfigurationError
+
         bundle = self._bundle({"xyzrins:persons/first": "Changed"})
-        upstream = self.resources / "www-from-model"
-        upstream.mkdir()
-        (upstream / "person.md.j2").write_text("{{ display_label }}\n")
         projection = self.root / "site-specific/projection.yaml"
-        projection.write_text(projection.read_text().replace(
-            "site-specific/projection-templates/person.md.j2",
-            "www-from-model:person.md.j2",
-        ))
-
-        with patch(
-            "orinoco_lite.projection.resolve_www_from_model",
-            return_value=upstream,
-        ):
-            report = apply_bundle_report(
-                self.workspace, self.resources, bundle, write=True
-            )
-
-        self.assertTrue(report["applied"])
-        self.assertEqual(report["changed_paths"], [
-            "site-specific/metadata/records/XYZPerson/first.yaml",
-        ])
-        self.assertIn("display_label: Changed", self.first.read_text())
+        projection.write_text("version: 2\n")
+        with self.assertRaisesRegex(ConfigurationError, "Unsupported projection override"):
+            apply_bundle_report(self.workspace, self.resources, bundle, write=True)
+        self.assertIn("display_label: First", self.first.read_text())
 
     def test_bundle_preserves_unchanged_rdf_multivalue_order(self) -> None:
         associated_with = [

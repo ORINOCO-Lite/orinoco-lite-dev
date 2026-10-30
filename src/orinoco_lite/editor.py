@@ -100,6 +100,18 @@ def record_catalog(
     sources = record_sources(workspace)
     graph = json.loads(render_graph(_record_stream([yaml.safe_load(s["content"]) for s in sources]), presentation))
     editable_pids = {node["id"] for node in graph["nodes"]}
+    # Ask the same upstream producer which schema classes it exposes, including
+    # classes with no stored records yet. Do not copy its class-selection policy.
+    from linkml_runtime import SchemaView
+    schema = resolve_resources().root / "schema/demo-research-information/unreleased.yaml"
+    view = SchemaView(str(schema))
+    candidates = [
+        {"pid": str(view.get_uri(name, expand=False)),
+         "schema_type": str(view.get_uri(name, expand=False))}
+        for name in view.all_classes()
+    ]
+    class_graph = json.loads(render_graph(_record_stream(candidates), presentation))
+    editable_classes = {node["id"] for node in class_graph["nodes"]}
     records = [
         {key: source[key] for key in ("path", "pid", "schema_type", "sha256")}
         for source in sources if source["pid"] in editable_pids
