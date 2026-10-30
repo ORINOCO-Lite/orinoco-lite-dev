@@ -129,6 +129,21 @@ Wheels carry the gitlink-selected Python dependency revisions; source archives r
 Downstreams can select a tag or exact commit with `orinoco-lite package update --revision TAG_OR_COMMIT`.
 Dependency locks and release inputs contain the versions required by the build; they are not a model for site metadata or project documentation.
 
+### Licensing
+
+The repository uses the [REUSE specification](https://reuse.software/) to describe licensing.
+See [LICENSES.md](LICENSES.md) for the project policy and `LICENSES/` for license texts.
+Run `pixi exec --spec 'reuse>=5.1,<6' reuse lint` to check the annotations.
+
+### Citation and DOI archival
+
+[`CITATION.cff`](CITATION.cff) contains the package's citation metadata.
+Add a version matching the release tag if preparing citation metadata for a specific release.
+
+When the project is ready to archive a release, enable Zenodo's GitHub integration for this repository and publish the intended GitHub release.
+Add the DOI badge supplied by Zenodo to this section after the first record is created.
+The DOI is a citation and archival link; the release workflow remains authoritative for the wheel, source distribution, checksums, and build provenance.
+
 ## Boundaries
 
 - Original software is MIT licensed; documentation is CC BY 4.0, factual metadata is CC0 1.0, and media licensing remains item-specific.

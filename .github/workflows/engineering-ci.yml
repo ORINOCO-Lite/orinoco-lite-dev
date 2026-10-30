@@ -25,7 +25,7 @@ jobs:
       matrix:
         runner:
           - ubuntu-24.04
-          - macos-14
+          - macos-15
     steps:
       - name: Check out only the parent repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

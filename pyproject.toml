@@ -48,6 +48,8 @@ runtime = [
   # Consumer counterpart of the temporary RDF compatibility bounds in pixi.toml.
   "linkml<1.12",
   "linkml-runtime<1.12",
+  # Old six releases cannot import six.moves on current Python versions.
+  "six>=1.16",
   "packaging",
   "pydantic",
   "pyoxigraph",
