@@ -138,7 +138,7 @@ Run `pixi exec --spec 'reuse>=5.1,<6' reuse lint` to check the annotations.
 ### Citation and DOI archival
 
 [`CITATION.cff`](CITATION.cff) contains the package's citation metadata.
-Keep its version aligned with the package version in [`the release tag`](the release tag) when preparing a release.
+Add a version matching the release tag if preparing citation metadata for a specific release.
 
 When the project is ready to archive a release, enable Zenodo's GitHub integration for this repository and publish the intended GitHub release.
 Add the DOI badge supplied by Zenodo to this section after the first record is created.
