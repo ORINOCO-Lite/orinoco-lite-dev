@@ -49,7 +49,12 @@ function github() {
     method: string;
     body: any;
   }> = [];
-  const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+  const fetcher = vi.fn(async function (
+    this: unknown,
+    url: RequestInfo | URL,
+    init?: RequestInit,
+  ) {
+    expect(this).toBeUndefined();
     const parsed = new URL(String(url));
     expect(parsed.origin).toBe("https://api.github.com");
     const match = /^\/repos\/([^/]+\/[^/]+)(\/.*)$/.exec(parsed.pathname)!;

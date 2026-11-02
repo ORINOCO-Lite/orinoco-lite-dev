@@ -41,7 +41,9 @@ class Repository {
     body?: unknown,
     raw = false,
   ): Promise<any> {
-    const response = await this.fetcher(
+    // Native browser fetch rejects a Repository instance as its receiver.
+    const fetcher = this.fetcher;
+    const response = await fetcher(
       `https://api.github.com/repos/${this.name}${path}`,
       {
         method,
