@@ -24,8 +24,8 @@ App registration, ownership transfer, permission changes, secret creation/deleti
   - Contents: write; and
   - Pull requests: write.
 - Install the App only on the selected downstream repositories.
-- Disable the webhook **Active** setting and subscribe to no webhook events.
-  This service consumes none.
+- Enable the webhook at `PUBLIC_ORIGIN/api/shacl/metadata-merge` and subscribe to pull request events.
+  Configure the same webhook secret as the service’s `GITHUB_WEBHOOK_SECRET`.
 
 Choose the App visibility deliberately:
 
@@ -34,7 +34,7 @@ Choose the App visibility deliberately:
 - Use **Any account** only for a deliberately shared, public service.
   A public App owner cannot prevent an external account from installing it; each installing account controls its own selected-repository scope, while the service still enforces App installation and curator permission on every request.
 
-To minimize manual entry, an agent may generate GitHub's current official prefilled registration URL with the resolved homepage, exact callback, visibility choice, permission values, OAuth-on-install disabled, and webhook disabled.
+To minimize manual entry, an agent may generate GitHub's current official prefilled registration URL with the resolved homepage, exact callback, visibility choice, permission values, OAuth-on-install disabled, and webhook enabled.
 Treat the URL as an operator convenience, not authority: GitHub's supported query parameters may change, it must contain no secrets, and the created App's settings must still be read back and verified field by field.
 
 The service requests no OAuth scopes and rejects a nonempty returned scope.

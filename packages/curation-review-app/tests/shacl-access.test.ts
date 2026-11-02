@@ -50,12 +50,7 @@ describe("read-only editor access", () => {
     expect(github.siteSubmodule).not.toHaveBeenCalled();
   });
   it("does not require a separate editor operation opt-in", async () => {
-    const github = client(
-      ORINOCO_CONFIG.replace(
-        "shacl_materialization = true",
-        "shacl_materialization = false",
-      ),
-    );
+    const github = client();
     await expect(
       checkShaclAccess(github, grant, "https://review.example"),
     ).resolves.toBeUndefined();

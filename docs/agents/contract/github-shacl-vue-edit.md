@@ -90,7 +90,8 @@ This bounded profile requires an absolute GitHub HTTPS or SSH URL.
 The metadata proposal starts at the deployed gitlink even if its default branch has advanced.
 The App MUST be installed on both repositories and the curator MUST have write permission in both.
 The service first creates a metadata draft pull request containing the unchanged bundle, then hands off the website proposal with the metadata draft's exact coordinates.
-It identifies the deployed commits and tells reviewers to merge the metadata proposal first and update the website proposal's gitlink to the resulting metadata default-branch commit before merging the website proposal.
+It identifies the deployed commits and companion website branch.
+When the metadata proposal merges, the service updates the website proposal gitlink to GitHub’s resulting merge commit.
 Each draft has its head and base in its own repository.
 The fixed temporary website handoff may wrap the unchanged bundle and metadata proposal coordinates; these are operational state removed by replacement.
 

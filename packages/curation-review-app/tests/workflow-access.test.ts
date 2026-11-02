@@ -90,7 +90,7 @@ async function setup() {
     name: "main",
     sha: source,
   });
-  const policy = "[tool.orinoco.operations]\nshacl_materialization = true";
+  const policy = "[tool.orinoco]";
   const initialContents = vi
     .spyOn(github, "contents")
     .mockResolvedValue(new Map([["operation-policy", policy]]));
@@ -407,10 +407,7 @@ describe("proposal-bound workflow authority", () => {
             repo === "owner/site"
               ? [
                   ["handoff", JSON.stringify(s.handoff)],
-                  [
-                    "operation-policy",
-                    "[tool.orinoco.operations]\nshacl_materialization = true",
-                  ],
+                  ["operation-policy", "[tool.orinoco]"],
                 ]
               : [
                   [

@@ -123,6 +123,7 @@ async function prepareHandoff(
     curator: { id: number; login: string };
     sign?: (input: AuthorizationInput) => Promise<string>;
     requireAutomation?: () => void;
+    autoGitlink: boolean;
   },
 ): Promise<{ bytes: Uint8Array; metadataPull: string | null }> {
   const source = proposal.bundle.source_commit;
@@ -167,7 +168,7 @@ async function prepareHandoff(
       repository.defaultBranch,
       head.sha,
       PULL_REQUEST_TITLE,
-      `Metadata proposal based on https://github.com/${submodule.repository}/commit/${submodule.sha}, as deployed by https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle. Merge this proposal first, then update the companion website proposal's gitlink to the resulting metadata default-branch commit before merging it.`,
+      `Metadata proposal based on https://github.com/${submodule.repository}/commit/${submodule.sha}, as deployed by https://github.com/${proposal.repository}/commit/${source}. The website workflow validates the composed result. ${authorization.autoGitlink ? "When this proposal is merged, the website proposal is updated automatically." : "After merging this proposal, update the website proposal gitlink to the merged commit."}\n\nWebsite branch: https://github.com/${proposal.repository}/tree/${encodeURIComponent(authorization.branch)}`,
     );
     const handoff: Record<string, unknown> = {
       format: "orinoco-shacl-submodule-handoff",
@@ -322,6 +323,7 @@ export async function createShaclProposal(
   serviceOrigin: string,
   sign?: (input: AuthorizationInput) => Promise<string>,
   requireAutomation?: () => void,
+  autoGitlink = false,
 ): Promise<ShaclProposalResult> {
   const pullRequest =
     proposal.target.kind === "pull_request"
@@ -384,6 +386,7 @@ export async function createShaclProposal(
         curator: user,
         sign,
         requireAutomation,
+        autoGitlink,
       },
     );
     let commit;
@@ -437,6 +440,7 @@ export async function createShaclProposal(
       curator: user,
       sign,
       requireAutomation,
+      autoGitlink,
     },
   );
   const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
@@ -469,7 +473,7 @@ export async function createShaclProposal(
       PULL_REQUEST_TITLE,
       metadataPull === null
         ? `Based on deployed website commit https://github.com/${proposal.repository}/commit/${source}.`
-        : `Companion metadata proposal: ${metadataPull}. Merge it first, then update this website proposal's gitlink to the resulting metadata default-branch commit before merging. This preserves metadata changes that arrived after the deployed snapshot.`,
+        : `Companion metadata proposal: ${metadataPull}. ${autoGitlink ? "Merge it first; the website gitlink will then update automatically." : "Merge it first, then update the website gitlink to the merged commit."}`,
     );
     return {
       commit_sha: commit.sha,

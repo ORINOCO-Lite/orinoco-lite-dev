@@ -110,9 +110,8 @@ template_updates = false
 ```
 
 These enable automated curation completion and template-update proposals.
-Missing choices are disabled; unknown names and nonboolean values are invalid.
+Missing choices are disabled; nonboolean values are invalid.
 Editor proposals and verified preview editing rely on GitHub App installation and curator permissions, without separate operation opt-ins.
-Existing `shacl_materialization` and `preview_editing` settings no longer control these editor operations.
 
 Copier initializes public site settings but MUST NOT ask operation-permission questions.
 The App post-install setup page explains the operations and required permissions and directs owners to edit `[tool.orinoco.operations]` in root `pyproject.toml`.
