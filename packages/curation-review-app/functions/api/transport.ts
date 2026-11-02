@@ -272,7 +272,7 @@ function proposalMatchesGrant(proposal) {
 }
 
 async function startShacl(session) {
-  setStatus("Checking GitHub access and repository operation settings…");
+  setStatus("Checking GitHub access…");
   await requestJson("/api/shacl/access", { method: "POST", headers: { "X-CSRF-Token": session.csrf_token } });
   const listener = async (event) => {
     if (

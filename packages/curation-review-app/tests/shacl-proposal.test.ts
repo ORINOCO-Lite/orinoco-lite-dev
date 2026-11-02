@@ -281,9 +281,7 @@ describe("attributed existing-PR SHACL handoff", () => {
                 {
                   context: "netlify/example/deploy-preview",
                   state: "success",
-                  target_url: enabled
-                    ? "https://deploy-preview-43--example.netlify.app/"
-                    : PREVIEW_ORIGIN + "/",
+                  target_url: "https://deploy-preview-43--example.netlify.app/",
                 },
               ],
             });
@@ -302,7 +300,7 @@ describe("attributed existing-PR SHACL handoff", () => {
           PREVIEW_ORIGIN,
         ),
       ).rejects.toMatchObject({
-        code: enabled ? "shacl_transport_mismatch" : "operation_disabled",
+        code: "shacl_transport_mismatch",
         status: 403,
       });
     },
@@ -692,24 +690,6 @@ describe("site-specific submodule handoff", () => {
         pull_request: 43,
       },
     });
-  });
-
-  it("stops before either write when downstream materialization is disabled", async () => {
-    const github = client();
-    const original = vi.mocked(github.contents).getMockImplementation()!;
-    vi.mocked(github.contents).mockImplementation(
-      async (repo, requests, limit) => {
-        const result = await original(repo, requests, limit);
-        if (result.has("operation-policy"))
-          result.set("operation-policy", "[tool.orinoco]");
-        return result;
-      },
-    );
-    await expect(
-      createProposal(github, request({ kind: "standalone" })),
-    ).rejects.toMatchObject({ code: "operation_disabled" });
-    expect(github.createBranch).not.toHaveBeenCalled();
-    expect(github.commitFileAtHead).not.toHaveBeenCalled();
   });
 
   it("stops before either write when service automation is not configured", async () => {

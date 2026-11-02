@@ -102,6 +102,8 @@ def revoke(token: str) -> None:
 def require_operation(repository: str, operation: str, token: str) -> None:
     """Check current default-branch policy for transport using a workflow token."""
     validate_operations({operation: True})
+    if operation in {"shacl_materialization", "preview_editing"}:
+        return
     api = f"https://api.github.com/repos/{repository}"
     repo = request_json(api, token)
     branch = urllib.parse.quote(repo["default_branch"], safe="")

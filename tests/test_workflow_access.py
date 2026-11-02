@@ -108,18 +108,7 @@ def test_template_access_uses_dispatch_base_without_proposal(tmp_path, monkeypat
     assert output.read_text() == "token=bot-secret\n"
 
 
-@pytest.mark.parametrize("enabled", [True, False])
-def test_workflow_token_transport_checks_current_default_branch(enabled):
-    import base64
-    policy = f"[tool.orinoco]\n[tool.orinoco.operations]\nshacl_materialization = {str(enabled).lower()}\n"
-    with patch.object(workflow_access, "request_json", side_effect=[
-        {"default_branch": "main"}, {"commit": {"sha": "a" * 40}},
-        {"content": base64.b64encode(policy.encode()).decode()},
-    ]) as request:
-        if enabled:
-            workflow_access.require_operation("owner/site", "shacl_materialization", "secret")
-        else:
-            with pytest.raises(workflow_access.ConfigurationError, match="Enable tool.orinoco.operations.shacl_materialization"):
-                workflow_access.require_operation("owner/site", "shacl_materialization", "secret")
-    assert request.call_args_list[1].args[0].endswith("/branches/main")
-    assert request.call_args_list[2].args[0].endswith("/contents/pyproject.toml?ref=" + "a" * 40)
+def test_editor_transport_needs_no_separate_operation_policy():
+    with patch.object(workflow_access, "request_json") as request:
+        workflow_access.require_operation("owner/site", "shacl_materialization", "secret")
+    request.assert_not_called()

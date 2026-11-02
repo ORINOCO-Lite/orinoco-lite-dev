@@ -38,14 +38,6 @@ export async function onRequest(context: EventContext): Promise<Response> {
     new GitHubClient(session.access_token),
     session.shacl_grant,
     origin,
-    () => {
-      if (!context.env.GITHUB_APP_PRIVATE_KEY)
-        throw new HttpError(
-          503,
-          "automation_unavailable",
-          "The service operator must configure the curation App signing key.",
-        );
-    },
   );
   return jsonResponse({ ready: true });
 }

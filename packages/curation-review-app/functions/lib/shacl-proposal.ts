@@ -1,4 +1,3 @@
-import { requireOperation } from "./operation-policy";
 import type { AuthorizationInput } from "./workflow-access";
 import type {
   ShaclGrant,
@@ -129,7 +128,6 @@ async function prepareHandoff(
   const source = proposal.bundle.source_commit;
   const submodule = await github.siteSubmodule(proposal.repository, source);
   const bytes = serializeShaclReviewBundle(proposal.bundle);
-  await requireOperation(github, proposal.repository, "shacl_materialization");
   if (submodule === null) return { bytes, metadataPull: null };
   authorization.requireAutomation?.();
   if (
@@ -225,7 +223,6 @@ async function requireTrustedEditorDeployment(
   }
   if (new URL(site.editorSiteUrl).origin === grant.editor_origin) return site;
   if (pull !== null) {
-    await requireOperation(github, repository, "preview_editing");
     const value = await github.commitStatus(repository, pull.headSha);
     if (
       value !== null &&
@@ -286,7 +283,6 @@ export async function checkShaclAccess(
   github: GitHubClient,
   grant: ShaclGrant,
   serviceOrigin: string,
-  requireAutomation: () => void,
 ): Promise<void> {
   const repository = grant.repository;
   await github.requireInstallationAccess(repository);
@@ -317,16 +313,6 @@ export async function checkShaclAccess(
     serviceOrigin,
     pull,
   );
-  const submodule = await github.siteSubmodule(
-    repository,
-    pull?.headSha ?? base.sha,
-  );
-  if (submodule !== null) {
-    await github.requireInstallationAccess(submodule.repository);
-    await github.requireCurator(submodule.repository, user.login);
-    requireAutomation();
-  }
-  await requireOperation(github, repository, "shacl_materialization");
 }
 
 export async function createShaclProposal(
