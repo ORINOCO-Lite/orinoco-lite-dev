@@ -278,6 +278,17 @@ describe("proposal-bound workflow authority", () => {
       verifyAuthorization(env, s.handoff, { ...identity, ...change }),
     ).rejects.toThrow();
   });
+  it("allows the metadata default branch to advance while preserving the authorized heads", async () => {
+    const s = await setup();
+    s.pull.mockImplementation(async (repo) =>
+      repo === "owner/site"
+        ? draft(repo, head, "curation/site", identity.workflow_sha)
+        : draft(repo, metaHead, "curation/metadata", "f".repeat(40)),
+    );
+    await expect(
+      workflowAccess(env, identity, request, s.auth),
+    ).resolves.toMatchObject({ token: "scoped-test-token" });
+  });
   it("rejects modified bundle coordinates and forged grants", async () => {
     const s = await setup();
     await expect(

@@ -75,7 +75,7 @@ It MUST verify:
 
 - installed repository and curator write permission;
 - trusted downstream and service origins;
-- source commit and current exact head;
+- deployed source commit and, when updating an existing draft, its current exact head;
 - allowed bundle format, size, record coordinates, and changed paths; and
 - the one-time session grant.
 
@@ -86,9 +86,11 @@ For that exception, the service MUST verify GitHub's successful Netlify deploy-p
 The service MUST NOT retarget a stale bundle, create a pull request with a head from another repository, convert metadata, or retain the bundle after processing.
 
 When `site-specific` is a Git submodule, the service MUST resolve its GitHub URL and exact gitlink from the deployed website commit.
-This bounded profile requires an absolute GitHub HTTPS or SSH URL and a gitlink at the metadata repository's current default-branch head.
+This bounded profile requires an absolute GitHub HTTPS or SSH URL.
+The metadata proposal starts at the deployed gitlink even if its default branch has advanced.
 The App MUST be installed on both repositories and the curator MUST have write permission in both.
 The service first creates a metadata draft pull request containing the unchanged bundle, then hands off the website proposal with the metadata draft's exact coordinates.
+It identifies the deployed commits and tells reviewers to merge the metadata proposal first and update the website proposal's gitlink to the resulting metadata default-branch commit before merging the website proposal.
 Each draft has its head and base in its own repository.
 The fixed temporary website handoff may wrap the unchanged bundle and metadata proposal coordinates; these are operational state removed by replacement.
 
@@ -114,7 +116,8 @@ The temporary bundle is removed from branch history.
 Earlier source-adapter proposal and review commits remain unchanged.
 
 Failure leaves the draft pull request visibly blocked and does not modify either reviewed default branch.
-A stale or ambiguous input fails rather than being rebased, retargeted, or guessed.
+The source snapshot remains unchanged; GitHub shows conflicts against the current default branches.
+An altered proposal head or ambiguous input fails rather than being retargeted or guessed.
 
 ## Boundaries
 

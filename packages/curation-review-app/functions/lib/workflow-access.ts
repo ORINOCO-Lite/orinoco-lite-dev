@@ -484,8 +484,6 @@ export async function workflowAccess(
         grant,
         false,
       );
-    if (metaPull.base.sha !== metadata.source_commit)
-      deny("The metadata default branch changed.");
     await github.requireCurator(
       metadata.repository,
       String(grant.curator_login),

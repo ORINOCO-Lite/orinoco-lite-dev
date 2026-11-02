@@ -463,7 +463,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
       if (url.endsWith("/pulls") && init?.method === "POST") {
         if (options.pullFails) return Response.json({}, { status: 422 });
         const pull = body as Record<string, unknown>;
-        expect(pull.body).toBe("");
+        expect(pull.body).toContain("Based on deployed website commit");
         return Response.json({
           base: { ref: "main", repo: { full_name: "example/site" } },
           draft: true,
@@ -489,7 +489,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
 }
 
 describe("standalone SHACL proposal", () => {
-  it("branches only from the freshly read default head and opens a draft PR", async () => {
+  it("branches from the deployed source and opens a draft PR", async () => {
     const mock = standaloneFetch();
     const result = await createProposal(
       new GitHubClient("ghu_curator", mock.fetchMock),
@@ -528,16 +528,18 @@ describe("standalone SHACL proposal", () => {
     ).toHaveLength(1);
   });
 
-  it("rejects a stale default head before creating a branch", async () => {
+  it("accepts a deployed source older than the default head", async () => {
     const mock = standaloneFetch();
     const stale = request({ kind: "standalone" });
     stale.bundle.source_commit = "d".repeat(40);
-    await expect(
-      createProposal(new GitHubClient("ghu_curator", mock.fetchMock), stale),
-    ).rejects.toMatchObject({ code: "stale_shacl_proposal", status: 409 });
-    expect(mock.requests.some((item) => item.url.endsWith("/git/refs"))).toBe(
-      false,
+    await createProposal(
+      new GitHubClient("ghu_curator", mock.fetchMock),
+      stale,
     );
+    const reference = mock.requests.find(
+      (item) => item.url.endsWith("/git/refs") && item.method === "POST",
+    );
+    expect(reference?.body).toMatchObject({ sha: stale.bundle.source_commit });
   });
 
   it.each([
@@ -728,16 +730,18 @@ describe("site-specific submodule handoff", () => {
     expect(github.createBranch).not.toHaveBeenCalled();
   });
 
-  it("rejects a stale metadata base without creating either branch", async () => {
+  it("branches metadata from the deployed gitlink when its default branch advanced", async () => {
     const github = client();
     vi.mocked(github.siteSubmodule).mockResolvedValue({
       repository: "example/metadata",
       sha: "e".repeat(40),
     });
-    await expect(
-      createProposal(github, request({ kind: "standalone" })),
-    ).rejects.toMatchObject({ code: "stale_metadata_submodule" });
-    expect(github.createBranch).not.toHaveBeenCalled();
+    await createProposal(github, request({ kind: "standalone" }));
+    expect(github.createBranch).toHaveBeenCalledWith(
+      "example/metadata",
+      expect.any(String),
+      "e".repeat(40),
+    );
   });
 
   it("reports missing metadata access before any write", async () => {

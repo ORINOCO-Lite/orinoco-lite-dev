@@ -149,17 +149,6 @@ async function prepareHandoff(
   await github.requireInstallationAccess(submodule.repository);
   await github.requireCurator(submodule.repository, login);
   const repository = await github.repository(submodule.repository);
-  const base = await github.branchHead(
-    submodule.repository,
-    repository.defaultBranch,
-  );
-  if (base.sha !== submodule.sha) {
-    throw new HttpError(
-      409,
-      "stale_metadata_submodule",
-      `The deployed site-specific commit is not the current ${submodule.repository} default-branch head. Update the website gitlink and rebuild its editor before proposing.`,
-    );
-  }
   await requireEmptyHandoffPath(github, submodule.repository, submodule.sha);
   const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   // A nonce-derived ref is also the replay gate. Never delete it after an
@@ -181,7 +170,7 @@ async function prepareHandoff(
       repository.defaultBranch,
       head.sha,
       PULL_REQUEST_TITLE,
-      `Metadata proposal for https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle.`,
+      `Metadata proposal based on https://github.com/${submodule.repository}/commit/${submodule.sha}, as deployed by https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle. Merge this proposal first, then update the companion website proposal's gitlink to the resulting metadata default-branch commit before merging it.`,
     );
     const handoff: Record<string, unknown> = {
       format: "orinoco-shacl-submodule-handoff",
@@ -445,13 +434,7 @@ export async function createShaclProposal(
     proposal.repository,
     repository.defaultBranch,
   );
-  if (base.sha !== proposal.bundle.source_commit) {
-    throw new HttpError(
-      409,
-      "stale_shacl_proposal",
-      "The repository default-branch head no longer matches the SHACL bundle source commit.",
-    );
-  }
+  const source = proposal.bundle.source_commit;
   const site = await requireTrustedEditorDeployment(
     github,
     proposal.repository,
@@ -460,23 +443,23 @@ export async function createShaclProposal(
     serviceOrigin,
   );
   validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
-  await requireEmptyHandoffPath(github, proposal.repository, base.sha);
+  await requireEmptyHandoffPath(github, proposal.repository, source);
   const { bytes, metadataPull } = await prepareHandoff(
     github,
     proposal,
     grant,
     user.login,
     {
-      branch: `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
+      branch: `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
       trustedSha: base.sha,
       curator: user,
       sign,
       requireAutomation,
     },
   );
-  const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
+  const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   try {
-    await github.createBranch(proposal.repository, branch, base.sha);
+    await github.createBranch(proposal.repository, branch, source);
   } catch (error) {
     if (metadataPull !== null)
       throw new HttpError(
@@ -490,11 +473,11 @@ export async function createShaclProposal(
     const commit = await github.commitFileAtHead(
       proposal.repository,
       branch,
-      base.sha,
+      source,
       SHACL_BUNDLE_PATH,
       bytes,
       COMMIT_HEADLINE,
-      commitBody(base.sha),
+      commitBody(source),
     );
     const pull = await github.openDraftPullRequest(
       proposal.repository,
@@ -503,8 +486,8 @@ export async function createShaclProposal(
       commit.sha,
       PULL_REQUEST_TITLE,
       metadataPull === null
-        ? ""
-        : `Companion metadata proposal: ${metadataPull}. Merge the metadata proposal before advancing the website gitlink.`,
+        ? `Based on deployed website commit https://github.com/${proposal.repository}/commit/${source}.`
+        : `Companion metadata proposal: ${metadataPull}. Merge it first, then update this website proposal's gitlink to the resulting metadata default-branch commit before merging. This preserves metadata changes that arrived after the deployed snapshot.`,
     );
     return {
       commit_sha: commit.sha,
