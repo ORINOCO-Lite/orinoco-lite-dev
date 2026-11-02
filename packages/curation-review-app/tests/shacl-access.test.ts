@@ -40,55 +40,21 @@ function client(config = ORINOCO_CONFIG) {
 }
 
 describe("read-only editor access", () => {
-  it("checks installations in different organizations without making GitHub writes", async () => {
+  it("checks website access without guessing which metadata snapshot will be submitted", async () => {
     const github = client();
-    const automation = vi.fn();
-    await checkShaclAccess(github, grant, "https://review.example", automation);
+    await checkShaclAccess(github, grant, "https://review.example");
     expect(github.requireInstallationAccess).toHaveBeenNthCalledWith(
       1,
       "website/site",
     );
-    expect(github.requireInstallationAccess).toHaveBeenNthCalledWith(
-      2,
-      "metadata/records",
-    );
-    expect(github.requireCurator).toHaveBeenCalledWith(
-      "metadata/records",
-      "curator",
-    );
-    expect(github.json).toHaveBeenCalledExactlyOnceWith("/repos/website/site");
-    expect(automation).toHaveBeenCalledOnce();
+    expect(github.siteSubmodule).not.toHaveBeenCalled();
   });
-  it("reports disabled policy separately after successful installation checks", async () => {
-    const github = client(
-      ORINOCO_CONFIG.replace(
-        "shacl_materialization = true",
-        "shacl_materialization = false",
-      ),
-    );
-    await expect(
-      checkShaclAccess(github, grant, "https://review.example", vi.fn()),
-    ).rejects.toMatchObject({ code: "operation_disabled", status: 403 });
-    expect(github.requireInstallationAccess).toHaveBeenCalledTimes(2);
-  });
-  it("identifies the missing metadata installation", async () => {
+  it("does not require a separate editor operation opt-in", async () => {
     const github = client();
-    vi.mocked(github.requireInstallationAccess).mockImplementation(
-      async (repository) => {
-        if (repository === "metadata/records")
-          throw new HttpError(
-            403,
-            "installation_access_required",
-            `Install the App on ${repository}.`,
-          );
-      },
-    );
     await expect(
-      checkShaclAccess(github, grant, "https://review.example", vi.fn()),
-    ).rejects.toMatchObject({
-      code: "installation_access_required",
-      message: "Install the App on metadata/records.",
-    });
+      checkShaclAccess(github, grant, "https://review.example"),
+    ).resolves.toBeUndefined();
+    expect(github.requireInstallationAccess).toHaveBeenCalledTimes(1);
   });
   it("does not relabel a network failure as missing curator permission", async () => {
     const github = client();
@@ -96,7 +62,7 @@ describe("read-only editor access", () => {
       new HttpError(502, "github_error", "GitHub unavailable"),
     );
     await expect(
-      checkShaclAccess(github, grant, "https://review.example", vi.fn()),
+      checkShaclAccess(github, grant, "https://review.example"),
     ).rejects.toMatchObject({ code: "github_error" });
   });
 });

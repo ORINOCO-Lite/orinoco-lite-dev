@@ -55,7 +55,6 @@ describe("access check session boundary", () => {
       expect.anything(),
       grant,
       origin,
-      expect.any(Function),
     );
   });
   it.each([

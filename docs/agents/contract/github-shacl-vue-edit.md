@@ -75,7 +75,7 @@ It MUST verify:
 
 - installed repository and curator write permission;
 - trusted downstream and service origins;
-- source commit and current exact head;
+- deployed source commit and, when updating an existing draft, its current exact head;
 - allowed bundle format, size, record coordinates, and changed paths; and
 - the one-time session grant.
 
@@ -86,9 +86,13 @@ For that exception, the service MUST verify GitHub's successful Netlify deploy-p
 The service MUST NOT retarget a stale bundle, create a pull request with a head from another repository, convert metadata, or retain the bundle after processing.
 
 When `site-specific` is a Git submodule, the service MUST resolve its GitHub URL and exact gitlink from the deployed website commit.
-This bounded profile requires an absolute GitHub HTTPS or SSH URL and a gitlink at the metadata repository's current default-branch head.
+This bounded profile requires an absolute GitHub HTTPS or SSH URL.
+The metadata proposal starts at the deployed gitlink even if its default branch has advanced.
 The App MUST be installed on both repositories and the curator MUST have write permission in both.
 The service first creates a metadata draft pull request containing the unchanged bundle, then hands off the website proposal with the metadata draft's exact coordinates.
+It identifies the deployed commits and companion website branch.
+When the metadata proposal merges, the service updates the website proposal gitlink to GitHub’s resulting merge commit.
+For private metadata, the website validation job obtains read access from the same installed App.
 Each draft has its head and base in its own repository.
 The fixed temporary website handoff may wrap the unchanged bundle and metadata proposal coordinates; these are operational state removed by replacement.
 
@@ -100,7 +104,7 @@ Applying a bundle containing both creates and updates MUST roll back all record 
 
 For a submodule proposal, the trusted website workflow MUST verify both exact heads, the pinned metadata base, the identical bundles, and curator authority in both repositories.
 It checks out metadata as data and validates the complete website and metadata composition without write credentials.
-The App MUST verify a separate completed successful validation job in the same exact first-attempt run before granting write access to the publishing job.
+The App MUST verify a separate completed successful validation job in the same workflow run before granting write access to the publishing job.
 The publishing job repeats materialization and validation from the same exact inputs on its isolated runner; no checkout or credentials cross the job boundary.
 Only then may it replace the metadata handoff with a metadata-only commit and replace the website handoff with a commit changing only the gitlink to that metadata commit.
 The existing curation App supplies bounded automated access under the [authentication contract](curation-service-authentication-options.md#app-credentials-and-automated-completion); downstreams MUST NOT configure a second App or copy its private key into Actions.
@@ -114,7 +118,8 @@ The temporary bundle is removed from branch history.
 Earlier source-adapter proposal and review commits remain unchanged.
 
 Failure leaves the draft pull request visibly blocked and does not modify either reviewed default branch.
-A stale or ambiguous input fails rather than being rebased, retargeted, or guessed.
+The source snapshot remains unchanged; GitHub shows conflicts against the current default branches.
+An altered proposal head or ambiguous input fails rather than being retargeted or guessed.
 
 ## Boundaries
 

@@ -142,6 +142,18 @@ class HandoffHistoryTests(unittest.TestCase):
             self.repository.git("merge-base", "--is-ancestor", proposal, head)
         )
 
+    def test_handoff_can_start_from_an_older_deployed_commit(self) -> None:
+        deployed = self.repository.head
+        self.repository.write("README.md", "new default branch content\n")
+        current = self.repository.commit("advance default branch")
+        self.repository.git("checkout", "--detach", deployed)
+        self.repository.handoff()
+
+        report = self.inspect(base_sha=current)
+
+        self.assertEqual("handoff", report["phase"])
+        self.assertEqual(deployed, report["source_commit"])
+
     def test_repeated_standalone_edit_uses_the_previous_exact_head(self) -> None:
         self.repository.write(
             "site-specific/metadata/records/XYZProject/example.yaml",
@@ -583,9 +595,13 @@ class SubmoduleHandoffTests(unittest.TestCase):
         self.assertEqual(
             HANDOFF.verify_submodule_handoff(self.root, **kwargs), self.coordinates
         )
+        pull["base"]["sha"] = "f" * 40
+        self.assertEqual(
+            HANDOFF.verify_submodule_handoff(self.root, **kwargs), self.coordinates
+        )
         for field, changed in (
             ("head", {"sha": "f" * 40}),
-            ("base", {"sha": "f" * 40}),
+            ("base", {"ref": "other"}),
         ):
             original = pull[field]
             pull[field] = {**original, **changed}

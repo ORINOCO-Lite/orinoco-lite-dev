@@ -19,8 +19,6 @@ repository = "example/site"
 [tool.orinoco.service]
 url = "https://review.example/"
 [tool.orinoco.operations]
-preview_editing = true
-shacl_materialization = true
 [tool.orinoco.paths]
 records = "site-specific/metadata/records"
 ${SITE_DATA}`;

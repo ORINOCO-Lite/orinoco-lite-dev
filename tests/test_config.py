@@ -38,7 +38,7 @@ def test_operation_choices(tmp_path, operations):
     assert load_workspace(tmp_path).raw["operations"] == operations
 
 
-@pytest.mark.parametrize("operations", [[], {"unknown": True}, {"template_updates": "true"}, {"template_updates": 1}])
+@pytest.mark.parametrize("operations", [[], {"template_updates": "true"}, {"template_updates": 1}])
 def test_invalid_operations(tmp_path, operations):
     write(tmp_path, operations=operations)
     with pytest.raises(ConfigurationError, match="tool.orinoco.operations"):

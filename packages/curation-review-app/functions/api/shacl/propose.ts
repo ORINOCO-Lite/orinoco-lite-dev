@@ -81,6 +81,7 @@ export async function onRequest(context: EventContext): Promise<Response> {
           "The service operator must configure the existing curation App signing key. No additional downstream App or secret is required.",
         );
     },
+    Boolean(context.env.GITHUB_WEBHOOK_SECRET),
   );
   return jsonResponse(result, {
     headers: {

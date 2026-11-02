@@ -90,7 +90,7 @@ async function setup() {
     name: "main",
     sha: source,
   });
-  const policy = "[tool.orinoco.operations]\nshacl_materialization = true";
+  const policy = "[tool.orinoco]";
   const initialContents = vi
     .spyOn(github, "contents")
     .mockResolvedValue(new Map([["operation-policy", policy]]));
@@ -104,7 +104,6 @@ async function setup() {
   const authorization = await authorizeWorkflow(github, env, {
     repository: "owner/site",
     branch: "curation/site",
-    trustedSha: source,
     curator: user,
     handoff: unsigned,
   });
@@ -170,7 +169,7 @@ async function setup() {
           actor: user,
           status: "in_progress",
         };
-      if (path.endsWith("/jobs?per_page=100"))
+      if (path.endsWith("/jobs?filter=all&per_page=100"))
         return {
           jobs: [
             {
@@ -240,7 +239,7 @@ describe("proposal-bound workflow authority", () => {
     const original = s.json.getMockImplementation()!;
     s.json.mockImplementation(async (path, ...rest) => {
       const value = (await original(path, ...rest)) as any;
-      if (path.endsWith("/jobs?per_page=100"))
+      if (path.endsWith("/jobs?filter=all&per_page=100"))
         Object.assign(value.jobs[1], change);
       return value;
     });
@@ -258,6 +257,22 @@ describe("proposal-bound workflow authority", () => {
     ).rejects.toThrow();
     expect(s.token.mock.calls.every((call) => call[1] !== true)).toBe(true);
   });
+  it("accepts a rerun with successful validation from the same workflow run", async () => {
+    const s = await setup();
+    const original = s.json.getMockImplementation()!;
+    s.json.mockImplementation(async (path, ...rest) => {
+      const result = await original(path, ...rest);
+      if (path.endsWith("/actions/runs/4"))
+        return { ...(result as object), run_attempt: 2 };
+      return result;
+    });
+    await expect(
+      workflowAccess(env, { ...identity, run_attempt: "2" }, request, s.auth),
+    ).resolves.toMatchObject({ token: "scoped-test-token" });
+    expect(s.json).toHaveBeenCalledWith(
+      "/repos/owner/site/actions/runs/4/jobs?filter=all&per_page=100",
+    );
+  });
   it("uses read-only access before validation", async () => {
     const s = await setup();
     await workflowAccess(env, identity, { ...request, write: false }, s.auth);
@@ -266,17 +281,33 @@ describe("proposal-bound workflow authority", () => {
   it.each([
     { repository_id: "9" },
     { repository: "attacker/site" },
-    { workflow_sha: "e".repeat(40) },
+    { workflow_sha: "invalid" },
     { workflow_ref: "owner/site/.github/workflows/other.yml@refs/heads/main" },
     { event_name: "pull_request" },
     { actor_id: "99" },
-    { run_attempt: "2" },
+    { run_attempt: "0" },
     { ref: "refs/tags/main" },
   ])("rejects a different workflow identity %j", async (change) => {
     const s = await setup();
     await expect(
       verifyAuthorization(env, s.handoff, { ...identity, ...change }),
     ).rejects.toThrow();
+  });
+  it("allows both default branches to advance before and during the workflow", async () => {
+    const s = await setup();
+    s.pull.mockImplementation(async (repo) =>
+      repo === "owner/site"
+        ? draft(repo, head, "curation/site", "f".repeat(40))
+        : draft(repo, metaHead, "curation/metadata", "f".repeat(40)),
+    );
+    await expect(
+      workflowAccess(
+        env,
+        { ...identity, workflow_sha: "e".repeat(40) },
+        request,
+        s.auth,
+      ),
+    ).resolves.toMatchObject({ token: "scoped-test-token" });
   });
   it("rejects modified bundle coordinates and forged grants", async () => {
     const s = await setup();
@@ -298,6 +329,16 @@ describe("proposal-bound workflow authority", () => {
       ),
     ).rejects.toThrow();
   });
+  it("accepts an older authorization while the proposal remains valid", async () => {
+    const s = await setup();
+    const claims = await verifyAuthorization(env, s.handoff, identity);
+    const authorization = await new SignJWT({ ...claims, iat: 1 })
+      .setProtectedHeader({ alg: "HS256" })
+      .sign(utf8(`orinoco-workflow-authorization-v1:${env.SESSION_SEAL_KEY}`));
+    await expect(
+      verifyAuthorization(env, { ...s.handoff, authorization }, identity),
+    ).resolves.toMatchObject({ repository: "owner/site" });
+  });
   it("rejects expired signed authorization", async () => {
     const s = await setup();
     const claims = await verifyAuthorization(env, s.handoff, identity);
@@ -318,7 +359,6 @@ describe("proposal-bound workflow authority", () => {
     ).rejects.toThrow();
   });
   it.each([
-    "operation disabled",
     "website head",
     "metadata head",
     "permission",
@@ -330,14 +370,6 @@ describe("proposal-bound workflow authority", () => {
     "closed draft",
   ])("denies %s changes without issuing write access", async (boundary) => {
     const s = await setup();
-    if (boundary === "operation disabled") {
-      const original = s.contents.getMockImplementation()!;
-      s.contents.mockImplementation(async (repo, requests, limit) => {
-        const result = await original(repo, requests, limit);
-        result.set("operation-policy", "[tool.orinoco]");
-        return result;
-      });
-    }
     if (boundary === "website head")
       s.pull.mockResolvedValue(
         draft("owner/site", "e".repeat(40), "curation/site", source),
@@ -375,10 +407,7 @@ describe("proposal-bound workflow authority", () => {
             repo === "owner/site"
               ? [
                   ["handoff", JSON.stringify(s.handoff)],
-                  [
-                    "operation-policy",
-                    "[tool.orinoco.operations]\nshacl_materialization = true",
-                  ],
+                  ["operation-policy", "[tool.orinoco]"],
                 ]
               : [
                   [
@@ -471,6 +500,7 @@ describe("completed proposal validation", () => {
     const dispatch = {
       ...identity,
       event_name: "workflow_dispatch",
+      workflow_sha: "9".repeat(40),
       actor_id: "41898282",
     };
     s.pull.mockImplementation(async (repo) =>
@@ -507,7 +537,7 @@ describe("completed proposal validation", () => {
             repository: { id: 1 },
             event: "workflow_dispatch",
             path: ".github/workflows/shacl-vue-proposal.yml",
-            head_sha: source,
+            head_sha: dispatch.workflow_sha,
             run_attempt: 1,
             status: "in_progress",
           }

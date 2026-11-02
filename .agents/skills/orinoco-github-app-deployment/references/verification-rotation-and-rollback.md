@@ -10,7 +10,7 @@ Do not record cookies, OAuth codes, access tokens, client secrets, or the sessio
 - Confirm the checkout is clean and at the reviewed application commit and tree.
 - Re-run `npm ci --ignore-scripts` and `npm run check` using the declared tools.
 - Confirm the deployment contains the checked Worker, Functions, or equivalent backend adapter and no static UI application or assets.
-- Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available; coordinated submodule materialization also requires `GITHUB_APP_PRIVATE_KEY`.
+- Confirm exactly the two public values `PUBLIC_ORIGIN` and `GITHUB_CLIENT_ID` and the encrypted secrets `GITHUB_CLIENT_SECRET` and `SESSION_SEAL_KEY` are available; coordinated submodule materialization also requires `GITHUB_APP_PRIVATE_KEY`, and automatic gitlink updates require `GITHUB_WEBHOOK_SECRET`.
 - Confirm staged editor files, editor-input artifacts, and durable storage bindings are absent.
 - Confirm there is no token, cookie, or received-bundle logging.
 - Confirm the provider exposes deployment history or that the checked Git revision can be redeployed.

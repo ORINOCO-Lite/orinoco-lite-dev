@@ -1,4 +1,3 @@
-import { requireOperation } from "./operation-policy";
 import type { AuthorizationInput } from "./workflow-access";
 import type {
   ShaclGrant,
@@ -121,16 +120,15 @@ async function prepareHandoff(
   login: string,
   authorization: {
     branch: string;
-    trustedSha: string;
     curator: { id: number; login: string };
     sign?: (input: AuthorizationInput) => Promise<string>;
     requireAutomation?: () => void;
+    autoGitlink: boolean;
   },
 ): Promise<{ bytes: Uint8Array; metadataPull: string | null }> {
   const source = proposal.bundle.source_commit;
   const submodule = await github.siteSubmodule(proposal.repository, source);
   const bytes = serializeShaclReviewBundle(proposal.bundle);
-  await requireOperation(github, proposal.repository, "shacl_materialization");
   if (submodule === null) return { bytes, metadataPull: null };
   authorization.requireAutomation?.();
   if (
@@ -149,17 +147,6 @@ async function prepareHandoff(
   await github.requireInstallationAccess(submodule.repository);
   await github.requireCurator(submodule.repository, login);
   const repository = await github.repository(submodule.repository);
-  const base = await github.branchHead(
-    submodule.repository,
-    repository.defaultBranch,
-  );
-  if (base.sha !== submodule.sha) {
-    throw new HttpError(
-      409,
-      "stale_metadata_submodule",
-      `The deployed site-specific commit is not the current ${submodule.repository} default-branch head. Update the website gitlink and rebuild its editor before proposing.`,
-    );
-  }
   await requireEmptyHandoffPath(github, submodule.repository, submodule.sha);
   const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   // A nonce-derived ref is also the replay gate. Never delete it after an
@@ -181,7 +168,7 @@ async function prepareHandoff(
       repository.defaultBranch,
       head.sha,
       PULL_REQUEST_TITLE,
-      `Metadata proposal for https://github.com/${proposal.repository}/commit/${source}. The website's trusted workflow validates the composed result before replacing this temporary bundle.`,
+      `Metadata proposal based on https://github.com/${submodule.repository}/commit/${submodule.sha}, as deployed by https://github.com/${proposal.repository}/commit/${source}. The website workflow validates the composed result. ${authorization.autoGitlink ? "When this proposal is merged, the website proposal is updated automatically." : "After merging this proposal, update the website proposal gitlink to the merged commit."}\n\nWebsite branch: https://github.com/${proposal.repository}/tree/${encodeURIComponent(authorization.branch)}`,
     );
     const handoff: Record<string, unknown> = {
       format: "orinoco-shacl-submodule-handoff",
@@ -199,7 +186,6 @@ async function prepareHandoff(
       handoff.authorization = await authorization.sign({
         repository: proposal.repository,
         branch: authorization.branch,
-        trustedSha: authorization.trustedSha,
         curator: authorization.curator,
         handoff,
       });
@@ -238,7 +224,6 @@ async function requireTrustedEditorDeployment(
   }
   if (new URL(site.editorSiteUrl).origin === grant.editor_origin) return site;
   if (pull !== null) {
-    await requireOperation(github, repository, "preview_editing");
     const value = await github.commitStatus(repository, pull.headSha);
     if (
       value !== null &&
@@ -299,7 +284,6 @@ export async function checkShaclAccess(
   github: GitHubClient,
   grant: ShaclGrant,
   serviceOrigin: string,
-  requireAutomation: () => void,
 ): Promise<void> {
   const repository = grant.repository;
   await github.requireInstallationAccess(repository);
@@ -330,16 +314,6 @@ export async function checkShaclAccess(
     serviceOrigin,
     pull,
   );
-  const submodule = await github.siteSubmodule(
-    repository,
-    pull?.headSha ?? base.sha,
-  );
-  if (submodule !== null) {
-    await github.requireInstallationAccess(submodule.repository);
-    await github.requireCurator(submodule.repository, user.login);
-    requireAutomation();
-  }
-  await requireOperation(github, repository, "shacl_materialization");
 }
 
 export async function createShaclProposal(
@@ -349,6 +323,7 @@ export async function createShaclProposal(
   serviceOrigin: string,
   sign?: (input: AuthorizationInput) => Promise<string>,
   requireAutomation?: () => void,
+  autoGitlink = false,
 ): Promise<ShaclProposalResult> {
   const pullRequest =
     proposal.target.kind === "pull_request"
@@ -408,10 +383,10 @@ export async function createShaclProposal(
       user.login,
       {
         branch: pull.branch,
-        trustedSha: pull.baseSha,
         curator: user,
         sign,
         requireAutomation,
+        autoGitlink,
       },
     );
     let commit;
@@ -445,13 +420,7 @@ export async function createShaclProposal(
     proposal.repository,
     repository.defaultBranch,
   );
-  if (base.sha !== proposal.bundle.source_commit) {
-    throw new HttpError(
-      409,
-      "stale_shacl_proposal",
-      "The repository default-branch head no longer matches the SHACL bundle source commit.",
-    );
-  }
+  const source = proposal.bundle.source_commit;
   const site = await requireTrustedEditorDeployment(
     github,
     proposal.repository,
@@ -460,23 +429,23 @@ export async function createShaclProposal(
     serviceOrigin,
   );
   validateShaclRecordPaths(proposal.bundle, site.metadataRoots);
-  await requireEmptyHandoffPath(github, proposal.repository, base.sha);
+  await requireEmptyHandoffPath(github, proposal.repository, source);
   const { bytes, metadataPull } = await prepareHandoff(
     github,
     proposal,
     grant,
     user.login,
     {
-      branch: `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
-      trustedSha: base.sha,
+      branch: `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
       curator: user,
       sign,
       requireAutomation,
+      autoGitlink,
     },
   );
-  const branch = `curation/shacl-vue-${base.sha.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
+  const branch = `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`;
   try {
-    await github.createBranch(proposal.repository, branch, base.sha);
+    await github.createBranch(proposal.repository, branch, source);
   } catch (error) {
     if (metadataPull !== null)
       throw new HttpError(
@@ -490,11 +459,11 @@ export async function createShaclProposal(
     const commit = await github.commitFileAtHead(
       proposal.repository,
       branch,
-      base.sha,
+      source,
       SHACL_BUNDLE_PATH,
       bytes,
       COMMIT_HEADLINE,
-      commitBody(base.sha),
+      commitBody(source),
     );
     const pull = await github.openDraftPullRequest(
       proposal.repository,
@@ -503,8 +472,8 @@ export async function createShaclProposal(
       commit.sha,
       PULL_REQUEST_TITLE,
       metadataPull === null
-        ? ""
-        : `Companion metadata proposal: ${metadataPull}. Merge the metadata proposal before advancing the website gitlink.`,
+        ? `Based on deployed website commit https://github.com/${proposal.repository}/commit/${source}.`
+        : `Companion metadata proposal: ${metadataPull}. ${autoGitlink ? "Merge it first; the website gitlink will then update automatically." : "Merge it first, then update the website gitlink to the merged commit."}`,
     );
     return {
       commit_sha: commit.sha,

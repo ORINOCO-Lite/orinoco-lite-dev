@@ -467,7 +467,6 @@ def verify_submodule_handoff(
         or pull.get("number") != metadata["pull_request"]
         or base.get("repo", {}).get("full_name") != metadata["repository"]
         or base.get("ref") != base.get("repo", {}).get("default_branch")
-        or base.get("sha") != metadata["source_commit"]
         or head.get("repo", {}).get("full_name") != metadata["repository"]
         or head.get("ref") != metadata["branch"]
         or head.get("sha") != metadata["head_sha"]
@@ -479,7 +478,7 @@ def verify_submodule_handoff(
         or str(user.get("id")) != curator_id
     ):
         raise HandoffError(
-            "Metadata draft head, pinned base, or curator authority changed; inspect both pull requests before retrying"
+            "Metadata draft head, target, or curator authority changed; inspect both pull requests before retrying"
         )
     metadata_head = str(metadata["head_sha"])
     metadata_source = str(metadata["source_commit"])

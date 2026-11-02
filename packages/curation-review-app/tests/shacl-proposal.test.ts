@@ -236,77 +236,69 @@ describe("attributed existing-PR SHACL handoff", () => {
     }
   });
 
-  it.each([true, false])(
-    "rejects an unauthorized preview (enabled=%s)",
-    async (enabled) => {
-      const fetchMock = vi.fn(
-        async (input: string | URL | Request, init?: RequestInit) => {
-          const url = String(input);
-          const common = commonResponse(url);
-          if (common !== null) return common;
-          if (url.endsWith("/pulls/42")) {
-            return Response.json({
-              base: {
-                ref: "main",
-                repo: { full_name: "example/site" },
-                sha: BASE,
+  it("rejects an unauthorized preview", async () => {
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        const common = commonResponse(url);
+        if (common !== null) return common;
+        if (url.endsWith("/pulls/42")) {
+          return Response.json({
+            base: {
+              ref: "main",
+              repo: { full_name: "example/site" },
+              sha: BASE,
+            },
+            draft: true,
+            head: {
+              ref: "curation/edit",
+              repo: { full_name: "example/site" },
+              sha: HEAD,
+            },
+            html_url: "https://github.com/example/site/pull/42",
+            number: 42,
+            state: "open",
+          });
+        }
+        if (url === "https://api.github.com/graphql") {
+          const graphql = JSON.parse(String(init?.body)) as {
+            variables: Record<string, unknown>;
+          };
+          return siteConfigResponse(
+            graphql.variables.expression0 === `${BASE}:pyproject.toml`
+              ? ORINOCO_CONFIG
+              : SITE_DATA,
+          );
+        }
+        if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
+          return Response.json({
+            statuses: [
+              {
+                context: "netlify/example/deploy-preview",
+                state: "success",
+                target_url: "https://deploy-preview-43--example.netlify.app/",
               },
-              draft: true,
-              head: {
-                ref: "curation/edit",
-                repo: { full_name: "example/site" },
-                sha: HEAD,
-              },
-              html_url: "https://github.com/example/site/pull/42",
-              number: 42,
-              state: "open",
-            });
-          }
-          if (url === "https://api.github.com/graphql") {
-            const graphql = JSON.parse(String(init?.body)) as {
-              variables: Record<string, unknown>;
-            };
-            return siteConfigResponse(
-              graphql.variables.expression0 === `${BASE}:pyproject.toml`
-                ? ORINOCO_CONFIG.replace(
-                    "preview_editing = true",
-                    `preview_editing = ${enabled}`,
-                  )
-                : SITE_DATA,
-            );
-          }
-          if (url.endsWith(`/commits/${HEAD}/status?per_page=100`)) {
-            return Response.json({
-              statuses: [
-                {
-                  context: "netlify/example/deploy-preview",
-                  state: "success",
-                  target_url: enabled
-                    ? "https://deploy-preview-43--example.netlify.app/"
-                    : PREVIEW_ORIGIN + "/",
-                },
-              ],
-            });
-          }
-          throw new Error(`Unexpected request: ${url}`);
-        },
-      );
-      await expect(
-        createProposal(
-          new GitHubClient("ghu_curator", fetchMock),
-          request({
-            expected_head_sha: HEAD,
-            kind: "pull_request",
-            pull_request: 42,
-          }),
-          PREVIEW_ORIGIN,
-        ),
-      ).rejects.toMatchObject({
-        code: enabled ? "shacl_transport_mismatch" : "operation_disabled",
-        status: 403,
-      });
-    },
-  );
+            ],
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
+    await expect(
+      createProposal(
+        new GitHubClient("ghu_curator", fetchMock),
+        request({
+          expected_head_sha: HEAD,
+          kind: "pull_request",
+          pull_request: 42,
+        }),
+        PREVIEW_ORIGIN,
+      ),
+    ).rejects.toMatchObject({
+      code: "shacl_transport_mismatch",
+      status: 403,
+    });
+  });
 
   it("rejects a changed PR head before creating a commit", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -463,7 +455,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
       if (url.endsWith("/pulls") && init?.method === "POST") {
         if (options.pullFails) return Response.json({}, { status: 422 });
         const pull = body as Record<string, unknown>;
-        expect(pull.body).toBe("");
+        expect(pull.body).toContain("Based on deployed website commit");
         return Response.json({
           base: { ref: "main", repo: { full_name: "example/site" } },
           draft: true,
@@ -489,7 +481,7 @@ function standaloneFetch(options: StandaloneOptions = {}): {
 }
 
 describe("standalone SHACL proposal", () => {
-  it("branches only from the freshly read default head and opens a draft PR", async () => {
+  it("branches from the deployed source and opens a draft PR", async () => {
     const mock = standaloneFetch();
     const result = await createProposal(
       new GitHubClient("ghu_curator", mock.fetchMock),
@@ -528,16 +520,18 @@ describe("standalone SHACL proposal", () => {
     ).toHaveLength(1);
   });
 
-  it("rejects a stale default head before creating a branch", async () => {
+  it("accepts a deployed source older than the default head", async () => {
     const mock = standaloneFetch();
     const stale = request({ kind: "standalone" });
     stale.bundle.source_commit = "d".repeat(40);
-    await expect(
-      createProposal(new GitHubClient("ghu_curator", mock.fetchMock), stale),
-    ).rejects.toMatchObject({ code: "stale_shacl_proposal", status: 409 });
-    expect(mock.requests.some((item) => item.url.endsWith("/git/refs"))).toBe(
-      false,
+    await createProposal(
+      new GitHubClient("ghu_curator", mock.fetchMock),
+      stale,
     );
+    const reference = mock.requests.find(
+      (item) => item.url.endsWith("/git/refs") && item.method === "POST",
+    );
+    expect(reference?.body).toMatchObject({ sha: stale.bundle.source_commit });
   });
 
   it.each([
@@ -668,6 +662,11 @@ describe("site-specific submodule handoff", () => {
       "example/metadata",
       "octocat",
     );
+    const metadataProposal = vi.mocked(github.openDraftPullRequest).mock
+      .calls[0];
+    expect(metadataProposal?.[5]).toContain(
+      "Website branch: https://github.com/example/site/tree/curation%2Fshacl-vue-",
+    );
     const calls = vi.mocked(github.commitFileAtHead).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.slice(0, 4)).toEqual([
@@ -692,24 +691,6 @@ describe("site-specific submodule handoff", () => {
     });
   });
 
-  it("stops before either write when downstream materialization is disabled", async () => {
-    const github = client();
-    const original = vi.mocked(github.contents).getMockImplementation()!;
-    vi.mocked(github.contents).mockImplementation(
-      async (repo, requests, limit) => {
-        const result = await original(repo, requests, limit);
-        if (result.has("operation-policy"))
-          result.set("operation-policy", "[tool.orinoco]");
-        return result;
-      },
-    );
-    await expect(
-      createProposal(github, request({ kind: "standalone" })),
-    ).rejects.toMatchObject({ code: "operation_disabled" });
-    expect(github.createBranch).not.toHaveBeenCalled();
-    expect(github.commitFileAtHead).not.toHaveBeenCalled();
-  });
-
   it("stops before either write when service automation is not configured", async () => {
     const github = client();
     const proposal = request({ kind: "standalone" });
@@ -728,16 +709,18 @@ describe("site-specific submodule handoff", () => {
     expect(github.createBranch).not.toHaveBeenCalled();
   });
 
-  it("rejects a stale metadata base without creating either branch", async () => {
+  it("branches metadata from the deployed gitlink when its default branch advanced", async () => {
     const github = client();
     vi.mocked(github.siteSubmodule).mockResolvedValue({
       repository: "example/metadata",
       sha: "e".repeat(40),
     });
-    await expect(
-      createProposal(github, request({ kind: "standalone" })),
-    ).rejects.toMatchObject({ code: "stale_metadata_submodule" });
-    expect(github.createBranch).not.toHaveBeenCalled();
+    await createProposal(github, request({ kind: "standalone" }));
+    expect(github.createBranch).toHaveBeenCalledWith(
+      "example/metadata",
+      expect.any(String),
+      "e".repeat(40),
+    );
   });
 
   it("reports missing metadata access before any write", async () => {

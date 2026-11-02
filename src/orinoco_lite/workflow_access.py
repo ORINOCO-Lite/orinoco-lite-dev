@@ -44,7 +44,7 @@ def request_json(url: str, token: str, body: dict | None = None) -> dict:
     return result
 
 
-def obtain(body: dict, *, curation: bool = False, template: bool = False) -> dict:
+def obtain(body: dict, *, curation: bool = False, template: bool = False, metadata: bool = False) -> dict:
     """Request and mask installation credentials without exporting them to Actions."""
     # Metadata may be a private, not-yet-initialized submodule. Only the
     # trusted website configuration is needed to obtain its checkout token.
@@ -55,7 +55,7 @@ def obtain(body: dict, *, curation: bool = False, template: bool = False) -> dic
     origin = _curation_service_origin(
         service.get("url", DEFAULT_CURATION_SERVICE), "tool.orinoco.service.url")
     operation = "template" if template else "curation" if curation else "shacl"
-    endpoint = f"{origin}/api/{operation}/workflow-access"
+    endpoint = f"{origin}/api/shacl/metadata-access" if metadata else f"{origin}/api/{operation}/workflow-access"
     identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
     parsed = urllib.parse.urlsplit(identity_url)
     if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".actions.githubusercontent.com"):
@@ -102,6 +102,8 @@ def revoke(token: str) -> None:
 def require_operation(repository: str, operation: str, token: str) -> None:
     """Check current default-branch policy for transport using a workflow token."""
     validate_operations({operation: True})
+    if operation in {"shacl_materialization", "preview_editing"}:
+        return
     api = f"https://api.github.com/repos/{repository}"
     repo = request_json(api, token)
     branch = urllib.parse.quote(repo["default_branch"], safe="")
@@ -118,6 +120,7 @@ def main() -> None:
     parser.add_argument("--curation", action="store_true")
     parser.add_argument("--template", action="store_true")
     parser.add_argument("--check-operation")
+    parser.add_argument("--metadata-read", action="store_true")
     args = parser.parse_args()
     if args.check_operation:
         require_operation(os.environ["GITHUB_REPOSITORY"], args.check_operation, os.environ["GH_TOKEN"])
@@ -135,7 +138,10 @@ def main() -> None:
         body = {"repository": os.environ["GITHUB_REPOSITORY"], "head": os.environ["GITHUB_SHA"]}
     if os.environ.get("PROPOSAL_HANDOFF") and not args.curation:
         body["handoff"] = os.environ["PROPOSAL_HANDOFF"]
-    result = obtain(body, curation=args.curation, template=args.template)
+    if args.metadata_read:
+        body.pop("write")
+    result = (obtain(body, metadata=True) if args.metadata_read else
+              obtain(body, curation=args.curation, template=args.template))
     keys = ["token"]
     if args.curation:
         keys += ["repository", "head"]

@@ -45,11 +45,13 @@ Package assembly includes the shell and its dependencies; the trusted site build
 Register a GitHub App with expiring user-to-server tokens enabled.
 Leave **Request user authorization (OAuth) during installation** and Device Flow disabled; the application starts its own state- and PKCE-bound browser authorization flow.
 Set the App **Setup URL** to `PUBLIC_ORIGIN/setup` to explain downstream operation opt-ins after installation.
-Disable callback-URL wildcard matching and webhooks, configure the exact callback URL as `PUBLIC_ORIGIN/api/auth/callback`, and install it only on selected repositories.
+Disable callback-URL wildcard matching, configure the exact callback URL as `PUBLIC_ORIGIN/api/auth/callback`, and install it only on selected repositories.
+Enable the App webhook for pull request events at `PUBLIC_ORIGIN/api/shacl/metadata-merge`, with the same secret as `GITHUB_WEBHOOK_SECRET`, to update the website gitlink when its metadata proposal merges.
 
 The [authentication contract](../../docs/agents/contract/curation-service-authentication-options.md#functionality-and-permissions) defines the feature-to-permission mapping and downstream authorization requirements.
 Configure the App for the supported features of this deployment; downstream operation choices cannot expand its GitHub grants.
-The service reads `tool.orinoco.operations` from the current default branch before authorizing automation or preview editing; absent choices are disabled.
+The service reads `tool.orinoco.operations` from the current default branch before authorizing automated curation or template updates; absent choices are disabled.
+Editor proposals and verified preview editing use GitHub permissions without separate opt-ins.
 
 If the editor reports a GitHub 401, 403, or 404, confirm that the App is installed for the target repository, approve any pending organization or SSO authorization, and sign in as a collaborator with `write` or `admin` permission.
 
@@ -62,6 +64,7 @@ Configure these Pages runtime values:
 | `GITHUB_CLIENT_SECRET`   | secret   | OAuth code exchange                                                |
 | `SESSION_SEAL_KEY`       | secret   | Base64url-encoded 32-byte AES-GCM key                              |
 | `GITHUB_APP_PRIVATE_KEY` | secret   | RSA PKCS#8 PEM; required for coordinated submodule materialization |
+| `GITHUB_WEBHOOK_SECRET`  | secret   | GitHub App webhook signature secret for automatic gitlink updates  |
 
 Do not configure KV, D1, R2, Durable Objects, queues, or analytics-backed curation storage.
 OAuth state and the short-lived GitHub access token exist only in encrypted, host-only browser cookies.

@@ -56,14 +56,9 @@ describe("downstream operation policy", () => {
       requireOperation(github, "owner/site", "template_updates"),
     ).rejects.toMatchObject({ code: "operation_disabled" });
   });
-  it.each([
-    null,
-    [],
-    { unknown: true },
-    { template_updates: "true" },
-    { template_updates: 1 },
-  ])("rejects malformed policy %j", (policy) =>
-    expect(() => parseOperations(policy)).toThrow(),
+  it.each([null, [], { template_updates: "true" }, { template_updates: 1 }])(
+    "rejects malformed policy %j",
+    (policy) => expect(() => parseOperations(policy)).toThrow(),
   );
   it("refuses duplicate TOML keys", async () => {
     await expect(

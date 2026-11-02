@@ -65,9 +65,9 @@ Installation alone MUST NOT authorize cross-repository access.
 The operator MUST protect signing keys in backend secret storage with restricted access, rotation, and revocation; keys MUST NOT enter source, browsers, downstream secrets, artifacts, or logs.
 
 Interactive operations MUST use expiring user access tokens; installation tokens MUST NOT substitute for failed user authorization.
-Automated materialization MUST remain bound to the curator-authorized proposal: immutable repository and curator identities, bundle, source and handoff commits, permitted operation, trusted workflow revision, and a short expiry.
+Automated materialization MUST remain bound to the curator-authorized proposal: immutable repository and curator identities, bundle, source and handoff commits, permitted operation and trusted workflow identity.
 Before granting write access, the service MUST recheck installations, curator permissions, both draft heads, and successful validation.
-Expired, revoked, stale, or ambiguous authorizations and replayed writes MUST fail closed.
+Revoked, stale, or ambiguous authorizations and replayed writes MUST fail closed.
 
 Workflow callers MUST authenticate through GitHub-signed Actions OIDC with verified signature, issuer, audience, expiry, repository, event, workflow revision, and run identity.
 Proposal content MUST remain data; untrusted code MUST NOT receive credentials or an OIDC capability that can obtain them.
@@ -105,17 +105,13 @@ The downstream owner MUST be able to opt into automated operations independently
 
 ```toml
 [tool.orinoco.operations]
-shacl_materialization = false
 automated_curation = false
 template_updates = false
-preview_editing = false
 ```
 
-These respectively enable automated SHACL proposal materialization, automated curation completion, template-update proposals, and editing from verified development previews.
-Missing choices are disabled; unknown names and nonboolean values are invalid.
-Local editing, bundle downloads, and read-only review do not opt into automation or preview editing.
-Creating a SHACL handoff for automated materialization requires `shacl_materialization`; preview-origin proposals additionally require `preview_editing`.
-The single-repository SHACL workflow also checks current default-branch policy before publishing with its workflow token.
+These enable automated curation completion and template-update proposals.
+Missing choices are disabled; nonboolean values are invalid.
+Editor proposals and verified preview editing rely on GitHub App installation and curator permissions, without separate operation opt-ins.
 
 Copier initializes public site settings but MUST NOT ask operation-permission questions.
 The App post-install setup page explains the operations and required permissions and directs owners to edit `[tool.orinoco.operations]` in root `pyproject.toml`.
@@ -124,11 +120,11 @@ The configuration boundary is defined in [Downstream configuration files](../../
 The configuration schema and user-facing controls MUST expose the operation, required permissions, and purpose from this mapping.
 Template updates MUST NOT silently enable additional operations or broaden an existing choice.
 
-Before issuing write access or performing a write, the service MUST read the current downstream policy from its trusted default branch and require the operation to be enabled.
-The operation's required permissions MUST fit both the downstream's enabled choices and the App installation's actual grants; otherwise the service MUST reject it with the missing choice or permission identified.
+Before issuing write access for automated curation or template updates, the service MUST read the current downstream policy from its trusted default branch and require the operation to be enabled.
+For those operations, required permissions MUST fit the downstream's enabled choices and the App installation's actual grants; otherwise the service MUST identify the missing choice or permission.
 A workflow input, proposed configuration change, update branch, or browser request MUST NOT authorize itself or broaden that policy.
 Changing a workflow file alone MUST NOT bypass the service's decision.
-A disabled operation MUST NOT be authorized merely because the App has the corresponding GitHub permission.
+Disabled curation and template operations MUST NOT be authorized merely because the App has the corresponding GitHub permission.
 These controls govern this service's use of its authority; they do not revoke GitHub-level grants or prevent independent repository collaborators from making changes.
 
 Authorization tests MUST exercise allowed operations, disabled operations despite sufficient App permissions, missing GitHub grants, and attempted opt-in through untrusted request or proposed-branch configuration.

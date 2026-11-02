@@ -329,10 +329,9 @@ def find_workspace_root(start: Path | None = None) -> Path:
 
 def validate_operations(operations: object) -> dict[str, bool]:
     """Validate explicit operation opt-ins; missing keys remain disabled."""
-    allowed = {"shacl_materialization", "automated_curation", "template_updates", "preview_editing"}
     if (not isinstance(operations, dict) or
-            any(key not in allowed or type(value) is not bool for key, value in operations.items())):
-        raise ConfigurationError("pyproject.toml tool.orinoco.operations must map known operation names to true or false")
+            any(type(value) is not bool for value in operations.values())):
+        raise ConfigurationError("pyproject.toml tool.orinoco.operations must map operation names to true or false")
     return operations
 
 
