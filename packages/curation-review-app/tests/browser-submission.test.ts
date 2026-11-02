@@ -37,6 +37,20 @@ const access: SubmissionAccess = {
   ),
 };
 
+function authorizer(scope = access.scope) {
+  return vi.fn(
+    async (request: { input_repository: string; input_commit: string }) => ({
+      authorization: [
+        Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url"),
+        Buffer.from(
+          JSON.stringify({ authorization: { ...request, scope } }),
+        ).toString("base64url"),
+        "test-signature",
+      ].join("."),
+    }),
+  );
+}
+
 /** A small Git data API fixture: commits are immutable, refs select commits. */
 function github() {
   let sequence = 0;
@@ -143,9 +157,7 @@ function github() {
 describe("downstream submission", () => {
   it("uploads private input to metadata and sends only coordinates to authentication", async () => {
     const api = github();
-    const authorize = vi.fn(async () => ({
-      authorization: "signed-submission",
-    }));
+    const authorize = authorizer();
     const result = await uploadSubmission(
       input,
       access,
@@ -177,9 +189,7 @@ describe("downstream submission", () => {
 
   it("resumes the same input after a lost response and advancing default branch", async () => {
     const api = github();
-    const authorize = vi.fn(async () => ({
-      authorization: "signed-submission",
-    }));
+    const authorize = authorizer();
     api.loseDispatch();
     await expect(
       uploadSubmission(input, access, { authorize }, api.fetcher),
@@ -209,6 +219,47 @@ describe("downstream submission", () => {
     expect(api.fetcher).not.toHaveBeenCalled();
   });
 
+  it("publishes no branch if authorization fails after the upload", async () => {
+    const api = github();
+    await expect(
+      uploadSubmission(
+        input,
+        access,
+        {
+          authorize: vi.fn(async () => {
+            throw new Error("Sign-in expired");
+          }),
+        },
+        api.fetcher,
+      ),
+    ).rejects.toThrow("Sign-in expired");
+    expect(api.refs.size).toBe(0);
+  });
+
+  it("recovers a missing website companion from its original workflow checkout", async () => {
+    const api = github();
+    const authorize = authorizer();
+    const result = await uploadSubmission(
+      input,
+      access,
+      { authorize },
+      api.fetcher,
+    );
+    api.refs.delete(`owner/website/${result.branch}`);
+    const advanced = structuredClone(access);
+    advanced.scope.repositories.forEach((repo) => {
+      repo.baseCommit = "b".repeat(40);
+      repo.worker = repo.worker.replace(base, "c".repeat(40));
+    });
+    await uploadSubmission(input, advanced, { authorize }, api.fetcher);
+    const writes = api.calls.filter(
+      (call) =>
+        call.repository === "owner/website" && call.path === "/git/commits",
+    );
+    expect(writes.at(-1)!.body.parents).toEqual([base]);
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
   it("round-trips input above GitHub's 1 MiB JSON-content limit", async () => {
     const api = github();
     const large = {
@@ -219,7 +270,7 @@ describe("downstream submission", () => {
       large,
       access,
       {
-        authorize: vi.fn(async () => ({ authorization: "signed-submission" })),
+        authorize: authorizer(),
       },
       api.fetcher,
     );

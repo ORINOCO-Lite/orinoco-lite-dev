@@ -176,4 +176,13 @@ The user agreed that the editor uploads with a repository-scoped user token and 
 The user rejected standing repository connections and requires website write access for SHACL Vue submission.
 The user agreed that automation finishes Alice's authorized proposal even when Bob, who lacks website write access, merges its metadata PR.
 Implementation is proceeding under those decisions; return to design if a further material choice arises.
-No replacement service or workflow has been deployed.
+The isolated test service and browser probe are deployed in the leej3 demos.
+The live browser authenticated as leej3, received separate eight-hour repository-scoped user tokens, downloaded a 7.4 MB Actions artifact directly, and uploaded a 1.2 MB input to private metadata.
+[The metadata Actions run](https://github.com/leej3/orinoco-lite-submodule-demo-metadata/actions/runs/41538195240) verified the signed submission and both repository credentials through GitHub OIDC, then revoked them.
+The browser released its user tokens after upload.
+Production is unchanged by this redesign.
+The actual editor, source-review flow, repository workers, and replacement template remain unfinished.
+
+Submission branches are published only after input and authorization are complete.
+A retry recovers a missing website companion from the original authorization's selected checkout, even when the current default branch has a newer worker.
+The browser decodes that record only to recover coordinates; the service verifies its signature and caller identity before granting workflow credentials.

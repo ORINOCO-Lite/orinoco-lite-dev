@@ -1,4 +1,5 @@
 /** Runs in the downstream browser. The authentication service never sees input. */
+import { decodeJwt } from "jose";
 import type { BrowserCredentialScope } from "../functions/lib/browser-access";
 
 export const SUBMISSION_PATH = ".orinoco-lite/submission.json";
@@ -123,14 +124,6 @@ class Repository {
       sha,
     });
   }
-
-  async advance(branch: string, sha: string): Promise<void> {
-    await this.request(
-      `/git/refs/heads/${encodeURIComponent(branch)}`,
-      "PATCH",
-      { sha, force: false },
-    );
-  }
 }
 
 function canonicalJson(value: unknown): string {
@@ -162,7 +155,10 @@ export async function uploadSubmission(
   if (new TextEncoder().encode(bytes).length > 10 * 1024 * 1024 + 64 * 1024)
     throw new Error("The submission exceeds the 10 MiB bundle limit.");
   const fingerprint = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bytes)),
+    await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(access.scope.source.repository + "\n" + bytes),
+    ),
   );
   const id = Array.from(fingerprint, (byte) =>
     byte.toString(16).padStart(2, "0"),
@@ -173,7 +169,11 @@ export async function uploadSubmission(
   const repositories = new Map(
     access.scope.repositories.map((repository) => {
       const credential = access.credentials[repository.name];
-      if (!credential?.token || Date.parse(credential.expires_at) <= Date.now())
+      if (
+        !credential?.token ||
+        !Number.isFinite(Date.parse(credential.expires_at)) ||
+        Date.parse(credential.expires_at) <= Date.now()
+      )
         throw new Error("Sign in again to submit the edit.");
       return [
         repository.name,
@@ -192,15 +192,32 @@ export async function uploadSubmission(
 
   let head = await storage.head(branch);
   if (head === null) {
-    const commit = await storage.commit(
+    const inputCommit = await storage.commit(
       base.baseCommit,
       SUBMISSION_PATH,
       bytes,
     );
+    const { authorization } = await authentication.authorize({
+      scope_proof: access.scope_proof,
+      input_repository: inputRepository,
+      input_commit: inputCommit,
+    });
+    const receipt =
+      JSON.stringify({
+        authorization,
+        input_repository: inputRepository,
+        input_commit: inputCommit,
+      }) + "\n";
+    const commit = await storage.commit(
+      inputCommit,
+      AUTHORIZATION_PATH,
+      receipt,
+    );
+    // Publish once input and authorization are complete. A failed upload must
+    // not leave a branch with an older workflow and a later authorization.
     try {
       await storage.create(branch, commit);
     } catch (error) {
-      // Another tab or a retry may have completed the same create. Verify it below.
       if (!(error instanceof GitHubSubmissionError && error.status === 422))
         throw error;
     }
@@ -211,39 +228,44 @@ export async function uploadSubmission(
       "The existing submission contains different input. Your edit has been retained; inspect its branch before retrying.",
     );
 
-  let receiptBytes = await storage.file(head, AUTHORIZATION_PATH);
-  let inputCommit: string;
-  if (receiptBytes === null) {
-    inputCommit = head;
-    const { authorization } = await authentication.authorize({
-      scope_proof: access.scope_proof,
-      input_repository: inputRepository,
-      input_commit: inputCommit,
-    });
-    receiptBytes =
-      JSON.stringify({
-        authorization,
-        input_repository: inputRepository,
-        input_commit: inputCommit,
-      }) + "\n";
-    const commit = await storage.commit(head, AUTHORIZATION_PATH, receiptBytes);
-    await storage.advance(branch, commit);
-  } else {
-    const receipt = JSON.parse(receiptBytes);
-    inputCommit = receipt.input_commit;
+  const receiptBytes = await storage.file(head, AUTHORIZATION_PATH);
+  if (receiptBytes === null)
+    throw new Error("The existing submission has no authorization record.");
+  let receipt: any;
+  let retained: BrowserCredentialScope;
+  try {
+    receipt = JSON.parse(receiptBytes);
+    // Decode only to recover the original checkout for a missing companion.
+    // This does not establish authority: the service verifies the signature
+    // and the workflow identity before issuing any workflow credentials.
+    const authorization = decodeJwt(receipt.authorization).authorization as any;
+    retained = authorization.scope;
     if (
       receipt.input_repository !== inputRepository ||
-      !SHA.test(inputCommit) ||
-      typeof receipt.authorization !== "string" ||
-      (await storage.file(inputCommit, SUBMISSION_PATH)) !== bytes
+      !SHA.test(receipt.input_commit) ||
+      authorization.input_repository !== inputRepository ||
+      authorization.input_commit !== receipt.input_commit ||
+      retained.source.repository !== access.scope.source.repository ||
+      !Array.isArray(retained.repositories) ||
+      retained.repositories.length !== access.scope.repositories.length ||
+      retained.repositories.some(
+        (repository, index) =>
+          repository.name !== access.scope.repositories[index]!.name ||
+          repository.id !== access.scope.repositories[index]!.id ||
+          !SHA.test(repository.baseCommit),
+      ) ||
+      (await storage.file(receipt.input_commit, SUBMISSION_PATH)) !== bytes
     )
-      throw new Error(
-        "The existing submission has an invalid authorization record.",
-      );
+      throw new Error("Invalid receipt");
+  } catch {
+    throw new Error(
+      "The existing submission has an invalid authorization record.",
+    );
   }
+  const inputCommit = receipt.input_commit as string;
 
   // Website retains only coordinates and authorization, never the private bundle.
-  for (const repository of access.scope.repositories) {
+  for (const repository of retained.repositories) {
     if (repository.name === inputRepository) continue;
     const client = repositories.get(repository.name)!;
     const existing = await client.head(branch);
