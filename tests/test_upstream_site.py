@@ -18,6 +18,29 @@ def repository(path):
     git(path, "config", "user.email", "test@example.invalid")
 
 
+def test_import_depiction_collision_leaves_destination_untouched(tmp_path):
+    from orinoco_lite.site_inputs import import_site_inputs
+    from orinoco_lite.errors import ConfigurationError
+
+    source = tmp_path / "source"
+    repository(source)
+    for name in ("persons/alice/portrait.png", "persons/alice_portrait.png"):
+        path = source / "content" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(name.encode())
+    git(source, "add", "content")
+    destination = tmp_path / "site-specific"
+    destination.mkdir()
+    (destination / "keep.txt").write_text("keep")
+    config = tmp_path / "pyproject.toml"
+    config.write_text("[tool.orinoco]\n")
+    with pytest.raises(ConfigurationError, match="destination already exists"):
+        import_site_inputs(source, destination, config_path=config, force=True)
+    assert config.read_text() == "[tool.orinoco]\n"
+    assert list(destination.iterdir()) == [destination / "keep.txt"]
+    assert (destination / "keep.txt").read_text() == "keep"
+
+
 @pytest.mark.parametrize("annexed", [False, True])
 def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(tmp_path, annexed):
     engineering = tmp_path / "engineering"
@@ -86,8 +109,10 @@ def test_site_export_requires_selected_committed_inputs_and_preserves_metadata(t
     assert not (destination / "content/_index.md").exists()
     assert not (destination / "content/persons/person/_index.md").exists()
     assert (destination / "content/persons/_index.md").read_text() == "Authored section\n"
-    assert not (destination / "content/persons/person/portrait.svg").is_symlink()
-    assert (destination / "content/persons/person/portrait.svg").read_text() == "<svg/>\n"
+    assert not (destination / "content/persons/person_portrait.svg").is_symlink()
+    assert (destination / "content/persons/person_portrait.svg").read_text() == "<svg/>\n"
+    assert not (destination / "content/persons/person").exists()
+    assert git(website, "status", "--porcelain") == ""
     assert (destination / "assets/img/logo.png").read_text() == "identity image"
     assert not (destination / "layouts").exists()
     assert (destination / "metadata/keep.yaml").read_text() == "authored: true\n"

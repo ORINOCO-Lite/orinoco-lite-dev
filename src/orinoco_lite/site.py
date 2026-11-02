@@ -269,7 +269,9 @@ def _assemble(
 ) -> None:
     from .annex_media import prepare_media, prepare_hugo_assets
     from .www_from_model import editable_package_checkout
+    from .depictions import bundle_depictions, validate_depictions
 
+    validate_depictions(workspace.path("editorial"))
     media = prepare_media(workspace)
     upstream = www_from_model or resolve_www_from_model(workspace.root, resources_root)
     theme = upstream / "themes" / "congo"
@@ -298,6 +300,7 @@ def _assemble(
     _copy_tree(projection / "content", assembly / "content")
     _copy_tree(projection / "static", assembly / "static")
     _copy_tree(workspace.path("editorial"), assembly / "content", media=media)
+    bundle_depictions(assembly / "content")
     _copy_file(
         theme / "LICENSE",
         assembly / "static" / "LICENSES" / "congo-MIT.txt",

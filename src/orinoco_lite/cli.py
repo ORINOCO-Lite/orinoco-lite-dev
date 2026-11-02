@@ -51,6 +51,15 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--no-cache", action="store_true", help="repeat schema and relationship checks even when a previous build validated the same inputs")
 
     commands.add_parser("prepare-media", help="retrieve and verify opted-in Annex site media without building")
+    commands.add_parser(
+        "flatten-depictions", help="move entity portraits, logos, and depictions into their section directory",
+        description=("Move depiction images in paths.editorial (default: site-specific/content), "
+                     "for example persons/alice/portrait.png to persons/alice_portrait.png. "
+                     "Other files stay in place; empty entity directories are removed. "
+                     "Existing destinations cause an error before any files move. "
+                     "Already-flat files are unchanged. No content is downloaded and no Git changes "
+                     "are staged or committed. Review and stage the moves before building an Annex site."),
+    )
 
     build = commands.add_parser(
         "build", help="build your website from its metadata and content",
@@ -408,6 +417,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
             from .annex_media import prepare_media
             paths = prepare_media(_workspace(args))
             print(f"Prepared {len(paths)} Annex media files")
+            return 0
+        if args.command == "flatten-depictions":
+            from .depictions import flatten_depictions
+            count = flatten_depictions(_workspace(args).path("editorial"))
+            print(f"Moved {count} depiction files.", file=sys.stderr)
             return 0
         if args.command == "validate":
             return _validate(args)

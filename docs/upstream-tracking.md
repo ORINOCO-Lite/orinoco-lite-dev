@@ -67,7 +67,7 @@ The importer maps the selected `www-from-model` checkout into the downstream pat
 | `config/_default/hugo.toml`: `baseURL` | `pyproject.toml` (`tool.orinoco.site`): `identity.base_url` | Normalize to one trailing slash |
 | `config/_default/menus.en.toml`: `main` | `pyproject.toml` (`tool.orinoco.site`): `navigation` | Map menu entries, including `pageRef` to `page_ref` and `params.icon` to `icon` |
 | `config/_default/params.toml`: `colorScheme`, `defaultAppearance`, `header.layout` | `pyproject.toml` (`tool.orinoco.site`): `appearance.color_scheme`, `appearance.default_appearance`, `appearance.header_layout` | Copy values |
-| `content/`: selected authored pages, section pages and bundle resources, including registered `portrait.*`, `logo.*` and `depiction.*` files | `content/`, at the same relative paths | Copy selected files and retrieve Annex-backed bytes; synchronize with deletions |
+| `content/`: selected authored pages, section pages and bundle resources | `content/`; depiction images use `<section>/<entity>_<kind>.<ext>`, other paths are preserved | Copy selected files and retrieve Annex-backed bytes; synchronize with deletions |
 | `assets/img/`: files named `fzj.svg`, `hhu.svg`, `logo.png` | `assets/img/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
 | `static/`: top-level images and `site.webmanifest` | `static/`, at the same relative paths | Copy ordinary bytes, retrieving Annex content when necessary |
 | `config/_default/params.toml`: `header.logo`, `header.logoDark`, `footer.showCopyright` | `overrides/config/params.toml`: same fields | Replace these fields; remove them when absent upstream |
@@ -111,12 +111,14 @@ A depiction is metadata: `XYZDepiction` is a `Thing` whose `distributions` link 
 SHACL Vue's configured upload wizard creates these records and links them to the depicted subject.
 Upstream's [Register depictions workflow](../submodules/www-from-model/.forgejo/workflows/register-depictions.yaml) follows their download URLs and retrieves images with Git Annex into page bundles, named `portrait.jpg`, `logo.svg`, or `depiction.jpg`.
 
-The importer retains those resources and authored section pages, while excluding generated entity pages and the homepage.
-The build combines freshly projected entity pages with the upstream Hugo layouts and assets, template adaptation, and imported media; Hugo finds depictions beside the regenerated pages.
+The importer flattens depiction filenames, for example `persons/alice/portrait.png` becomes `persons/alice_portrait.png`, and retains authored section pages while excluding generated entity pages and the homepage.
+For existing downstream inputs, run `orinoco-lite flatten-depictions`; it uses the same file-moving utility as the importer.
+Validation rejects nested depiction images and points to that command.
+The build places flat depiction files beside the generated entity pages in its Hugo assembly, preserving upstream rendering and published image URLs.
 
 Media comes from the pinned website revision, not by downloading every depiction referenced in the records dump.
 A newer dump can therefore refer to images absent from that revision; full-site comparisons should check the rendered depictions as well as metadata.
-Other labs must supply the corresponding local page-bundle resources through their site inputs or arrange their own acquisition; a depiction URL alone does not make a local Hugo resource available.
+Other labs must supply the corresponding flat depiction files through their site inputs or arrange their own acquisition; a depiction URL alone does not make a local Hugo resource available.
 
 ## Comparing and following upstream
 

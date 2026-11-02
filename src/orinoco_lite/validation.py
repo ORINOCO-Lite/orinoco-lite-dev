@@ -224,6 +224,8 @@ def validate_workspace(workspace: WorkspaceConfig) -> dict[str, Any]:
                   for path, key in workspace_annex_files(workspace).items()}
     _validate_metadata_boundary(workspace)
     _validate_extension_boundary(workspace)
+    from .depictions import validate_depictions
+    validate_depictions(workspace.path("editorial"))
 
     records = [(path, _load_record(path)) for path in record_files(workspace)]
     if not records:

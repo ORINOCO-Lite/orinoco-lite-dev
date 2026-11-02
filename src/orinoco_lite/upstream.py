@@ -18,7 +18,8 @@ def register(commands):
         "and comparison with Orinoco Lite. "
         "Map upstream Hugo settings into root pyproject.toml and copy authored content, identity images, "
         "and site overrides from the selected www-from-model checkout. "
-        "Retrieve upstream Annex media as ordinary site files. Imported content/assets/static "
+        "Retrieve upstream Annex media as ordinary site files and flatten depiction filenames "
+        "(persons/alice/portrait.png becomes persons/alice_portrait.png). Imported content/assets/static "
         "are synchronized, including deletions; metadata is preserved. Use --force to replace or delete existing imported files."))
     export.add_argument("--source", type=Path, help="upstream website checkout (default: package-selected www-from-model)")
     export.add_argument("--media-remote", help="Annex source Git URL (default: upstream host for package-selected www; existing remotes with --source)")
