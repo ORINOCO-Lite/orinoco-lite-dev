@@ -221,9 +221,9 @@ Reusable adapter primitives belong in Orinoco Lite or the template.
 Orinoco Lite combines `site-specific/metadata/` with the package-selected `www-from-model` rendering resources to generate the graph and Hugo pages.
 Fixed installs select its committed gitlink; editable installs use its nested working checkout, including edits.
 Projection executes that source's Forgejo workflow shell blocks in upstream order.
-Downstreams can [adjust selected commands and inherit upstream page templates](agents/projection-templates.md) without copying the projection policy.
+Downstreams override templates by filename and use Jinja inheritance to change selected blocks while retaining upstream rendering.
 Upstream commands retain ownership of selection, relationship expansion, and Jinja rendering.
-`orinoco-lite projection blocks --site site-specific show` displays the upstream text and all package and downstream adjustments used by execution.
+`orinoco-lite projection blocks show` displays the upstream commands and Lite’s execution adjustments.
 Hugo assets come from the same checkout through Git Annex, without a template overlay.
 Both installation modes reuse unchanged projections, accounting for editable dependency source changes, and preserve Hugo resource caches between clean website builds.
 The template declares the minimum package version required by its adaptation and workflows; downstreams select an exact compatible package release or commit independently.

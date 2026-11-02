@@ -73,9 +73,11 @@ def render_graph(records: str, presentation: Path) -> str:
 
 
 def stage_templates(presentation: Path, destination: Path, site: Path | None = None) -> None:
-    """Compose files for query-things' native FileSystemLoader, without shadowing parents."""
+    """Prepare same-name overrides and upstream parents for the native Jinja loader."""
     import shutil
-    shutil.copytree(presentation / 'page_templates', destination)
+    upstream = presentation / 'page_templates'
+    shutil.copytree(upstream, destination)
+    shutil.copytree(upstream, destination / 'upstream')
     if site is None:
         return
     local = site / 'projection-templates'
@@ -88,10 +90,10 @@ def stage_templates(presentation: Path, destination: Path, site: Path | None = N
             raise DriverError(f'Projection templates cannot be symlinks: {source}')
         if source.is_dir():
             continue
-        target = destination / source.relative_to(local)
-        if target.exists():
-            raise DriverError(f'Local template would replace an upstream template: {source}; '
-                              'use a distinct filename and Jinja inheritance')
+        relative = source.relative_to(local)
+        if relative.parts[0] == 'upstream':
+            raise DriverError(f'The upstream/ template directory is reserved for upstream parents: {source}')
+        target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
 

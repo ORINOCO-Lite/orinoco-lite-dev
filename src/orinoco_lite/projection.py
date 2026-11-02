@@ -18,7 +18,7 @@ from .config import WorkspaceConfig
 from .errors import DriverError
 from .integrity import canonical_json_bytes, sha256_file, tree_sha256
 from .progress import progress
-from .projection_blocks import read_adjustments
+from .projection_blocks import reject_projection_override
 from .records import joined_records, stored_records
 from .schema_conversion import build_format_converters, concise_date_warning
 from .www_from_model import resolve_www_from_model
@@ -31,7 +31,7 @@ FORBIDDEN_BRIDGE_PREDICATES = {
 
 
 def _www_from_model_root(workspace, resources_root):
-    read_adjustments(workspace.path("site"))
+    reject_projection_override(workspace.path("site"))
     return resolve_www_from_model(workspace.root, resources_root)
 
 
@@ -60,7 +60,7 @@ def _record_stream(records):
 def validate_semantics(workspace, resources_root, www_from_model_root=None):
     from linkml_runtime import SchemaView
     from .upstream_projection import homepage_pid, render_graph
-    read_adjustments(workspace.path("site"))
+    reject_projection_override(workspace.path("site"))
     presentation = www_from_model_root or _www_from_model_root(workspace, resources_root)
     schema = resources_root / "schema/demo-research-information/unreleased.yaml"
     records, pids = _records(workspace, schema)
@@ -169,7 +169,7 @@ def render_projection(workspace, resources_root, output, *, records_input=None,
     if records_input is not None:
         from .record_stages import _check_record_input
         _check_record_input(records_input)
-    read_adjustments(workspace.path("site"))
+    reject_projection_override(workspace.path("site"))
     presentation = www_from_model_root or _www_from_model_root(workspace, resources_root)
     if records_input is None:
         report = validate_semantics(workspace, resources_root, presentation)

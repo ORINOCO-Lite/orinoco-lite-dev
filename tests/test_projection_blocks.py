@@ -226,32 +226,6 @@ def test_missing_workflow_is_a_concise_cli_error(tmp_path):
     assert 'Traceback' not in result.stderr
 
 
-def test_site_adjustments_are_scoped_inspectable_and_fail_on_drift(tmp_path):
-    import yaml
-    from orinoco_lite.projection_blocks import adjust_for_site
-    from orinoco_lite.errors import ConfigurationError
-
-    original = Pipeline((CodeBlock('Projects', 'query-things list | filter | render'),
-                         CodeBlock('People', 'unchanged')))
-    settings = {'version': 3, 'extends': 'upstream', 'adjustments': [
-        {'step': 'Projects', 'old': 'filter', 'new': 'cat', 'reason': 'Include all projects'},
-    ]}
-    config = tmp_path / 'projection.yaml'
-    config.write_text(yaml.safe_dump(settings))
-    actual = adjust_for_site(original, tmp_path)
-    assert actual['People'] == original['People']
-    assert actual['Projects'].raw == original['Projects'].raw
-    assert actual['Projects'].adjusted == 'query-things list | cat | render'
-    assert actual['Projects'].adjustments[0].reason == 'Include all projects'
-    for text in ('query-things list | changed | render', 'filter | filter'):
-        with pytest.raises(ConfigurationError, match='exactly once'):
-            adjust_for_site(Pipeline((CodeBlock('Projects', text),)), tmp_path)
-    settings['adjustments'][0]['step'] = 'Unknown'
-    config.write_text(yaml.safe_dump(settings))
-    with pytest.raises(ConfigurationError, match='Unknown or inactive'):
-        adjust_for_site(original, tmp_path)
-
-
 @pytest.mark.parametrize('field,value', [
     ('if', False), ('env', {'VALUE': 'hello'}), ('working-directory', 'elsewhere'),
     ('shell', 'python'), ('continue-on-error', True), ('timeout-minutes', 1),
@@ -286,20 +260,3 @@ def test_unknown_actions_and_workflow_environment_are_not_silently_ignored(tmp_p
     workflow.write_text(yaml.safe_dump(document))
     with pytest.raises(ValueError, match='unsupported workflow environment'):
         parse_workflow(workflow)
-
-
-def test_cli_site_adjustments_share_production_pipeline(tmp_path):
-    import yaml
-    from orinoco_lite.projection_blocks import load_pipeline
-    document = {'version': 3, 'extends': 'upstream', 'adjustments': [{
-        'step': 'Update projects', 'old': 'page_templates/project.md.j2',
-        'new': 'page_templates/local-project.md.j2', 'reason': 'Local presentation',
-    }]}
-    (tmp_path / 'projection.yaml').write_text(yaml.safe_dump(document))
-    result = cli('--site', str(tmp_path), 'show', 'Update projects', '--json')
-    assert result.returncode == 0, result.stderr
-    state = json.loads(result.stdout)[0]
-    production = load_pipeline(WORKFLOW.parents[2], tmp_path)['Update projects']
-    assert state['adjusted'] == production.adjusted
-    assert state['raw'] == production.raw
-    assert state['adjustments'][-1]['reason'] == 'Local presentation'

@@ -237,54 +237,22 @@ def adjust_for_lite(pipeline: Pipeline) -> Pipeline:
     return Pipeline(tuple(adjusted))
 
 
-def read_adjustments(site: Path | None) -> list[dict[str, str]]:
-    """Read only scoped adjustments; never load a second projection policy."""
-    import yaml
+def reject_projection_override(site: Path | None) -> None:
     if site is None:
-        return []
+        return
     path = site / 'projection.yaml'
-    if not path.exists() and not path.is_symlink():
-        return []
-    try:
-        value = yaml.safe_load(path.read_text())
-    except (OSError, UnicodeError, yaml.YAMLError) as error:
-        raise ConfigurationError(f'Cannot read projection adjustments: {path}') from error
-    if (not isinstance(value, dict) or value.get('version') != 3
-            or value.get('extends') != 'upstream'
-            or set(value) - {'version', 'extends', 'adjustments'}):
+    if path.exists() or path.is_symlink():
         raise ConfigurationError(
-            f'Unsupported projection override: {path}. Migrate the complete policy '
-            'to version: 3, extends: upstream, and scoped adjustments; '
-            'see docs/agents/projection-templates.md.'
+            f'Unsupported projection override: {path}. '
+            'Use projection-templates/ for template overrides; '
+            'projection.yaml does not configure the upstream workflow.'
         )
-    adjustments = value.get('adjustments', [])
-    if not isinstance(adjustments, list):
-        raise ConfigurationError(f'{path}: adjustments must be a list')
-    for item in adjustments:
-        if (not isinstance(item, dict) or set(item) != {'step', 'old', 'new', 'reason'}
-                or not all(isinstance(v, str) for v in item.values())
-                or not all(item[key].strip() for key in ('step', 'old', 'reason'))):
-            raise ConfigurationError(f'{path}: each adjustment needs step, old, new, and reason strings')
-    return adjustments
-
-
-def adjust_for_site(pipeline: Pipeline, site: Path | None) -> Pipeline:
-    for item in read_adjustments(site):
-        matches = [block for block in pipeline.blocks if block.name == item['step']]
-        if len(matches) != 1 or not matches[0].adjusted.strip():
-            raise ConfigurationError(f'Unknown or inactive projection step: {item["step"]}')
-        try:
-            changed = matches[0].replace(item['old'], item['new'], reason=item['reason'])
-        except ValueError as error:
-            raise ConfigurationError(str(error)) from error
-        pipeline = Pipeline(tuple(changed if block.name == changed.name else block
-                                  for block in pipeline.blocks))
-    return pipeline
 
 
 def load_pipeline(presentation: Path, site: Path | None = None) -> Pipeline:
     try:
-        return adjust_for_site(adjust_for_lite(parse_workflow(presentation / WORKFLOW)), site)
+        reject_projection_override(site)
+        return adjust_for_lite(parse_workflow(presentation / WORKFLOW))
     except (OSError, ValueError) as error:
         raise ConfigurationError(f'Cannot prepare upstream projection: {error}') from error
 
@@ -299,8 +267,6 @@ def register(commands) -> None:
     parser.add_argument('--workflow', type=Path,
                         help='inspect or run an explicit YAML file instead of the selected upstream workflow')
     parser.add_argument('--job', default='create_pages')
-    parser.add_argument('--site', type=Path,
-                        help='site-specific directory containing scoped projection.yaml adjustments')
     parser.add_argument('--upstream', action='store_true',
                         help='inspect unadjusted blocks; run also includes setup and publishing commands')
     commands = parser.add_subparsers(dest='blocks_command', required=True)
@@ -327,10 +293,8 @@ def execute(args) -> int:
         else:
             workflow = args.workflow
         pipeline = parse_workflow(workflow, job=args.job)
-        if args.site and args.upstream:
-            raise ValueError('--site cannot be combined with --upstream; use --view raw to inspect the original')
         if not args.upstream:
-            pipeline = adjust_for_site(adjust_for_lite(pipeline), args.site)
+            pipeline = adjust_for_lite(pipeline)
         if getattr(args, 'names', None):
             pipeline = pipeline.chain(*args.names)
         if args.blocks_command == 'list':

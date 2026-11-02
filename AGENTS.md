@@ -11,8 +11,7 @@
   Put reusable optional behavior in the template when an existing or small, natural opt-in supports it; do not force site preferences on every downstream or add configuration for merely conceivable choices.
   For the Center for Open Neuroscience downstream, start with the generic template experience and use observed friction to improve it while allowing deliberate local polish.
   Before implementing a presentation change, state its intended home.
-  Use scoped workflow adjustments and native Jinja child templates as described in `docs/agents/projection-templates.md`.
-  Existing project/homepage blocks support additions with `super()`; insertion inside a parent block still requires an upstream extension point that must be implemented and exercised before relying on it.
+  Use same-name overrides in `site-specific/projection-templates/` and native Jinja inheritance from `upstream/<filename>`; see the README downstream interface.
   Do not patch `www-from-model` merely to customize this site; when missing upstream extension support prevents a small adaptation, consider contributing that support upstream or retaining explicit submodule commits through the mirror workflow below.
   Make routine placement decisions from these rules without repeated approval requests; explain verified limitations and seek agreement only when the implementation changes the agreed scope or requires a full template copy.
 - Git Annex is used for maintainer repinning and explicit upstream-site preparation.

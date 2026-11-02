@@ -91,8 +91,8 @@ def test_native_jinja_inheritance_preserves_selected_project_template(tmp_path):
     site = tmp_path / 'site-specific'
     templates = site / 'projection-templates'
     templates.mkdir(parents=True)
-    (templates / 'local-project.md.j2').write_text(
-        '{% extends "project.md.j2" %}\n'
+    (templates / 'project.md.j2').write_text(
+        '{% extends "upstream/project.md.j2" %}\n'
         '{% block frontmatter_params %}{{ super() }}\n  conContribution: true\n{% endblock %}\n'
         '{% block content %}{{ super() }}\nLocal editorial addition.\n{% endblock %}'
     )
@@ -102,7 +102,7 @@ def test_native_jinja_inheritance_preserves_selected_project_template(tmp_path):
               'associated_with': [], 'influenced_by': [], 'part_of': [], 'parts': [], 'generated': []}
     output = tmp_path / 'project.md'
     environment = make_jinja_env(staged)
-    render_records([json.dumps(record)], environment.get_template('local-project.md.j2'),
+    render_records([json.dumps(record)], environment.get_template('project.md.j2'),
                    output_filename_template=[str(output)])
     rendered = output.read_text()
     frontmatter = yaml.safe_load(rendered.split('---', 2)[1])
@@ -110,18 +110,19 @@ def test_native_jinja_inheritance_preserves_selected_project_template(tmp_path):
     assert frontmatter['params']['conContribution'] is True
     assert 'Upstream content' in rendered
     assert 'Local editorial addition.' in rendered
-    assert (staged / 'project.md.j2').read_bytes() == (source / 'page_templates/project.md.j2').read_bytes()
+    assert (staged / 'upstream/project.md.j2').read_bytes() == (source / 'page_templates/project.md.j2').read_bytes()
 
 
-def test_local_templates_cannot_shadow_upstream_or_follow_symlinks(tmp_path):
+def test_templates_cannot_replace_upstream_parents_or_follow_symlinks(tmp_path):
     from orinoco_lite.upstream_projection import stage_templates
     source = TOOLS / 'www-from-model'
     site = tmp_path / 'site'
     templates = site / 'projection-templates'
     templates.mkdir(parents=True)
-    local = templates / 'project.md.j2'
+    (templates / 'upstream').mkdir()
+    local = templates / 'upstream/project.md.j2'
     local.write_text('accidental copy')
-    with pytest.raises(DriverError, match='replace an upstream template'):
+    with pytest.raises(DriverError, match='reserved for upstream parents'):
         stage_templates(source, tmp_path / 'shadow', site)
     local.unlink()
     local.symlink_to(source / 'page_templates/project.md.j2')
@@ -129,16 +130,29 @@ def test_local_templates_cannot_shadow_upstream_or_follow_symlinks(tmp_path):
         stage_templates(source, tmp_path / 'symlink', site)
 
 
-def test_homepage_selection_uses_the_adjusted_workflow(tmp_path):
-    from orinoco_lite.upstream_projection import homepage_pid
-    source, _ = fixture(tmp_path)
+@pytest.mark.parametrize('inherit', [False, True])
+def test_same_name_overrides_replace_blocks_and_share_the_base(tmp_path, inherit):
+    from query_things.render_record import make_jinja_env
+    from orinoco_lite.upstream_projection import stage_templates
+    source = tmp_path / 'source'
+    upstream = source / 'page_templates'
+    upstream.mkdir(parents=True)
+    (upstream / 'page.md.j2').write_text('Base:{% block content %}default{% endblock %}:{% block footer %}end{% endblock %}')
+    (upstream / 'project.md.j2').write_text(
+        '{% extends "page.md.j2" %}{% block content %}project{% endblock %}')
+    (upstream / 'person.md.j2').write_text(
+        '{% extends "page.md.j2" %}{% block content %}person{% endblock %}')
     site = tmp_path / 'site'
-    site.mkdir()
-    (site / 'projection.yaml').write_text(yaml.safe_dump({
-        'version': 3, 'extends': 'upstream', 'adjustments': [{
-            'step': 'Update frontpage', 'old': 'xyzrins:.', 'new': 'xyzrins:new-home',
-            'reason': 'Select this organization',
-        }],
-    }))
-    assert homepage_pid(source, site) == 'xyzrins:new-home'
-    assert homepage_pid(source) == 'xyzrins:.'
+    overrides = site / 'projection-templates'
+    overrides.mkdir(parents=True)
+    (overrides / 'page.md.j2').write_text(
+        '{% extends "upstream/page.md.j2" %}{% block footer %}shared footer{% endblock %}')
+    (overrides / 'project.md.j2').write_text(
+        '{% extends "upstream/project.md.j2" %}{% block content %}replacement{% endblock %}'
+        if inherit else 'Complete replacement')
+    stage_templates(source, tmp_path / 'staged', site)
+    env = make_jinja_env(tmp_path / 'staged')
+    assert env.get_template('project.md.j2').render() == (
+        'Base:replacement:shared footer' if inherit else 'Complete replacement')
+    assert env.get_template('person.md.j2').render() == 'Base:person:shared footer'
+    assert env.get_template('page.md.j2').render() == 'Base:default:shared footer'
