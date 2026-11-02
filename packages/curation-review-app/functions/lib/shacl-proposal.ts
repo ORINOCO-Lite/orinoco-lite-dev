@@ -121,7 +121,6 @@ async function prepareHandoff(
   login: string,
   authorization: {
     branch: string;
-    trustedSha: string;
     curator: { id: number; login: string };
     sign?: (input: AuthorizationInput) => Promise<string>;
     requireAutomation?: () => void;
@@ -188,7 +187,6 @@ async function prepareHandoff(
       handoff.authorization = await authorization.sign({
         repository: proposal.repository,
         branch: authorization.branch,
-        trustedSha: authorization.trustedSha,
         curator: authorization.curator,
         handoff,
       });
@@ -397,7 +395,6 @@ export async function createShaclProposal(
       user.login,
       {
         branch: pull.branch,
-        trustedSha: pull.baseSha,
         curator: user,
         sign,
         requireAutomation,
@@ -451,7 +448,6 @@ export async function createShaclProposal(
     user.login,
     {
       branch: `curation/shacl-vue-${source.slice(0, 12)}-${grant.handoff_nonce.slice(0, 16)}`,
-      trustedSha: base.sha,
       curator: user,
       sign,
       requireAutomation,

@@ -44,7 +44,6 @@ function grantKey(env: Env): Uint8Array {
 export interface AuthorizationInput {
   repository: string;
   branch: string;
-  trustedSha: string;
   curator: { id: number; login: string };
   handoff: Record<string, unknown>;
 }
@@ -70,7 +69,6 @@ export async function authorizeWorkflow(
     repository_id: String(repo.id),
     metadata_repository_id: String(meta.id),
     branch: input.branch,
-    trusted_sha: input.trustedSha,
     curator_id: input.curator.id,
     curator_login: input.curator.login,
     digest: await sha256Base64url(JSON.stringify(input.handoff)),
@@ -138,11 +136,14 @@ export async function verifyAuthorization(
       "The proposal's service authorization is missing, invalid, or expired. Start a new authenticated proposal.",
     );
   }
+  // GitHub attests the workflow ref at run time; the default branch may advance
+  // after authorization or while this run is in progress.
   if (
     grant.digest !== (await sha256Base64url(JSON.stringify(unsigned))) ||
     identity.repository !== grant.repository ||
     identity.repository_id !== grant.repository_id ||
-    identity.workflow_sha !== grant.trusted_sha ||
+    typeof identity.workflow_sha !== "string" ||
+    !SHA.test(identity.workflow_sha) ||
     (canonicalRead
       ? identity.event_name !== "workflow_dispatch"
       : identity.event_name !== "pull_request_target" ||
@@ -378,10 +379,6 @@ export async function workflowAccess(
       await website.pullRequest(request.repository, request.pull_request),
     );
     requireDraft(pull, request.repository, request.head, String(grant.branch));
-    if (pull.base.sha !== grant.trusted_sha)
-      deny(
-        "The trusted default branch changed; submit again from the current deployment.",
-      );
     await handoffCommit(
       website,
       request.repository,
@@ -423,7 +420,7 @@ export async function workflowAccess(
       run.event !==
         (canonicalRead ? "workflow_dispatch" : "pull_request_target") ||
       run.path !== WORKFLOW ||
-      run.head_sha !== (canonicalRead ? grant.trusted_sha : request.head) ||
+      run.head_sha !== (canonicalRead ? identity.workflow_sha : request.head) ||
       run.run_attempt !== 1 ||
       (!canonicalRead && run.actor?.id !== grant.curator_id) ||
       run.status !== "in_progress"

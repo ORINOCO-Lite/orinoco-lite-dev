@@ -104,7 +104,6 @@ async function setup() {
   const authorization = await authorizeWorkflow(github, env, {
     repository: "owner/site",
     branch: "curation/site",
-    trustedSha: source,
     curator: user,
     handoff: unsigned,
   });
@@ -266,7 +265,7 @@ describe("proposal-bound workflow authority", () => {
   it.each([
     { repository_id: "9" },
     { repository: "attacker/site" },
-    { workflow_sha: "e".repeat(40) },
+    { workflow_sha: "invalid" },
     { workflow_ref: "owner/site/.github/workflows/other.yml@refs/heads/main" },
     { event_name: "pull_request" },
     { actor_id: "99" },
@@ -278,15 +277,20 @@ describe("proposal-bound workflow authority", () => {
       verifyAuthorization(env, s.handoff, { ...identity, ...change }),
     ).rejects.toThrow();
   });
-  it("allows the metadata default branch to advance while preserving the authorized heads", async () => {
+  it("allows both default branches to advance before and during the workflow", async () => {
     const s = await setup();
     s.pull.mockImplementation(async (repo) =>
       repo === "owner/site"
-        ? draft(repo, head, "curation/site", identity.workflow_sha)
+        ? draft(repo, head, "curation/site", "f".repeat(40))
         : draft(repo, metaHead, "curation/metadata", "f".repeat(40)),
     );
     await expect(
-      workflowAccess(env, identity, request, s.auth),
+      workflowAccess(
+        env,
+        { ...identity, workflow_sha: "e".repeat(40) },
+        request,
+        s.auth,
+      ),
     ).resolves.toMatchObject({ token: "scoped-test-token" });
   });
   it("rejects modified bundle coordinates and forged grants", async () => {
@@ -482,6 +486,7 @@ describe("completed proposal validation", () => {
     const dispatch = {
       ...identity,
       event_name: "workflow_dispatch",
+      workflow_sha: "9".repeat(40),
       actor_id: "41898282",
     };
     s.pull.mockImplementation(async (repo) =>
@@ -518,7 +523,7 @@ describe("completed proposal validation", () => {
             repository: { id: 1 },
             event: "workflow_dispatch",
             path: ".github/workflows/shacl-vue-proposal.yml",
-            head_sha: source,
+            head_sha: dispatch.workflow_sha,
             run_attempt: 1,
             status: "in_progress",
           }
