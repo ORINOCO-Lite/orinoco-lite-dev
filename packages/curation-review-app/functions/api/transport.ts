@@ -72,7 +72,8 @@ const target = Object.freeze(${embeddedJson(target)});
 const status = document.getElementById("status");
 const source = window.opener;
 let finished = false;
-let requestAccepted = false;
+const issuedTokens = new Set();
+const acceptedRequests = new Set();
 
 function setStatus(value) {
   status.textContent = value;
@@ -132,12 +133,12 @@ async function requestJson(path, init = {}) {
   try {
     value = await response.json();
   } catch {
-    throw new Error("The curation service returned an invalid response.");
+    throw new Error("The authentication service returned an invalid response.");
   }
   if (!response.ok) {
     const detail = value && typeof value === "object" && value.error && typeof value.error === "object"
       ? value.error : {};
-    const error = new Error(typeof detail.message === "string" ? detail.message : "The curation request failed.");
+    const error = new Error(typeof detail.message === "string" ? detail.message : "The authentication request failed.");
     error.code = typeof detail.code === "string" ? detail.code : null;
     error.status = response.status;
     throw error;
@@ -179,151 +180,63 @@ function matchingGrant(session) {
     grant.expected_head_sha === target.expected_head_sha;
 }
 
-function reviewCoordinates() {
-  return {
-    artifact_id: target.artifact_id,
-    handoff_nonce: target.handoff_nonce,
-    pull_request: target.pull_request,
-    repository: target.repository,
-  };
-}
-
-async function startReview(session) {
-  const query = new URLSearchParams({
-    artifact_id: String(target.artifact_id),
-    pull_request: String(target.pull_request),
-    repository: target.repository,
+async function startAuthentication(session) {
+  async function authenticatedPost(path, input) {
+    return requestJson(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
+      body: JSON.stringify(input),
+    });
+  }
+  async function revokeIssuedTokens() {
+    await Promise.allSettled([...issuedTokens].map(async (token) => {
+      await authenticatedPost("/api/auth/revoke", { token });
+      issuedTokens.delete(token);
+    }));
+  }
+  window.addEventListener("message", async (event) => {
+    if (finished || event.source !== source || event.origin !== target.client_origin) return;
+    const value = event.data;
+    if (!exactKeys(value, ["format", "handoff_nonce", "repository", "id", "method", "input"]) ||
+        value.format !== "orinoco-authentication-request-v1" ||
+        value.handoff_nonce !== target.handoff_nonce || value.repository !== target.repository ||
+        typeof value.id !== "string" || !/^[0-9a-f]{32}$/.test(value.id) ||
+        acceptedRequests.has(value.id)) return;
+    if (!["credentials", "authorize", "release"].includes(value.method)) return;
+    acceptedRequests.add(value.id);
+    let result = null;
+    let error = null;
+    try {
+      if (value.method === "credentials") {
+        if (!exactKeys(value.input, ["source_commit"])) throw new Error("Invalid credential request.");
+        result = await authenticatedPost("/api/auth/credentials", { ...value.input, kind: target.kind });
+        Object.values(result.credentials).forEach((credential) => issuedTokens.add(credential.token));
+      } else if (value.method === "authorize") {
+        if (!exactKeys(value.input, ["scope_proof", "input_repository", "input_commit"])) throw new Error("Invalid authorization request.");
+        result = await authenticatedPost("/api/auth/authorize-submission", value.input);
+      } else {
+        await revokeIssuedTokens();
+        result = { released: true };
+        finished = true;
+      }
+    } catch (failure) {
+      error = { ...errorDetails(failure), message: failure instanceof Error ? failure.message : "GitHub authentication failed." };
+    }
+    post({ format: "orinoco-authentication-response-v1", handoff_nonce: target.handoff_nonce,
+      repository: target.repository, id: value.id, result, error });
   });
-  const proposal = await requestJson("/api/proposal?" + query.toString());
-  const listener = async (event) => {
-    if (
-      finished || event.source !== source || event.origin !== target.client_origin ||
-      event.data === null || typeof event.data !== "object" || Array.isArray(event.data)
-    ) return;
-    const value = event.data;
-    if (value.format === "orinoco-lite-review-proposal-request-v1") {
-      if (!exactKeys(value, ["artifact_id", "format", "handoff_nonce", "pull_request", "repository"]) || !coordinatesMatch(value)) return;
-      post({
-        ...reviewCoordinates(),
-        format: "orinoco-lite-review-proposal-message-v1",
-        login: session.login,
-        proposal,
-      });
-      return;
-    }
-    if (
-      value.format !== "orinoco-lite-review-submission-message-v1" || requestAccepted ||
-      !exactKeys(value, ["artifact_id", "format", "handoff_nonce", "pull_request", "repository", "submission"]) ||
-      !coordinatesMatch(value)
-    ) return;
-    requestAccepted = true;
-    post({ ...reviewCoordinates(), format: "orinoco-lite-review-post-started-v1" });
-    setStatus("Posting the confirmed downstream decisions to GitHub…");
-    let result;
-    try {
-      const submitted = await requestJson("/api/submit?artifact_id=" + encodeURIComponent(String(target.artifact_id)), {
-        body: JSON.stringify(value.submission),
+  window.addEventListener("pagehide", () => {
+    for (const token of issuedTokens) {
+      void fetch("/api/auth/revoke", {
+        method: "POST", credentials: "same-origin", keepalive: true, redirect: "error",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
-        method: "POST",
-      });
-      result = {
-        ...reviewCoordinates(),
-        comment_url: submitted.comment_url,
-        error_code: null,
-        error_status: null,
-        error: null,
-        format: "orinoco-lite-review-submission-result-v1",
-        retry_safe: false,
-      };
-    } catch (error) {
-      const details = errorDetails(error);
-      result = {
-        ...reviewCoordinates(),
-        comment_url: null,
-        error_code: details.code,
-        error_status: details.status,
-        error: error instanceof Error ? error.message : "The decisions could not be posted.",
-        format: "orinoco-lite-review-submission-result-v1",
-        retry_safe: Number.isInteger(error && error.status) && error.status >= 400 && error.status < 500,
-      };
+        body: JSON.stringify({ token }),
+      }).catch(() => {});
     }
-    finished = true;
-    post(result);
-    setStatus(result.error === null ? "GitHub received the confirmed decisions." : result.error);
-  };
-  window.addEventListener("message", listener);
-  post({ ...reviewCoordinates(), format: "orinoco-lite-review-transport-ready-v1" });
-  setStatus("Connected. Complete and confirm the review in the downstream site.");
-}
-
-function shaclCoordinates() {
-  return {
-    handoff_nonce: target.handoff_nonce,
-    repository: target.repository,
-  };
-}
-
-function proposalMatchesGrant(proposal) {
-  if (!proposal || typeof proposal !== "object" || proposal.repository?.toLowerCase() !== target.repository.toLowerCase()) return false;
-  if (target.pull_request === null) return proposal.target?.kind === "standalone";
-  return proposal.target?.kind === "pull_request" &&
-    proposal.target.pull_request === target.pull_request &&
-    proposal.target.expected_head_sha === target.expected_head_sha;
-}
-
-async function startShacl(session) {
-  setStatus("Checking GitHub access…");
-  await requestJson("/api/shacl/access", { method: "POST", headers: { "X-CSRF-Token": session.csrf_token } });
-  const listener = async (event) => {
-    if (
-      finished || requestAccepted || event.source !== source || event.origin !== target.client_origin ||
-      event.data === null || typeof event.data !== "object" || Array.isArray(event.data)
-    ) return;
-    const value = event.data;
-    if (
-      value.format !== "orinoco-lite-shacl-proposal-message-v1" ||
-      !exactKeys(value, ["format", "handoff_nonce", "proposal", "repository"]) ||
-      !coordinatesMatch(value) || !proposalMatchesGrant(value.proposal)
-    ) return;
-    requestAccepted = true;
-    post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-started-v1" });
-    setStatus("Creating the downstream proposal on GitHub…");
-    let result;
-    try {
-      const created = await requestJson("/api/shacl/propose", {
-        body: JSON.stringify(value.proposal),
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
-        method: "POST",
-      });
-      result = {
-        ...shaclCoordinates(),
-        error_code: null,
-        error_status: null,
-        error: null,
-        format: "orinoco-lite-shacl-proposal-result-v1",
-        result: created,
-        retry_safe: false,
-      };
-    } catch (error) {
-      const details = errorDetails(error);
-      result = {
-        ...shaclCoordinates(),
-        error_code: details.code,
-        error_status: details.status,
-        error: error instanceof Error ? error.message : "The bundle could not be proposed.",
-        format: "orinoco-lite-shacl-proposal-result-v1",
-        result: null,
-        retry_safe: Number.isInteger(error && error.status) && error.status >= 400 && error.status < 500,
-      };
-    }
-    finished = true;
-    post(result);
-    setStatus(result.error === null ? "GitHub created the proposal." : result.error);
-  };
-  window.addEventListener("message", listener);
-  post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-access-verified-v1" });
-  post({ ...shaclCoordinates(), format: "orinoco-lite-shacl-proposal-ready-v1" });
-  setStatus("Connected. Return to the downstream editor. This window closes automatically after GitHub responds.");
+  });
+  post({ format: "orinoco-authentication-ready-v1", handoff_nonce: target.handoff_nonce,
+    repository: target.repository, login: session.login });
+  setStatus("Connected. Continue in the website; its repository workflows will process your submission.");
 }
 
 async function main() {
@@ -334,8 +247,7 @@ async function main() {
     window.location.replace(authUrl());
     return;
   }
-  if (target.kind === "review") await startReview(session);
-  else await startShacl(session);
+  await startAuthentication(session);
 }
 
 void main().catch(transportError);`;
@@ -349,10 +261,10 @@ function htmlResponse(target: BrowserTarget): Response {
 <meta charset="utf-8">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Orinoco GitHub transport</title>
+<title>Orinoco GitHub sign-in</title>
 </head>
 <body>
-<p id="status" role="status">Starting the secure GitHub transport. This window closes automatically after GitHub responds.</p>
+<p id="status" role="status">Connecting to GitHub. Continue in the website after sign-in.</p>
 <script nonce="${nonce}">${transportScript(target)}</script>
 </body>
 </html>`;
