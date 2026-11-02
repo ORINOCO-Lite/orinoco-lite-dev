@@ -92,6 +92,7 @@ The App MUST be installed on both repositories and the curator MUST have write p
 The service first creates a metadata draft pull request containing the unchanged bundle, then hands off the website proposal with the metadata draft's exact coordinates.
 It identifies the deployed commits and companion website branch.
 When the metadata proposal merges, the service updates the website proposal gitlink to GitHub’s resulting merge commit.
+For private metadata, the website validation job obtains read access from the same installed App.
 Each draft has its head and base in its own repository.
 The fixed temporary website handoff may wrap the unchanged bundle and metadata proposal coordinates; these are operational state removed by replacement.
 

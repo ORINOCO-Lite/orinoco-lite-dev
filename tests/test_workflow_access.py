@@ -112,3 +112,28 @@ def test_editor_transport_needs_no_separate_operation_policy():
     with patch.object(workflow_access, "request_json") as request:
         workflow_access.require_operation("owner/site", "shacl_materialization", "secret")
     request.assert_not_called()
+
+
+def test_merged_metadata_access_uses_its_own_oidc_audience(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("[tool.orinoco]\n[tool.orinoco.service]\nurl = 'https://review.example'\n")
+    output = tmp_path / "output"
+    for key, value in {
+        "ACTIONS_ID_TOKEN_REQUEST_URL": "https://example.actions.githubusercontent.com/token?api-version=2",
+        "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "request-secret",
+        "GITHUB_REPOSITORY": "example/site", "PROPOSAL_NUMBER": "7",
+        "PROPOSAL_HEAD": "a" * 40, "GITHUB_OUTPUT": str(output),
+    }.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.delenv("PROPOSAL_HANDOFF", raising=False)
+    monkeypatch.setattr("sys.argv", ["workflow-access", "--metadata-read"])
+    with patch.object(workflow_access, "request_json", side_effect=[
+        {"value": "oidc-secret"}, {"token": "metadata-secret"},
+    ]) as request:
+        workflow_access.main()
+    assert request.call_args_list[1].args == (
+        "https://review.example/api/shacl/metadata-access", "oidc-secret",
+        {"repository": "example/site", "pull_request": 7, "head": "a" * 40},
+    )
+    assert output.read_text() == "token=metadata-secret\n"
+    assert "metadata-secret" in capsys.readouterr().out
