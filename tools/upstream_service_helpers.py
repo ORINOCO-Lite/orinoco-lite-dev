@@ -8,6 +8,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 import os
+import re
 import secrets
 import subprocess
 import time
@@ -37,19 +38,21 @@ def local_service(
     scratch: Path,
     schema: Path,
     *,
-    port: int,
+    port: int = 0,
     timeout: float = 120,
 ) -> Iterator[LocalService]:
     """Start a fresh loopback Pool; stop it when the caller leaves the context.
 
     The selected environment must supply ``dump-things-service``. Scratch
     must be empty; its configuration, store, and log remain for inspection.
+    Port zero lets the service bind an OS-assigned port without reserving and
+    releasing a socket in the caller. Uvicorn announces the bound port in its log.
     """
     schema = schema.resolve(strict=True)
     if not schema.is_file():
         raise ValueError(f"Service schema is not a file: {schema}")
-    if not 1 <= port <= 65535:
-        raise ValueError("Service port must be between 1 and 65535")
+    if not 0 <= port <= 65535:
+        raise ValueError("Service port must be between 0 and 65535")
     scratch.mkdir(parents=True, exist_ok=True)
     if any(scratch.iterdir()):
         raise ValueError(f"Service scratch directory is not empty: {scratch}")
@@ -104,10 +107,22 @@ def local_service(
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 if process.poll() is not None:
+                    detail = log_path.read_text(encoding="utf-8", errors="replace")
+                    detail = detail.replace(token, "<redacted>")[-4000:]
                     raise RuntimeError(
                         f"Local service exited with status {process.returncode}; "
-                        f"see {log_path}"
+                        f"see {log_path}\n{detail}"
                     )
+                if port == 0:
+                    match = re.search(
+                        r"Uvicorn running on http://127\.0\.0\.1:(\d+)",
+                        log_path.read_text(encoding="utf-8", errors="replace"),
+                    )
+                    if match is None:
+                        time.sleep(0.1)
+                        continue
+                    port = int(match[1])
+                    connection = LocalService(f"http://127.0.0.1:{port}", token, store)
                 try:
                     request = Request(
                         f"{connection.url}/server",
