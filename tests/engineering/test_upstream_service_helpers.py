@@ -27,12 +27,6 @@ def schema():
     return selected
 
 
-def available_port():
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        return listener.getsockname()[1]
-
-
 def captured_records():
     return [
         {
@@ -83,7 +77,8 @@ def test_real_service_preserves_records_and_stops_after_success(tmp_path, schema
         "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in records),
         encoding="utf-8",
     )
-    with local_service(tmp_path / "service", schema, port=available_port()) as service:
+    with local_service(tmp_path / "service", schema) as service:
+        assert not service.url.endswith(":0")
         with pytest.raises(HTTPError) as rejection:
             urlopen(f"{service.url}/public/curated/records/p/", timeout=1)
         assert rejection.value.code in {401, 403}
@@ -116,8 +111,18 @@ def test_real_service_stops_when_comparison_fails(tmp_path, schema):
     capture = tmp_path / "source.jsonl"
     capture.write_text(json.dumps(captured_records()[0]) + "\n", encoding="utf-8")
     with pytest.raises(upstream_snapshot.SnapshotError, match="snapshot PID mismatch"):
-        with local_service(tmp_path / "service", schema, port=available_port()) as service:
+        with local_service(tmp_path / "service", schema) as service:
             verify_service_snapshot(
                 capture, "public", service.token, service_url=service.url,
             )
     assert_stopped(service.url)
+
+
+def test_startup_failure_includes_the_service_log(tmp_path, schema):
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        with pytest.raises(RuntimeError, match="(?i)address already in use"):
+            with local_service(tmp_path / "service", schema,
+                               port=listener.getsockname()[1]):
+                pytest.fail("Service started on an occupied port")

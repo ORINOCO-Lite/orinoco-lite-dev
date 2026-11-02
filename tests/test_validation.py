@@ -29,6 +29,13 @@ DISPLAY_LABEL_ASSERTION = {
 
 
 class DownstreamValidationTests(unittest.TestCase):
+    def test_nested_depictions_point_to_the_file_moving_command(self):
+        image = self.root / "site-specific/content/persons/test/portrait.png"
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"portrait")
+        with self.assertRaisesRegex(ConfigurationError, "orinoco-lite flatten-depictions"):
+            validate_workspace(load_workspace(self.root))
+
     def test_workspace_rejects_old_overlay_path_before_use(self):
         old = self.root / "site-specific/metadata/overlays/annotations"
         old.parent.mkdir(parents=True, exist_ok=True)

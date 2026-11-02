@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from collections.abc import Mapping
 import subprocess
+import tempfile
 import tomllib
 
 import tomlkit
@@ -13,6 +14,7 @@ import tomlkit
 from .progress import progress
 from .errors import DriverError
 from .annex_media import annex_files, retrieve_and_verify
+from .depictions import flatten_depictions
 
 ENTITY_SECTIONS = frozenset({
     "datasets", "instruments", "objectives", "persons", "projects",
@@ -53,8 +55,8 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
     """Return the explicitly owned site-input paths and source bytes.
 
     Generated record pages are omitted; importing the homepage requires an explicit choice. Section pages,
-    authored pages outside record sections, and page-bundle resources remain
-    at their original content-relative paths.
+    authored pages outside record sections, and other page-bundle resources
+    retain their paths. Depiction images use flat downstream paths.
     """
     result = subprocess.run(
         ["git", "-C", str(source), "ls-files", "-z", "--", "content", "assets/img", "static"],
@@ -92,6 +94,19 @@ def selected_site_files(source: Path, *, retrieve_media: bool = False, media_rem
         selected = {path: managed[path] for path in paths if path in managed}
         media = retrieve_and_verify(source, selected, remote=media_remote)
     files = {path: _source_bytes(source, path, media=media) for path in paths}
+    # Apply the same file-moving utility offered to downstreams, on imported
+    # bytes only. A conflict must fail before changing the destination.
+    with tempfile.TemporaryDirectory(prefix="orinoco-site-inputs-") as temporary:
+        content = Path(temporary) / "content"
+        content.mkdir()
+        for path in list(files):
+            if path.parts[0] == "content":
+                target = Path(temporary) / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(files.pop(path))
+        flatten_depictions(content)
+        files.update({path.relative_to(temporary): path.read_bytes()
+                      for path in content.rglob("*") if path.is_file()})
     # These source-owned values are deliberately cleared by the generic
     # template. Keep their real upstream settings as site overrides; fields
     # already mapped into tool.orinoco.site remain owned only by that document.

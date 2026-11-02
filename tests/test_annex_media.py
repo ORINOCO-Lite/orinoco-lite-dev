@@ -7,6 +7,7 @@ import pytest
 from orinoco_lite.annex_media import annex_files, prepare_media, retrieve_and_verify, workspace_annex_files
 from orinoco_lite.config import load_workspace
 from orinoco_lite.errors import ConfigurationError, DriverError
+from orinoco_lite.depictions import bundle_depictions, flatten_depictions
 from orinoco_lite.publication import _clone_inputs
 from orinoco_lite.site import _copy_tree
 from orinoco_lite.validation import validate_workspace
@@ -108,7 +109,7 @@ def test_publication_clone_retrieves_from_original_checkout(workspace, tmp_path)
 @pytest.mark.parametrize('unlocked', [False, True])
 def test_annex_editorial_content_and_portraits_are_materialized(workspace, tmp_path, unlocked):
     site = workspace.path('site')
-    portrait = site / 'content/persons/person/portrait.png'
+    portrait = site / 'content/persons/person_portrait.png'
     portrait.parent.mkdir(parents=True)
     portrait.write_bytes(b'portrait bytes')
     git(site, 'rm', '--cached', 'content/example.md')
@@ -118,6 +119,7 @@ def test_annex_editorial_content_and_portraits_are_materialized(workspace, tmp_p
     report = validate_workspace(workspace)
     media = prepare_media(workspace)
     _copy_tree(site / 'content', tmp_path / 'output', media=media)
+    bundle_depictions(tmp_path / 'output')
     assert (tmp_path / 'output/example.md').read_text() == 'Editorial content.\n'
     assert (tmp_path / 'output/persons/person/portrait.png').read_bytes() == b'portrait bytes'
     assert not any(path.is_symlink() for path in (tmp_path / 'output').rglob('*'))
@@ -125,6 +127,25 @@ def test_annex_editorial_content_and_portraits_are_materialized(workspace, tmp_p
     assert validate_workspace(workspace)['site_owned_tree_sha256'] == report['site_owned_tree_sha256']
     with pytest.raises(DriverError, match='content/'):
         prepare_media(workspace)
+
+
+@pytest.mark.parametrize('unlocked', [False, True])
+def test_flatten_depictions_preserves_annex_keys_without_fetching(workspace, unlocked):
+    site = workspace.path('site')
+    old = site / 'content/persons/alice/portrait.png'
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b'portrait')
+    git(site, 'annex', 'add', str(old))
+    if unlocked:
+        git(site, 'annex', 'unlock', str(old))
+    key = git(site, 'annex', 'lookupkey', str(old))
+    git(site, 'annex', 'drop', '--force', str(old))
+    assert flatten_depictions(site / 'content') == 1
+    new = site / 'content/persons/alice_portrait.png'
+    git(site, 'add', '-A', 'content')
+    assert git(site, 'annex', 'lookupkey', str(new)) == key
+    assert 'content/persons/alice_portrait.png' in git(site, 'annex', 'find', '--not', '--in', 'here')
+    validate_workspace(workspace)
 
 
 def test_corrupt_media_is_not_copied(workspace):

@@ -90,6 +90,29 @@ def test_assembly_materializes_annex_editorial_content(tmp_path, monkeypatch):
     assert not (assembly / "content/annex.md").is_symlink()
 
 
+def test_assembly_places_flat_depictions_in_hugo_bundles(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(CONFIG)
+    _write_site_data(tmp_path)
+    upstream = _www_from_model(tmp_path)
+    content = tmp_path / "site-specific/content/persons"
+    content.mkdir(parents=True)
+    portrait = content / "alice_smith_portrait.png"
+    portrait.write_bytes(b"portrait")
+    assembly = tmp_path / "assembly"
+    site._assemble(load_config_path(tmp_path / "pyproject.toml"), tmp_path / "resources",
+                   assembly, www_from_model=upstream)
+    assert (assembly / "content/persons/alice_smith/portrait.png").read_bytes() == b"portrait"
+    assert not (assembly / "content/persons/alice_smith_portrait.png").exists()
+    assert portrait.read_bytes() == b"portrait"
+
+    nested = content / "alice_smith/portrait.png"
+    nested.parent.mkdir()
+    portrait.rename(nested)
+    with pytest.raises(ConfigurationError, match="flatten-depictions"):
+        site._assemble(load_config_path(tmp_path / "pyproject.toml"), tmp_path / "resources",
+                       tmp_path / "rejected-assembly", www_from_model=upstream)
+
+
 class HugoCompatibilityTests(unittest.TestCase):
     def test_partial_config_override_preserves_other_site_settings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
