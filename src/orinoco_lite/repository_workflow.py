@@ -58,7 +58,7 @@ def clone(repository: str, commit: str, destination: Path, token: str) -> None:
 
 
 def bundle(root: Path, destination: Path) -> None:
-    git(root, "branch", "-f", "orinoco-result", "HEAD")
+    git(root, "update-ref", "refs/heads/orinoco-result", "HEAD")
     git(root, "bundle", "create", str(destination.resolve()), "orinoco-result")
 
 

@@ -49,6 +49,21 @@ def repositories(tmp_path, monkeypatch):
 ENV = worker.identity({"submitter": {"id": 1, "login": "fixture"}}, "2026-01-01T00:00:00Z")
 
 
+def test_materialized_bundle_can_be_exported_again(repositories, tmp_path):
+    root, _ = repositories["metadata"]
+    worker.bundle(root, tmp_path / "input.bundle")
+    restored = tmp_path / "restored"
+    worker.restore_bundle(tmp_path / "input.bundle", restored)
+    (restored / "record.yaml").write_text("name: edited\n")
+    worker.git(restored, "add", "record.yaml")
+    worker.git(restored, "commit", "-qm", "test: materialized edit", environment=ENV)
+    expected = worker.git(restored, "rev-parse", "HEAD")
+    worker.bundle(restored, tmp_path / "result.bundle")
+    worker.restore_bundle(tmp_path / "result.bundle", tmp_path / "result")
+    assert worker.git(tmp_path / "result", "rev-parse", "HEAD") == expected
+    assert (tmp_path / "result/record.yaml").read_text() == "name: edited\n"
+
+
 def test_integration_preserves_concurrent_work_and_is_repeatable(repositories):
     root, remote = repositories["metadata"]
     base = git(root, "rev-parse", "HEAD")
