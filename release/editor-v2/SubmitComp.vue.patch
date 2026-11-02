@@ -1,5 +1,4 @@
 diff --git a/src/components/SubmitComp.vue b/src/components/SubmitComp.vue
-index 9621e55..7939e6a 100644
 --- a/src/components/SubmitComp.vue
 +++ b/src/components/SubmitComp.vue
 @@ -3,0 +4,31 @@
@@ -49,7 +48,7 @@ index 9621e55..7939e6a 100644
 +            >
 +                {{ reviewBundleStatus.message }}
 +            </v-alert>
-@@ -17,0 +63,1 @@
+@@ -17,0 +63 @@
 +                                :aria-label="accessibleRecordSubmissionLabel(r)"
 @@ -57,0 +104,47 @@
 +                    <v-alert
@@ -125,10 +124,10 @@ index 9621e55..7939e6a 100644
 +                </v-alert>
 +                <a
 +                    v-if="proposalResult"
-+                    :href="proposalResult.pull_request_url"
++                    :href="proposalResult.workflow_url"
 +                    rel="noreferrer"
 +                    target="_blank"
-+                >Open draft pull request</a>
++                >Open processing workflow</a>
 @@ -98,4 +220,4 @@
 -        <v-card-actions class="position-absolute top-0 right-0 pa-2">
 -            <v-btn v-if="!responseReceived && nodesToSubmit.length" @click="downloadRecords()">
@@ -138,9 +137,9 @@ index 9621e55..7939e6a 100644
 +            <v-btn v-if="!proposalMode && !responseReceived && nodesToSubmit.length" @click="downloadRecords()">
 +                <v-icon>{{ patchDownloadMode && framedContext ? 'mdi-send' : 'mdi-download' }}</v-icon>
 +                {{ patchDownloadMode ? (framedContext ? 'Add to review' : 'Download review bundle') : 'Download RDF' }}
-@@ -109,1 +231,0 @@
+@@ -109 +230,0 @@
 -            <v-btn prepend-icon="mdi-close-box" @click="props.openCloseFn()">Close</v-btn>
-@@ -139,1 +260,14 @@ import { getDisplayName, getRecordDisplayLabel, getRecordQuads, quadsToTTL, dlJS
+@@ -139 +260,14 @@
 -import { buildReviewBundle, reviewBundleFilename } from '@/modules/review-bundle';
 +import {
 +    beginReviewBundleProposal,
@@ -156,13 +155,13 @@ index 9621e55..7939e6a 100644
 +    reviewProposalTarget,
 +    reviewBundleFilename,
 +} from '@/modules/review-bundle';
-@@ -164,0 +299,5 @@ const responseFailure = ref(false);
+@@ -164,0 +299,5 @@
 +const accessStatus = ref('');
 +const proposalResult = ref(null);
 +const proposing = ref(false);
 +const reviewBundleStatus = ref(null);
 +const reviewBundleUpload = ref(null);
-@@ -174,0 +314,40 @@ const patchDownloadMode = computed(
+@@ -174,0 +314,40 @@
 +const proposalMode = computed(
 +    () =>
 +        patchDownloadMode.value &&
@@ -203,7 +202,8 @@ index 9621e55..7939e6a 100644
 +        recordLabel,
 +    });
 +}
-@@ -191,0 +371,74 @@ function clearSubmitErrors() {
+@@ -192 +371,144 @@
+-
 +    proposalResult.value = null;
 +    proposing.value = false;
 +
@@ -278,7 +278,7 @@ index 9621e55..7939e6a 100644
 +    responseReceived.value = true;
 +    responseText.value = `The review bundle could not be created: ${error.message}`;
 +}
-@@ -192,0 +446,73 @@ function clearSubmitErrors() {
++
 +async function checkGitHubAccess() {
 +    proposing.value = true;
 +    accessStatus.value = 'Signing in and checking repository access…';
@@ -287,7 +287,7 @@ index 9621e55..7939e6a 100644
 +            config.value.review_bundle_proposal, window, { checkOnly: true }
 +        );
 +        await handoff.deliver(null);
-+        accessStatus.value = 'GitHub access and operation settings verified. They will be checked again when proposing.';
++        accessStatus.value = 'Your GitHub account can submit edits to the required repositories.';
 +        responseFailure.value = false;
 +        responseReceived.value = false;
 +        responseErrors.value = [];
@@ -327,11 +327,7 @@ index 9621e55..7939e6a 100644
 +        responseSuccess.value = true;
 +        responseFailure.value = false;
 +        responseReceived.value = true;
-+        responseText.value =
-+            result.pull_request ===
-+            config.value.review_bundle_proposal?.target?.pull_request
-+                ? 'GitHub updated the draft pull request.'
-+                : 'GitHub created the draft pull request.';
++        responseText.value = 'Edit submitted. The repository workflow will validate it and create or update the pull request.';
 +    } catch (error) {
 +        handoff?.cancel();
 +        accessStatus.value = 'Resolve the reported problem, then check GitHub access again.';
@@ -352,7 +348,7 @@ index 9621e55..7939e6a 100644
 +    } finally {
 +        proposing.value = false;
 +    }
-@@ -242,13 +568,1 @@ async function downloadRecords() {
+@@ -242,13 +564 @@
 -            const response = await fetch(config.value.review_bundle_catalog, {
 -                cache: 'no-cache',
 -                credentials: 'omit',
@@ -367,9 +363,9 @@ index 9621e55..7939e6a 100644
 -                selectedNodes: toSubmit,
 -            });
 +            const bundle = await buildSelectedReviewBundle();
-@@ -255,0 +570,1 @@ async function downloadRecords() {
+@@ -255,0 +566 @@
 +            dispatchReviewBundle(bundle);
-@@ -257,3 +572,1 @@ async function downloadRecords() {
+@@ -257,3 +568 @@
 -            responseFailure.value = true;
 -            responseReceived.value = true;
 -            responseText.value = `The review bundle could not be created: ${error.message}`;

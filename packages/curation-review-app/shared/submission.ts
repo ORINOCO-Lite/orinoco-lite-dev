@@ -139,6 +139,43 @@ function canonicalJson(value: unknown): string {
   return serialized;
 }
 
+/** Freeze an existing proposal's GitHub targets before authorizing the input. */
+export async function editorSubmission(
+  bundle: unknown,
+  target:
+    { kind: "standalone" } | { kind: "pull_request"; pull_request: number },
+  access: SubmissionAccess,
+  fetcher: typeof fetch = fetch,
+): Promise<unknown> {
+  let metadata_pull_request: number | null = null;
+  if (target.kind === "pull_request" && access.scope.metadata) {
+    const metadata = access.scope.metadata;
+    const repository = new Repository(
+      metadata.repository,
+      access.credentials[metadata.repository]!.token,
+      fetcher,
+    );
+    const associated = await repository.request(
+      `/commits/${metadata.commit}/pulls`,
+    );
+    const open = associated.filter(
+      (pull: any) =>
+        pull.state === "open" &&
+        pull.head?.repo?.full_name === metadata.repository,
+    );
+    if (open.length > 1)
+      throw new Error(
+        "This metadata snapshot belongs to multiple open pull requests. Select the metadata proposal before submitting.",
+      );
+    metadata_pull_request = open[0]?.number ?? null;
+  }
+  return {
+    operation: "shacl",
+    bundle,
+    target: { ...target, metadata_pull_request },
+  };
+}
+
 /** Content determines the submission ref, so a lost response does not duplicate work. */
 export async function uploadSubmission(
   input: unknown,

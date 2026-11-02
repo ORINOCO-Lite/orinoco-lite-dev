@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DataFactory, Store, Writer } from 'n3';
 
+const authMocks = vi.hoisted(() => ({
+    openAuthentication: vi.fn(), uploadSubmission: vi.fn(),
+    editorSubmission: vi.fn(async (bundle, target) => ({ operation: 'shacl', bundle, target })),
+}));
+vi.mock('../src/modules/repository-auth.js', () => authMocks);
+
 vi.mock('@/modules/utils', () => ({
     getRecordQuads: (iri, graph) => graph.getQuads(iri, null, null, null),
     quadsToTTL: (quads, prefixes) =>
@@ -37,10 +43,6 @@ const {
     restoreReviewBundle,
     reviewProposalTarget,
     REVIEW_BUNDLE_EVENT,
-    REVIEW_PROPOSAL_MESSAGE_FORMAT,
-    REVIEW_PROPOSAL_READY_FORMAT,
-    REVIEW_PROPOSAL_RESULT_FORMAT,
-    REVIEW_PROPOSAL_STARTED_FORMAT,
     reviewBundleFilename,
     validateRecordCatalog,
 } = await import('../src/modules/review-bundle');
@@ -141,9 +143,8 @@ describe('Orinoco review bundles', () => {
             })
         ).rejects.toThrow('not editable');
     });
-    it('binds a candidate preview to one exact draft pull request', () => {
+    it('identifies the pull request without a current-head permission check', () => {
         const target = {
-            expected_head_sha: SOURCE_COMMIT,
             kind: 'pull_request',
             pull_request: 42,
         };
@@ -304,215 +305,34 @@ describe('Orinoco review bundles', () => {
         expect(graph.has(original)).toBe(true);
     });
 
-    it('sends a confirmed proposal only to the exact transport popup', async () => {
-        const listeners = new Map();
-        const popup = {
-            close: vi.fn(),
-            closed: false,
-            postMessage: vi.fn((message) => structuredClone(message)),
-        };
-        const nonce = '0a'.repeat(32);
-        const target = {
-            addEventListener: vi.fn((type, listener) =>
-                listeners.set(type, listener)
-            ),
-            clearTimeout: vi.fn(),
-            crypto: {
-                getRandomValues: vi.fn((value) => value.fill(10)),
-            },
-            location: {
-                hostname: 'site.example.test',
-                origin: 'https://site.example.test',
-            },
-            open: vi.fn(() => popup),
-            removeEventListener: vi.fn(),
-            clearInterval: vi.fn(),
-            setTimeout: vi.fn(() => 17),
-            setInterval: vi.fn(() => 18),
-        };
-        const proposal = {
-            bundle: {
-                format: 'orinoco-shacl-review-bundle',
-                records: [],
-                source_commit: SOURCE_COMMIT,
-                version: 2,
-            },
-            format: 'orinoco-lite-shacl-proposal-v1',
-            repository: 'ORINOCO-Lite/example-site',
-            target: { kind: 'standalone' },
-        };
-        const handoff = beginReviewBundleProposal(
-            {
-                repository: 'ORINOCO-Lite/example-site',
-                service_origin: 'https://review.example.test',
-            },
-            target
-        );
-        expect(target.open).toHaveBeenCalledWith(
-            'https://review.example.test/api/transport?kind=shacl&repository=ORINOCO-Lite%2Fexample-site&editor_origin=https%3A%2F%2Fsite.example.test&handoff_nonce=' +
-                nonce,
-            `orinoco-lite-shacl-proposal-${nonce}`,
-            'popup,width=720,height=760,resizable=yes,scrollbars=yes'
-        );
-        const reactiveProposal = new Proxy(proposal, {});
-        const delivered = handoff.deliver(reactiveProposal);
-        const receive = listeners.get('message');
-        receive({
-            data: {
-                format: REVIEW_PROPOSAL_READY_FORMAT,
-                handoff_nonce: nonce,
-                repository: 'ORINOCO-Lite/example-site',
-            },
-            origin: 'https://evil.example',
-            source: popup,
+    it('uploads the bundle directly and releases browser credentials', async () => {
+        const access = { scope: 'fixture' };
+        const channel = { credentials: vi.fn(async () => access), release: vi.fn(async () => {}), cancel: vi.fn() };
+        authMocks.openAuthentication.mockReturnValue(channel);
+        authMocks.uploadSubmission.mockResolvedValue({ workflow_url: 'https://github.com/owner/repo/actions' });
+        const handoff = beginReviewBundleProposal({
+            repository: 'owner/repo', service_origin: 'https://auth.example',
         });
-        expect(popup.postMessage).not.toHaveBeenCalled();
-        receive({
-            data: {
-                format: REVIEW_PROPOSAL_READY_FORMAT,
-                handoff_nonce: '0b'.repeat(32),
-                repository: 'ORINOCO-Lite/example-site',
-            },
-            origin: 'https://review.example.test',
-            source: popup,
-        });
-        expect(popup.postMessage).not.toHaveBeenCalled();
-        receive({
-            data: {
-                format: REVIEW_PROPOSAL_READY_FORMAT,
-                handoff_nonce: nonce,
-                repository: 'ORINOCO-Lite/example-site',
-            },
-            origin: 'https://review.example.test',
-            source: popup,
-        });
-        expect(popup.postMessage).toHaveBeenCalledWith(
-            {
-                format: REVIEW_PROPOSAL_MESSAGE_FORMAT,
-                handoff_nonce: nonce,
-                proposal,
-                repository: 'ORINOCO-Lite/example-site',
-            },
-            'https://review.example.test'
-        );
-        expect(popup.postMessage.mock.calls[0][0].proposal).not.toBe(
-            reactiveProposal
-        );
-        receive({
-            data: {
-                format: REVIEW_PROPOSAL_STARTED_FORMAT,
-                handoff_nonce: nonce,
-                repository: 'ORINOCO-Lite/example-site',
-            },
-            origin: 'https://review.example.test',
-            source: popup,
-        });
-        const result = {
-            commit_sha: 'c'.repeat(40),
-            commit_url:
-                'https://github.com/ORINOCO-Lite/example-site/commit/' +
-                'c'.repeat(40),
-            pull_request: 42,
-            pull_request_url:
-                'https://github.com/ORINOCO-Lite/example-site/pull/42',
-        };
-        receive({
-            data: {
-                error_code: null,
-                error_status: null,
-                error: null,
-                format: REVIEW_PROPOSAL_RESULT_FORMAT,
-                handoff_nonce: nonce,
-                repository: 'ORINOCO-Lite/example-site',
-                result,
-                retry_safe: false,
-            },
-            origin: 'https://review.example.test',
-            source: popup,
-        });
-        await expect(delivered).resolves.toBe(result);
-        expect(target.removeEventListener).toHaveBeenCalledWith(
-            'message',
-            receive
-        );
-        expect(target.clearTimeout).toHaveBeenCalledWith(17);
-        expect(target.clearInterval).toHaveBeenCalledWith(18);
-        expect(popup.close).toHaveBeenCalledOnce();
+        const bundle = new Proxy({ source_commit: SOURCE_COMMIT, records: [] }, {});
+        const result = await handoff.deliver({ bundle });
+        expect(channel.credentials).toHaveBeenCalledWith(SOURCE_COMMIT);
+        expect(authMocks.uploadSubmission).toHaveBeenLastCalledWith({
+            operation: 'shacl', bundle: { source_commit: SOURCE_COMMIT, records: [] }, target: { kind: 'standalone' },
+        }, access, channel);
+        expect(result.workflow_url).toContain('/actions');
+        expect(channel.release).toHaveBeenCalledOnce();
     });
 
-    it('distinguishes retry-safe failures from uncertain post-start results', async () => {
-        async function runFailure(retrySafe) {
-            const listeners = new Map();
-            const popup = { closed: false, postMessage: vi.fn() };
-            const target = {
-                addEventListener: (type, listener) =>
-                    listeners.set(type, listener),
-                clearInterval: vi.fn(),
-                clearTimeout: vi.fn(),
-                crypto: {
-                    getRandomValues: (value) => value.fill(10),
-                },
-                location: {
-                    hostname: 'site.example.test',
-                    origin: 'https://site.example.test',
-                },
-                open: () => popup,
-                removeEventListener: vi.fn(),
-                setInterval: () => 18,
-                setTimeout: () => 17,
-            };
-            const handoff = beginReviewBundleProposal(
-                {
-                    repository: 'ORINOCO-Lite/example-site',
-                    service_origin: 'https://review.example.test',
-                },
-                target
-            );
-            const delivered = handoff.deliver({
-                repository: 'ORINOCO-Lite/example-site',
-            });
-            const receive = listeners.get('message');
-            for (const format of [
-                REVIEW_PROPOSAL_READY_FORMAT,
-                REVIEW_PROPOSAL_STARTED_FORMAT,
-            ]) {
-                receive({
-                    data: {
-                        format,
-                        handoff_nonce: '0a'.repeat(32),
-                        repository: 'ORINOCO-Lite/example-site',
-                    },
-                    origin: 'https://review.example.test',
-                    source: popup,
-                });
-            }
-            receive({
-                data: {
-                    error: 'GitHub did not return a complete result.',
-                    error_code: 'github_forbidden',
-                    error_status: 403,
-                    format: REVIEW_PROPOSAL_RESULT_FORMAT,
-                    handoff_nonce: '0a'.repeat(32),
-                    repository: 'ORINOCO-Lite/example-site',
-                    result: null,
-                    retry_safe: retrySafe,
-                },
-                origin: 'https://review.example.test',
-                source: popup,
-            });
-            return delivered;
-        }
-
-        await expect(runFailure(true)).rejects.toThrow(
-            'GitHub did not return a complete result.'
-        );
-        await expect(runFailure(true)).rejects.toMatchObject({
-            code: 'github_forbidden',
-            status: 403,
-        });
-        await expect(runFailure(false)).rejects.toThrow(
-            /did not confirm.*If no pull request exists.*retry/
-        );
+    it('checks access without uploading any input', async () => {
+        const channel = { credentials: vi.fn(async () => ({})), release: vi.fn(async () => {}), cancel: vi.fn() };
+        authMocks.openAuthentication.mockReturnValue(channel);
+        authMocks.uploadSubmission.mockClear();
+        const handoff = beginReviewBundleProposal({
+            repository: 'owner/repo', service_origin: 'https://auth.example', source_commit: SOURCE_COMMIT,
+        }, window, { checkOnly: true });
+        await expect(handoff.deliver(null)).resolves.toEqual({ ready: true });
+        expect(authMocks.uploadSubmission).not.toHaveBeenCalled();
+        expect(channel.release).toHaveBeenCalledOnce();
     });
 
     it('recognizes only the exact shared GitHub Pages hostname boundary', () => {
@@ -591,7 +411,7 @@ describe('Orinoco review bundles', () => {
 
         expect(isFramedContext(framed)).toBe(true);
         expect(() => beginReviewBundleProposal(proposal, framed)).toThrow(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.'
+            'Open the editor in its own tab to propose via GitHub.'
         );
         expect(open).not.toHaveBeenCalled();
         expect(isFramedContext({ self: window, top: window })).toBe(false);
@@ -618,7 +438,6 @@ describe('Orinoco review bundles', () => {
 describe('proposal failure guidance', () => {
     it.each([
         ['installation_access_required', 'installation'],
-        ['operation_disabled', 'operation'],
         ['authentication_required', 'signin'],
         ['curator_permission_required', 'permission'],
         ['github_forbidden', 'other'],
@@ -629,79 +448,6 @@ describe('proposal failure guidance', () => {
         'reports %s without inferring installation from HTTP status',
         (code, expected) => {
             expect(proposalFailureGuidance(code)).toBe(expected);
-        }
-    );
-    it.each(['verified', 'unsupported', 'denied-before-delivery'])(
-        'checks access without sending a proposal (service supports checks: %s)',
-        async (state) => {
-            let receive;
-            const popup = {
-                closed: false,
-                close: vi.fn(),
-                postMessage: vi.fn(),
-            };
-            const target = {
-                location: { origin: 'https://site.example' },
-                crypto: { getRandomValues: (value) => value.fill(10) },
-                addEventListener: (_type, listener) => {
-                    receive = listener;
-                },
-                removeEventListener: vi.fn(),
-                open: () => popup,
-                setTimeout: vi.fn(),
-                clearTimeout: vi.fn(),
-                setInterval: vi.fn(),
-                clearInterval: vi.fn(),
-            };
-            const handoff = beginReviewBundleProposal(
-                {
-                    repository: 'website/site',
-                    service_origin: 'https://review.example',
-                },
-                target,
-                { checkOnly: true }
-            );
-            if (state === 'denied-before-delivery') {
-                receive({
-                    origin: 'https://review.example',
-                    source: popup,
-                    data: {
-                        format: 'orinoco-lite-transport-error-v1',
-                        kind: 'shacl',
-                        code: 'operation_disabled',
-                        status: 403,
-                        message: 'Enable the operation.',
-                        handoff_nonce: '0a'.repeat(32),
-                        repository: 'website/site',
-                    },
-                });
-                await expect(handoff.deliver(null)).rejects.toMatchObject({
-                    code: 'operation_disabled',
-                });
-                expect(popup.postMessage).not.toHaveBeenCalled();
-                return;
-            }
-            const result = handoff.deliver(null);
-            receive({
-                origin: 'https://review.example',
-                source: popup,
-                data: {
-                    format:
-                        state === 'verified'
-                            ? 'orinoco-lite-shacl-access-verified-v1'
-                            : REVIEW_PROPOSAL_READY_FORMAT,
-                    handoff_nonce: '0a'.repeat(32),
-                    repository: 'website/site',
-                },
-            });
-            if (state === 'verified')
-                await expect(result).resolves.toEqual({ ready: true });
-            else
-                await expect(result).rejects.toMatchObject({
-                    code: 'access_check_unavailable',
-                });
-            expect(popup.postMessage).not.toHaveBeenCalled();
-            expect(popup.close).toHaveBeenCalledOnce();
         }
     );
 });

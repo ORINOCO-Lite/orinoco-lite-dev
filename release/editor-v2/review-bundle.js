@@ -1,18 +1,11 @@
 import { Parser, Store } from 'n3';
+import { editorSubmission, openAuthentication, uploadSubmission } from './repository-auth.js';
 
 import { getRecordQuads, quadsToTTL, toCURIE, toIRI } from '@/modules/utils';
 
 export const REVIEW_BUNDLE_FORMAT = 'orinoco-shacl-review-bundle';
 export const REVIEW_BUNDLE_VERSION = 3;
 export const REVIEW_BUNDLE_EVENT = 'orinoco:review-bundle';
-export const REVIEW_PROPOSAL_MESSAGE_FORMAT =
-    'orinoco-lite-shacl-proposal-message-v1';
-export const REVIEW_PROPOSAL_READY_FORMAT =
-    'orinoco-lite-shacl-proposal-ready-v1';
-export const REVIEW_PROPOSAL_RESULT_FORMAT =
-    'orinoco-lite-shacl-proposal-result-v1';
-export const REVIEW_PROPOSAL_STARTED_FORMAT =
-    'orinoco-lite-shacl-proposal-started-v1';
 export const CURATION_INSTALL_URL =
     'https://github.com/apps/orinoco-lite-curation-review/installations/new';
 export const CURATION_SETUP_URL =
@@ -20,8 +13,6 @@ export const CURATION_SETUP_URL =
 
 const GITHUB_REPOSITORY =
     /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/;
-const HANDOFF_TIMEOUT_MS = 10 * 60 * 1000;
-const POPUP_POLL_MS = 250;
 
 function exactKeys(value, expected) {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -77,44 +68,17 @@ export function reviewProposalTarget(value) {
     if (value?.target === undefined) return { kind: 'standalone' };
     const target = value.target;
     if (
-        !exactKeys(target, ['kind', 'pull_request', 'expected_head_sha']) ||
+        !exactKeys(target, ['kind', 'pull_request']) ||
         target.kind !== 'pull_request' ||
         !Number.isSafeInteger(target.pull_request) ||
-        target.pull_request < 1 ||
-        !/^[0-9a-f]{40}$/.test(target.expected_head_sha)
+        target.pull_request < 1
     ) {
         throw new Error('Review proposal has an invalid pull-request target');
     }
     return {
-        expected_head_sha: target.expected_head_sha,
         kind: 'pull_request',
         pull_request: target.pull_request,
     };
-}
-
-function editorOrigin(target) {
-    const value = target.location?.origin;
-    let origin;
-    try {
-        origin = new URL(value);
-    } catch {
-        throw new Error('The static editor has an invalid origin');
-    }
-    const loopback =
-        origin.protocol === 'http:' &&
-        ['127.0.0.1', 'localhost'].includes(origin.hostname);
-    if (
-        (origin.protocol !== 'https:' && !loopback) ||
-        origin.origin !== value ||
-        origin.pathname !== '/' ||
-        origin.search ||
-        origin.hash ||
-        origin.username ||
-        origin.password
-    ) {
-        throw new Error('The static editor has an invalid origin');
-    }
-    return value;
 }
 
 function setupUrl(value) {
@@ -169,14 +133,6 @@ export function curationInstallUrl(value) {
     return installUrl(value);
 }
 
-function handoffNonce(target) {
-    const bytes = new Uint8Array(32);
-    target.crypto.getRandomValues(bytes);
-    return [...bytes]
-        .map((value) => value.toString(16).padStart(2, '0'))
-        .join('');
-}
-
 export function isSharedGithubPagesOrigin(target = window) {
     const hostname = String(target.location?.hostname || '')
         .toLowerCase()
@@ -198,295 +154,30 @@ export function beginReviewBundleProposal(
     { checkOnly = false } = {}
 ) {
     if (isFramedContext(target)) {
-        throw new Error(
-            'Direct GitHub proposal is unavailable while the editor is embedded. Add the bundle to the parent review page or open the editor in its own tab.'
-        );
+        throw new Error('Open the editor in its own tab to propose via GitHub.');
     }
-    const {
-        repository,
-        serviceOrigin,
-        target: proposalTarget,
-    } = reviewProposalCoordinates(value);
-    setupUrl(value);
-    installUrl(value);
-    const sourceOrigin = editorOrigin(target);
-    const nonce = handoffNonce(target);
-    const url = new URL('/api/transport', serviceOrigin);
-    url.searchParams.set('kind', 'shacl');
-    url.searchParams.set('repository', repository);
-    url.searchParams.set('editor_origin', sourceOrigin);
-    url.searchParams.set('handoff_nonce', nonce);
-    if (proposalTarget.kind === 'pull_request') {
-        url.searchParams.set(
-            'pull_request',
-            String(proposalTarget.pull_request)
-        );
-        url.searchParams.set(
-            'expected_head_sha',
-            proposalTarget.expected_head_sha
-        );
-    }
-    let popup;
-    let proposal;
-    let ready = false;
-    let timeout;
-    let closedPoll;
-    let settled = false;
-    let started = false;
-    let resolveProposal;
-    let rejectProposal;
-    let terminalError;
-
-    function dispose({ reject } = {}) {
-        target.removeEventListener('message', receive);
-        if (timeout !== undefined) target.clearTimeout(timeout);
-        if (closedPoll !== undefined) target.clearInterval(closedPoll);
-        try {
-            if (popup && !popup.closed) popup.close?.();
-        } catch {
-            // Cleanup is best effort after the protocol has settled.
-        }
-        proposal = undefined;
-        if (!settled && reject) {
-            settled = true;
-            terminalError =
-                reject instanceof Error ? reject : new Error(reject);
-            rejectProposal?.(terminalError);
-        }
-    }
-
-    function sendIfReady() {
-        if (
-            checkOnly ||
-            !ready ||
-            proposal === undefined ||
-            popup?.closed ||
-            started
-        )
-            return;
-        popup.postMessage(
-            {
-                format: REVIEW_PROPOSAL_MESSAGE_FORMAT,
-                handoff_nonce: nonce,
-                proposal,
-                repository,
-            },
-            serviceOrigin
-        );
-    }
-
-    function receive(event) {
-        if (
-            event.origin !== serviceOrigin ||
-            event.source !== popup ||
-            event.data?.handoff_nonce !== nonce ||
-            event.data?.repository?.toLowerCase() !== repository.toLowerCase()
-        ) {
-            return;
-        }
-        if (
-            event.data?.format === 'orinoco-lite-transport-error-v1' &&
-            exactKeys(event.data, [
-                'code',
-                'format',
-                'handoff_nonce',
-                'kind',
-                'message',
-                'repository',
-                'status',
-            ]) &&
-            event.data.kind === 'shacl'
-        ) {
-            const error = new Error(
-                typeof event.data.message === 'string'
-                    ? event.data.message
-                    : 'The GitHub transport failed'
-            );
-            error.code =
-                typeof event.data.code === 'string' ? event.data.code : null;
-            error.status = Number.isSafeInteger(event.data.status)
-                ? event.data.status
-                : null;
-            dispose({
-                reject: error,
-            });
-            return;
-        }
-        if (
-            event.data?.format === REVIEW_PROPOSAL_STARTED_FORMAT &&
-            exactKeys(event.data, ['format', 'handoff_nonce', 'repository'])
-        ) {
-            if (!ready || proposal === undefined || started) return;
-            started = true;
-            return;
-        }
-        if (
-            event.data?.format === REVIEW_PROPOSAL_RESULT_FORMAT &&
-            exactKeys(event.data, [
-                'error',
-                'error_code',
-                'error_status',
-                'format',
-                'handoff_nonce',
-                'repository',
-                'result',
-                'retry_safe',
-            ])
-        ) {
-            if (!started || settled) return;
-            const pullRequest = event.data.result?.pull_request;
-            const commitSha = event.data.result?.commit_sha;
-            const expectedCommitUrl =
-                typeof commitSha === 'string'
-                    ? `https://github.com/${repository}/commit/${commitSha}`
-                    : '';
-            const expectedPullUrl = Number.isSafeInteger(pullRequest)
-                ? `https://github.com/${repository}/pull/${pullRequest}`
-                : '';
-            if (
-                event.data.error === null &&
-                event.data.retry_safe === false &&
-                exactKeys(event.data.result, [
-                    'commit_sha',
-                    'commit_url',
-                    'pull_request',
-                    'pull_request_url',
-                ]) &&
-                /^[0-9a-f]{40}$/.test(commitSha || '') &&
-                Number.isSafeInteger(pullRequest) &&
-                pullRequest > 0 &&
-                event.data.result.commit_url?.toLowerCase() ===
-                    expectedCommitUrl.toLowerCase() &&
-                event.data.result.pull_request_url?.toLowerCase() ===
-                    expectedPullUrl.toLowerCase()
-            ) {
-                settled = true;
-                const result = event.data.result;
-                dispose();
-                resolveProposal?.(result);
-            } else if (
-                event.data.result === null &&
-                typeof event.data.error === 'string' &&
-                event.data.retry_safe === true
-            ) {
-                settled = true;
-                const message = event.data.error;
-                dispose();
-                const error = new Error(message);
-                error.code =
-                    typeof event.data.error_code === 'string'
-                        ? event.data.error_code
-                        : null;
-                error.status = Number.isSafeInteger(event.data.error_status)
-                    ? event.data.error_status
-                    : null;
-                rejectProposal?.(error);
-            } else if (
-                event.data.result === null &&
-                typeof event.data.error === 'string' &&
-                event.data.retry_safe === false
-            ) {
-                settled = true;
-                const message = event.data.error;
-                dispose();
-                const error = new Error(
-                    `${message} GitHub did not confirm that it created a pull ` +
-                        'request. Check the repository first. If no pull request ' +
-                        'exists, retry after resolving the reported problem.'
-                );
-                error.code =
-                    typeof event.data.error_code === 'string'
-                        ? event.data.error_code
-                        : null;
-                error.status = Number.isSafeInteger(event.data.error_status)
-                    ? event.data.error_status
-                    : null;
-                rejectProposal?.(error);
-            }
-            return;
-        }
-        if (
-            checkOnly &&
-            event.data?.format === 'orinoco-lite-shacl-access-verified-v1' &&
-            exactKeys(event.data, ['format', 'handoff_nonce', 'repository'])
-        ) {
-            settled = true;
-            dispose();
-            resolveProposal?.({ ready: true });
-            return;
-        }
-        if (
-            event.data?.format !== REVIEW_PROPOSAL_READY_FORMAT ||
-            !exactKeys(event.data, ['format', 'handoff_nonce', 'repository']) ||
-            ready
-        ) {
-            return;
-        }
-        if (checkOnly) {
-            const error = new Error(
-                'This curation service does not support access checks yet. Ask its operator to update it.'
-            );
-            error.code = 'access_check_unavailable';
-            dispose({ reject: error });
-            return;
-        }
-        ready = true;
-        sendIfReady();
-    }
-
-    target.addEventListener('message', receive);
-    popup = target.open(
-        url.toString(),
-        `orinoco-lite-shacl-proposal-${nonce}`,
-        'popup,width=720,height=760,resizable=yes,scrollbars=yes'
-    );
-    if (!popup) {
-        dispose();
-        throw new Error('The GitHub proposal window was blocked');
-    }
-    timeout = target.setTimeout(
-        () =>
-            dispose({
-                reject: started
-                    ? 'GitHub did not confirm that it created a pull request. ' +
-                      'Check the repository first. If no pull request exists, ' +
-                      'retry after resolving the reported problem.'
-                    : 'The GitHub proposal transport expired before writing.',
-            }),
-        HANDOFF_TIMEOUT_MS
-    );
-    closedPoll = target.setInterval(() => {
-        if (popup.closed) {
-            dispose({
-                reject: started
-                    ? 'GitHub did not confirm that it created a pull request. ' +
-                      'Check the repository first. If no pull request exists, ' +
-                      'retry after resolving the reported problem.'
-                    : 'The GitHub proposal window was closed before writing.',
-            });
-        }
-    }, POPUP_POLL_MS);
+    const { repository, serviceOrigin, target: proposalTarget } = reviewProposalCoordinates(value);
+    const authentication = openAuthentication({
+        repository, service_origin: serviceOrigin, kind: 'shacl',
+    }, target);
+    let delivered = false;
     return {
-        cancel() {
-            dispose({ reject: 'The GitHub proposal was cancelled.' });
-        },
-        deliver(reviewProposal) {
-            if (proposal !== undefined || settled) {
-                return Promise.reject(
-                    terminalError ??
-                        new Error('The GitHub proposal was already delivered')
-                );
+        cancel: () => authentication.cancel(),
+        async deliver(proposal) {
+            if (delivered) throw new Error('This submission was already delivered.');
+            delivered = true;
+            try {
+                const source = checkOnly ? value.source_commit : proposal.bundle.source_commit;
+                const access = await authentication.credentials(source);
+                if (checkOnly) return { ready: true };
+                // Convert Vue proxies to ordinary JSON before upload. The
+                // bundle is sent directly to GitHub, never to authentication.
+                const bundle = JSON.parse(JSON.stringify(proposal.bundle));
+                const input = await editorSubmission(bundle, proposalTarget, access);
+                return await uploadSubmission(input, access, authentication);
+            } finally {
+                await authentication.release().catch(() => authentication.cancel());
             }
-            // Vue exposes the editor state through reactive Proxy objects.
-            // Window.postMessage() cannot structured-clone a Proxy, so cross
-            // the transport boundary with the proposal's plain JSON value.
-            proposal = JSON.parse(JSON.stringify(reviewProposal));
-            const result = new Promise((resolve, reject) => {
-                resolveProposal = resolve;
-                rejectProposal = reject;
-            });
-            sendIfReady();
-            return result;
         },
     };
 }
@@ -782,7 +473,6 @@ export function reviewBundleFilename(records) {
 // HTTP status alone cannot distinguish policy, identity, installation, or trust failures.
 export function proposalFailureGuidance(code) {
     if (code === 'installation_access_required') return 'installation';
-    if (code === 'operation_disabled') return 'operation';
     if (['authentication_required', 'shacl_grant_required'].includes(code))
         return 'signin';
     if (

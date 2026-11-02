@@ -6,9 +6,11 @@ only the explicitly selected transport step receives the output token.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import base64
 import json
 import os
+import sys
 from pathlib import Path
 import urllib.error
 import urllib.parse
@@ -23,9 +25,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise RuntimeError("Credential-bearing requests must not redirect")
 
 
-def request_json(url: str, token: str, body: dict | None = None) -> dict:
+def request_json(url: str, token: str, body: dict | None = None, *, method: str | None = None):
     request = urllib.request.Request(
-        url,
+        url, method=method,
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -35,12 +37,11 @@ def request_json(url: str, token: str, body: dict | None = None) -> dict:
     )
     try:
         with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
-            result = json.load(response)
+            payload = response.read()
+            result = json.loads(payload) if payload else None
     except urllib.error.HTTPError as error:
         # Do not print response bodies, request headers, or identity tokens.
-        raise RuntimeError(f"Workflow authorization was rejected (HTTP {error.code}); inspect the draft and service configuration") from None
-    if not isinstance(result, dict):
-        raise RuntimeError("Workflow authorization returned invalid JSON")
+        raise RuntimeError(f"Request to {urllib.parse.urlsplit(url).hostname} failed (HTTP {error.code})") from None
     return result
 
 
@@ -150,6 +151,52 @@ def main() -> None:
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         for key in keys:
             output.write(f"{key}={result[key]}\n")
+
+
+@contextmanager
+def submission_credentials(branch: str):
+    """Authenticate this job and release its submission-specific App tokens."""
+    import re
+    if re.fullmatch(r"orinoco/submissions/[0-9a-f]{64}", branch) is None:
+        raise RuntimeError("Invalid submission branch")
+    repository = os.environ["GITHUB_REPOSITORY"]
+    receipt_file = request_json(
+        f"https://api.github.com/repos/{repository}/contents/.orinoco-lite/submission-authorization.json?ref="
+        + urllib.parse.quote(branch, safe=""), os.environ["GH_TOKEN"])
+    receipt = json.loads(base64.b64decode(receipt_file["content"]))
+    # The issuer is a routing coordinate, not verified authority. The receiving
+    # service must verify its signature; the OIDC audience is specific to that
+    # issuer, so another endpoint cannot replay it to the real service.
+    payload = receipt["authorization"].split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    origin = _curation_service_origin(claims["iss"], "Authentication service")
+    endpoint = origin + "/api/auth/workflow-credentials"
+    identity_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+    parsed = urllib.parse.urlsplit(identity_url)
+    if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".actions.githubusercontent.com"):
+        raise RuntimeError("Unexpected GitHub Actions identity endpoint")
+    identity = request_json(identity_url + "&audience=" + urllib.parse.quote(endpoint, safe=""),
+                            os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"])["value"]
+    print(f"::add-mask::{identity}")
+    result = request_json(endpoint, identity, {"authorization": receipt["authorization"]})
+    credentials = result["credentials"]
+    for credential in credentials.values():
+        print(f"::add-mask::{credential['token']}")
+    try:
+        yield result
+    finally:
+        failed = sys.exc_info()[0] is not None
+        errors = []
+        for credential in credentials.values():
+            try:
+                revoke(credential["token"])
+            except RuntimeError as error:
+                errors.append(error)
+        if errors:
+            message = "Some temporary GitHub credentials could not be revoked; they will expire automatically"
+            if not failed:
+                raise RuntimeError(message)
+            print(message, file=sys.stderr)
 
 
 if __name__ == "__main__":

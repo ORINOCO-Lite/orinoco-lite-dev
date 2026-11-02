@@ -103,7 +103,7 @@ def build_resources(checkout: Path, destination: Path, *, editable: bool = False
         source = scratch / "source"
         build = source / "build"
         ignore = shutil.ignore_patterns(
-            ".git", "node_modules", "dist", "dist-review", ".wrangler",
+            ".git", "node_modules", "dist", "dist-review", "dist-authentication", ".wrangler",
             ".env*", ".dev.vars*", "__pycache__",
         )
         editor_source = scratch / "editor-source"

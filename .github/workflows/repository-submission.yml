@@ -1,0 +1,164 @@
+name: Process an authorized repository submission
+
+on:
+  workflow_call:
+    inputs:
+      submission:
+        required: true
+        type: string
+      pull_request:
+        type: string
+        default: "0"
+      phase:
+        type: string
+        default: process
+
+permissions: {}
+
+concurrency:
+  group: orinoco-submission-${{ inputs.submission }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    outputs:
+      repository: ${{ steps.source.outputs.repository }}
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      # GitHub's context names the caller. Its OIDC identity also identifies
+      # this exact reusable workflow, including when an old submission resumes.
+      - id: source
+        name: Locate this reusable workflow's package
+        shell: python
+        env:
+          PHASE: ${{ inputs.phase }}
+        run: |
+          import base64, json, os, re, urllib.request
+          if os.environ['PHASE'] not in {'process', 'complete'}:
+              raise SystemExit('Choose process or complete')
+          request = urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'],
+              headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              token = json.load(response)['value']
+          print('::add-mask::' + token)
+          payload = token.split('.')[1]
+          claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+          selected = re.fullmatch(r'([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/\.github/workflows/repository-submission.yml@([0-9a-f]{40})', claims['job_workflow_ref'])
+          assert selected and selected[2] == claims['job_workflow_sha']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('repository=' + selected[1] + '\ncommit=' + selected[2] + '\n')
+
+  prepare:
+    if: inputs.phase == 'process'
+    needs: source
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.commit }}
+          path: package
+          persist-credentials: false
+      - name: Fetch authorized input and release credentials
+        env:
+          PYTHONPATH: package/src
+          GH_TOKEN: ${{ github.token }}
+          SUBMISSION: ${{ inputs.submission }}
+        run: python -m orinoco_lite.repository_workflow prepare --directory data --submission "$SUBMISSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: submission-input
+          path: |
+            data/*.bundle
+            data/input.json
+            data/context.json
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 1
+
+  materialize:
+    needs: [source, prepare]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.commit }}
+          path: package
+          submodules: recursive
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347
+        with:
+          manifest-path: package/pixi.toml
+          locked: false
+      - name: Prepare package resources
+        run: pixi run --manifest-path package/pixi.toml orinoco-lite dev prepare-resources
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: submission-input
+          path: data
+      - name: Materialize and validate without write credentials
+        run: pixi run --manifest-path package/pixi.toml python -m orinoco_lite.repository_workflow materialize --directory data
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: submission-result
+          path: |
+            data/*-result.bundle
+            data/context.json
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [source, materialize]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.commit }}
+          path: package
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: submission-result
+          path: data
+      - name: Publish ordinary pull requests and release credentials
+        env:
+          PYTHONPATH: package/src
+          GH_TOKEN: ${{ github.token }}
+          SUBMISSION: ${{ inputs.submission }}
+        run: python -m orinoco_lite.repository_workflow publish --directory data --submission "$SUBMISSION"
+
+  complete:
+    if: inputs.phase == 'complete'
+    needs: source
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.commit }}
+          path: package
+          persist-credentials: false
+      - name: Finish the original user's website proposal
+        env:
+          PYTHONPATH: package/src
+          GH_TOKEN: ${{ github.token }}
+          SUBMISSION: ${{ inputs.submission }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+        run: python -m orinoco_lite.repository_workflow complete --directory data --submission "$SUBMISSION" --pull-request "$PULL_REQUEST"

@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AUTHORIZATION_PATH,
+  editorSubmission,
   SUBMISSION_PATH,
   uploadSubmission,
   type SubmissionAccess,
@@ -155,6 +156,32 @@ function github() {
 }
 
 describe("downstream submission", () => {
+  it("binds an existing metadata proposal into the input before authorization", async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json([
+        {
+          number: 17,
+          state: "open",
+          head: { repo: { full_name: "owner/metadata" } },
+        },
+        {
+          number: 12,
+          state: "closed",
+          head: { repo: { full_name: "owner/metadata" } },
+        },
+      ]),
+    );
+    expect(
+      await editorSubmission(
+        input.bundle,
+        { kind: "pull_request", pull_request: 8 },
+        access,
+        fetcher,
+      ),
+    ).toMatchObject({ target: { pull_request: 8, metadata_pull_request: 17 } });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
   it("uploads private input to metadata and sends only coordinates to authentication", async () => {
     const api = github();
     const authorize = authorizer();
