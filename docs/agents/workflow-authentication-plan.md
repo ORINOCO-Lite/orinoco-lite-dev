@@ -171,18 +171,57 @@ Do not add a new ledger or proof framework.
 
 ## Current state
 
-The current implementation and GitHub APIs have been inspected.
-The user agreed that the editor uploads with a repository-scoped user token and workflows process the submission.
-The user rejected standing repository connections and requires website write access for SHACL Vue submission.
-The user agreed that automation finishes Alice's authorized proposal even when Bob, who lacks website write access, merges its metadata PR.
-Implementation is proceeding under those decisions; return to design if a further material choice arises.
 The isolated test service and browser probe are deployed in the leej3 demos.
 The live browser authenticated as leej3, received separate eight-hour repository-scoped user tokens, downloaded a 7.4 MB Actions artifact directly, and uploaded a 1.2 MB input to private metadata.
 [The metadata Actions run](https://github.com/leej3/orinoco-lite-submodule-demo-metadata/actions/runs/41538195240) verified the signed submission and both repository credentials through GitHub OIDC, then revoked them.
 The browser released its user tokens after upload.
 Production is unchanged by this redesign.
-The actual editor, source-review flow, repository workers, and replacement template remain unfinished.
+The real editor and repository worker are implemented and undergoing live testing.
+The source-review flow and the remaining template workflows are unfinished.
 
 Submission branches are published only after input and authorization are complete.
 A retry recovers a missing website companion from the original authorization's selected checkout, even when the current default branch has a newer worker.
 The browser decodes that record only to recover coordinates; the service verifies its signature and caller identity before granting workflow credentials.
+
+The real editor from package `5960445d` was built and deployed in the public demo, retaining its older published record snapshot.
+Demo setup PRs [website #30](https://github.com/leej3/orinoco-lite-submodule-demo/pull/30) and [metadata #19](https://github.com/leej3/orinoco-lite-submodule-demo-metadata/pull/19) installed the matching worker.
+The browser submitted a fixture edit directly to private metadata.
+[The processing run](https://github.com/leej3/orinoco-lite-submodule-demo-metadata/actions/runs/41543679762) authenticated, fetched the input, applied it, and passed metadata validation.
+Export then failed because `git branch -f` refuses to reset a checked-out result branch.
+The worker now uses `update-ref`; the regression test exercises export, restoration, editing, and re-export.
+That fix has not yet completed a live run, and neither PR publication nor merge completion is established for this revision.
+
+## Outstanding work before deployment
+
+This is an incomplete replacement, not a deployable authentication-only service yet.
+The following application and workflow issues remain:
+
+1. **Settle authorization for operations started directly in GitHub.**
+   For source refreshes and template updates, the proposed design uses the GitHub-verified initiating user and their current permissions on each required repository as authorization for that run, without another browser sign-in.
+   This decision is pending; do not implement that credential path until the user answers.
+   The editor's browser authorization and delayed completion decisions are settled.
+2. **Allow recovery after a worker bug fix.**
+   Retrying the same input currently rediscovers its old authorization and selects the old worker permanently.
+   A new authenticated submission must be able to select the updated worker while preserving any existing proposal.
+   Do not silently change the worker authorized by an existing receipt: a metadata-only writer must not gain website access by changing workflow code.
+3. **Finish the authentication-only service boundary.**
+   Old proposal, review-comment, and metadata-merge write handlers still exist in the service.
+   Remove them and their operation-specific credential gates after moving their callers to repository workflows.
+   The new editor path avoids those write handlers, but their presence means the full service still exceeds the intended boundary.
+4. **Migrate source review and template updates.**
+   The review interface still speaks the old popup protocol, which the changed transport no longer serves.
+   Move artifact retrieval and review submission into the browser and processing into workflows, preserving existing DataLad provenance.
+   Replace the template updater's old credential exchange and remove obsolete operation settings and retry restrictions.
+5. **Finish downstream workflow setup and private metadata CI.**
+   The template routing workflow and its tests are prepared, but setup must install the matching wrapper in both repositories.
+   Ordinary website validation and Pages workflows still attempt unauthenticated private-submodule checkout; the demo's ordinary validation currently fails there.
+   The demo editor deployment reused already-published records and does not prove a fresh private-metadata website build.
+   Connect composed validation to the resulting PR checks, resolve release-tag selections to exact worker commits, and finalize the package requirement and retained pin after merge.
+6. **Complete live verification on the final candidate.**
+   Rerun after the export fix in `fbaa784c`, then prove website and metadata PR publication and automatic gitlink completion.
+   Exercise updates to existing PRs, duplicate deliveries, ordinary and squash/rebase merges, concurrent changes, recoverable conflicts, and a metadata-only merger finishing the original submitter's proposal.
+   Repeat the real editor and source-review tests after the final relevant changes; the earlier authentication probe and local Git tests do not establish that whole flow.
+7. **Complete documentation, cutover, and cleanup.**
+   Revise the existing contracts, project design, configuration guidance, and affected skills to match the finished implementation.
+   Deploy the tested service and matching workflows together, remove the obsolete production webhook, and revoke the isolated test App's credentials and repository access after verification.
+   Production has not been updated by this redesign.
