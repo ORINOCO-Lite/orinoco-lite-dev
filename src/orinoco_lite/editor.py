@@ -142,7 +142,7 @@ def _editor_config(
                 if github_handoff
                 else ""
             )
-            + "This static editor receives no authentication credential."
+            + "Repository workflows validate and process submitted edits."
         ),
         "page_title": f"{workspace.site_name} metadata review",
         "priority_classes": [
@@ -169,6 +169,7 @@ def _editor_config(
                 "installations/new"
             ),
             "repository": resolved_repository,
+            "source_commit": _git_commit(workspace.root),
             "service_origin": resolved_service,
             "setup_url": (
                 "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
@@ -197,7 +198,6 @@ def _editor_config(
             ):
                 raise DriverError("Candidate pull-request target is invalid")
             config["review_bundle_proposal"]["target"] = {
-                "expected_head_sha": candidate_commit,
                 "kind": "pull_request",
                 "pull_request": int(candidate_pull),
             }

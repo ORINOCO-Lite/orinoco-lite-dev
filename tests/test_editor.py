@@ -227,6 +227,7 @@ class EditorBundleTests(unittest.TestCase):
                     "installations/new"
                 ),
                 "repository": "ORINOCO-Lite/example-site",
+                "source_commit": _git_commit(self.root),
                 "service_origin": "https://orinoco-curation-review.pages.dev",
                 "setup_url": (
                     "https://github.com/ORINOCO-Lite/orinoco-lite-dev/blob/main/"
@@ -259,7 +260,6 @@ class EditorBundleTests(unittest.TestCase):
         self.assertEqual(
             config["review_bundle_proposal"]["target"],
             {
-                "expected_head_sha": commit,
                 "kind": "pull_request",
                 "pull_request": 42,
             },

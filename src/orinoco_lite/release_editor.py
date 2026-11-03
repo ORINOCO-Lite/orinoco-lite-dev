@@ -172,8 +172,8 @@ def _apply_submission_accessibility_patch(
         raise DriverError("Editor submission accessibility patch is missing")
     if not patch_path.read_text(encoding="utf-8").startswith("diff --git "):
         raise DriverError("Editor submission patch has an invalid preamble")
-    _run(["git", "apply", "--unidiff-zero", "--check", patch_path], shacl)
-    _run(["git", "apply", "--unidiff-zero", patch_path], shacl)
+    _run(["git", "apply", "--recount", "--unidiff-zero", "--check", patch_path], shacl)
+    _run(["git", "apply", "--recount", "--unidiff-zero", patch_path], shacl)
     source = component.read_text(encoding="utf-8")
     if (
         source.count(SUBMISSION_ARIA_BINDING) != 1
@@ -320,6 +320,13 @@ def build_editor(
         _initialize_repository(repository, commit)
     shutil.copyfile(overlay / "review-bundle.js", module)
     shutil.copyfile(overlay / "review-bundle.test.js", test)
+    authentication = pool_ui.parent / "authentication-source"
+    shutil.copytree(overlay.parent.parent / "packages/curation-review-app", authentication,
+                    ignore=shutil.ignore_patterns("node_modules", "dist*", ".wrangler", ".dev.vars*"))
+    _run(["npm", "ci", "--ignore-scripts"], authentication)
+    _run(["npm", "run", "build:authentication"], authentication)
+    shutil.copyfile(authentication / "dist-authentication/repository-auth.js",
+                    shacl / "src/modules/repository-auth.js")
     _apply_submission_accessibility_patch(
         shacl,
         submit_component,

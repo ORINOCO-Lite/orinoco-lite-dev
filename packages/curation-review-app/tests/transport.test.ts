@@ -118,28 +118,21 @@ describe("minimal downstream OAuth transport", () => {
     ).rejects.toMatchObject({ code: "method_not_allowed", status: 405 });
   });
 
-  it("executes the SHACL protocol with exact opener, nonce, grant, and CSRF binding", async () => {
+  it("delivers credentials only to the bound opener and never accepts a bundle", async () => {
     const url = shaclUrl();
     const response = await transport(context(new Request(url)));
-    const opener = {
-      closed: false,
-      postMessage: vi.fn(),
-    };
-    const result = {
-      commit_sha: "b".repeat(40),
-      commit_url: `https://github.com/example/site/commit/${"b".repeat(40)}`,
-      pull_request: 43,
-      pull_request_url: "https://github.com/example/site/pull/43",
+    const opener = { closed: false, postMessage: vi.fn() };
+    const credential = {
+      token: "scoped-fixture-token",
+      expires_at: "2999-01-01T00:00:00Z",
     };
     const fetchMock = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (String(input) === "/api/shacl/access")
-          return Response.json({ ready: true });
-        if (String(input) === "/api/session") {
+      async (path: RequestInfo | URL, init?: RequestInit) => {
+        if (String(path) === "/api/session")
           return Response.json({
             authenticated: true,
             csrf_token: "csrf-token",
-            login: "octocat",
+            login: "alice",
             review_grant: null,
             shacl_grant: {
               editor_origin: CLIENT_ORIGIN,
@@ -149,252 +142,121 @@ describe("minimal downstream OAuth transport", () => {
               repository: "example/site",
             },
           });
-        }
-        if (String(input) === "/api/shacl/propose") {
-          expect(init).toMatchObject({
-            credentials: "same-origin",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              "X-CSRF-Token": "csrf-token",
-            },
-            method: "POST",
-          });
-          return Response.json(result, { status: 201 });
-        }
-        throw new Error(`Unexpected transport request: ${String(input)}`);
+        expect(init).toMatchObject({
+          credentials: "same-origin",
+          method: "POST",
+          headers: {
+            "X-CSRF-Token": "csrf-token",
+            "Content-Type": "application/json",
+          },
+        });
+        if (String(path) === "/api/auth/credentials")
+          return Response.json({ credentials: { "example/site": credential } });
+        if (String(path) === "/api/auth/authorize-submission")
+          return Response.json({ authorization: "signed-input" });
+        if (String(path) === "/api/auth/revoke")
+          return Response.json({ revoked: true });
+        throw new Error("Unexpected request: " + String(path));
       },
     );
-    const virtualConsole = new VirtualConsole();
     const dom = new JSDOM(await response.text(), {
       beforeParse(window: Window & typeof globalThis) {
         Object.defineProperty(window, "opener", { value: opener });
-        window.fetch = fetchMock as unknown as typeof window.fetch;
+        window.fetch = fetchMock as typeof window.fetch;
       },
       runScripts: "dangerously",
       url,
-      virtualConsole,
+      virtualConsole: new VirtualConsole(),
     });
-
     await vi.waitFor(() =>
       expect(opener.postMessage).toHaveBeenCalledWith(
         {
-          format: "orinoco-lite-shacl-proposal-ready-v1",
+          format: "orinoco-authentication-ready-v1",
           handoff_nonce: NONCE,
           repository: "example/site",
+          login: "alice",
         },
         CLIENT_ORIGIN,
       ),
     );
-
-    const proposal = {
-      bundle: {
-        format: "orinoco-shacl-review-bundle",
-        records: [],
-        source_commit: "a".repeat(40),
-        version: 2,
-      },
-      format: "orinoco-lite-shacl-proposal-v1",
+    const message = {
+      format: "orinoco-authentication-request-v1",
+      handoff_nonce: NONCE,
       repository: "example/site",
-      target: { kind: "standalone" },
+      id: "a".repeat(32),
+      method: "credentials",
+      input: { source_commit: "b".repeat(40) },
     };
-    const wrong = new dom.window.Event("message");
-    Object.defineProperties(wrong, {
-      data: {
-        value: {
-          format: "orinoco-lite-shacl-proposal-message-v1",
-          handoff_nonce: NONCE,
-          proposal,
-          repository: "example/site",
-        },
-      },
-      origin: { value: "https://attacker.example" },
-      source: { value: opener },
-    });
-    dom.window.dispatchEvent(wrong);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    const message = new dom.window.Event("message");
-    Object.defineProperties(message, {
-      data: {
-        value: {
-          format: "orinoco-lite-shacl-proposal-message-v1",
-          handoff_nonce: NONCE,
-          proposal,
-          repository: "example/site",
-        },
-      },
-      origin: { value: CLIENT_ORIGIN },
-      source: { value: opener },
-    });
-    dom.window.dispatchEvent(message);
-
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
-    expect(opener.postMessage).toHaveBeenCalledWith(
-      {
-        format: "orinoco-lite-shacl-proposal-started-v1",
-        handoff_nonce: NONCE,
-        repository: "example/site",
-      },
-      CLIENT_ORIGIN,
-    );
-    await vi.waitFor(() =>
-      expect(opener.postMessage).toHaveBeenCalledWith(
-        {
-          error: null,
-          error_code: null,
-          error_status: null,
-          format: "orinoco-lite-shacl-proposal-result-v1",
-          handoff_nonce: NONCE,
-          repository: "example/site",
-          result,
-          retry_safe: false,
-        },
-        CLIENT_ORIGIN,
-      ),
-    );
-    dom.window.close();
-  });
-
-  it("forwards safe API error details through the SHACL popup", async () => {
-    const response = await transport(context(new Request(shaclUrl())));
-    const opener = { closed: false, postMessage: vi.fn() };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/shacl/access")
-        return Response.json({ ready: true });
-      if (String(input) === "/api/session") {
-        return Response.json({
-          authenticated: true,
-          csrf_token: "csrf-token",
-          login: "octocat",
-          review_grant: null,
-          shacl_grant: {
-            editor_origin: CLIENT_ORIGIN,
-            expected_head_sha: null,
-            handoff_nonce: NONCE,
-            pull_request: null,
-            repository: "example/site",
-          },
-        });
-      }
-      return Response.json(
-        {
-          error: {
-            code: "github_forbidden",
-            message: "GitHub denied the write.",
-          },
-        },
-        { status: 403 },
+    const send = (data: unknown, origin = CLIENT_ORIGIN, source = opener) =>
+      dom.window.dispatchEvent(
+        new dom.window.MessageEvent("message", {
+          data,
+          origin,
+          source: source as unknown as Window,
+        }),
       );
-    });
-    const dom = new JSDOM(await response.text(), {
-      beforeParse(window: Window & typeof globalThis) {
-        Object.defineProperty(window, "opener", { value: opener });
-        window.fetch = fetchMock as unknown as typeof window.fetch;
-      },
-      runScripts: "dangerously",
-      url: shaclUrl(),
-    });
-
-    await vi.waitFor(() =>
-      expect(opener.postMessage).toHaveBeenCalledWith(
-        {
-          format: "orinoco-lite-shacl-proposal-ready-v1",
-          handoff_nonce: NONCE,
-          repository: "example/site",
-        },
-        CLIENT_ORIGIN,
-      ),
-    );
-    const message = new dom.window.Event("message");
-    Object.defineProperties(message, {
-      data: {
-        value: {
-          format: "orinoco-lite-shacl-proposal-message-v1",
-          handoff_nonce: NONCE,
-          proposal: {
-            bundle: {
-              format: "orinoco-shacl-review-bundle",
-              records: [],
-              source_commit: "a".repeat(40),
-              version: 2,
-            },
-            format: "orinoco-lite-shacl-proposal-v1",
-            repository: "example/site",
-            target: { kind: "standalone" },
-          },
-          repository: "example/site",
-        },
-      },
-      origin: { value: CLIENT_ORIGIN },
-      source: { value: opener },
-    });
-    dom.window.dispatchEvent(message);
-
-    await vi.waitFor(() =>
-      expect(opener.postMessage).toHaveBeenCalledWith(
-        {
-          error: "GitHub denied the write.",
-          error_code: "github_forbidden",
-          error_status: 403,
-          format: "orinoco-lite-shacl-proposal-result-v1",
-          handoff_nonce: NONCE,
-          repository: "example/site",
-          result: null,
-          retry_safe: true,
-        },
-        CLIENT_ORIGIN,
-      ),
-    );
-    dom.window.close();
-  });
-  it.each([
-    "operation_disabled",
-    "installation_access_required",
-    "github_error",
-  ])("reports %s before accepting a bundle", async (code) => {
-    const response = await transport(context(new Request(shaclUrl())));
-    const opener = { closed: false, postMessage: vi.fn() };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/session")
-        return Response.json({
-          authenticated: true,
-          csrf_token: "csrf-token",
-          login: "curator",
-          shacl_grant: {
-            editor_origin: CLIENT_ORIGIN,
-            expected_head_sha: null,
-            handoff_nonce: NONCE,
-            pull_request: null,
-            repository: "example/site",
-          },
-        });
-      if (String(input) === "/api/shacl/access")
-        return Response.json(
-          { error: { code, message: "Specific prerequisite failed." } },
-          { status: 403 },
-        );
-      throw new Error("Must not submit a bundle after a failed check");
-    });
-    const dom = new JSDOM(await response.text(), {
-      beforeParse(window: Window & typeof globalThis) {
-        Object.defineProperty(window, "opener", { value: opener });
-        window.fetch = fetchMock as unknown as typeof window.fetch;
-      },
-      runScripts: "dangerously",
-      url: shaclUrl(),
-    });
+    send(message, "https://unrelated.example");
+    send(message, CLIENT_ORIGIN, { closed: false, postMessage: vi.fn() });
+    send({ ...message, handoff_nonce: "wrong" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    send(message);
     await vi.waitFor(() =>
       expect(opener.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          format: "orinoco-lite-transport-error-v1",
-          code,
+          id: message.id,
+          result: { credentials: { "example/site": credential } },
+          error: null,
         }),
         CLIENT_ORIGIN,
       ),
     );
-    expect(opener.postMessage).toHaveBeenCalledTimes(1);
+    send(message); // duplicate messages do not issue additional credentials
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    send({
+      ...message,
+      id: "c".repeat(32),
+      method: "authorize",
+      input: { bundle: "must stay downstream" },
+    });
+    await vi.waitFor(() =>
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "c".repeat(32),
+          error: expect.objectContaining({
+            message: "Invalid authorization request.",
+          }),
+        }),
+        CLIENT_ORIGIN,
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    send({
+      ...message,
+      id: "d".repeat(32),
+      method: "authorize",
+      input: {
+        scope_proof: "proof",
+        input_repository: "example/site",
+        input_commit: "b".repeat(40),
+      },
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    send({ ...message, id: "e".repeat(32), method: "release", input: {} });
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/auth/revoke",
+        expect.objectContaining({
+          body: JSON.stringify({ token: credential.token }),
+        }),
+      ),
+    );
+    expect(
+      fetchMock.mock.calls.every(
+        ([path]) =>
+          String(path) === "/api/session" ||
+          String(path).startsWith("/api/auth/"),
+      ),
+    ).toBe(true);
     dom.window.close();
   });
 });
