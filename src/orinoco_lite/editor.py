@@ -90,19 +90,32 @@ def record_catalog(
 ) -> dict[str, Any]:
     """Return coordinates for records editable under the projection plan."""
 
-    # Import here so projection and editor can share record loading without a
-    # module cycle. Editability is declarative, never inferred from a second
-    # filesystem category.
-    from .projection import load_contract
+    from .projection import _record_stream
+    from .projection_blocks import load_pipeline
+    from .upstream_projection import render_graph
+    from .resources import resolve_resources
+    from .www_from_model import resolve_www_from_model
 
-    contract = load_contract(workspace, www_from_model_root)
-    editable_classes = set(contract.pages) | set(contract.graph_node_classes)
-
+    presentation = www_from_model_root or resolve_www_from_model(workspace.root, resolve_resources().root)
+    load_pipeline(presentation, workspace.path("site"))
+    sources = record_sources(workspace)
+    graph = json.loads(render_graph(_record_stream([yaml.safe_load(s["content"]) for s in sources]), presentation))
+    editable_pids = {node["id"] for node in graph["nodes"]}
+    # Ask the same upstream producer which schema classes it exposes, including
+    # classes with no stored records yet. Do not copy its class-selection policy.
+    from linkml_runtime import SchemaView
+    schema = resolve_resources().root / "schema/demo-research-information/unreleased.yaml"
+    view = SchemaView(str(schema))
+    candidates = [
+        {"pid": str(view.get_uri(name, expand=False)),
+         "schema_type": str(view.get_uri(name, expand=False))}
+        for name in view.all_classes()
+    ]
+    class_graph = json.loads(render_graph(_record_stream(candidates), presentation))
+    editable_classes = {node["id"] for node in class_graph["nodes"]}
     records = [
         {key: source[key] for key in ("path", "pid", "schema_type", "sha256")}
-        for source in record_sources(workspace)
-        if source["pid"] == contract.homepage_pid
-        or source["schema_type"] in editable_classes
+        for source in sources if source["pid"] in editable_pids
     ]
     return {
         "format": CATALOG_FORMAT,
@@ -281,7 +294,7 @@ def bind_editor(
     repository: str | None = None,
     service_origin: str | None = None,
 ) -> dict[str, Any]:
-    from .projection import _www_from_model_root, load_contract
+    from .projection import _www_from_model_root
 
     shell = resources_root / "editor-shell"
     if not shell.is_dir() or not (shell / "index.html").is_file():
@@ -300,14 +313,9 @@ def bind_editor(
         shutil.copyfile(source, destination / name)
 
     www_from_model_root = _www_from_model_root(workspace, resources_root)
-    contract = load_contract(workspace, www_from_model_root)
     all_sources = record_sources(workspace)
     catalog = record_catalog(workspace, www_from_model_root)
-    if contract.editor_record_scope == "editable":
-        editable_pids = {entry["pid"] for entry in catalog["records"]}
-        sources = [source for source in all_sources if source["pid"] in editable_pids]
-    else:
-        sources = all_sources
+    sources = all_sources
     json_to_rdf, _ = _converters(
         resources_root / "schema/demo-research-information/unreleased.yaml"
     )
@@ -329,7 +337,7 @@ def bind_editor(
         "catalog_format": CATALOG_FORMAT,
         "editable_records": len(catalog["records"]),
         "loaded_records": len(sources),
-        "record_scope": contract.editor_record_scope,
+        "record_scope": "all",
         "source_commit": catalog["source_commit"],
         "source_records": len(all_sources),
         "version": VERSION,

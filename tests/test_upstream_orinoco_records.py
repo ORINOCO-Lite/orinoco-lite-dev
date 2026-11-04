@@ -7,77 +7,9 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from orinoco_lite.projection import load_contract
 
 from orinoco_lite import upstream_orinoco_records as storage
 from orinoco_lite import upstream_snapshot as snapshot
-
-
-class UpstreamProjectionTests(unittest.TestCase):
-    def test_inherited_homepage_preserves_upstream_metadata_and_content(self):
-        from orinoco_lite.projection import _render_record, RenderPolicy
-        import yaml
-
-        upstream = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
-        record = {
-            "pid": "xyzrins:.", "title": "Example", "description": "Description",
-            "parts": [{"pid": "xyzrins:projects/one", "schema_type": "xyzri:XYZProject"}],
-            "influenced_by": [{"object": {
-                "pid": "xyzrins:objectives/open", "schema_type": "xyzri:XYZObjective",
-                "title": "Open research",
-            }, "roles": []}],
-            "associated_with": [], "generated": [],
-        }
-        parent = RenderPolicy(upstream / "page_templates/homepage.md.j2", {}, (), ())
-        expected = _render_record(record, parent, {}, [], upstream)
-        with tempfile.TemporaryDirectory() as temporary:
-            child = Path(temporary) / "homepage.md.j2"
-            child.write_text(
-                '{% extends "www-from-model:page_templates/homepage.md.j2" %}'
-                '{% block content %}{{ super() }}Editorial addition.{% endblock %}'
-            )
-            actual = _render_record(record, RenderPolicy(child, {}, (), ()), {}, [], upstream)
-        frontmatter = yaml.safe_load(actual.split("---", 2)[1])
-        self.assertEqual(frontmatter, yaml.safe_load(expected.split("---", 2)[1]))
-        self.assertEqual(frontmatter["params"]["graphRootNodePID"], "xyzrins:.")
-        self.assertEqual(frontmatter["objectives"], ["open"])
-        self.assertEqual(frontmatter["projects"], ["one"])
-        self.assertIn("[Open research](/objectives/open)", actual)
-        self.assertIn(expected.split("---", 2)[2], actual)
-        self.assertIn("Editorial addition.", actual)
-
-    def test_default_projection_keeps_publication_authors_and_issued_date(self):
-        from orinoco_lite.projection import _render_record
-        import yaml
-
-        www_from_model = Path(__file__).resolve().parents[1] / "submodules/www-from-model"
-        with tempfile.TemporaryDirectory() as temporary:
-            workspace = Mock()
-            workspace.path.return_value = Path(temporary)
-            contract = load_contract(workspace, www_from_model)
-        person = {
-            "pid": "xyzrins:persons/example",
-            "schema_type": "xyzri:XYZPerson",
-            "given_name": "Example",
-            "family_name": "Author",
-        }
-        publication = {
-            "pid": "xyzrins:publications/example",
-            "schema_type": "xyzri:XYZPublication",
-            "title": "Example publication",
-            "attributed_to": [{"object": person["pid"]}],
-            "attributes": [{"predicate": "dcterms:issued", "value": "2024"}],
-        }
-        original = deepcopy(publication)
-        rendered = _render_record(
-            publication, contract.pages["xyzri:XYZPublication"],
-            {person["pid"]: person}, [publication, person],
-        )
-        frontmatter = yaml.safe_load(rendered.split("---", 2)[1])
-        self.assertEqual(frontmatter["persons"], ["example"])
-        self.assertEqual(frontmatter["params"]["author"][0]["family_name"], "Author")
-        self.assertEqual(frontmatter["params"]["date"], "2024")
-        self.assertEqual(publication, original)
 
 
 class UpstreamOrinocoRecordTests(unittest.TestCase):

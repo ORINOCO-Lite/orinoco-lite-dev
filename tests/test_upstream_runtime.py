@@ -23,6 +23,7 @@ def test_packaged_subset_matches_editable_assembly_and_excludes_website(tmp_path
         'content/persons/_index.md': '---\ntitle: Persons\n---\nUpstream editorial body',
         'content/persons/somebody/_index.md': 'upstream record',
         'NOTICE': 'upstream notice',
+        '.forgejo/workflows/update-from-pool.yaml': 'selected projection workflow',
         '.git/config': 'private git state',
     }
     for name, content in files.items():
@@ -33,6 +34,7 @@ def test_packaged_subset_matches_editable_assembly_and_excludes_website(tmp_path
     with patch('orinoco_lite.annex_media.prepare_hugo_assets', return_value={}):
         stage_upstream_runtime(source, payload)
     assert (payload / 'NOTICE').read_text() == 'upstream notice'
+    assert (payload / '.forgejo/workflows/update-from-pool.yaml').read_text() == 'selected projection workflow'
     assert (payload / 'themes/congo/LICENSE').is_file()
     for excluded in ('static/graph.json', 'static/favicon.ico', 'assets/img/logo.png',
                      'assets/img/unrelated.png', 'content/persons/somebody/_index.md',

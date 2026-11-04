@@ -139,6 +139,8 @@ def stage_upstream_runtime(source: Path, destination: Path) -> None:
     copy_hugo_runtime(source, destination, media=media)
     _copy_tree(source / "page_templates", destination / "page_templates")
     _copy_file(source / "code/pool2graph.py", destination / "code/pool2graph.py")
+    workflow = Path(".forgejo/workflows/update-from-pool.yaml")
+    _copy_file(source / workflow, destination / workflow)
     # Preserve source notices, without assigning our license to upstream work.
     for root, target in ((source, destination), (source / "themes/congo", destination / "themes/congo")):
         for path in root.iterdir():

@@ -59,6 +59,23 @@ orinoco-lite build --base-url /
 orinoco-lite serve
 ```
 
+To customize generated project pages, add `site-specific/projection-templates/project.md.j2`:
+
+```jinja
+{% extends "upstream/project.md.j2" %}
+{% block content %}{{ super() }}
+
+Additional project content.
+{% endblock %}
+```
+
+A downstream template overrides the upstream template with the same filename.
+Extend `upstream/<filename>` to change selected Jinja blocks; `super()` retains the parent block's content.
+Omitted templates and blocks retain upstream behavior.
+No YAML configuration is needed.
+A `page.md.j2` override applies to all templates that inherit that shared base, including upstream templates.
+Hugo layouts remain a separate customization surface under `site-specific/layouts/`.
+
 The downstream selects its Orinoco Lite package and template versions and chooses when to update either one.
 `orinoco-lite template update` selects the latest tagged release (including release candidates) and applies a Copier update recorded through DataLad, using the selected template's package declaration by default.
 Use `--revision main` or an exact commit to select development work.
